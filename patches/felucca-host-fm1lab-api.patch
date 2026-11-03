@@ -1,7 +1,7 @@
 diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 --- a/platforms/host/felucca_host.c
 +++ b/platforms/host/felucca_host.c
-@@ -380,6 +380,64 @@ FH_API void fh_boot(void)
+@@ -380,6 +380,77 @@ FH_API void fh_boot(void)
  FH_API const void *fh_plugin_host(void) { return &PLG_HOST; }
  FH_API uint32_t fh_plugin_add(const void *d, uint32_t no) { return fh_on ? 4u : (uint32_t)plg_add((const fe_plugin_t *)d, no); }
  
@@ -11,6 +11,19 @@ diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 +FH_API uint32_t fh_fm6_api_version(void) { return 1u; }
 +FH_API uint32_t fh_fm6_track_count(void) { return NTRK; }
 +FH_API uint32_t fh_fm6_patch_size(void) { return FP_SIZE; }
++
++FH_API uint32_t fh_fm6_factory_count(void)
++{
++    return ENGINES[ENGI_FM6]->npresets;
++}
++
++FH_API uint32_t fh_fm6_factory_load(uint32_t track, uint32_t preset)
++{
++    if (!fh_on || track >= NTRK || preset >= ENGINES[ENGI_FM6]->npresets)
++        return 0u;
++    host_preset_req(&trk[track], ENGI_FM6, preset);
++    return 1u;
++}
 +
 +/* A dedicated, non-flash scratch buffer for the browser host's patch messages. */
 +static uint8_t fm1lab_patch_io[FP_SIZE];
