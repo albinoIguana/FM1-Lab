@@ -1,53 +1,29 @@
-# FM1-Lab accelerated roadmap
+# FM1-Lab roadmap
 
-## Sprint A — Foundation and playable workbench
-- [x] Responsive UI, startup and operator editor.
-- [x] Six-operator design model and patch persistence/export.
-- [x] Real-time Web Audio FM voice.
-- [x] Six oscillators, three selectable FM routing graphs, carrier summing.
-- [x] Per-operator attack, decay, sustain and release envelopes.
-- [x] Delayed feedback loops and four performance macros.
-- [x] Add zero-dependency mocked audio-graph tests and GitHub Actions CI.
-- [ ] Browser/device smoke tests and accessibility review.
-- [x] Publish static app through GitHub Pages with automatic deployment.
+## Priority 1 — Real FM-1 emulation
+- [x] Pin the upstream MIT-licensed FM-1 emulator as a recursive Git submodule.
+- [x] Build the upstream WebAssembly runtime and FM-1 SID pages in CI.
+- [x] Run upstream Rust and browser tests.
+- [x] Run the Felucca firmware smoke test and verify MIDI produces audio.
+- [x] Verify flash persistence with the upstream WASM round-trip test.
+- [x] Make the upstream FM-1 emulator the primary site at the root URL.
+- [ ] Verify playback, touch controls and firmware selection on desktop and iOS Safari.
+- [ ] Add a repeatable test matrix for selected firmware builds and saved-flash scenarios.
+- [ ] Capture audio regression references and compare output across emulator changes.
 
-## Sprint B — Emulator integration proof
-- [x] Inspect upstream WASM/UI and try-out source boundaries.
-- [x] Embed official emulator using documented `?embed=1` mode.
-- [x] Document same-origin and cross-origin constraints.
-- [x] Pin the MIT-licensed upstream emulator as a submodule and serve it on the FM1-Lab origin.
-- [x] Add documented try-out script loading and lifecycle event handling for a MIDI smoke scenario.
-- [ ] Test locally hosted emulator iframe on desktop and iOS Safari.
-- [x] Run upstream emulator smoke tests that verify firmware boot, LCD output and audible MIDI response.\n- [x] Run upstream WASM flash persistence round-trip tests.
-- [ ] If desired, propose a secure upstream host API rather than relying on private internals.
+## Priority 2 — Emulator development tools
+- [x] Add same-origin boot-time script support for MIDI/key/encoder input scenarios.
+- [x] Receive documented try-out lifecycle events with origin and iframe-source checks.
+- [ ] Build a scenario runner for firmware, script and flash-overlay combinations.
+- [ ] Explore a documented upstream host API for read-only telemetry and safe live parameter writes.
+- [ ] Add a developer panel for emulator build, firmware version, audio health and test results.
 
-## Sprint C — FM engine v1
-- [x] Modular local DSP engine in `src/fm-engine.js`.
-- [x] Six independently configurable operators.
-- [x] Three genuine audio-rate modulation topologies.
-- [x] Carrier summing, per-operator ADSR and delayed feedback.
-- [x] Brightness/body/motion/feedback macros.
-- [x] Add held-note note-off and bounded polyphonic voice stealing.
-- [ ] Normalize modulation index by algorithm and operator level.
-- [ ] Add oversampling/aliasing evaluation, audio regression tests and CPU profiling.
-- [x] Add malformed-patch guard and mocked routing/feedback tests.
+## Priority 3 — Four-patch Instrument architecture
+- [x] Prototype an Instrument as a preset containing four FM patches.
+- [x] Prototype patch editor, operator map, macros and local six-operator DSP.
+- [ ] Map the Instrument model to capabilities that the actual emulator/firmware exposes.
+- [ ] Decide whether an Instrument should be four firmware presets, four sequenced parts, or another real FM-1 concept.
+- [ ] Implement import/export only after the firmware data model and save format are understood.
 
-## Sprint D — Instrument architecture
-- [x] Define Instrument as a saved preset containing exactly four FM patches.
-- [x] Add four factory Instruments and four-patch home screen.
-- [x] Add preset selector and four patch-select controls.
-- [x] Reuse the six-operator editor for the selected patch.
-- [x] Persist Instruments independently and export the complete Instrument as JSON.
-- [x] Migrate legacy single-patch local saves into the new four-patch structure.
-- [x] Add Instrument schema and migration tests.
-- [ ] Browser/device smoke tests for preset switching, patch editing, persistence and export.
-
-## Sprint E — Firmware test console
-- [x] Add a dedicated full-interface FM-1 emulator console page.
-- [x] Embed the upstream emulator's full firmware selection, local package loading, controls, MIDI input and save/backup UI.
-- [x] Document what the console can test and the cross-origin automation limits.
-- [x] Deploy the app to GitHub Pages after approval.
-- [ ] Explore a safe same-origin scripted test runner or upstream host API for repeatable automated tests.
-
-## Later
-Held-note/polyphonic lifecycle, simultaneous patch performance, independent sequencing, key/velocity zones, patch-level automation, effects, preset import/library management and hardware compatibility matrix.
+## Experimental / deferred
+The previous FM1-Lab Web Audio engine is not the stock FM-1 engine. Keep it as an isolated prototype until its parameters can be mapped to real firmware behavior with tests.
