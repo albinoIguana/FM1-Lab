@@ -18,7 +18,7 @@
 - [x] Pin the MIT-licensed upstream emulator as a submodule and serve it on the FM1-Lab origin.
 - [x] Add documented try-out script loading and lifecycle event handling for a MIDI smoke scenario.
 - [ ] Test locally hosted emulator iframe on desktop and iOS Safari.
-- [ ] Add assertions for audio output and flash-overlay test scenarios.
+- [x] Run upstream emulator smoke tests that verify firmware boot, LCD output and audible MIDI response.\n- [x] Run upstream WASM flash persistence round-trip tests.
 - [ ] If desired, propose a secure upstream host API rather than relying on private internals.
 
 ## Sprint C — FM engine v1
