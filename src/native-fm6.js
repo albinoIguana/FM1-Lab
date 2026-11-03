@@ -80,8 +80,9 @@ export function writeNativeField(source, patch, field, operatorNumber = 1) {
       break;
     case "ratio": {
       const ratio = clamp(operator.ratio, 0.5, 61.69);
-      const coarse = ratio < 1 ? 0 : Math.floor(ratio);
-      const fine = ratio < 1 ? Math.round((ratio / 0.5 - 1) * 100) : Math.round((ratio - coarse) * 100);
+      const coarse = ratio < 1 ? 0 : Math.min(31, Math.floor(ratio));
+      const base = coarse === 0 ? 0.5 : coarse;
+      const fine = Math.round((ratio / base - 1) * 100);
       bytes[offset + 17] = 0; // ratio mode
       bytes[offset + 18] = clamp(coarse, 0, 31);
       bytes[offset + 19] = clamp(fine, 0, 99);
