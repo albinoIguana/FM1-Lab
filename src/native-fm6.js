@@ -60,6 +60,12 @@ export function writeNativeField(source, patch, field, operatorNumber = 1) {
     bytes[135] = clamp(patch.feedback, 0, 7);
     return bytes;
   }
+  if (field === "name") {
+    const name = String(patch.name || "FM PATCH").toUpperCase().replace(/[^A-Z0-9 _-]/g, " ").slice(0, 10);
+    bytes.fill(32, 145, 155);
+    for (let i = 0; i < name.length; i++) bytes[145 + i] = name.charCodeAt(i);
+    return bytes;
+  }
   const operator = patch.operators[operatorNumber - 1];
   if (!operator) throw new Error("FM6 operator must be 1–6.");
   const offset = (6 - operatorNumber) * OP_SIZE;
