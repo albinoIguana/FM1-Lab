@@ -15,7 +15,12 @@ export class FeluccaEngine {
   async ready() {
     if (this.readyPromise) return this.readyPromise;
     this.onState("STARTING FELUCCA FIRMWARE…");
-    this.readyPromise = this.start().catch(error => {
+    this.readyPromise = this.start().catch(async error => {
+      this.node?.disconnect();
+      this.node = null;
+      if (this.context) await this.context.close().catch(() => {});
+      this.context = null;
+      this.pending.clear();
       this.readyPromise = null;
       this.onState("FELUCCA ENGINE OFFLINE");
       throw error;
