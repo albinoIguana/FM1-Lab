@@ -1,11 +1,11 @@
 // Instrument model: one saved Instrument contains exactly four independent FM patches.
 const BASE_OPERATORS = [
-  { ratio: 1, level: 86, attack: 8, decay: 54, sustain: 55, release: 30, feedback: 18 },
-  { ratio: 2, level: 58, attack: 14, decay: 42, sustain: 48, release: 24, feedback: 0 },
-  { ratio: 3, level: 42, attack: 22, decay: 62, sustain: 62, release: 42, feedback: 0 },
-  { ratio: 1.5, level: 65, attack: 4, decay: 30, sustain: 35, release: 18, feedback: 0 },
-  { ratio: 0.5, level: 34, attack: 36, decay: 72, sustain: 70, release: 55, feedback: 0 },
-  { ratio: 1, level: 72, attack: 10, decay: 48, sustain: 50, release: 32, feedback: 0 }
+  { ratio: 1, level: 86, attack: 8, decay: 54, sustain: 55, release: 30, rates: [85, 58, 46, 30], levels: [99, 78, 62, 0], feedback: 18 },
+  { ratio: 2, level: 58, attack: 14, decay: 42, sustain: 48, release: 24, rates: [78, 54, 46, 32], levels: [99, 70, 56, 0], feedback: 0 },
+  { ratio: 3, level: 42, attack: 22, decay: 62, sustain: 62, release: 42, rates: [70, 48, 42, 26], levels: [99, 74, 60, 0], feedback: 0 },
+  { ratio: 1.5, level: 65, attack: 4, decay: 30, sustain: 35, release: 18, rates: [90, 62, 50, 38], levels: [99, 80, 64, 0], feedback: 0 },
+  { ratio: 0.5, level: 34, attack: 36, decay: 72, sustain: 70, release: 55, rates: [56, 38, 34, 20], levels: [99, 72, 58, 0], feedback: 0 },
+  { ratio: 1, level: 72, attack: 10, decay: 48, sustain: 50, release: 32, rates: [82, 56, 48, 28], levels: [99, 76, 60, 0], feedback: 0 }
 ];
 
 export function createDefaultPatch(name = "Glass Current", seed = 0) {
