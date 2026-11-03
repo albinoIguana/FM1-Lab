@@ -214,13 +214,13 @@ function renderEditor() {
     writeCurrentField("coarse");
     const output = coarseSelect.parentElement.querySelector("output");
     output.textContent = [1, 10, 100, 1000][operator.nativeCoarse] + " HZ";
-    $("#f-fine").previousElementSibling.textContent = "FIXED FINE · TOTAL " + (Math.pow(10, operator.nativeCoarse) * Math.pow(1.0233, operator.nativeFine)).toFixed(1) + " HZ";
+    fineInput.parentElement.querySelector("label").textContent = "FIXED FINE · TOTAL " + (Math.pow(10, operator.nativeCoarse) * Math.pow(1.0233, operator.nativeFine)).toFixed(1) + " HZ";
   };
   const fineInput = $("#f-fine");
   if (fineInput) fineInput.oninput = event => {
     operator.nativeFine = +event.target.value;
     $("#v-fine").textContent = operator.nativeFine;
-    fineInput.previousElementSibling.textContent = "FIXED FINE · TOTAL " + (Math.pow(10, operator.nativeCoarse) * Math.pow(1.0233, operator.nativeFine)).toFixed(1) + " HZ";
+    fineInput.parentElement.querySelector("label").textContent = "FIXED FINE · TOTAL " + (Math.pow(10, operator.nativeCoarse) * Math.pow(1.0233, operator.nativeFine)).toFixed(1) + " HZ";
     writeCurrentField("fine");
   };
   fields.forEach(([key]) => {
