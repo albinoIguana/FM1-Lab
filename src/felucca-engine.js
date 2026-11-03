@@ -31,7 +31,7 @@ export class FeluccaEngine {
       throw new Error("Felucca requires a 44.1 kHz audio context; this browser opened " + this.context.sampleRate + " Hz.");
     }
     await this.context.audioWorklet.addModule(new URL("./felucca-worklet.js", import.meta.url));
-    this.node = new AudioWorkletNode(this.context, "felucca", {
+    this.node = new AudioWorkletNode(this.context, "fm1lab-felucca", {
       numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2]
     });
     this.node.port.onmessage = event => this.onMessage(event.data);
