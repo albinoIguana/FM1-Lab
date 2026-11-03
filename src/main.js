@@ -178,15 +178,15 @@ function renderEditor() {
   const operator = patch.operators[patch.selected - 1];
   const topology = topologyCache.get(patch.algorithm);
   const feedbackActive = topology && topology.feedback === patch.selected;
-  const modeControl = `<div class="param"><label for="f-mode">OSCILLATOR MODE</label><output>${operator.nativeMode ? "FIXED" : "RATIO"}</output><select id="f-mode"><option value="0" ${operator.nativeMode ? "" : "selected"}>RATIO</option><option value="1" ${operator.nativeMode ? "selected" : ""}>FIXED</option></select></div>`;
+  const modeControl = `<div class="param"><label for="f-mode">OSCILLATOR MODE</label><output>${operator.nativeMode ? "FIXED" : "RATIO"}</output><select id="f-mode" ${engineReady ? "" : "disabled"}><option value="0" ${operator.nativeMode ? "" : "selected"}>RATIO</option><option value="1" ${operator.nativeMode ? "selected" : ""}>FIXED</option></select></div>`;
   const fixedHz = nativeFixedFrequency(operator.nativeCoarse, operator.nativeFine);
   const frequencyControl = operator.nativeMode
-    ? `<div class="param"><label for="f-coarse">FIXED BASE FREQUENCY</label><output>${[1, 10, 100, 1000][operator.nativeCoarse]} HZ</output><select id="f-coarse">${[1, 10, 100, 1000].map((hz, index) => `<option value="${index}" ${operator.nativeCoarse === index ? "selected" : ""}>${hz} HZ</option>`).join("")}</select></div>
-       <div class="param"><label for="f-fine">FIXED FINE · TOTAL ${fixedHz.toFixed(1)} HZ</label><output id="v-fine">${operator.nativeFine}</output><input id="f-fine" type="range" min="0" max="99" step="1" value="${operator.nativeFine}"></div>`
-    : `<div class="param"><label for="f-ratio">FREQUENCY RATIO</label><output id="v-ratio">${operator.ratio}</output><input id="f-ratio" type="range" min="0.5" max="61.69" step="0.01" value="${operator.ratio}"></div>`;
+    ? `<div class="param"><label for="f-coarse">FIXED BASE FREQUENCY</label><output>${[1, 10, 100, 1000][operator.nativeCoarse]} HZ</output><select id="f-coarse" ${engineReady ? "" : "disabled"}>${[1, 10, 100, 1000].map((hz, index) => `<option value="${index}" ${operator.nativeCoarse === index ? "selected" : ""}>${hz} HZ</option>`).join("")}</select></div>
+       <div class="param"><label for="f-fine">FIXED FINE · TOTAL ${fixedHz.toFixed(1)} HZ</label><output id="v-fine">${operator.nativeFine}</output><input id="f-fine" type="range" min="0" max="99" step="1" value="${operator.nativeFine}" ${engineReady ? "" : "disabled"}></div>`
+    : `<div class="param"><label for="f-ratio">FREQUENCY RATIO</label><output id="v-ratio">${operator.ratio}</output><input id="f-ratio" type="range" min="0.5" max="61.69" step="0.01" value="${operator.ratio}" ${engineReady ? "" : "disabled"}></div>`;
   $("#editor").innerHTML = `<div class="op-title">OPERATOR 0${patch.selected}<span>LIVE FELUCCA FM6 PARAMETERS</span></div>` + modeControl + frequencyControl +
     fields.map(([key, label, min, max, step]) => {
-      const disabled = key === "feedback" && !feedbackActive ? "disabled" : "";
+      const disabled = !engineReady || (key === "feedback" && !feedbackActive) ? "disabled" : "";
       const value = key === "feedback" ? operator.feedback
         : /^rate[1-4]$/.test(key) ? operator.rates[Number(key.slice(4)) - 1]
         : /^level[1-4]$/.test(key) ? operator.levels[Number(key.slice(5)) - 1]
@@ -265,6 +265,10 @@ function renderSpectrum() {
 
 function renderAll() {
   $("#patch-name").value = patch.name;
+  $("#patch-name").disabled = !engineReady;
+  $("#algorithm").disabled = !engineReady;
+  $("#reset").disabled = !engineReady;
+  $("#mutate").disabled = !engineReady;
   $("#algorithm").value = String(patch.algorithm || 1);
   $("#editor-instrument-name").textContent = instrument.name.toUpperCase();
   $("#patch-id").textContent = "FM PATCH 0" + (selectedPatchIndex + 1);
