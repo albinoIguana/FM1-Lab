@@ -1,36 +1,39 @@
-# Emulator capability investigation
+# FM-1 emulator integration
 
-Research snapshot: 2026-11-03. Upstream source is pinned as a Git submodule at vendor/fm1-emu (MIT license), currently commit 9de1ef053a3c4bf56f16f05b5f0de193f4608a1d.
+Research snapshot: 2026-11-03. Upstream source is pinned as a recursive Git submodule at `vendor/fm1-emu` (MIT license), commit `9de1ef053a3c4bf56f16f05b5f0de193f4608a1d`.
 
-## Integration architecture
-- The upstream FM-1 emulator is served from /FM1-Lab/vendor/fm1-emu/ on the same GitHub Pages origin as FM1-Lab.
-- The Pages deployment workflow checks out submodules so the upstream WebAssembly binary, JavaScript, firmware catalog and assets are deployed with the app.
-- The iframe uses the upstream embed-only mode for the main editor and the full page for the dedicated test console.
-- Same-origin hosting means documented try-out URL parameters can load test scripts from FM1-Lab's own scripts directory.
-- The upstream page's documented postMessage lifecycle events (loading, booting, playing, start, error) can be received by the parent after checking both origin and iframe window.
+## Primary runtime
+- The upstream `tools/build_site.sh` builds the actual emulator site into the GitHub Pages artifact root.
+- The root page is the upstream FM-1 interface itself, not an iframe or a reimplementation.
+- The emulator runs the FM-1 CPU, display, controls and audio in WebAssembly; community firmware packages run unchanged.
+- The upstream page's own firmware picker, Start button, keyboard/touch input, MIDI input, flash persistence and backup UI remain intact.
+- The experimental FM1-Lab Instrument designer is staged separately at `/designer/`.
 
 ## Scripted test surface
-- The Felucca MIDI smoke scenario loads the Felucca firmware and sends a MIDI note-on / note-off sequence on channel 1.
-- The emulator's playing event means the scripted input sequence has been delivered to the emulated machine. It is not proof that audio was audible or that the firmware passed a semantic assertion.
-- A flash URL can load documented flash-sector overlays from the same origin, enabling repeatable save-state scenarios later.
+- The root page accepts the upstream documented `?fw=felucca&script=scripts/felucca-midi-smoke.fm1` try-out URL.
+- The Felucca MIDI smoke script sends note-on and note-off events on channel 1.
+- The upstream emulator reports documented try-out lifecycle messages (`loading`, `booting`, `playing`, `start`, `error`). Parent pages validate both origin and iframe source before displaying them.
+- The upstream CI smoke script boots the firmware, checks rendered LCD pixels and verifies audible output from MIDI input.
+- The upstream persistence test verifies a flash save/restore round trip.
 
 ## Boundaries
 | Capability | Status |
 |---|---|
-| Run official upstream emulator unchanged | Supported via pinned submodule |
-| Run on same origin as FM1-Lab | Supported |
-| Load scripted MIDI / key / encoder events at boot | Supported via documented try-out API |
-| Receive documented try-out lifecycle events | Supported; origin and iframe source are validated |
-| Verify flash persistence / sector restore round trip | Implemented in upstream WASM CI test |
-| Read arbitrary internal WASM state | Not exposed as a stable host API |
-| Assert MIDI produces audio in upstream Felucca smoke test | Implemented in CI |\n| Compare audio against a stored reference across builds | Not implemented |
-| Arbitrary live parameter writes | Not documented / not implemented |
-| FM1-Lab local DSP engine | Independent implementation, not bit-accurate stock firmware |
+| Emulate FM-1 CPU, screen, controls and audio | Implemented upstream in WebAssembly |
+| Run supported community firmware unchanged | Implemented upstream |
+| Use original firmware picker, Start, keyboard/touch and MIDI controls | Available on primary root page |
+| Load scripted MIDI/key/encoder events at boot | Supported by upstream try-out API |
+| Verify Felucca boot, LCD and audible MIDI response | Implemented in CI |
+| Verify flash persistence round trip | Implemented in CI |
+| Compare recorded audio against a golden reference across builds | Not implemented |
+| Read arbitrary internal WASM state from a host page | No stable public API |
+| Arbitrary live parameter writes from FM1-Lab | No documented host API |
+| Former FM1-Lab local DSP | Independent prototype, not stock firmware emulation |
 
-## Next integration steps
-1. Verify the locally hosted emulator on desktop and iOS Safari.
-2. Add a scenario runner for firmware, script, and optional flash overlay combinations.
-3. Capture audio output for deterministic audio regression comparisons where browser support allows.
-4. If deeper live telemetry is needed, propose a small explicit host API upstream rather than scraping private WASM exports.
+## Development sequence
+1. Validate the primary root experience on desktop and iOS Safari.
+2. Add scenario orchestration and retained test artifacts.
+3. Investigate a stable host API with upstream rather than scraping internal WASM exports.
+4. Map the four-patch Instrument abstraction only to real firmware parameters and workflows.
 
-The submodule preserves upstream attribution and pins a known-good revision. Update it deliberately, review upstream changes, then run the browser and firmware smoke matrix.
+Retain upstream attribution and license. Update the pinned commit deliberately, then rerun the complete emulator build and firmware smoke matrix.
