@@ -37,9 +37,9 @@ function selectInstrument(index){
 }
 function renderHome(){
  $("#instrument-name").value=instrument.name;
- $("#preset-number").textContent=String(factoryInstruments.findIndex(item=>item.id===selectedInstrumentId)+1).padStart(2,"0");
+ const presetIndex=factoryInstruments.findIndex(item=>item.id===selectedInstrumentId);\n $("#preset-number").textContent=presetIndex<0?"USR":String(presetIndex+1).padStart(2,"0");
  $("#preset-name").textContent=instrument.name.toUpperCase();
- $("#preset-knob").value=factoryInstruments.findIndex(item=>item.id===selectedInstrumentId);
+ $("#preset-knob").value=Math.max(0,presetIndex);
  $("#patch-slots").innerHTML=instrument.patches.map((item,index)=>`
   <article class="patch-slot ${selectedPatchIndex===index?"active":""}">
    <div class="slot-top"><span>FM PATCH 0${index+1}</span><span class="slot-state">${item.topology.toUpperCase()}</span></div>
@@ -91,7 +91,7 @@ function renderSpectrum(){
 function renderAll(){
  $("#patch-name").value=patch.name;
  $("#topology").value=patch.topology;
- $("#editor-instrument-name").textContent=instrument.name.toUpperCase();
+ $("#editor-instrument-name").textContent=instrument.name.toUpperCase();\n $("#patch-id").textContent="FM PATCH 0"+(selectedPatchIndex+1);
  $("#editor-patch-label").textContent="FM PATCH 0"+(selectedPatchIndex+1);
  renderMap();renderTabs();renderEditor();renderMacros();renderSpectrum();
 }
@@ -105,7 +105,7 @@ function load(){
    if(library[saved.selectedInstrumentId])selectedInstrumentId=saved.selectedInstrumentId;
   }else{
    const legacy=JSON.parse(localStorage.getItem("fm1lab.patch.v3")||localStorage.getItem("fm1lab.patch.v2"));
-   if(legacy?.operators){const migrated=migrateLegacyPatch(legacy);library[migrated.id]=migrated;selectedInstrumentId=migrated.id;}
+   if(legacy?.operators){const migrated=migrateLegacyPatch(legacy);migrated.id=factoryInstruments[0].id;library[migrated.id]=migrated;selectedInstrumentId=migrated.id;}
   }
  }catch(error){console.warn("Ignoring invalid saved Instrument library",error)}
  instrument=library[selectedInstrumentId]||factoryInstruments[0];
