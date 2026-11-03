@@ -36,3 +36,5 @@ $("#reset").onclick=()=>{if(confirm("Reset this patch?")){stopAll();patch=fresh(
 $("#export").onclick=()=>{let blob=new Blob([JSON.stringify({format:"fm1-lab-patch",version:2,engine:"local-web-audio-fm",patch},null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=(patch.name.replace(/[^a-z0-9-_]/gi,"-")||"patch")+".json";a.click();URL.revokeObjectURL(url)};
 $("#play").onclick=()=>{try{voice(+$ ("#note").value,+$("#velocity").value,1.5)}catch(e){alert(e.message)}};
 load();renderAll();renderKeys();
+const toggleEmulator=$("#toggle-emulator"),frameWrap=$("#emulator-frame-wrap");
+toggleEmulator.onclick=()=>{frameWrap.hidden=!frameWrap.hidden;toggleEmulator.textContent=frameWrap.hidden?"LOAD OFFICIAL FM-1 EMULATOR ↓":"HIDE OFFICIAL FM-1 EMULATOR ↑";};
