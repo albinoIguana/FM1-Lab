@@ -1,21 +1,21 @@
 # FM1-Lab
 
-An independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
+Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
 
 ## Run locally
-`python3 -m http.server 8000` then open http://localhost:8000. No build step or package install is required.
+`python3 -m http.server 8000` then open http://localhost:8000. No build tool or package install is required.
 
-## Current speedrun build
-- Geometric startup and responsive instrument workbench.
-- Six-operator design/routing model with editable parameters.
-- Four macro controls, patch mutation, local persistence and JSON export.
-- Real-time local two-operator FM voice using Web Audio API (modulator frequency-modulates carrier frequency, with amplitude envelope).
-- Play-test note and on-screen keyboard.
-- Lazy-loaded iframe embedding the official emulator using its documented `?embed=1` mode.
+## Current build
+- Responsive workbench, six-operator routing map and editable operator parameters.
+- Three real DSP topologies: six-stage cascade, three paired voices, and split/converging tree.
+- Six sine oscillators per note, audio-rate frequency modulation, summed carriers, per-operator ADSR and delayed feedback loops.
+- Brightness, body, motion and feedback-edge macros.
+- Local patch persistence, mutation, JSON export and play-test keyboard.
+- Lazy-loaded official firmware emulator iframe using its documented `?embed=1` mode.
 
 ## Engine boundaries
-The local Web Audio FM voice is an independent engine, not the M-VAVE stock firmware and not a bit-accurate FM1 emulator. The current audio voice uses two operators; the six-operator editor is a broader design model. Routing diagrams are illustrative.
+The Web Audio engine is an independent six-operator FM implementation, not a bit-accurate emulation of M-VAVE stock firmware. Its three routing algorithms are FM1-Lab design choices, not claims about the stock instrument's internal algorithms. The official emulator runs separately in an iframe and remains the authority for stock-firmware behavior.
 
-The upstream emulator runs firmware in WebAssembly. Its `?embed=1` mode is supported. Its try-out `?flash=` / `?script=` files must be same-origin with the emulator page. Its parent status messages are posted to the emulator page's own origin, so they do not form a cross-origin control API for FM1-Lab. Arbitrary live parameter writes and MIDI output are not claimed.
+The upstream iframe is directly interactive. Same-origin restrictions prevent FM1-Lab from reading its internal state or using the emulator's same-origin boot-script mechanism from this different origin. Arbitrary live parameter writes and MIDI output are not claimed.
 
 See [accelerated roadmap](docs/roadmap.md) and [emulator capability notes](docs/emulator-capabilities.md).
