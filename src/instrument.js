@@ -57,7 +57,18 @@ export function normalizePatch(candidate, fallback = createDefaultPatch()) {
     feedback: Math.round(Math.max(0, Math.min(7, Number(candidate.feedback) || 0))),
     selected: Math.max(1, Math.min(6, Number(candidate.selected) || 1)),
     macros: { ...base.macros, ...(candidate.macros || {}) },
-    operators: candidate.operators.map((operator, index) => ({ ...base.operators[index], ...operator }))
+    operators: candidate.operators.map((operator, index) => {
+      const baseOperator = base.operators[index];
+      return {
+        ...baseOperator, ...operator,
+        rates: Array.isArray(operator.rates) && operator.rates.length === 4
+          ? operator.rates.map(value => Math.round(Math.max(0, Math.min(99, Number(value) || 0))))
+          : [...baseOperator.rates],
+        levels: Array.isArray(operator.levels) && operator.levels.length === 4
+          ? operator.levels.map(value => Math.round(Math.max(0, Math.min(99, Number(value) || 0))))
+          : [...baseOperator.levels]
+      };
+    })
   };
 }
 
