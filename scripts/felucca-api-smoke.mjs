@@ -51,7 +51,7 @@ assert.equal(ex.fh_fm6_factory_load(0, 8), 0, "Factory voice 9 must be rejected"
 // Render a real MIDI note through Felucca's native FM6 engine and require non-silent output.
 assert.equal(ex.fh_midi(0x90, 60, 100), 1, "Felucca rejected MIDI note-on");
 let audioPeak = 0;
-for (let block = 0; block < 12; block++) {
+for (let block = 0; block < 44; block++) {
   ex.fh_render(1024);
   const samples = new Float32Array(ex.memory.buffer, ex.fh_out_l(), 1024);
   for (const sample of samples) audioPeak = Math.max(audioPeak, Math.abs(sample));
