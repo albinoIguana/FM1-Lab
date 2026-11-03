@@ -23,7 +23,8 @@ export class FMEngine{
  noteOn({note=60,velocity=100,patch,duration=1.2}={}){
   if(!this.context||this.context.state!=="running")throw new Error("Audio engine is not ready. Press Play to initialize audio.");
   if(!patch||!Array.isArray(patch.operators)||patch.operators.length!==6)throw new Error("A six-operator patch is required.");
-  if(this.voices.size>=this.maxVoices){const oldest=this.voices.values().next().value;if(oldest)this.dispose(oldest);}\n  const ctx=this.context,now=ctx.currentTime,freq=midiHz(note),route=ROUTES[patch.topology]||ROUTES.cascade;
+  if(this.voices.size>=this.maxVoices){const oldest=this.voices.values().next().value;if(oldest)this.dispose(oldest);}
+  const ctx=this.context,now=ctx.currentTime,freq=midiHz(note),route=ROUTES[patch.topology]||ROUTES.cascade;
   const macros=patch.macros||{},brightness=clamp(macros.brightness??50,0,100)/100;
   const body=clamp(macros.body??50,0,100)/100,motion=clamp(macros.motion??30,0,100)/100;
   const edge=clamp(macros.edge??0,0,100)/100,velocityGain=Math.pow(clamp(velocity,1,127)/127,1.35);
@@ -62,21 +63,23 @@ export class FMEngine{
    fb.gain.value=Math.min(12000,selfHz*.75)*amount*(.08+edge*.7);
    envelopes[i].connect(delay);delay.connect(fb);fb.connect(oscillators[i].frequency);feedbackNodes.push(delay,fb);
   }
-  const voice={oscillators,envelopes,feedbackNodes,master,envelopeParams,stopped:false};
-  this.voices.add(voice);this.noteOff(voice,duration);
-  const longestRelease=Math.max(...envelopeParams.map(p=>p.release));
-  const cleanupAt=now+Math.max(0,duration)+longestRelease+.2;
-  voice.cleanupTimer=window.setTimeout(()=>this.dispose(voice),Math.max(50,(cleanupAt-ctx.currentTime)*1000));
+  const voice={oscillators,envelopes,feedbackNodes,master,envelopeParams,startedAt:now,stopped:false,released:false,cleanupTimer:null};
+  this.voices.add(voice);
+  if(duration!==null&&Number.isFinite(duration))this.noteOff(voice,duration);
   return voice;
  }
- noteOff(voice,duration=0){
-  if(!voice||voice.stopped)return;
-  const off=this.context.currentTime+Math.max(0,duration),t=Math.max(0,duration);
+ noteOff(voice,duration=null){
+  if(!voice||voice.stopped||voice.released)return;
+  const elapsed=duration===null?Math.max(0,this.context.currentTime-voice.startedAt):Math.max(0,duration);
+  const off=this.context.currentTime+(duration===null?0:duration);
   voice.envelopes.forEach((env,i)=>{
-   const p=voice.envelopeParams[i],level=envelopeLevelAt(t,p);
+   const p=voice.envelopeParams[i],level=envelopeLevelAt(elapsed,p);
    env.gain.cancelScheduledValues(off);env.gain.setValueAtTime(Math.max(.0001,level),off);
    env.gain.linearRampToValueAtTime(.0001,off+p.release);
   });
+  voice.released=true;
+  const longestRelease=Math.max(...voice.envelopeParams.map(p=>p.release));
+  voice.cleanupTimer=window.setTimeout(()=>this.dispose(voice),Math.max(50,(off+longestRelease+.2-this.context.currentTime)*1000));
  }
  dispose(voice){
   if(!voice||voice.stopped)return;voice.stopped=true;
