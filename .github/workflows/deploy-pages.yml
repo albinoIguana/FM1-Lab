@@ -3,6 +3,8 @@ name: Deploy FM1-Lab to GitHub Pages
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +30,36 @@ jobs:
         with:
           node-version: 22
 
+      - name: Run FM1-Lab tests
+        run: npm test
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.64
+
+      - name: Fetch pinned Felucca firmware source
+        run: |
+          git clone https://github.com/hugelton/Felucca.git vendor/felucca
+          git -C vendor/felucca checkout 743551712c36b3984392eea1dbe13a309907e17a
+          git -C vendor/felucca submodule update --init --recursive
+
+      - name: Build Felucca's browser-native firmware runtime
+        working-directory: vendor/felucca
+        run: |
+          python -m pip install --disable-pip-version-check Pillow fonttools
+          ./build.sh gen
+          ./build.sh web
+
+      - name: Run Felucca FM6 and browser-host regression suite
+        working-directory: vendor/felucca
+        run: sh tests/run_tests.sh
+
       - name: Install WebAssembly target
         run: rustup target add wasm32-unknown-unknown
 
@@ -35,7 +67,7 @@ jobs:
         run: cargo test --release -p fm1-isa -p fm1-core -p fm1-soc -p fm1-web
         working-directory: vendor/fm1-emu
 
-      - name: Run upstream browser-code tests
+      - name: Run upstream emulator browser-code tests
         run: node --test web/*.test.mjs
         working-directory: vendor/fm1-emu
 
@@ -48,9 +80,12 @@ jobs:
       - name: Verify emulator flash persistence round trip
         run: node vendor/fm1-emu/web/persistence.wasm.mjs _site
 
-      - name: Stage the experimental Instrument designer and test console
+      - name: Stage the Felucca runtime, designer and test console
         run: |
-          mkdir -p _site/designer _site/scripts
+          mkdir -p _site/felucca _site/designer _site/scripts
+          cp -R vendor/felucca/build/web/. _site/felucca/
+          cp vendor/felucca/LICENSE vendor/felucca/LICENSING.md _site/felucca/
+          cp -R vendor/felucca/LICENSES _site/felucca/
           cp index.html _site/designer/index.html
           cp -R src _site/designer/
           cp testing.html _site/testing.html
@@ -67,6 +102,7 @@ jobs:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

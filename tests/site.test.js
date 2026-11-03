@@ -7,7 +7,7 @@ import { dirname, resolve } from "node:path";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = path => readFile(resolve(root, path), "utf8");
 
-test("designer page references its local assets and root emulator", async () => {
+test("designer page references its local assets and the real runtime pages", async () => {
   const html = await read("index.html");
   const stylesheet = html.match(/href="\.\/([^"]+\.css)"/)?.[1];
   const module = html.match(/src="\.\/([^"]+\.js)"/)?.[1];
@@ -16,18 +16,27 @@ test("designer page references its local assets and root emulator", async () => 
   await access(resolve(root, stylesheet));
   await access(resolve(root, module));
   assert.match(html, /href="\.\.\/testing\.html"/);
+  assert.match(html, /href="\.\.\/felucca\/"/);
   assert.match(html, /src="\.\.\/\?embed=1"/);
 });
 
-test("deployment makes the actual upstream emulator the primary site", async () => {
+test("deployment builds both the generic emulator and the Felucca host runtime", async () => {
   const workflow = await read(".github/workflows/deploy-pages.yml");
   const injector = await read("scripts/inject-lab-link.mjs");
   assert.match(workflow, /build_site\.sh _site/);
   assert.match(workflow, /smoke\.mjs _site/);
   assert.match(workflow, /persistence\.wasm\.mjs _site/);
+  assert.match(workflow, /github\.com\/hugelton\/Felucca/);
+  assert.match(workflow, /checkout [0-9a-f]{40}/);
+  assert.match(workflow, /setup-emsdk/);
+  assert.match(workflow, /\.\/build\.sh gen/);
+  assert.match(workflow, /\.\/build\.sh web/);
+  assert.match(workflow, /tests\/run_tests\.sh/);
+  assert.match(workflow, /_site\/felucca/);
   assert.match(workflow, /cp index\.html _site\/designer\/index\.html/);
   assert.match(workflow, /inject-lab-link\.mjs _site\/index\.html/);
   assert.match(workflow, /cp \.nojekyll _site\//);
+  assert.match(injector, /Felucca runtime/);
   assert.match(injector, /Instrument designer/);
   assert.match(injector, /fm1-emu/);
 });
