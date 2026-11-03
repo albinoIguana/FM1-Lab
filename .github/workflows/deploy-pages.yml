@@ -56,6 +56,10 @@ jobs:
           ./build.sh gen
           ./build.sh web
 
+      - name: Run Felucca FM6 and browser-host regression suite
+        working-directory: vendor/felucca
+        run: sh tests/run_tests.sh
+
       - name: Install WebAssembly target
         run: rustup target add wasm32-unknown-unknown
 
