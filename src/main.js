@@ -120,8 +120,23 @@ async function playNote(note,velocity=100,duration=1.15){
 function renderKeys(){
  const notes=[60,62,64,65,67,69,71,72,74,76,77,79],black=[1,3,6,8,10];
  $("#keyboard").innerHTML=notes.map((note,index)=>`<button class="key ${black.includes(index)?"black":""}" data-note="${note}" aria-label="Play MIDI note ${note}">${["C","D","E","F","G","A","B","C","D","E","F","G"][index]}</button>`).join("");
- $("#keyboard").querySelectorAll("button").forEach(button=>button.addEventListener("pointerdown",event=>{event.preventDefault();playNote(+button.dataset.note,+$("#velocity").value,.75)}));
+ $("#keyboard").querySelectorAll("button").forEach(button=>{
+  const note=+button.dataset.note;
+  button.addEventListener("pointerdown",event=>{event.preventDefault();button.setPointerCapture?.(event.pointerId);startHeldNote(note,+$("#velocity").value)});
+  button.addEventListener("pointerup",()=>stopHeldNote(note));
+  button.addEventListener("pointercancel",()=>stopHeldNote(note));
+  button.addEventListener("lostpointercapture",()=>stopHeldNote(note));
+  button.addEventListener("keydown",event=>{if((event.key===" "||event.key==="Enter")&&!event.repeat){event.preventDefault();startHeldNote(note,+$("#velocity").value)}});
+  button.addEventListener("keyup",event=>{if(event.key===" "||event.key==="Enter"){event.preventDefault();stopHeldNote(note)}});
+ });
 }
+async function startHeldNote(note,velocity=100){
+ try{await engine.ready();const voice=engine.noteOn({note,velocity,patch,duration:null});heldNotes.set(note,voice)}
+ catch(error){console.error(error);alert(error.message)}
+}
+function stopHeldNote(note){const voice=heldNotes.get(note);if(voice){engine.noteOff(voice);heldNotes.delete(note)}}
+function stopAllHeldNotes(){for(const note of [...heldNotes.keys()])stopHeldNote(note)}
+window.addEventListener("blur",stopAllHeldNotes);
 $("#enter").onclick=()=>{$("#boot").remove();$("#app").hidden=false};
 $("#preset-knob").oninput=event=>selectInstrument(+event.target.value);
 $("#instrument-name").onchange=event=>{instrument.name=event.target.value.trim().slice(0,32)||"Untitled Instrument";persist();renderHome();renderAll()};
