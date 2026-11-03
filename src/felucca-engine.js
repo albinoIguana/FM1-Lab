@@ -32,6 +32,7 @@ export class FeluccaEngine {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) throw new Error("This browser does not support Web Audio.");
     this.context = new AudioContextClass({ sampleRate: 44100, latencyHint: "interactive" });
+    const resumeAudio = this.context.resume();
     if (this.context.sampleRate !== 44100) {
       throw new Error("Felucca requires a 44.1 kHz audio context; this browser opened " + this.context.sampleRate + " Hz.");
     }
@@ -52,7 +53,7 @@ export class FeluccaEngine {
     if (this.api.fm6Api !== 1 || this.api.tracks !== 4 || this.api.patchSize !== 155 || this.api.factoryCount < 8) {
       throw new Error("Unexpected Felucca FM6 bridge API.");
     }
-    await this.context.resume();
+    await resumeAudio;
     this.onState("FELUCCA FM6 ENGINE ACTIVE · 4 PARTS");
     return this;
   }
