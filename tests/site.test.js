@@ -118,6 +118,6 @@ test("Pages build verifies real browser audio and product startup in Chromium", 
   assert.match(browserTest, /chromium\.launch/);
   assert.match(browserTest, /run-native-smoke/);
   assert.match(browserTest, /LIVE AUDIO RENDER/);
-  assert.match(browserTest, /4 \\/ 4 NATIVE VOICES LOADED/);
+  assert.ok(browserTest.includes("4 / 4 NATIVE VOICES LOADED"));
   assert.match(browserTest, /\.edit-patch/);
 });
