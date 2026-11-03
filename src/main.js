@@ -177,7 +177,10 @@ function renderEditor() {
   $("#editor").innerHTML = `<div class="op-title">OPERATOR 0${patch.selected}<span>LIVE FELUCCA FM6 PARAMETERS</span></div>` +
     fields.map(([key, label, min, max, step]) => {
       const disabled = key === "feedback" && !feedbackActive ? "disabled" : "";
-      const value = key === "feedback" ? operator.feedback : operator[key];
+      const value = key === "feedback" ? operator.feedback
+        : /^rate[1-4]$/.test(key) ? operator.rates[Number(key.slice(4)) - 1]
+        : /^level[1-4]$/.test(key) ? operator.levels[Number(key.slice(5)) - 1]
+        : operator[key];
       return `<div class="param"><label for="f-${key}">${label}</label><output id="v-${key}">${value}</output><input id="f-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" ${disabled}></div>`;
     }).join("");
   fields.forEach(([key]) => {
