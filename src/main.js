@@ -135,7 +135,6 @@ function selectOp(number) {
 }
 
 const fields = [
-  ["ratio", "FREQUENCY RATIO", 0.5, 16, 0.01],
   ["level", "OUTPUT LEVEL", 0, 99, 1],
   ["rate1", "STAGE 1 RATE · ATTACK", 0, 99, 1],
   ["level1", "STAGE 1 LEVEL", 0, 99, 1],
@@ -174,7 +173,12 @@ function renderEditor() {
   const operator = patch.operators[patch.selected - 1];
   const topology = topologyCache.get(patch.algorithm);
   const feedbackActive = topology && topology.feedback === patch.selected;
-  $("#editor").innerHTML = `<div class="op-title">OPERATOR 0${patch.selected}<span>LIVE FELUCCA FM6 PARAMETERS</span></div>` +
+  const modeControl = `<div class="param"><label for="f-mode">OSCILLATOR MODE</label><output>${operator.nativeMode ? "FIXED" : "RATIO"}</output><select id="f-mode"><option value="0" ${operator.nativeMode ? "" : "selected"}>RATIO</option><option value="1" ${operator.nativeMode ? "selected" : ""}>FIXED</option></select></div>`;
+  const frequencyControl = operator.nativeMode
+    ? `<div class="param"><label for="f-coarse">FIXED BASE FREQUENCY</label><output>${[1, 10, 100, 1000][operator.nativeCoarse]} HZ</output><select id="f-coarse">${[1, 10, 100, 1000].map((hz, index) => `<option value="${index}" ${operator.nativeCoarse === index ? "selected" : ""}>${hz} HZ</option>`).join("")}</select></div>
+       <div class="param"><label for="f-fine">FIXED FINE</label><output id="v-fine">${operator.nativeFine}</output><input id="f-fine" type="range" min="0" max="99" step="1" value="${operator.nativeFine}"></div>`
+    : `<div class="param"><label for="f-ratio">FREQUENCY RATIO</label><output id="v-ratio">${operator.ratio}</output><input id="f-ratio" type="range" min="0.5" max="61.69" step="0.01" value="${operator.ratio}"></div>`;
+  $("#editor").innerHTML = `<div class="op-title">OPERATOR 0${patch.selected}<span>LIVE FELUCCA FM6 PARAMETERS</span></div>` + modeControl + frequencyControl +
     fields.map(([key, label, min, max, step]) => {
       const disabled = key === "feedback" && !feedbackActive ? "disabled" : "";
       const value = key === "feedback" ? operator.feedback
@@ -183,6 +187,40 @@ function renderEditor() {
         : operator[key];
       return `<div class="param"><label for="f-${key}">${label}</label><output id="v-${key}">${value}</output><input id="f-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" ${disabled}></div>`;
     }).join("");
+  const modeSelect = $("#f-mode");
+  modeSelect.onchange = async event => {
+    operator.nativeMode = +event.target.value;
+    if (operator.nativeMode === 1) operator.nativeCoarse = Math.min(3, operator.nativeCoarse);
+    else operator.ratio = Number(((operator.nativeCoarse === 0 ? 0.5 : operator.nativeCoarse) * (1 + operator.nativeFine / 100)).toFixed(2));
+    await writeCurrentField("mode");
+    if (operator.nativeMode === 1) await writeCurrentField("coarse");
+    renderEditor();
+  };
+  const ratioInput = $("#f-ratio");
+  if (ratioInput) ratioInput.oninput = event => {
+    operator.ratio = +event.target.value;
+    operator.nativeMode = 0;
+    operator.nativeCoarse = operator.ratio < 1 ? 0 : Math.floor(operator.ratio);
+    operator.nativeFine = operator.ratio < 1
+      ? Math.round((operator.ratio / 0.5 - 1) * 100)
+      : Math.round((operator.ratio - operator.nativeCoarse) * 100);
+    $("#v-ratio").textContent = operator.ratio;
+    writeCurrentField("ratio");
+    renderSpectrum();
+  };
+  const coarseSelect = $("#f-coarse");
+  if (coarseSelect) coarseSelect.onchange = event => {
+    operator.nativeCoarse = +event.target.value;
+    writeCurrentField("coarse");
+    const output = coarseSelect.parentElement.querySelector("output");
+    output.textContent = [1, 10, 100, 1000][operator.nativeCoarse] + " HZ";
+  };
+  const fineInput = $("#f-fine");
+  if (fineInput) fineInput.oninput = event => {
+    operator.nativeFine = +event.target.value;
+    $("#v-fine").textContent = operator.nativeFine;
+    writeCurrentField("fine");
+  };
   fields.forEach(([key]) => {
     const input = $("#f-" + key);
     if (!input || input.disabled) return;
@@ -332,7 +370,14 @@ async function writeWholePatch() {
   bytes = writeNativeField(bytes, patch, "feedback");
   bytes = writeNativeField(bytes, patch, "name");
   for (let operator = 1; operator <= 6; operator++) {
-    for (const key of ["ratio", "level", "rate1", "level1", "rate2", "level2", "rate3", "level3", "rate4", "level4"]) {
+    bytes = writeNativeField(bytes, patch, "mode", operator);
+    if (patch.operators[operator - 1].nativeMode === 1) {
+      bytes = writeNativeField(bytes, patch, "coarse", operator);
+      bytes = writeNativeField(bytes, patch, "fine", operator);
+    } else {
+      bytes = writeNativeField(bytes, patch, "ratio", operator);
+    }
+    for (const key of ["level", "rate1", "level1", "rate2", "level2", "rate3", "level3", "rate4", "level4"]) {
       bytes = writeNativeField(bytes, patch, key, operator);
     }
   }
