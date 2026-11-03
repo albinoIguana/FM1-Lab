@@ -5,6 +5,8 @@ class FM1LabFeluccaProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.ex = null;
+    this.busyMilliseconds = 0;
+    this.renderedFrames = 0;
     this.port.onmessage = event => this.onMessage(event.data);
   }
 
@@ -99,6 +101,7 @@ class FM1LabFeluccaProcessor extends AudioWorkletProcessor {
     }
 
     // AudioWorklet quantum sizes vary by browser; Felucca accepts up to 1024 frames per render call.
+    const started = globalThis.performance.now();
     let offset = 0;
     while (offset < left.length) {
       const count = Math.min(1024, left.length - offset);
@@ -107,6 +110,14 @@ class FM1LabFeluccaProcessor extends AudioWorkletProcessor {
       left.set(new Float32Array(memory, ex.fh_out_l(), count), offset);
       if (right) right.set(new Float32Array(memory, ex.fh_out_r(), count), offset);
       offset += count;
+    }
+    this.busyMilliseconds += globalThis.performance.now() - started;
+    this.renderedFrames += left.length;
+    if (this.renderedFrames >= 44100) {
+      const load = this.busyMilliseconds / (this.renderedFrames / 44.1);
+      this.port.postMessage({ type: "load", load });
+      this.busyMilliseconds = 0;
+      this.renderedFrames = 0;
     }
     return true;
   }
