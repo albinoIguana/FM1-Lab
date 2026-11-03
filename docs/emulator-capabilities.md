@@ -45,7 +45,8 @@ The first integration build publishes the upstream Felucca browser UI at `/feluc
 | Felucca host control/audio/screen/LED/flash API | Exported upstream |
 | Custom FM1-Lab UI controlling Felucca runtime | Not implemented yet |
 | Four-patch Instrument mapped to four Felucca tracks | Proposed; needs tests |
-| Algorithm-aware UI and role-based macros | Design requirement; not implemented |
+| FM6 32-algorithm topology graph and operator/envelope pages | Implemented in Felucca firmware; custom UI integration pending |
+| Additional role-specific four-knob macros | Design requirement; not implemented in FM1-Lab |
 | Clipper-style effect page workflow | Design requirement; not implemented |
 | Old local six-operator Web Audio engine | Prototype only; not the target engine |
 
