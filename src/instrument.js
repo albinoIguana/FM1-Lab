@@ -18,7 +18,7 @@ export function createDefaultPatch(name = "Glass Current", seed = 0) {
     feedback: i === 0 ? Math.max(0, Math.min(80, op.feedback + seed * 4)) : op.feedback
   }));
   return {
-    name, topology: topologies[seed % topologies.length], selected: 1,
+    name, topology: topologies[seed % topologies.length], algorithm: 1 + ((seed * 3) % 32), feedback: 0, selected: 1,
     macros: {
       brightness: Math.max(0, Math.min(100, 62 + seed * 5)),
       body: Math.max(0, Math.min(100, 48 + seed * 3)),
@@ -30,10 +30,8 @@ export function createDefaultPatch(name = "Glass Current", seed = 0) {
 }
 
 const FACTORY_DEFINITIONS = [
-  { id: "glass-current", name: "Glass Current", patches: ["Glass Lead", "Soft Voltage", "Silver Pluck", "Air Choir"] },
-  { id: "neon-orchard", name: "Neon Orchard", patches: ["Neon Bass", "Prism Keys", "Pulse Bloom", "Night Bell"] },
-  { id: "iron-bloom", name: "Iron Bloom", patches: ["Iron Motion", "Brass Circuit", "Low Orbit", "Chrome Dust"] },
-  { id: "velvet-machine", name: "Velvet Machine", patches: ["Velvet Pad", "FM Mallet", "Deep Signal", "Slow Halo"] }
+  { id: "glass-current", name: "Glass Current", factorySlots: [0, 1, 2, 3], patches: ["Factory Voice 01", "Factory Voice 02", "Factory Voice 03", "Factory Voice 04"] },
+  { id: "neon-orchard", name: "Neon Orchard", factorySlots: [4, 5, 6, 7], patches: ["Factory Voice 05", "Factory Voice 06", "Factory Voice 07", "Factory Voice 08"] }
 ];
 
 export function createFactoryInstruments() {
@@ -42,6 +40,7 @@ export function createFactoryInstruments() {
     version: 1,
     id: definition.id,
     name: definition.name,
+    factorySlots: [...definition.factorySlots],
     patches: definition.patches.map((name, patchIndex) => createDefaultPatch(name, index + patchIndex))
   }));
 }
@@ -54,7 +53,9 @@ export function normalizePatch(candidate, fallback = createDefaultPatch()) {
   const topology = ["cascade", "pairs", "split"].includes(candidate.topology) ? candidate.topology : "cascade";
   return {
     ...base, ...candidate, name: String(candidate.name || fallback.name || base.name).slice(0, 32),
-    topology, selected: Math.max(1, Math.min(6, Number(candidate.selected) || 1)),
+    topology, algorithm: Math.max(1, Math.min(32, Number(candidate.algorithm) || 1)),
+    feedback: Math.max(0, Math.min(7, Number(candidate.feedback) || 0)),
+    selected: Math.max(1, Math.min(6, Number(candidate.selected) || 1)),
     macros: { ...base.macros, ...(candidate.macros || {}) },
     operators: candidate.operators.map((operator, index) => ({ ...base.operators[index], ...operator }))
   };
@@ -69,6 +70,7 @@ export function normalizeInstrument(candidate, fallbackId = "custom-instrument")
     format: "fm1-lab-instrument", version: 1,
     id: String(candidate.id || fallbackId),
     name: String(candidate.name || "Untitled Instrument").slice(0, 32),
+    factorySlots: Array.isArray(candidate.factorySlots) && candidate.factorySlots.length === 4 ? candidate.factorySlots.map(value => Math.max(0, Math.min(7, Number(value) || 0))) : null,
     patches: candidate.patches.map((patch, index) => normalizePatch(patch, fallback.patches[index]))
   };
 }
