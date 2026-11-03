@@ -71,3 +71,23 @@ test("rejects malformed patches instead of creating a partial voice",async()=>{
   const engine=new FMEngine();await engine.ready();
   assert.throws(()=>engine.noteOn({patch:{topology:"cascade",operators:[]}}),/six-operator patch/);
 });
+
+test("held notes sustain until note-off, then release",async()=>{
+  const engine=new FMEngine();await engine.ready();
+  const voice=engine.noteOn({patch:makePatch("cascade"),duration:null});
+  assert.equal(voice.released,false);
+  engine.noteOff(voice);
+  assert.equal(voice.released,true);
+  assert.ok(voice.cleanupTimer);
+  engine.dispose(voice);
+});
+
+test("voice limit steals the oldest active voice",async()=>{
+  const engine=new FMEngine({maxVoices:2});await engine.ready();
+  const first=engine.noteOn({patch:makePatch("cascade"),duration:null});
+  const second=engine.noteOn({patch:makePatch("cascade"),duration:null});
+  const third=engine.noteOn({patch:makePatch("cascade"),duration:null});
+  assert.equal(first.stopped,true);
+  assert.equal(engine.voices.size,2);
+  engine.dispose(second);engine.dispose(third);
+});
