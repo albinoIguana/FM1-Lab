@@ -147,10 +147,11 @@ const fields = [
   ["feedback", "ALGORITHM FEEDBACK", 0, 7, 1]
 ];
 
-async function writeCurrentField(key, operatorNumber = patch.selected) {
+async function writeCurrentFields(keys, operatorNumber = patch.selected) {
   if (!engineReady || !Array.isArray(patch.nativePatch)) return;
   try {
-    const bytes = writeNativeField(Uint8Array.from(patch.nativePatch), patch, key, operatorNumber);
+    let bytes = Uint8Array.from(patch.nativePatch);
+    for (const key of keys) bytes = writeNativeField(bytes, patch, key, operatorNumber);
     await engine.writePatch(selectedPatchIndex, bytes);
     patch.nativePatch = Array.from(bytes);
     persist();
@@ -158,6 +159,10 @@ async function writeCurrentField(key, operatorNumber = patch.selected) {
     console.error("FM6 patch write failed", error);
     $("#engine-status").textContent = "FM6 PATCH WRITE ERROR";
   }
+}
+
+async function writeCurrentField(key, operatorNumber = patch.selected) {
+  return writeCurrentFields([key], operatorNumber);
 }
 
 function renderTabs() {
@@ -193,9 +198,7 @@ function renderEditor() {
     operator.nativeMode = +event.target.value;
     if (operator.nativeMode === 1) operator.nativeCoarse = Math.min(3, operator.nativeCoarse);
     else operator.ratio = Number(((operator.nativeCoarse === 0 ? 0.5 : operator.nativeCoarse) * (1 + operator.nativeFine / 100)).toFixed(2));
-    await writeCurrentField("mode");
-    await writeCurrentField("coarse");
-    await writeCurrentField("fine");
+    await writeCurrentFields(["mode", "coarse", "fine"]);
     renderEditor();
   };
   const ratioInput = $("#f-ratio");
