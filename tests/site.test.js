@@ -31,6 +31,7 @@ test("deployment builds both the generic emulator and the Felucca host runtime",
   assert.match(workflow, /setup-emsdk/);
   assert.match(workflow, /\.\/build\.sh gen/);
   assert.match(workflow, /\.\/build\.sh web/);
+  assert.match(workflow, /tests\/run_tests\.sh/);
   assert.match(workflow, /_site\/felucca/);
   assert.match(workflow, /cp index\.html _site\/designer\/index\.html/);
   assert.match(workflow, /inject-lab-link\.mjs _site\/index\.html/);
