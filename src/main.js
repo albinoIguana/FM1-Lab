@@ -426,7 +426,7 @@ $("#instrument-name").onchange = event => {
 };
 $("#home-button").onclick = showHome;
 $("#patch-name").onchange = event => {
-  patch.name = event.target.value.trim().slice(0, 32) || "FM Patch";
+  patch.name = event.target.value.trim().toUpperCase().slice(0, 10) || "FM PATCH";
   writeCurrentField("name");
   renderHome();
 };
