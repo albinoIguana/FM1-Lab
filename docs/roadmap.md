@@ -27,10 +27,16 @@
 - [ ] Normalize modulation index by algorithm and operator level.
 - [ ] Add oversampling/aliasing evaluation, audio regression tests and CPU profiling.
 - [x] Add malformed-patch guard and mocked routing/feedback tests.
-- [ ] Add canonical patch schema validation and migration tests.
 
-## Combined sprint exit criteria
-A stable standalone workbench that produces six-operator FM sound, exports patches, and embeds the official emulator without misrepresenting integration capabilities. Code syntax and mocked graph construction can be checked in CI; real browser/audio testing remains required.
+## Sprint D — Instrument architecture
+- [x] Define Instrument as a saved preset containing exactly four FM patches.
+- [x] Add four factory Instruments and four-patch home screen.
+- [x] Add preset selector and four patch-select controls.
+- [x] Reuse the six-operator editor for the selected patch.
+- [x] Persist Instruments independently and export the complete Instrument as JSON.
+- [x] Migrate legacy single-patch local saves into the new four-patch structure.
+- [x] Add Instrument schema and migration tests.
+- [ ] Browser/device smoke tests for preset switching, patch editing, persistence and export.
 
 ## Later
-Algorithm-aware macro mapping, additional algorithms, four-layer hybrid architecture, sequencer/arpeggiator, automation, effects, presets and hardware compatibility matrix.
+Held-note/polyphonic lifecycle, simultaneous patch performance, independent sequencing, key/velocity zones, patch-level automation, effects, preset import/library management and hardware compatibility matrix.
