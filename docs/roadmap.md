@@ -14,8 +14,9 @@
 - [x] Preserve the accepted FM1-Lab boot animation.
 - [ ] Replace the generic dashboard feel with a hardware-oriented FM-1 control surface and screen hierarchy.
 - [ ] Build a page/parameter navigation model around Felucca's real controls and parameter descriptions.
-- [ ] Implement the Clipper-inspired FX workflow: select, page, tweak, hear immediately; clear bypass.
-- [ ] Add algorithm-aware FM topology visualization and role-specific macro controls, with advanced operator editing available.
+- [ ] Adapt Felucca's existing FX page and quick layer to the Clipper-inspired workflow: select, page, tweak, hear immediately; clear bypass.
+- [x] Use Felucca's existing 32-algorithm FM6 topology graph, carrier/modulator/feedback roles and operator/envelope edit pages as the baseline.
+- [ ] Extend role-specific macro controls in the FM1-Lab layer while retaining Felucca's tested operator editor.
 - [ ] Add a bridge from the custom front end to the Felucca host runtime; use its exported host API rather than a separate Web Audio synth.
 
 ## Priority 3 — Four-patch Instrument
