@@ -45,7 +45,9 @@ function renderHome() {
   const presetIndex = factoryInstruments.findIndex(item => item.id === selectedInstrumentId);
   $("#preset-number").textContent = presetIndex < 0 ? "USR" : String(presetIndex + 1).padStart(2, "0");
   $("#preset-name").textContent = instrument.name.toUpperCase();
+  $("#preset-knob").max = String(factoryInstruments.length - 1);
   $("#preset-knob").value = Math.max(0, presetIndex);
+  $("#preset-range-labels").innerHTML = factoryInstruments.map((item, index) => `<span>${String(index + 1).padStart(2, "0")} ${escapeHtml(item.name.toUpperCase().slice(0, 12))}</span>`).join("");
   $("#patch-slots").innerHTML = instrument.patches.map((item, index) => `
     <article class="patch-slot ${selectedPatchIndex === index ? "active" : ""}">
       <div class="slot-top"><span>FM PATCH 0${index + 1}</span><span class="slot-state">ALG ${String(item.algorithm || 1).padStart(2, "0")}</span></div>
@@ -557,6 +559,38 @@ $("#reset").onclick = async () => {
   } catch (error) {
     console.error(error);
     alert(error.message);
+  }
+};
+$("#import").onclick = () => $("#import-file").click();
+$("#import-file").onchange = async event => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  try {
+    const parsed = JSON.parse(await file.text());
+    const imported = normalizeInstrument(parsed);
+    const baseId = (imported.id || imported.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "imported-instrument").slice(0, 48);
+    let id = baseId;
+    let suffix = 2;
+    while (library[id] || factoryInstruments.some(item => item.id === id)) id = baseId + "-" + suffix++;
+    imported.id = id;
+    imported.name = imported.name || "Imported Instrument";
+    factoryInstruments.push(imported);
+    library[id] = imported;
+    selectedInstrumentId = id;
+    instrument = imported;
+    setActivePatch(0);
+    persist();
+    renderHome();
+    renderAll();
+    if (engineReady) {
+      $("#native-status").textContent = "LOADING IMPORTED INSTRUMENT…";
+      await activateInstrument();
+    }
+    $("#engine-status").textContent = engineReady ? "FELUCCA FM6 ENGINE ACTIVE" : "INSTRUMENT IMPORTED";
+  } catch (error) {
+    console.error("Instrument import failed", error);
+    alert("Could not import this Instrument: " + error.message);
   }
 };
 $("#export").onclick = () => {
