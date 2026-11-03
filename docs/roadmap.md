@@ -1,0 +1,42 @@
+# FM1-Lab accelerated roadmap
+
+## Sprint A — Foundation and playable workbench
+- [x] Responsive UI, startup and operator editor.
+- [x] Six-operator design model and patch persistence/export.
+- [x] Real-time Web Audio FM voice.
+- [x] Six oscillators, three selectable FM routing graphs, carrier summing.
+- [x] Per-operator attack, decay, sustain and release envelopes.
+- [x] Delayed feedback loops and four performance macros.
+- [x] Add zero-dependency mocked audio-graph tests and GitHub Actions CI.
+- [ ] Browser/device smoke tests, accessibility and GitHub Pages deployment.
+
+## Sprint B — Emulator integration proof
+- [x] Inspect upstream WASM/UI and try-out source boundaries.
+- [x] Embed official emulator using documented `?embed=1` mode.
+- [x] Document same-origin and cross-origin constraints.
+- [ ] Test emulator iframe on desktop and iOS Safari.
+- [ ] If desired, propose a secure upstream host API rather than relying on private internals.
+
+## Sprint C — FM engine v1
+- [x] Modular local DSP engine in `src/fm-engine.js`.
+- [x] Six independently configurable operators.
+- [x] Three genuine audio-rate modulation topologies.
+- [x] Carrier summing, per-operator ADSR and delayed feedback.
+- [x] Brightness/body/motion/feedback macros.
+- [ ] Add held-note note-off and polyphonic voice stealing.
+- [ ] Normalize modulation index by algorithm and operator level.
+- [ ] Add oversampling/aliasing evaluation, audio regression tests and CPU profiling.
+- [x] Add malformed-patch guard and mocked routing/feedback tests.
+
+## Sprint D — Instrument architecture
+- [x] Define Instrument as a saved preset containing exactly four FM patches.
+- [x] Add four factory Instruments and four-patch home screen.
+- [x] Add preset selector and four patch-select controls.
+- [x] Reuse the six-operator editor for the selected patch.
+- [x] Persist Instruments independently and export the complete Instrument as JSON.
+- [x] Migrate legacy single-patch local saves into the new four-patch structure.
+- [x] Add Instrument schema and migration tests.
+- [ ] Browser/device smoke tests for preset switching, patch editing, persistence and export.
+
+## Later
+Held-note/polyphonic lifecycle, simultaneous patch performance, independent sequencing, key/velocity zones, patch-level automation, effects, preset import/library management and hardware compatibility matrix.

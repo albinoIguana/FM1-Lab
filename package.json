@@ -1,0 +1,9 @@
+{
+  "name": "fm1-lab",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
