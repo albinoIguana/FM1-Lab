@@ -24,7 +24,7 @@ Clone with `git clone --recurse-submodules https://github.com/albinoIguana/FM1-L
 
 ## Upstream emulator
 
-The MIT-licensed upstream FM-1 emulator is pinned as a Git submodule at vendor/fm1-emu. GitHub Pages checks out the submodule and serves it under the FM1-Lab site path, keeping the emulator and host on the same origin. Update the pinned commit deliberately and retain the upstream LICENSE.
+The MIT-licensed upstream FM-1 emulator is pinned as a recursive Git submodule at vendor/fm1-emu. The Pages workflow builds its WebAssembly runtime, runs upstream Rust and browser tests, smoke-tests Felucca audio/MIDI, verifies a flash persistence round trip, and serves the built emulator under the FM1-Lab site path on the same origin. Update the pinned commit deliberately and retain the upstream LICENSE.
 
 ## Firmware test console
 The [FM-1 Test Console](testing.html) embeds the full upstream emulator interface (not just its instrument-only embed). It provides the upstream firmware catalog, local `.fwsc` loading, emulated front-panel input, supported MIDI input, and browser flash save/backup controls. It now supports a documented same-origin boot-time MIDI smoke scenario and lifecycle status messages. The current smoke result confirms scripted input delivery, not audible output or firmware correctness; deeper assertions and audio capture remain future work.
