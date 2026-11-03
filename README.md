@@ -22,7 +22,7 @@ The GitHub Pages build fetches Felucca at pinned commit `743551712c36b3984392eea
 
 Felucca's `platforms/host/felucca_host.h` exports the `fh_*` host API: boot, render audio, send keys/buttons/encoder events and MIDI, inspect the screen and LEDs, and persist flash. The browser frontend runs the same firmware application sources against a simulated FM-1.
 
-Felucca currently provides four independent tracks/parts and a six-operator FM engine. That gives us a credible starting point for the four-patch Instrument idea. The exact mapping—especially sound-only Instrument save/load versus a full sequencer project—still needs to be implemented and tested.
+Felucca currently provides four independent tracks/parts and a six-operator FM engine. Its firmware already draws and tests all 32 FM6 algorithm topologies and includes dedicated operator/envelope pages. That gives us a credible starting point for the four-patch Instrument idea. The exact mapping—especially sound-only Instrument save/load versus a full sequencer project—still needs to be implemented and tested.
 
 ## Product and interaction direction
 
@@ -30,7 +30,7 @@ Felucca currently provides four independent tracks/parts and a six-operator FM e
 - Make the working interface feel like a purpose-built FM-1 instrument, not a generic neon dashboard: hardware-oriented controls, clear screen hierarchy, compact parameter pages and immediate feedback.
 - Use Felucca's actual engine and parameter model as the source of truth.
 - Use Clipper as a workflow reference only: choose an effect, navigate its pages, turn the hardware-style controls, hear the change immediately; keep bypass and navigation obvious and advanced detail tucked away.
-- Make FM algorithm topology meaningful in the editor: show carrier/modulator roles and adapt the four primary macro controls to the selected algorithm, while retaining a deeper operator-parameter view.
+- Preserve Felucca's existing 32-algorithm FM6 topology graphs, carrier/modulator/feedback roles and per-operator edit pages. Extend the four-knob macro layer around those real engine semantics instead of duplicating or approximating the graph.
 - Keep DSP modular. The four-patch Instrument is a higher-level container; operator routing remains inside each patch.
 
 ## Build locally
