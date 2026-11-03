@@ -18,7 +18,7 @@ export function createDefaultPatch(name = "Glass Current", seed = 0) {
     feedback: i === 0 ? Math.max(0, Math.min(80, op.feedback + seed * 4)) : op.feedback
   }));
   return {
-    name, topology: topologies[seed % topologies.length], algorithm: 1 + ((seed * 3) % 32), feedback: 0, selected: 1,
+    name, topology: topologies[seed % topologies.length], algorithm: 1 + ((seed * 3) % 32), feedback: 0, detune: 0, selected: 1,
     macros: {
       brightness: Math.max(0, Math.min(100, 62 + seed * 5)),
       body: Math.max(0, Math.min(100, 48 + seed * 3)),
@@ -55,6 +55,7 @@ export function normalizePatch(candidate, fallback = createDefaultPatch()) {
     ...base, ...candidate, name: String(candidate.name || fallback.name || base.name).slice(0, 32),
     topology, algorithm: Math.max(1, Math.min(32, Number(candidate.algorithm) || 1)),
     feedback: Math.round(Math.max(0, Math.min(7, Number(candidate.feedback) || 0))),
+    detune: Math.round(Math.max(0, Math.min(127, Number(candidate.detune) || 0)),
     selected: Math.max(1, Math.min(6, Number(candidate.selected) || 1)),
     macros: { ...base.macros, ...(candidate.macros || {}) },
     operators: candidate.operators.map((operator, index) => {
