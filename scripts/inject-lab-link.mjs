@@ -12,7 +12,7 @@ const links = [
 let changed = false;
 for (const [needle, link] of links) {
   if (!html.includes(needle)) {
-    html = html.replace(marker, link + "\\n    " + marker);
+    html = html.replace(marker, link + "\n    " + marker);
     changed = true;
   }
 }
