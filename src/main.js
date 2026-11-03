@@ -1,6 +1,6 @@
 import { FeluccaEngine } from "./felucca-engine.js";
 import { createFactoryInstruments, migrateLegacyPatch, normalizeInstrument } from "./instrument.js";
-import { decodeNativePatch, nativeTopologyCaption, topologyEdges, writeNativeField } from "./native-fm6.js";
+import { decodeNativePatch, nativeFixedFrequency, nativeTopologyCaption, topologyEdges, writeNativeField } from "./native-fm6.js";
 
 const $ = selector => document.querySelector(selector);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value)));
@@ -174,7 +174,7 @@ function renderEditor() {
   const topology = topologyCache.get(patch.algorithm);
   const feedbackActive = topology && topology.feedback === patch.selected;
   const modeControl = `<div class="param"><label for="f-mode">OSCILLATOR MODE</label><output>${operator.nativeMode ? "FIXED" : "RATIO"}</output><select id="f-mode"><option value="0" ${operator.nativeMode ? "" : "selected"}>RATIO</option><option value="1" ${operator.nativeMode ? "selected" : ""}>FIXED</option></select></div>`;
-  const fixedHz = Math.pow(10, operator.nativeCoarse & 3) * Math.pow(1.0233, operator.nativeFine);
+  const fixedHz = nativeFixedFrequency(operator.nativeCoarse, operator.nativeFine);
   const frequencyControl = operator.nativeMode
     ? `<div class="param"><label for="f-coarse">FIXED BASE FREQUENCY</label><output>${[1, 10, 100, 1000][operator.nativeCoarse]} HZ</output><select id="f-coarse">${[1, 10, 100, 1000].map((hz, index) => `<option value="${index}" ${operator.nativeCoarse === index ? "selected" : ""}>${hz} HZ</option>`).join("")}</select></div>
        <div class="param"><label for="f-fine">FIXED FINE · TOTAL ${fixedHz.toFixed(1)} HZ</label><output id="v-fine">${operator.nativeFine}</output><input id="f-fine" type="range" min="0" max="99" step="1" value="${operator.nativeFine}"></div>`
@@ -214,7 +214,7 @@ function renderEditor() {
     writeCurrentField("coarse");
     const output = coarseSelect.parentElement.querySelector("output");
     output.textContent = [1, 10, 100, 1000][operator.nativeCoarse] + " HZ";
-    fineInput.parentElement.querySelector("label").textContent = "FIXED FINE · TOTAL " + (Math.pow(10, operator.nativeCoarse) * Math.pow(1.0233, operator.nativeFine)).toFixed(1) + " HZ";
+    fineInput.parentElement.querySelector("label").textContent = "FIXED FINE · TOTAL " + nativeFixedFrequency(operator.nativeCoarse, operator.nativeFine).toFixed(1) + " HZ";
   };
   const fineInput = $("#f-fine");
   if (fineInput) fineInput.oninput = event => {
