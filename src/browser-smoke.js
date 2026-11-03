@@ -44,26 +44,27 @@ async function runBrowserSmokeTest() {
     assert(activeEngine.context?.state === "running", "AudioContext did not enter the running state.");
     result("AUDIOWORKLET + WASM BOOT", "Felucca initialized in the browser at " + activeEngine.context.sampleRate + " Hz.");
 
-    const patches = [];
-    for (let track = 0; track < 4; track++) {
-      await activeEngine.loadFactoryPreset(track, track);
+    for (let preset = 0; preset < 8; preset++) {
+      const track = preset % 4;
+      await activeEngine.loadFactoryPreset(track, preset);
       const patch = await activeEngine.readPatch(track);
-      assert(patch.length === 155, "Part " + (track + 1) + " returned " + patch.length + " bytes, expected 155.");
-      patches.push(patch);
+      assert(patch.length === 155, "Factory voice " + (preset + 1) + " returned " + patch.length + " bytes, expected 155.");
       const algorithm = (patch[134] & 31) + 1;
       const topology = await activeEngine.getTopology(algorithm);
-      assert(topology.algorithm === algorithm, "Part " + (track + 1) + " returned the wrong algorithm.");
-      assert(topology.carriers > 0 && topology.carriers < 64, "Part " + (track + 1) + " returned an invalid carrier mask.");
-      assert(topology.feedback >= 1 && topology.feedback <= 6, "Part " + (track + 1) + " returned an invalid feedback operator.");
-      assert(topology.modulators.length === 6, "Part " + (track + 1) + " returned incomplete routing data.");
+      assert(topology.algorithm === algorithm, "Factory voice " + (preset + 1) + " returned the wrong algorithm.");
+      assert(topology.carriers > 0 && topology.carriers < 64, "Factory voice " + (preset + 1) + " returned an invalid carrier mask.");
+      assert(topology.feedback >= 1 && topology.feedback <= 6, "Factory voice " + (preset + 1) + " returned an invalid feedback operator.");
+      assert(topology.modulators.length === 6, "Factory voice " + (preset + 1) + " returned incomplete routing data.");
     }
-    result("FOUR NATIVE PARTS", "Loaded and read four independent 155-byte FM6 factory voices.");
-    result("NATIVE ALGORITHM DATA", "Validated Felucca routing and feedback data for all four loaded patches.");
+    result("EIGHT FACTORY VOICES", "Loaded and read all eight native factory voices across the four Felucca parts.");
+    result("NATIVE ALGORITHM DATA", "Validated Felucca routing and feedback data for all eight factory voices.");
 
-    await activeEngine.writePatch(0, patches[0]);
+    await activeEngine.loadFactoryPreset(0, 0);
+    const originalPatch = await activeEngine.readPatch(0);
+    await activeEngine.writePatch(0, originalPatch);
     const roundTrip = await activeEngine.readPatch(0);
-    assert(roundTrip.length === patches[0].length, "Patch read-back length changed.");
-    assert(roundTrip.every((value, index) => value === patches[0][index]), "Native patch bytes changed during a write/read round trip.");
+    assert(roundTrip.length === originalPatch.length, "Patch read-back length changed.");
+    assert(roundTrip.every((value, index) => value === originalPatch[index]), "Native patch bytes changed during a write/read round trip.");
     result("PATCH READ / WRITE", "A native patch survived a byte-for-byte write/read round trip.");
 
     const analyser = activeEngine.context.createAnalyser();
