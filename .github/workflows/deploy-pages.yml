@@ -48,6 +48,7 @@ jobs:
           git clone https://github.com/hugelton/Felucca.git vendor/felucca
           git -C vendor/felucca checkout 743551712c36b3984392eea1dbe13a309907e17a
           git -C vendor/felucca submodule update --init --recursive
+          git -C vendor/felucca apply ../../patches/felucca-host-fm1lab-api.patch
 
       - name: Build Felucca's browser-native firmware runtime
         working-directory: vendor/felucca
@@ -55,6 +56,9 @@ jobs:
           python -m pip install --disable-pip-version-check Pillow fonttools
           ./build.sh gen
           ./build.sh web
+
+      - name: Verify FM1-Lab native FM6 bridge
+        run: node scripts/felucca-api-smoke.mjs vendor/felucca/build/web/felucca.wasm
 
       - name: Run Felucca FM6 and browser-host regression suite
         working-directory: vendor/felucca
