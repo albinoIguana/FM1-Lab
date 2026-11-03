@@ -27,14 +27,15 @@ export function decodeNativePatch(patch, source) {
     }
     return {
       ...previous,
-      ratio: Number(clamp(ratio, 0.5, 16).toFixed(2)),
+      ratio: Number(clamp(ratio, 0.5, 61.69).toFixed(2)),
       level: Math.round(bytes[offset + 16] / 99 * 100),
       rates: Array.from({ length: 4 }, (_, stage) => bytes[offset + stage]),
       levels: Array.from({ length: 4 }, (_, stage) => bytes[offset + 4 + stage]),
       feedback: index + 1 === (patch.feedbackOperator || 1) ? feedback : 0,
       nativeMode: mode,
       nativeCoarse: coarse,
-      nativeFine: fine
+      nativeFine: fine,
+      fixedHz: mode === 1 ? Number((Math.pow(10, coarse & 3) * Math.pow(1.0233, fine)).toFixed(2)) : null
     };
   });
   return {
@@ -68,8 +69,17 @@ export function writeNativeField(source, patch, field, operatorNumber = 1) {
   if (!operator) throw new Error("FM6 operator must be 1–6.");
   const offset = (6 - operatorNumber) * OP_SIZE;
   switch (field) {
+    case "mode":
+      bytes[offset + 17] = clamp(operator.nativeMode, 0, 1);
+      break;
+    case "coarse":
+      bytes[offset + 18] = clamp(operator.nativeCoarse, 0, operator.nativeMode ? 3 : 31);
+      break;
+    case "fine":
+      bytes[offset + 19] = clamp(operator.nativeFine, 0, 99);
+      break;
     case "ratio": {
-      const ratio = clamp(operator.ratio, 0.5, 16);
+      const ratio = clamp(operator.ratio, 0.5, 61.69);
       const coarse = ratio < 1 ? 0 : Math.floor(ratio);
       const fine = ratio < 1 ? Math.round((ratio / 0.5 - 1) * 100) : Math.round((ratio - coarse) * 100);
       bytes[offset + 17] = 0; // ratio mode
