@@ -467,7 +467,12 @@ $("#reset").onclick = async () => {
     await engine.writePatch(selectedPatchIndex, bytes);
     instrument.patches[selectedPatchIndex] = decodeNativePatch(patch, bytes);
     const topology = await loadTopology(instrument.patches[selectedPatchIndex].algorithm);
-    instrument.patches[selectedPatchIndex].feedbackOperator = topology?.feedback || 1;
+    const resetPatch = instrument.patches[selectedPatchIndex];
+    resetPatch.feedbackOperator = topology?.feedback || 1;
+    resetPatch.operators.forEach((operator, index) => {
+      operator.feedback = index + 1 === resetPatch.feedbackOperator
+        ? Math.round(resetPatch.feedback / 7 * 100) : 0;
+    });
     setActivePatch(selectedPatchIndex);
     renderAll();
     persist();
