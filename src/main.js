@@ -295,6 +295,7 @@ async function ensureEngine() {
     await activateInstrument();
   })();
   try { await activationPromise; }
+  catch (error) { engineReady = false; throw error; }
   finally { activationPromise = null; }
 }
 
