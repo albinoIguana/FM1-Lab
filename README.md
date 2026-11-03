@@ -20,7 +20,7 @@ A narrow patch overlay against the pinned Felucca host exposes:
 - Felucca's eight factory FM6 voices.
 - The actual carrier masks, modulation routing masks and feedback operator for all 32 algorithms.
 
-The custom UI maps operator ratio, output level, all four native envelope rates and levels, algorithm, feedback and voice name into the native patch bytes. Algorithm diagrams and carrier/modulator roles come from Felucca's own routing tables.
+The custom UI maps operator ratio or fixed-frequency mode, output level, all four native envelope rates and levels, algorithm, feedback and voice name into the native patch bytes. Algorithm diagrams and carrier/modulator roles come from Felucca's own routing tables.
 
 The current editor deliberately exposes the native voice fields that have direct UI controls. The remaining native voice fields are preserved when these controls are changed. Modulation matrix, LFO and FX pages, plus broader Instrument management, are subsequent work.
 
