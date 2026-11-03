@@ -58,7 +58,8 @@ export class FMEngine{
   for(let i=0;i<6;i++){
    const amount=clamp(patch.operators[i].feedback??0,0,100)/100;if(amount<=0)continue;
    const delay=ctx.createDelay(.02),fb=ctx.createGain();delay.delayTime.value=.004;
-   fb.gain.value=Math.min(.88,amount*(.12+edge*.48));
+   const selfHz=freq*clamp(patch.operators[i].ratio??1,.25,16);
+   fb.gain.value=Math.min(12000,selfHz*.75)*amount*(.08+edge*.7);
    envelopes[i].connect(delay);delay.connect(fb);fb.connect(oscillators[i].frequency);feedbackNodes.push(delay,fb);
   }
   const voice={oscillators,envelopes,feedbackNodes,master,envelopeParams,stopped:false};
