@@ -513,6 +513,7 @@ $("#mutate").onclick = async () => {
   patch.algorithm = 1 + Math.floor(Math.random() * 32);
   patch.operators = patch.operators.map(operator => ({
     ...operator,
+    nativeMode: 0,
     ratio: Number((0.5 + Math.random() * 7.5).toFixed(2)),
     level: 20 + Math.round(Math.random() * 80),
     rates: Array.from({ length: 4 }, () => Math.round(Math.random() * 99)),
