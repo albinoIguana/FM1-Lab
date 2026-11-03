@@ -14,7 +14,7 @@ function envelopeLevelAt(t,p){
  return p.peak*p.sustain;
 }
 export class FMEngine{
- constructor({onState=()=>{}}={}){this.context=null;this.voices=new Set();this.onState=onState;}
+ constructor({onState=()=>{},maxVoices=12}={}){this.context=null;this.voices=new Set();this.onState=onState;this.maxVoices=Math.max(1,Math.floor(maxVoices));}
  async ready(){
   if(!this.context){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error("Web Audio is not supported in this browser.");this.context=new AC();}
   if(this.context.state==="suspended")await this.context.resume();
@@ -23,7 +23,7 @@ export class FMEngine{
  noteOn({note=60,velocity=100,patch,duration=1.2}={}){
   if(!this.context||this.context.state!=="running")throw new Error("Audio engine is not ready. Press Play to initialize audio.");
   if(!patch||!Array.isArray(patch.operators)||patch.operators.length!==6)throw new Error("A six-operator patch is required.");
-  const ctx=this.context,now=ctx.currentTime,freq=midiHz(note),route=ROUTES[patch.topology]||ROUTES.cascade;
+  if(this.voices.size>=this.maxVoices){const oldest=this.voices.values().next().value;if(oldest)this.dispose(oldest);}\n  const ctx=this.context,now=ctx.currentTime,freq=midiHz(note),route=ROUTES[patch.topology]||ROUTES.cascade;
   const macros=patch.macros||{},brightness=clamp(macros.brightness??50,0,100)/100;
   const body=clamp(macros.body??50,0,100)/100,motion=clamp(macros.motion??30,0,100)/100;
   const edge=clamp(macros.edge??0,0,100)/100,velocityGain=Math.pow(clamp(velocity,1,127)/127,1.35);
