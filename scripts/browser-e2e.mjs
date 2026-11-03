@@ -45,6 +45,7 @@ try {
   );
   await appPage.waitForFunction(
     () => /4 \/ 4 NATIVE VOICES LOADED/.test(document.querySelector("#native-status")?.textContent || ""),
+    null,
     { timeout: 120000 }
   );
   await appPage.locator('.edit-patch[data-patch="0"]').click();
