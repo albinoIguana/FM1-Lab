@@ -55,3 +55,5 @@
 .map-wait{padding:48px 12px;text-align:center;color:var(--amber);font:9px var(--mono);letter-spacing:.12em}
 .node.feedback circle{stroke:var(--amber);stroke-width:3;stroke-dasharray:3 2}
 .node.feedback.selected circle{stroke:white}
+
+.param select{width:100%;background:#090e18;color:var(--text);border:1px solid var(--line);padding:7px;font:10px var(--mono)}
