@@ -8,7 +8,7 @@
 - [x] Per-operator attack, decay, sustain and release envelopes.
 - [x] Delayed feedback loops and four performance macros.
 - [x] Add zero-dependency mocked audio-graph tests and GitHub Actions CI.
-- [ ] Browser/device smoke tests, accessibility and GitHub Pages deployment.
+- [ ] Browser/device smoke tests and accessibility review.\n- [x] Publish static app through GitHub Pages with automatic deployment.
 
 ## Sprint B — Emulator integration proof
 - [x] Inspect upstream WASM/UI and try-out source boundaries.
@@ -42,7 +42,7 @@
 - [x] Add a dedicated full-interface FM-1 emulator console page.
 - [x] Embed the upstream emulator's full firmware selection, local package loading, controls, MIDI input and save/backup UI.
 - [x] Document what the console can test and the cross-origin automation limits.
-- [ ] Deploy the app to GitHub Pages after approval.
+- [x] Deploy the app to GitHub Pages after approval.
 - [ ] Explore a safe same-origin scripted test runner or upstream host API for repeatable automated tests.
 
 ## Later
