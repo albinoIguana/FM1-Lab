@@ -3,6 +3,11 @@ const OP_SIZE = 21;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value)));
 const roundByte = value => Math.round(clamp(value, 0, 99));
 
+export function nativeFixedFrequency(coarse, fine) {
+  const logQ24 = (4458616 * (clamp(coarse, 0, 3) * 100 + clamp(fine, 0, 99))) >> 3;
+  return Number(Math.pow(2, logQ24 / 16777216).toFixed(2));
+}
+
 export function nativePatchName(bytes, fallback = "FM Patch") {
   const raw = String.fromCharCode(...bytes.slice(145, 155)).replace(/[\0-\x1f\x7f]/g, "").trim();
   return raw || fallback;
@@ -22,7 +27,7 @@ export function decodeNativePatch(patch, source) {
     if (mode === 0) {
       ratio = (coarse === 0 ? 0.5 : coarse) * (1 + fine / 100);
     } else {
-      const hz = Math.pow(10, coarse & 3) * Math.pow(1.0233, fine);
+      const hz = nativeFixedFrequency(coarse, fine);
       ratio = hz / 261.625565;
     }
     return {
@@ -35,7 +40,7 @@ export function decodeNativePatch(patch, source) {
       nativeMode: mode,
       nativeCoarse: coarse,
       nativeFine: fine,
-      fixedHz: mode === 1 ? Number((Math.pow(10, coarse & 3) * Math.pow(1.0233, fine)).toFixed(2)) : null
+      fixedHz: mode === 1 ? nativeFixedFrequency(coarse, fine) : null
     };
   });
   return {
