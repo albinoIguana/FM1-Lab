@@ -13,7 +13,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -96,6 +96,13 @@ jobs:
           cp testing.html _site/testing.html
           cp .nojekyll _site/
           cp scripts/felucca-midi-smoke.fm1 _site/scripts/
+
+      - name: Verify the built product in headless Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+          python -m http.server 4173 --directory _site > /tmp/fm1lab-http.log 2>&1 &
+          node scripts/browser-e2e.mjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
