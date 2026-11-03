@@ -71,27 +71,27 @@ jobs:
         run: node --test web/*.test.mjs
         working-directory: vendor/fm1-emu
 
-      - name: Build the upstream emulator as the primary site
-        run: vendor/fm1-emu/tools/build_site.sh _site
+      - name: Build the upstream emulator as a supporting compatibility bench
+        run: vendor/fm1-emu/tools/build_site.sh _compat
 
       - name: Smoke-test emulated firmware and audio output
-        run: node vendor/fm1-emu/web/smoke.mjs _site
+        run: node vendor/fm1-emu/web/smoke.mjs _compat
 
       - name: Verify emulator flash persistence round trip
-        run: node vendor/fm1-emu/web/persistence.wasm.mjs _site
+        run: node vendor/fm1-emu/web/persistence.wasm.mjs _compat
 
-      - name: Stage the Felucca runtime, designer and test console
+      - name: Assemble FM1-Lab product site and supporting runtimes
         run: |
-          mkdir -p _site/felucca _site/designer _site/scripts
+          mkdir -p _site/compatibility _site/felucca _site/src _site/scripts
+          cp -R _compat/. _site/compatibility/
           cp -R vendor/felucca/build/web/. _site/felucca/
           cp vendor/felucca/LICENSE vendor/felucca/LICENSING.md _site/felucca/
           cp -R vendor/felucca/LICENSES _site/felucca/
-          cp index.html _site/designer/index.html
-          cp -R src _site/designer/
+          cp index.html _site/index.html
+          cp -R src/. _site/src/
           cp testing.html _site/testing.html
           cp .nojekyll _site/
           cp scripts/felucca-midi-smoke.fm1 _site/scripts/
-          node scripts/inject-lab-link.mjs _site/index.html
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
