@@ -135,7 +135,7 @@ $("#export").onclick=()=>{
  const blob=new Blob([JSON.stringify(normalizeInstrument(instrument),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),anchor=document.createElement("a");
  anchor.href=url;anchor.download=(instrument.name.replace(/[^a-z0-9-_]/gi,"-")||"instrument")+".fm1lab.json";anchor.click();URL.revokeObjectURL(url);
 };
-$("#play").onclick=()=>playNote(+$(" #note").value,+$("#velocity").value,1.5);
+$("#play").onclick=()=>playNote(+$("#note").value,+$("#velocity").value,1.5);
 load();renderHome();renderAll();renderKeys();
 const toggleEmulator=$("#toggle-emulator"),frameWrap=$("#emulator-frame-wrap");
 if(toggleEmulator&&frameWrap)toggleEmulator.onclick=()=>{frameWrap.hidden=!frameWrap.hidden;toggleEmulator.textContent=frameWrap.hidden?"LOAD OFFICIAL FM-1 EMULATOR ↓":"HIDE OFFICIAL FM-1 EMULATOR ↑"};
