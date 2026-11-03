@@ -17,6 +17,15 @@ h1{font-size:clamp(30px,5vw,54px);line-height:1;margin:10px 0}h1 em{font-style:n
 .intro{max-width:760px;color:var(--muted);font-size:13px;line-height:1.7}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
 .console{border:1px solid #34445e;background:#0b111c;box-shadow:0 15px 45px #0006}
+.native-body{padding:16px}
+.native-body p{max-width:850px;color:var(--muted);font-size:12px;line-height:1.7;margin:0 0 14px}
+.native-results{list-style:none;padding:0;margin:15px 0 0;display:grid;gap:8px}
+.native-results li{display:grid;gap:4px;border:1px solid var(--line);background:#111a29;padding:10px 12px;font:10px ui-monospace,monospace}
+.native-results li strong{letter-spacing:.06em;color:var(--cyan)}
+.native-results li span{color:var(--muted);line-height:1.5}
+.native-results li.fail{border-color:#7b3c60}
+.native-results li.fail strong{color:var(--pink)}
+.action:disabled{opacity:.55;cursor:wait}
 .console-head{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;border-bottom:1px solid var(--line);font:9px ui-monospace,monospace;letter-spacing:.1em;color:var(--muted);gap:12px}
 .status{color:var(--cyan)}iframe{display:block;width:100%;height:min(82vh,980px);min-height:650px;border:0;background:#090b12}
 .info{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:17px 0}
@@ -34,6 +43,14 @@ footer{padding:24px 0;color:#65738a;font:9px ui-monospace,monospace;letter-spaci
 <div class="eyebrow">09 / FIRMWARE VALIDATION ENVIRONMENT</div>
 <h1>FM-1 <em>Test Console.</em></h1>
 <p class="intro">Run the real FM-1 firmware emulator alongside FM1-Lab. This is the upstream emulator's full interface—not the stripped-down instrument-only embed. Pick community firmware, load a local .fwsc package, use the emulated controls, connect MIDI where supported, and save or export emulator flash backups.</p>
+<section class="console native-console">
+<div class="console-head"><span>FM1-LAB PRODUCT ENGINE · FELUCCA WASM</span><span class="status" id="native-status">READY FOR BROWSER SELF-TEST</span></div>
+<div class="native-body">
+<p>This tests the same native Felucca engine used by the Instrument Designer—not the upstream emulator. Start it with this button so the browser can authorize audio. It loads all eight factory voices, checks native patch and algorithm data, then measures the actual AudioWorklet output for a MIDI note.</p>
+<button class="action" id="run-native-smoke" type="button">RUN NATIVE BROWSER SELF-TEST ↗</button>
+<ol class="native-results" id="native-results" aria-live="polite"></ol>
+</div>
+</section>
 <div class="toolbar"><a class="action" href="./compatibility/" target="_blank" rel="noopener">LAUNCH FULL-SCREEN TEST BENCH ↗</a><a class="action" href="https://github.com/joakimeriksson/fm1-emu" target="_blank" rel="noopener">EMULATOR SOURCE ↗</a><button class="action" id="run-midi-smoke" type="button">RUN FELUCCA MIDI SMOKE TEST ↗</button></div>
 <section class="console">
 <div class="console-head"><span>UPSTREAM FM-1 EMULATOR · FULL TEST INTERFACE</span><span class="status" id="test-status">SAME-ORIGIN WEBASSEMBLY FIRMWARE RUNTIME</span></div>
@@ -44,7 +61,7 @@ footer{padding:24px 0;color:#65738a;font:9px ui-monospace,monospace;letter-spaci
 <article><h2>INTERACTION</h2><p>Use the emulated buttons, encoders and keyboard, or connect a supported MIDI input. The emulator runs the firmware unchanged in WebAssembly and renders its screen and audio.</p></article>
 <article><h2>SAVES & BACKUPS</h2><p>The emulator saves changed flash locally in the browser. Use its Save &amp; backup controls to export a portable backup. Clearing browser data can remove local saves.</p></article>
 </section>
-<p class="warning"><strong>Important boundary:</strong> the emulator now runs on the same origin from a pinned upstream MIT-licensed submodule. FM1-Lab can supply documented boot-time input scripts and receive documented try-out lifecycle messages. The Felucca smoke sequence sends MIDI note-on and note-off events; "script sent" confirms delivery to the emulator, not audible output or a semantic firmware pass. Arbitrary internal WASM state and live parameter writes are still not exposed as a stable host API.</p>
+<p class="warning"><strong>Important boundary:</strong> the native browser self-test above verifies Felucca's WASM engine, patch bridge and non-silent AudioWorklet samples. The separate upstream emulator below runs supported firmware unchanged. Its MIDI smoke sequence confirms script delivery, not audible output or a semantic firmware pass. Arbitrary internal WASM state and live parameter writes are not exposed by the upstream emulator as a stable host API.</p>
 <footer>FM1-LAB · TEST CONSOLE · UPSTREAM EMULATOR BY JOAKIM ERIKSSON · NO FIRMWARE MODIFICATIONS</footer>
 </main>
 <script>
