@@ -38,5 +38,12 @@
 - [x] Add Instrument schema and migration tests.
 - [ ] Browser/device smoke tests for preset switching, patch editing, persistence and export.
 
+## Sprint E — Firmware test console
+- [x] Add a dedicated full-interface FM-1 emulator console page.
+- [x] Embed the upstream emulator's full firmware selection, local package loading, controls, MIDI input and save/backup UI.
+- [x] Document what the console can test and the cross-origin automation limits.
+- [ ] Deploy the app to GitHub Pages after approval.
+- [ ] Explore a safe same-origin scripted test runner or upstream host API for repeatable automated tests.
+
 ## Later
 Held-note/polyphonic lifecycle, simultaneous patch performance, independent sequencing, key/velocity zones, patch-level automation, effects, preset import/library management and hardware compatibility matrix.
