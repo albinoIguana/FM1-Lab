@@ -11,7 +11,9 @@ Felucca is GPL-3.0-only. Its engine library is MIT and its board layer is MPL-2.
 ## What we inherit
 
 - Four independent tracks/parts.
-- A six-operator FM engine (FM6).
+- A six-operator FM engine (FM6) with 32 algorithms.
+- A native, tested topology graph for all 32 FM6 algorithms (`ui_graph.c` / `fm6_core.c`), including carrier/modulator routes and feedback.
+- Dedicated FM6 operator, envelope and secondary operator edit pages (`ui_fm6op.c`).
 - Existing envelopes, LFO, modulation matrix, sequencer, arpeggiator, mixer and effects.
 - A parameter description system and a documented editor protocol.
 - A browser host API for audio rendering, keys, buttons, encoders, MIDI, display, LEDs and flash.
@@ -29,7 +31,7 @@ The accepted boot animation stays. After boot, the workspace should read as an i
 
 Effects use the Clipper-inspired workflow, not Clipper code: select an effect, navigate its pages, turn the four primary controls and hear the result immediately. Bypass and page navigation stay obvious; advanced parameters are available without crowding the first page.
 
-FM editing is algorithm-aware. The topology view labels carriers, modulators and hybrid roles. Four main controls expose role-relevant macros for the selected algorithm; a deeper operator view preserves access to raw ratios, levels, envelopes and feedback.
+FM editing already has a strong firmware-native foundation: Felucca draws the 32 FM6 algorithms from its actual routing table, labels carriers and modulators, marks feedback, and provides operator/envelope edit pages. The custom layer should expose and extend this tested model—not invent a parallel topology. Four main controls can surface role-relevant macros for the selected algorithm; the deeper operator view retains raw ratios, levels, envelopes and feedback.
 
 Each Instrument contains four independent FM patches. The patch owns its internal operator graph and routing. Instrument-level controls select, mute/solo and mix patches. Stacked, split and velocity-zone behavior is added only after the four-part voice and MIDI behavior is verified against Felucca.
 
