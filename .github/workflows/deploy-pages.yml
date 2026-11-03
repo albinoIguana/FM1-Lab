@@ -39,20 +39,23 @@ jobs:
         run: node --test web/*.test.mjs
         working-directory: vendor/fm1-emu
 
-      - name: Build upstream emulator and FM-1 SID pages
-        run: vendor/fm1-emu/tools/build_site.sh _site/vendor/fm1-emu
+      - name: Build the upstream emulator as the primary site
+        run: vendor/fm1-emu/tools/build_site.sh _site
 
       - name: Smoke-test emulated firmware and audio output
-        run: node vendor/fm1-emu/web/smoke.mjs _site/vendor/fm1-emu
+        run: node vendor/fm1-emu/web/smoke.mjs _site
 
       - name: Verify emulator flash persistence round trip
-        run: node vendor/fm1-emu/web/persistence.wasm.mjs _site/vendor/fm1-emu
+        run: node vendor/fm1-emu/web/persistence.wasm.mjs _site
 
-      - name: Stage FM1-Lab host application
+      - name: Stage the experimental Instrument designer and test console
         run: |
-          mkdir -p _site
-          cp index.html testing.html .nojekyll _site/
-          cp -R src scripts _site/
+          mkdir -p _site/designer _site/scripts
+          cp index.html _site/designer/index.html
+          cp -R src _site/designer/
+          cp testing.html _site/testing.html
+          cp scripts/felucca-midi-smoke.fm1 _site/scripts/
+          node scripts/inject-lab-link.mjs _site/index.html
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
