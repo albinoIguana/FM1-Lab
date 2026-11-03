@@ -3,15 +3,20 @@
 Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
 
 ## Run locally
-`python3 -m http.server 8000` then open http://localhost:8000. No build tool or package install is required.
+`git clone https://github.com/albinoIguana/FM1-Lab.git`, check out the `speedrun/phase-1-3` branch, then run `python3 -m http.server 8000` and open http://localhost:8000. No build tool or package install is required.
 
 ## Current build
-- Responsive workbench, six-operator routing map and editable operator parameters.
-- Three real DSP topologies: six-stage cascade, three paired voices, and split/converging tree.
-- Six sine oscillators per note, audio-rate frequency modulation, summed carriers, per-operator ADSR and delayed feedback loops.
-- Brightness, body, motion and feedback-edge macros.
-- Local patch persistence, mutation, JSON export and play-test keyboard.
+- Instrument home screen with four factory Instrument presets.
+- Each Instrument contains exactly four independent six-operator FM patches.
+- Preset selector changes the active Instrument; Knob 1–4 style controls select the four FM patches.
+- Each patch opens the existing six-operator routing map, operator editor, macro controls and play-test engine.
+- Local Instrument library persistence, legacy single-patch migration and complete Instrument JSON export.
+- Three local DSP topologies: six-stage cascade, three paired carriers, and split/converging tree.
+- Six sine oscillators per played note, audio-rate frequency modulation, summed carriers, per-operator ADSR and delayed feedback loops.
 - Lazy-loaded official firmware emulator iframe using its documented `?embed=1` mode.
+
+## Data model
+An **Instrument** is the saved preset and contains four **FM patches**. Each FM patch contains its own topology, macros, and six operator parameter sets. The four-patch model is now the home-screen/navigation structure; simultaneous layering, independent sequencing, and performance routing are future work.
 
 ## Engine boundaries
 The Web Audio engine is an independent six-operator FM implementation, not a bit-accurate emulation of M-VAVE stock firmware. Its three routing algorithms are FM1-Lab design choices, not claims about the stock instrument's internal algorithms. The official emulator runs separately in an iframe and remains the authority for stock-firmware behavior.
