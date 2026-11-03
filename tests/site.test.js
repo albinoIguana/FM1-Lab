@@ -38,7 +38,7 @@ test("deployment publishes FM1-Lab at root and keeps runtimes in supporting rout
   assert.match(workflow, /_site\/compatibility/);
   assert.match(workflow, /_site\/felucca/);
   assert.match(workflow, /cp index\.html _site\/index\.html/);
-  assert.match(workflow, /cp -R src\\/\\. _site\\/src\\//);
+  assert.ok(workflow.includes("cp -R src/. _site/src/"));
   assert.doesNotMatch(workflow, /build_site\.sh _site/);
 });
 
