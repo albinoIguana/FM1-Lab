@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createFactoryInstruments, normalizeInstrument } from "../src/instrument.js";
-import { decodeNativePatch, nativePatchName, topologyEdges, writeNativeField } from "../src/native-fm6.js";
+import { decodeNativePatch, nativeFixedFrequency, nativePatchName, topologyEdges, writeNativeField } from "../src/native-fm6.js";
 
 function blankVoice() {
   const bytes = new Uint8Array(155);
@@ -93,7 +93,8 @@ test("fixed-frequency operators retain their native base and fine tuning", () =>
   assert.equal(decoded.operators[0].nativeMode, 1);
   assert.equal(decoded.operators[0].nativeCoarse, 2);
   assert.equal(decoded.operators[0].nativeFine, 35);
-  assert.ok(decoded.operators[0].fixedHz > 100 && decoded.operators[0].fixedHz < 1000);
+  assert.equal(decoded.operators[0].fixedHz, nativeFixedFrequency(2, 35));
+  assert.equal(nativeFixedFrequency(0, 0), 1);
 });
 
 test("native algorithm routing masks become source-to-destination edges", () => {
