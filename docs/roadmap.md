@@ -8,13 +8,17 @@
 - [x] Per-operator attack, decay, sustain and release envelopes.
 - [x] Delayed feedback loops and four performance macros.
 - [x] Add zero-dependency mocked audio-graph tests and GitHub Actions CI.
-- [ ] Browser/device smoke tests and accessibility review.\n- [x] Publish static app through GitHub Pages with automatic deployment.
+- [ ] Browser/device smoke tests and accessibility review.
+- [x] Publish static app through GitHub Pages with automatic deployment.
 
 ## Sprint B — Emulator integration proof
 - [x] Inspect upstream WASM/UI and try-out source boundaries.
 - [x] Embed official emulator using documented `?embed=1` mode.
 - [x] Document same-origin and cross-origin constraints.
-- [ ] Test emulator iframe on desktop and iOS Safari.
+- [x] Pin the MIT-licensed upstream emulator as a submodule and serve it on the FM1-Lab origin.
+- [x] Add documented try-out script loading and lifecycle event handling for a MIDI smoke scenario.
+- [ ] Test locally hosted emulator iframe on desktop and iOS Safari.
+- [ ] Add assertions for audio output and flash-overlay test scenarios.
 - [ ] If desired, propose a secure upstream host API rather than relying on private internals.
 
 ## Sprint C — FM engine v1
