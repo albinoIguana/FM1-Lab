@@ -78,6 +78,24 @@ test("operator controls encode to Felucca's native 155-byte layout", () => {
   assert.deepEqual(Array.from(out.slice(op1 + 4, op1 + 8)), [99, 80, 63, 0]);
 });
 
+test("fixed-frequency operators retain their native base and fine tuning", () => {
+  const bytes = blankVoice();
+  const patch = createFactoryInstruments()[0].patches[0];
+  patch.operators[0] = { ...patch.operators[0], nativeMode: 1, nativeCoarse: 2, nativeFine: 35 };
+  let out = writeNativeField(bytes, patch, "mode", 1);
+  out = writeNativeField(out, patch, "coarse", 1);
+  out = writeNativeField(out, patch, "fine", 1);
+  const op1 = 5 * 21;
+  assert.equal(out[op1 + 17], 1);
+  assert.equal(out[op1 + 18], 2);
+  assert.equal(out[op1 + 19], 35);
+  const decoded = decodeNativePatch(patch, out);
+  assert.equal(decoded.operators[0].nativeMode, 1);
+  assert.equal(decoded.operators[0].nativeCoarse, 2);
+  assert.equal(decoded.operators[0].nativeFine, 35);
+  assert.ok(decoded.operators[0].fixedHz > 100 && decoded.operators[0].fixedHz < 1000);
+});
+
 test("native algorithm routing masks become source-to-destination edges", () => {
   const edges = topologyEdges({ modulators: [0b000010, 0, 0b000001, 0, 0, 0] });
   assert.deepEqual(edges, [[2, 1], [1, 3]]);
