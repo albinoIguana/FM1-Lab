@@ -37,7 +37,11 @@ const scratchPtr = ex.fh_fm6_patch_buffer();
 const size = ex.fh_fm6_patch_size();
 const scratch = new Uint8Array(ex.memory.buffer, scratchPtr, size);
 
-// Load native factory voices across the four Felucca parts, then test isolated edits.
+// Verify all eight Felucca factory slots, then build the two four-part FM1-Lab banks.
+for (let preset = 0; preset < 8; preset++) {
+  assert.equal(ex.fh_fm6_factory_load(0, preset), 1, "Could not load factory voice " + (preset + 1));
+  assert.equal(ex.fh_fm6_patch_read(0, scratchPtr, size), size, "Could not read factory voice " + (preset + 1));
+}
 for (let track = 0; track < 4; track++) {
   assert.equal(ex.fh_fm6_factory_load(track, track), 1, "Could not load factory voice " + (track + 1));
 }
