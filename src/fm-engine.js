@@ -18,7 +18,7 @@ export class FMEngine{
  async ready(){
   if(!this.context){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error("Web Audio is not supported in this browser.");this.context=new AC();}
   if(this.context.state==="suspended")await this.context.resume();
-  this.onState("LOCAL 6-OP FM ENGINE ACTIVE");return this.context;
+  this.onState("LOCAL DSP PREVIEW ACTIVE · NOT FIRMWARE");return this.context;
  }
  noteOn({note=60,velocity=100,patch,duration=1.2}={}){
   if(!this.context||this.context.state!=="running")throw new Error("Audio engine is not ready. Press Play to initialize audio.");
