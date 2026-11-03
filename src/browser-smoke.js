@@ -34,13 +34,12 @@ async function runBrowserSmokeTest() {
   button.disabled = true;
   setStatus("STARTING NATIVE FELUCCA BROWSER TEST…");
 
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  assert(AudioContextClass, "This browser does not expose Web Audio.");
-
   activeEngine = new FeluccaEngine({ onState: setStatus });
   let voice = null;
 
   try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    assert(AudioContextClass, "This browser does not expose Web Audio.");
     await activeEngine.ready();
     assert(activeEngine.context?.state === "running", "AudioContext did not enter the running state.");
     result("AUDIOWORKLET + WASM BOOT", "Felucca initialized in the browser at " + activeEngine.context.sampleRate + " Hz.");
