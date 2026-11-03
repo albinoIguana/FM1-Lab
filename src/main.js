@@ -276,7 +276,7 @@ async function activateInstrument() {
     instrument.patches[index].feedbackOperator = candidate.feedbackOperator;
     instrument.patches[index].operators.forEach((operator, opIndex) => {
       operator.feedback = opIndex + 1 === candidate.feedbackOperator
-        ? Math.round(instrument.patches[index].feedback / 7 * 100) : 0;
+        ? instrument.patches[index].feedback : 0;
     });
   }
   setActivePatch(selectedPatchIndex);
