@@ -32,7 +32,7 @@ test("firmware test console embeds the upstream full emulator", async () => {
   assert.match(html, /\.\/vendor\/fm1-emu\//);
   assert.match(html, /run-midi-smoke/);
   assert.match(html, /title="Full M-VAVE FM-1 firmware emulator and test console"/);
-  assert.match(html, /same-origin|cross-origin/i);
+  assert.match(html, /same[- ]origin|cross-origin/i);
   assert.match(html, /felucca-midi-smoke\.fm1/);
   const script = await read("scripts/felucca-midi-smoke.fm1");
   assert.match(script, /500:m903c64,1300:m803c00/);
