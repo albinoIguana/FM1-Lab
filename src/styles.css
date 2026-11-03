@@ -49,3 +49,9 @@
 .editor-hero h2{margin-bottom:5px}
 .editor-hero p{font:9px var(--mono);letter-spacing:.14em;color:var(--pink);margin:10px 0 0}
 @media(max-width:650px){.preset-control{grid-template-columns:115px 1fr;gap:15px;padding:17px 0 3px}.rotary.large{width:90px;height:90px}.patch-slots{grid-template-columns:1fr}.patch-home-head{align-items:start;gap:10px;flex-direction:column}.patch-home-head>span{align-self:start}.slot-main{gap:14px}.instrument-stamp{min-width:105px;min-height:110px}.instrument-stamp b{font-size:48px}.hero{align-items:start}.preset-details p{font-size:10px}}
+
+/* Native Felucca bridge status and graph states */
+.native-status{min-height:72px;display:grid;place-items:center;text-align:center;padding:18px;border:1px solid #55e4ed44;background:#0a111b;color:var(--cyan);font:10px var(--mono);letter-spacing:.12em;line-height:1.7}
+.map-wait{padding:48px 12px;text-align:center;color:var(--amber);font:9px var(--mono);letter-spacing:.12em}
+.node.feedback circle{stroke:var(--amber);stroke-width:3;stroke-dasharray:3 2}
+.node.feedback.selected circle{stroke:white}
