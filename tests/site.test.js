@@ -78,6 +78,8 @@ test("FM1-Lab uses Felucca's real AudioWorklet and native patch adapter", async 
   assert.match(worklet, /fh_fm6_modulator_mask/);
   assert.match(worklet, /registerProcessor\("fm1lab-felucca"/);
   assert.match(worklet, /fh_render\(count\)/);
+  assert.match(worklet, /renderedFrames >= 44100/);
+  assert.match(engine, /DSP /);
   assert.doesNotMatch(worklet, /fh_screen/);
 });
 
