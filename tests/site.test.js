@@ -88,8 +88,16 @@ test("firmware test console opens the compatibility route and retains its Felucc
   assert.match(html, /src="\.\/compatibility\//);
   assert.match(html, /href="\.\/compatibility\//);
   assert.match(html, /run-midi-smoke/);
+  assert.match(html, /run-native-smoke/);
+  assert.match(html, /src="\.\/src\/browser-smoke\.js"/);
+  assert.match(html, /non-silent AudioWorklet samples/);
   assert.match(html, /same[- ]origin/i);
   assert.match(html, /felucca-midi-smoke\.fm1/);
+  const browserSmoke = await read("src/browser-smoke.js");
+  assert.match(browserSmoke, /loadFactoryPreset/);
+  assert.match(browserSmoke, /writePatch/);
+  assert.match(browserSmoke, /getFloatTimeDomainData/);
+  assert.match(browserSmoke, /LIVE AUDIO RENDER/);
   const script = await read("scripts/felucca-midi-smoke.fm1");
   assert.match(script, /500:m903c64,1300:m803c00/);
 });
