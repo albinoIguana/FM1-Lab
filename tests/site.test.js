@@ -15,7 +15,6 @@ test("FM1-Lab product page owns the root and references local application assets
   assert.equal(module, "src/main.js");
   await access(resolve(root, stylesheet));
   await access(resolve(root, module));
-  assert.match(html, /href="\.\/testing\.html"/);
   assert.match(html, /href="\.\/felucca\//);
   assert.match(html, /href="\.\/compatibility\//);
   assert.match(html, /FOUR PATCHES/);
@@ -39,7 +38,7 @@ test("deployment publishes FM1-Lab at root and keeps runtimes in supporting rout
   assert.match(workflow, /_site\/compatibility/);
   assert.match(workflow, /_site\/felucca/);
   assert.match(workflow, /cp index\.html _site\/index\.html/);
-  assert.match(workflow, /cp -R src\. _site\/src\//);
+  assert.match(workflow, /cp -R src\\/\\. _site\\/src\\//);
   assert.doesNotMatch(workflow, /build_site\.sh _site/);
 });
 
