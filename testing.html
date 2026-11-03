@@ -52,7 +52,7 @@ footer{padding:24px 0;color:#65738a;font:9px ui-monospace,monospace;letter-spaci
 </div>
 </section>
 <div class="toolbar"><a class="action" href="./compatibility/" target="_blank" rel="noopener">LAUNCH FULL-SCREEN TEST BENCH ↗</a><a class="action" href="https://github.com/joakimeriksson/fm1-emu" target="_blank" rel="noopener">EMULATOR SOURCE ↗</a><button class="action" id="run-midi-smoke" type="button">RUN FELUCCA MIDI SMOKE TEST ↗</button></div>
-<section class="console">
+<section class="console emulator-console">
 <div class="console-head"><span>UPSTREAM FM-1 EMULATOR · FULL TEST INTERFACE</span><span class="status" id="test-status">SAME-ORIGIN WEBASSEMBLY FIRMWARE RUNTIME</span></div>
 <iframe src="./compatibility/" title="Full M-VAVE FM-1 firmware emulator and test console" allow="autoplay; midi" loading="eager"></iframe>
 </section>
@@ -66,7 +66,7 @@ footer{padding:24px 0;color:#65738a;font:9px ui-monospace,monospace;letter-spaci
 </main>
 <script type="module" src="./src/browser-smoke.js"></script>
 <script>
-const emulatorFrame=document.querySelector(".console iframe");
+const emulatorFrame=document.querySelector(".emulator-console iframe");
 const testStatus=document.querySelector("#test-status");
 document.querySelector("#run-midi-smoke").addEventListener("click",()=>{
  testStatus.textContent="LOADING FELUCCA + MIDI SMOKE SCRIPT";
