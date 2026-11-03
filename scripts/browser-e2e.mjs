@@ -11,6 +11,7 @@ const pageErrors = [];
 try {
   const testPage = await browser.newPage();
   testPage.on("pageerror", error => pageErrors.push("test console: " + error.message));
+  testPage.on("console", message => { if (message.type() === "error") pageErrors.push("test console: " + message.text()); });
   let response;
   for (let attempt = 0; attempt < 40; attempt++) {
     try {
@@ -20,12 +21,17 @@ try {
     await new Promise(resolve => setTimeout(resolve, 250));
   }
   assert(response?.ok(), "The local Pages artifact did not become available.");
+  await testPage.waitForFunction(
+    () => document.querySelector("#run-native-smoke")?.dataset.nativeSmokeReady === "true",
+    null,
+    { timeout: 15000 }
+  ).catch(() => { throw new Error("Native smoke module did not initialize. Status: " + document.querySelector("#native-status")?.textContent + ". Browser errors: " + pageErrors.join("; ")); });
   await testPage.locator("#run-native-smoke").click();
   await testPage.waitForFunction(
     () => /NATIVE BROWSER SELF-TEST (PASSED|FAILED)/.test(document.querySelector("#native-status")?.textContent || ""),
     null,
     { timeout: 120000 }
-  );
+  ).catch(() => { throw new Error("Native smoke timed out. Status: " + document.querySelector("#native-status")?.textContent + ". Results: " + document.querySelector("#native-results")?.innerText + ". Browser errors: " + pageErrors.join("; ")); });
   const status = await testPage.locator("#native-status").innerText();
   const results = await testPage.locator("#native-results").innerText();
   assert.match(status, /PASSED/, "Native browser audio test failed: " + results);
