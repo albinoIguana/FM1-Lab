@@ -32,8 +32,12 @@ test("decode native voice reads algorithm, feedback, operator order, envelope an
   bytes[op1 + 19] = 50;
   bytes[op1] = 75;
   bytes[op1 + 1] = 60;
-  bytes[op1 + 6] = 42;
+  bytes[op1 + 2] = 45;
   bytes[op1 + 3] = 33;
+  bytes[op1 + 4] = 99;
+  bytes[op1 + 5] = 78;
+  bytes[op1 + 6] = 42;
+  bytes[op1 + 7] = 0;
   const seed = createFactoryInstruments()[0].patches[0];
   seed.feedbackOperator = 3;
   const patch = decodeNativePatch(seed, bytes);
@@ -43,10 +47,8 @@ test("decode native voice reads algorithm, feedback, operator order, envelope an
   assert.equal(patch.feedback, 5);
   assert.equal(patch.operators[0].ratio, 3);
   assert.equal(patch.operators[0].level, 51);
-  assert.equal(patch.operators[0].attack, 75);
-  assert.equal(patch.operators[0].decay, 60);
-  assert.equal(patch.operators[0].sustain, 42);
-  assert.equal(patch.operators[0].release, 33);
+  assert.deepEqual(patch.operators[0].rates, [75, 60, 45, 33]);
+  assert.deepEqual(patch.operators[0].levels, [99, 78, 42, 0]);
   assert.equal(patch.operators[2].feedback, 5);
   assert.equal(patch.operators[0].feedback, 0);
 });
@@ -57,11 +59,11 @@ test("operator controls encode to Felucca's native 155-byte layout", () => {
   patch.algorithm = 32;
   patch.feedback = 6;
   patch.name = "Chrome Dust";
-  patch.operators[0] = { ...patch.operators[0], ratio: 2.5, level: 50, attack: 72, decay: 41, sustain: 63, release: 19 };
+  patch.operators[0] = { ...patch.operators[0], ratio: 2.5, level: 50, rates: [72, 41, 63, 19], levels: [99, 80, 63, 0] };
   let out = writeNativeField(bytes, patch, "algorithm");
   out = writeNativeField(out, patch, "feedback");
   out = writeNativeField(out, patch, "name");
-  for (const field of ["ratio", "level", "attack", "decay", "sustain", "release"]) {
+  for (const field of ["ratio", "level", "rate1", "level1", "rate2", "level2", "rate3", "level3", "rate4", "level4"]) {
     out = writeNativeField(out, patch, field, 1);
   }
   const op1 = 5 * 21;
@@ -72,10 +74,8 @@ test("operator controls encode to Felucca's native 155-byte layout", () => {
   assert.equal(out[op1 + 18], 2);
   assert.equal(out[op1 + 19], 50);
   assert.equal(out[op1 + 16], 50);
-  assert.equal(out[op1], 72);
-  assert.equal(out[op1 + 1], 41);
-  assert.equal(out[op1 + 6], 63);
-  assert.equal(out[op1 + 3], 19);
+  assert.deepEqual(Array.from(out.slice(op1, op1 + 4)), [72, 41, 63, 19]);
+  assert.deepEqual(Array.from(out.slice(op1 + 4, op1 + 8)), [99, 80, 63, 0]);
 });
 
 test("native algorithm routing masks become source-to-destination edges", () => {
