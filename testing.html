@@ -64,6 +64,7 @@ footer{padding:24px 0;color:#65738a;font:9px ui-monospace,monospace;letter-spaci
 <p class="warning"><strong>Important boundary:</strong> the native browser self-test above verifies Felucca's WASM engine, patch bridge and non-silent AudioWorklet samples. The separate upstream emulator below runs supported firmware unchanged. Its MIDI smoke sequence confirms script delivery, not audible output or a semantic firmware pass. Arbitrary internal WASM state and live parameter writes are not exposed by the upstream emulator as a stable host API.</p>
 <footer>FM1-LAB · TEST CONSOLE · UPSTREAM EMULATOR BY JOAKIM ERIKSSON · NO FIRMWARE MODIFICATIONS</footer>
 </main>
+<script type="module" src="./src/browser-smoke.js"></script>
 <script>
 const emulatorFrame=document.querySelector(".console iframe");
 const testStatus=document.querySelector("#test-status");
