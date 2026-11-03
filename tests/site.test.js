@@ -106,3 +106,18 @@ test("firmware test console opens the compatibility route and retains its Felucc
   const script = await read("scripts/felucca-midi-smoke.fm1");
   assert.match(script, /500:m903c64,1300:m803c00/);
 });
+
+
+test("Pages build verifies real browser audio and product startup in Chromium", async () => {
+  const workflow = await read(".github/workflows/deploy-pages.yml");
+  const browserTest = await read("scripts/browser-e2e.mjs");
+  assert.match(workflow, /group: pages-\$\{\{ github\.ref \}\}/);
+  assert.match(workflow, /npm install --no-save --no-package-lock playwright/);
+  assert.match(workflow, /playwright install --with-deps chromium/);
+  assert.match(workflow, /node scripts\/browser-e2e\.mjs/);
+  assert.match(browserTest, /chromium\.launch/);
+  assert.match(browserTest, /run-native-smoke/);
+  assert.match(browserTest, /LIVE AUDIO RENDER/);
+  assert.match(browserTest, /4 \\/ 4 NATIVE VOICES LOADED/);
+  assert.match(browserTest, /\.edit-patch/);
+});
