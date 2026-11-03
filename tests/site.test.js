@@ -93,6 +93,8 @@ test("firmware test console opens the compatibility route and retains its Felucc
   assert.match(html, /run-midi-smoke/);
   assert.match(html, /run-native-smoke/);
   assert.match(html, /src="\.\/src\/browser-smoke\.js"/);
+  assert.match(html, /class="console emulator-console"/);
+  assert.match(html, /querySelector\("\.emulator-console iframe"\)/);
   assert.match(html, /non-silent AudioWorklet samples/);
   assert.match(html, /same[- ]origin/i);
   assert.match(html, /felucca-midi-smoke\.fm1/);
