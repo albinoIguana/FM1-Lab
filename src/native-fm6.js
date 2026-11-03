@@ -29,10 +29,8 @@ export function decodeNativePatch(patch, source) {
       ...previous,
       ratio: Number(clamp(ratio, 0.5, 16).toFixed(2)),
       level: Math.round(bytes[offset + 16] / 99 * 100),
-      attack: bytes[offset],
-      decay: bytes[offset + 1],
-      sustain: bytes[offset + 6],
-      release: bytes[offset + 3],
+      rates: Array.from({ length: 4 }, (_, stage) => bytes[offset + stage]),
+      levels: Array.from({ length: 4 }, (_, stage) => bytes[offset + 4 + stage]),
       feedback: index + 1 === (patch.feedbackOperator || 1) ? feedback : 0,
       nativeMode: mode,
       nativeCoarse: coarse,
@@ -80,10 +78,16 @@ export function writeNativeField(source, patch, field, operatorNumber = 1) {
       break;
     }
     case "level": bytes[offset + 16] = roundByte(operator.level / 100 * 99); break;
-    case "attack": bytes[offset] = roundByte(operator.attack); break;
-    case "decay": bytes[offset + 1] = roundByte(operator.decay); break;
-    case "sustain": bytes[offset + 6] = roundByte(operator.sustain); break;
-    case "release": bytes[offset + 3] = roundByte(operator.release); break;
+    case "rate1": case "rate2": case "rate3": case "rate4": {
+      const stage = Number(field.slice(4)) - 1;
+      bytes[offset + stage] = roundByte(operator.rates[stage]);
+      break;
+    }
+    case "level1": case "level2": case "level3": case "level4": {
+      const stage = Number(field.slice(5)) - 1;
+      bytes[offset + 4 + stage] = roundByte(operator.levels[stage]);
+      break;
+    }
     default: throw new Error("Unsupported native FM6 field: " + field);
   }
   return bytes;
