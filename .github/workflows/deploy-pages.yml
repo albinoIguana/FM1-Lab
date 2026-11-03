@@ -54,6 +54,7 @@ jobs:
           cp index.html _site/designer/index.html
           cp -R src _site/designer/
           cp testing.html _site/testing.html
+          cp .nojekyll _site/
           cp scripts/felucca-midi-smoke.fm1 _site/scripts/
           node scripts/inject-lab-link.mjs _site/index.html
 
