@@ -27,6 +27,7 @@ test("deployment makes the actual upstream emulator the primary site", async () 
   assert.match(workflow, /persistence\.wasm\.mjs _site/);
   assert.match(workflow, /cp index\.html _site\/designer\/index\.html/);
   assert.match(workflow, /inject-lab-link\.mjs _site\/index\.html/);
+  assert.match(workflow, /cp \.nojekyll _site\//);
   assert.match(injector, /Instrument designer/);
   assert.match(injector, /fm1-emu/);
 });
