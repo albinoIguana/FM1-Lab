@@ -1,32 +1,36 @@
 # Emulator capability investigation
 
-Research snapshot: 2026-11-03. Findings below are based on the upstream `web/main.js`, `web/tryout.js`, `web/index.html` and README.
+Research snapshot: 2026-11-03. Upstream source is pinned as a Git submodule at vendor/fm1-emu (MIT license), currently commit 9de1ef053a3c4bf56f16f05b5f0de193f4608a1d.
 
-## Confirmed integration surface
-- `?embed=1`: the upstream page enters an embed-only UI mode (its own stylesheet hides the surrounding site chrome). FM1-Lab now embeds this page in an iframe.
-- The emulator runs firmware unchanged in WebAssembly and has a real AudioWorklet audio graph. Its page owns its AudioContext, WASM instance, firmware boot and machine state.
-- Parent notification: `tell()` posts `{source:"fm1-emu", type:"tryout", state, text}` with `targetOrigin=location.origin`. This is only try-out lifecycle status. Because the iframe is hosted on `joakimeriksson.github.io`, a parent on another origin cannot receive that origin-restricted message.
-- Try-out URL parameters: `?flash=PATH` and `?script=PATH`. `web/tryout.js` explicitly restricts these resources to the emulator page's own origin, over HTTP(S), with redirects rejected.
-- Script syntax is fm1-live's `FM1_BENCH_KEYS`: time-stamped MIDI bytes into the emulated MIDI IN jack, key/button press/release IDs, encoder clicks and pot events. It runs from boot; it is not a live host RPC.
-- Emulator input can be driven inside the iframe directly by its own UI, keyboard, mouse/touch and Web MIDI input where the browser supports it.
+## Integration architecture
+- The upstream FM-1 emulator is served from /FM1-Lab/vendor/fm1-emu/web/ on the same GitHub Pages origin as FM1-Lab.
+- The Pages deployment workflow checks out submodules so the upstream WebAssembly binary, JavaScript, firmware catalog and assets are deployed with the app.
+- The iframe uses the upstream embed-only mode for the main editor and the full page for the dedicated test console.
+- Same-origin hosting means documented try-out URL parameters can load test scripts from FM1-Lab's own scripts directory.
+- The upstream page's documented postMessage lifecycle events (loading, booting, playing, start, error) can be received by the parent after checking both origin and iframe window.
+
+## Scripted test surface
+- The Felucca MIDI smoke scenario loads the Felucca firmware and sends a MIDI note-on / note-off sequence on channel 1.
+- The emulator's playing event means the scripted input sequence has been delivered to the emulated machine. It is not proof that audio was audible or that the firmware passed a semantic assertion.
+- A flash URL can load documented flash-sector overlays from the same origin, enabling repeatable save-state scenarios later.
 
 ## Boundaries
 | Capability | Status |
 |---|---|
-| Embed official emulator UI | Supported and integrated in FM1-Lab |
-| Interact directly with emulator canvas | Supported inside iframe |
-| Read emulator internal state from FM1-Lab | Not exposed cross-origin |
-| Receive upstream try-out postMessage in cross-origin parent | Blocked by target-origin restriction |
-| Supply try-out script from FM1-Lab origin | Rejected by same-origin validation |
-| Arbitrary live parameter write API | Not documented |
-| Emulator MIDI OUT | Not implemented by published page |
-| Local independent FM synthesis | Implemented separately in FM1-Lab |
+| Run official upstream emulator unchanged | Supported via pinned submodule |
+| Run on same origin as FM1-Lab | Supported |
+| Load scripted MIDI / key / encoder events at boot | Supported via documented try-out API |
+| Receive documented try-out lifecycle events | Supported; origin and iframe source are validated |
+| Load a flash-sector overlay from this site | Supported by upstream format; tooling still to build |
+| Read arbitrary internal WASM state | Not exposed as a stable host API |
+| Assert audible output or compare audio automatically | Not implemented |
+| Arbitrary live parameter writes | Not documented / not implemented |
+| FM1-Lab local DSP engine | Independent implementation, not bit-accurate stock firmware |
 
-## Potential deeper integration
-A robust scripted integration would require a same-origin companion page or upstream change (for example, a reviewed host API / configurable postMessage target origin and explicit message schema). Do not use permissive wildcard messaging or scrape internal WASM exports as if they were stable APIs. Any upstream contribution should be reviewed for license, security and compatibility.
+## Next integration steps
+1. Verify the locally hosted emulator on desktop and iOS Safari.
+2. Add a scenario runner for firmware, script, and optional flash overlay combinations.
+3. Capture audio output for deterministic audio regression comparisons where browser support allows.
+4. If deeper live telemetry is needed, propose a small explicit host API upstream rather than scraping private WASM exports.
 
-References:
-- https://github.com/joakimeriksson/fm1-emu/blob/master/web/main.js
-- https://github.com/joakimeriksson/fm1-emu/blob/master/web/tryout.js
-- https://github.com/joakimeriksson/fm1-emu/blob/master/web/index.html
-- https://github.com/joakimeriksson/fm1-emu
+The submodule preserves upstream attribution and pins a known-good revision. Update it deliberately, review upstream changes, then run the browser and firmware smoke matrix.
