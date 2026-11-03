@@ -1,5 +1,5 @@
 import { FeluccaEngine } from "./felucca-engine.js";
-import { createFactoryInstruments, createDefaultPatch, migrateLegacyPatch, normalizeInstrument } from "./instrument.js";
+import { createFactoryInstruments, migrateLegacyPatch, normalizeInstrument } from "./instrument.js";
 import { decodeNativePatch, nativeTopologyCaption, topologyEdges, writeNativeField } from "./native-fm6.js";
 
 const $ = selector => document.querySelector(selector);
@@ -222,13 +222,18 @@ function renderAll() {
 
 function load() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem("fm1lab.instrument-library.v1"));
     if (saved?.format === "fm1-lab-library" && saved.instruments) {
       for (const [id, candidate] of Object.entries(saved.instruments)) {
         try { library[id] = normalizeInstrument(candidate, id); }
         catch (error) { console.warn("Skipped invalid saved Instrument", id, error); }
       }
-      if (library[saved.selectedInstrumentId]) selectedInstrumentId = saved.selectedInstrumentId;
+      for (const item of factoryInstruments) {
+        if (library[item.id] && !library[item.id].factorySlots && !library[item.id].patches.some(p => Array.isArray(p.nativePatch))) {
+          library[item.id].factorySlots = [...item.factorySlots];
+        }
+      }
+      if (library[saved.selectedInstrumentId] && factoryInstruments.some(item => item.id === saved.selectedInstrumentId)) selectedInstrumentId = saved.selectedInstrumentId;
     } else {
       const legacy = JSON.parse(localStorage.getItem("fm1lab.patch.v3") || localStorage.getItem("fm1lab.patch.v2"));
       if (legacy?.operators) {
