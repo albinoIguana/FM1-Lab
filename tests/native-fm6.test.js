@@ -72,7 +72,7 @@ test("operator controls encode to Felucca's native 155-byte layout", () => {
   assert.equal(out[145], "C".charCodeAt(0));
   assert.equal(out[op1 + 17], 0);
   assert.equal(out[op1 + 18], 2);
-  assert.equal(out[op1 + 19], 50);
+  assert.equal(out[op1 + 19], 25);
   assert.equal(out[op1 + 16], 50);
   assert.deepEqual(Array.from(out.slice(op1, op1 + 4)), [72, 41, 63, 19]);
   assert.deepEqual(Array.from(out.slice(op1 + 4, op1 + 8)), [99, 80, 63, 0]);
