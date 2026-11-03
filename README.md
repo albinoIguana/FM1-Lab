@@ -27,7 +27,7 @@ Clone the repository, then run `python3 -m http.server 8000` from its folder and
 The MIT-licensed upstream FM-1 emulator is pinned as a Git submodule at vendor/fm1-emu. GitHub Pages checks out the submodule and serves it under the FM1-Lab site path, keeping the emulator and host on the same origin. Update the pinned commit deliberately and retain the upstream LICENSE.
 
 ## Firmware test console
-The [FM-1 Test Console](testing.html) embeds the full upstream emulator interface (not just its instrument-only embed). It provides the upstream firmware catalog, local `.fwsc` loading, emulated front-panel input, supported MIDI input, and browser flash save/backup controls. It is interactive firmware validation, not yet an automated regression runner: the upstream boot-script and flash-overlay try-out files are restricted to the emulator's own origin, and its internal state is not exposed to FM1-Lab.
+The [FM-1 Test Console](testing.html) embeds the full upstream emulator interface (not just its instrument-only embed). It provides the upstream firmware catalog, local `.fwsc` loading, emulated front-panel input, supported MIDI input, and browser flash save/backup controls. It now supports a documented same-origin boot-time MIDI smoke scenario and lifecycle status messages. The current smoke result confirms scripted input delivery, not audible output or firmware correctness; deeper assertions and audio capture remain future work.
 
 ## Data model
 An **Instrument** is the saved preset and contains four **FM patches**. Each FM patch contains its own topology, macros, and six operator parameter sets. The four-patch model is now the home-screen/navigation structure; simultaneous layering, independent sequencing, and performance routing are future work.
