@@ -138,7 +138,7 @@ async function startHeldNote(note,velocity=100){
  catch(error){heldKeyIntents.delete(note);console.error(error);alert(error.message)}
 }
 function stopHeldNote(note){heldKeyIntents.delete(note);const voice=heldNotes.get(note);if(voice){engine.noteOff(voice);heldNotes.delete(note)}}
-function stopAllHeldNotes(){for(const note of [...heldNotes.keys()])stopHeldNote(note)}
+function stopAllHeldNotes(){for(const note of new Set([...heldNotes.keys(),...heldKeyIntents]))stopHeldNote(note)}
 window.addEventListener("blur",stopAllHeldNotes);
 $("#enter").onclick=()=>{$("#boot").remove();$("#app").hidden=false};
 $("#preset-knob").oninput=event=>selectInstrument(+event.target.value);
