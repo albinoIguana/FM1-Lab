@@ -224,7 +224,7 @@ function renderEditor() {
   if (fineInput) fineInput.oninput = event => {
     operator.nativeFine = +event.target.value;
     $("#v-fine").textContent = operator.nativeFine;
-    fineInput.parentElement.querySelector("label").textContent = "FIXED FINE · TOTAL " + (Math.pow(10, operator.nativeCoarse) * Math.pow(1.0233, operator.nativeFine)).toFixed(1) + " HZ";
+    fineInput.parentElement.querySelector("label").textContent = "FIXED FINE · TOTAL " + nativeFixedFrequency(operator.nativeCoarse, operator.nativeFine).toFixed(1) + " HZ";
     writeCurrentField("fine");
   };
   fields.forEach(([key]) => {
