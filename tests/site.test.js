@@ -72,6 +72,8 @@ test("FM1-Lab uses Felucca's real AudioWorklet and native patch adapter", async 
   assert.match(main, /engine\.loadFactoryPreset/);
   assert.match(main, /normalizeInstrument\(parsed\)/);
   assert.match(main, /factoryInstruments\.push\(imported\)/);
+  assert.match(main, /candidate\.factoryNativePatch = Array\.from\(bytes\)/);
+  assert.match(main, /writeNativeField\(bytes, candidate, "algorithm"\)/);
   assert.match(main, /#import-file/);
   assert.match(main, /engine\.writePatch/);
   assert.match(main, /engine\.getTopology/);
