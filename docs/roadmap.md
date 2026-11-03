@@ -7,6 +7,7 @@
 - [x] Six oscillators, three selectable FM routing graphs, carrier summing.
 - [x] Per-operator attack, decay, sustain and release envelopes.
 - [x] Delayed feedback loops and four performance macros.
+- [x] Add zero-dependency mocked audio-graph tests and GitHub Actions CI.
 - [ ] Browser/device smoke tests, accessibility and GitHub Pages deployment.
 
 ## Sprint B — Emulator integration proof
@@ -25,6 +26,7 @@
 - [ ] Add held-note note-off and polyphonic voice stealing.
 - [ ] Normalize modulation index by algorithm and operator level.
 - [ ] Add oversampling/aliasing evaluation, audio regression tests and CPU profiling.
+- [x] Add malformed-patch guard and mocked routing/feedback tests.
 - [ ] Add canonical patch schema validation and migration tests.
 
 ## Combined sprint exit criteria
