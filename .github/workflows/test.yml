@@ -2,7 +2,6 @@ name: FM1-Lab checks
 
 on:
   push:
-    branches: ["main", "speedrun/**"]
   pull_request:
     branches: ["main"]
 
