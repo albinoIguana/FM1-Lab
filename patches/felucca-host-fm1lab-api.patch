@@ -1,7 +1,7 @@
 diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 --- a/platforms/host/felucca_host.c
 +++ b/platforms/host/felucca_host.c
-@@ -380,6 +380,89 @@ FH_API void fh_boot(void)
+@@ -380,6 +380,104 @@ FH_API void fh_boot(void)
  FH_API const void *fh_plugin_host(void) { return &PLG_HOST; }
  FH_API uint32_t fh_plugin_add(const void *d, uint32_t no) { return fh_on ? 4u : (uint32_t)plg_add((const fe_plugin_t *)d, no); }
  
@@ -57,6 +57,21 @@ diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 +FH_API uint32_t fh_fm6_feedback_operator(uint32_t algorithm)
 +{
 +    return algorithm >= 1u && algorithm <= 32u ? fm6_fb_op(algorithm - 1u) + 1u : 0u;
++}
++
++/* DTUN is a track macro rather than part of the 155-byte FM6 voice.
++ * Keep it alongside each FM1-Lab patch so factory PAD detune survives bank changes. */
++FH_API uint32_t fh_fm6_detune_read(uint32_t track)
++{
++    return fh_on && track < NTRK ? (uint32_t)trk[track].p[P_E6] : 0u;
++}
++
++FH_API uint32_t fh_fm6_detune_write(uint32_t track, uint32_t value)
++{
++    if (!fh_on || track >= NTRK)
++        return 0u;
++    trk[track].p[P_E6] = value > 127u ? 127 : value;
++    return 1u;
 +}
 +
 +FH_API uint32_t fh_fm6_patch_read(uint32_t track, uint8_t *dst, uint32_t capacity)
