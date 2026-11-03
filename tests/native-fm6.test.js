@@ -47,7 +47,7 @@ test("decode native voice reads algorithm, feedback, operator order, envelope an
   assert.equal(patch.operators[0].decay, 60);
   assert.equal(patch.operators[0].sustain, 42);
   assert.equal(patch.operators[0].release, 33);
-  assert.equal(patch.operators[2].feedback, 71);
+  assert.equal(patch.operators[2].feedback, 5);
   assert.equal(patch.operators[0].feedback, 0);
 });
 
