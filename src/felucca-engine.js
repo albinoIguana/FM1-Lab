@@ -86,10 +86,6 @@ export class FeluccaEngine {
     await this.request("factory-load", { track, preset });
   }
 
-  async loadFactoryPreset(track, preset) {
-    await this.request("factory-load", { track, preset });
-  }
-
   async readPatch(track) {
     const result = await this.request("patch-read", { track });
     return new Uint8Array(result.patch);
