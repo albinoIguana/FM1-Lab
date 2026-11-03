@@ -200,10 +200,9 @@ function renderEditor() {
   if (ratioInput) ratioInput.oninput = event => {
     operator.ratio = +event.target.value;
     operator.nativeMode = 0;
-    operator.nativeCoarse = operator.ratio < 1 ? 0 : Math.floor(operator.ratio);
-    operator.nativeFine = operator.ratio < 1
-      ? Math.round((operator.ratio / 0.5 - 1) * 100)
-      : Math.round((operator.ratio - operator.nativeCoarse) * 100);
+    operator.nativeCoarse = operator.ratio < 1 ? 0 : Math.min(31, Math.floor(operator.ratio));
+    const baseRatio = operator.nativeCoarse === 0 ? 0.5 : operator.nativeCoarse;
+    operator.nativeFine = Math.round((operator.ratio / baseRatio - 1) * 100);
     $("#v-ratio").textContent = operator.ratio;
     writeCurrentField("ratio");
     renderSpectrum();
