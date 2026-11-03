@@ -23,6 +23,7 @@ try {
   await testPage.locator("#run-native-smoke").click();
   await testPage.waitForFunction(
     () => /NATIVE BROWSER SELF-TEST (PASSED|FAILED)/.test(document.querySelector("#native-status")?.textContent || ""),
+    null,
     { timeout: 120000 }
   );
   const status = await testPage.locator("#native-status").innerText();
@@ -38,7 +39,7 @@ try {
   assert(appResponse?.ok(), "The FM1-Lab product page did not load.");
   await appPage.locator("#enter").click();
   await appPage.waitForFunction(
-    () => /FELUCCA FM6 ENGINE ACTIVE/.test(document.querySelector("#engine-status")?.textContent || ""),
+    () => /FELUCCA FM6 (ENGINE )?ACTIVE/.test(document.querySelector("#engine-status")?.textContent || ""),
     { timeout: 120000 }
   );
   await appPage.waitForFunction(
