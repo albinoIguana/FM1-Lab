@@ -29,15 +29,15 @@ footer{padding:24px 0;color:#65738a;font:9px ui-monospace,monospace;letter-spaci
 </style>
 </head>
 <body>
-<header><a class="logo" href="./">FM1<span>·</span>LAB</a><nav><a href="./designer/">← INSTRUMENT DESIGNER</a><a href="./" target="_blank" rel="noopener">OPEN EMULATOR DIRECTLY ↗</a></nav></header>
+<header><a class="logo" href="./">FM1<span>·</span>LAB</a><nav><a href="./">← INSTRUMENT DESIGNER</a><a href="./compatibility/" target="_blank" rel="noopener">OPEN EMULATOR DIRECTLY ↗</a></nav></header>
 <main>
 <div class="eyebrow">09 / FIRMWARE VALIDATION ENVIRONMENT</div>
 <h1>FM-1 <em>Test Console.</em></h1>
 <p class="intro">Run the real FM-1 firmware emulator alongside FM1-Lab. This is the upstream emulator's full interface—not the stripped-down instrument-only embed. Pick community firmware, load a local .fwsc package, use the emulated controls, connect MIDI where supported, and save or export emulator flash backups.</p>
-<div class="toolbar"><a class="action" href="./vendor/fm1-emu/" target="_blank" rel="noopener">LAUNCH FULL-SCREEN TEST BENCH ↗</a><a class="action" href="https://github.com/joakimeriksson/fm1-emu" target="_blank" rel="noopener">EMULATOR SOURCE ↗</a><button class="action" id="run-midi-smoke" type="button">RUN FELUCCA MIDI SMOKE TEST ↗</button></div>
+<div class="toolbar"><a class="action" href="./compatibility/" target="_blank" rel="noopener">LAUNCH FULL-SCREEN TEST BENCH ↗</a><a class="action" href="https://github.com/joakimeriksson/fm1-emu" target="_blank" rel="noopener">EMULATOR SOURCE ↗</a><button class="action" id="run-midi-smoke" type="button">RUN FELUCCA MIDI SMOKE TEST ↗</button></div>
 <section class="console">
 <div class="console-head"><span>UPSTREAM FM-1 EMULATOR · FULL TEST INTERFACE</span><span class="status" id="test-status">SAME-ORIGIN WEBASSEMBLY FIRMWARE RUNTIME</span></div>
-<iframe src="./" title="Full M-VAVE FM-1 firmware emulator and test console" allow="autoplay; midi" loading="eager"></iframe>
+<iframe src="./compatibility/" title="Full M-VAVE FM-1 firmware emulator and test console" allow="autoplay; midi" loading="eager"></iframe>
 </section>
 <section class="info">
 <article><h2>FIRMWARE UNDER TEST</h2><p>Select from the community firmware catalog or use the emulator's Open control to load an .fwsc package from your computer. M-VAVE stock firmware requires your own downloaded package.</p></article>
@@ -52,7 +52,7 @@ const emulatorFrame=document.querySelector(".console iframe");
 const testStatus=document.querySelector("#test-status");
 document.querySelector("#run-midi-smoke").addEventListener("click",()=>{
  testStatus.textContent="LOADING FELUCCA + MIDI SMOKE SCRIPT";
- emulatorFrame.src="./?fw=felucca&script=scripts/felucca-midi-smoke.fm1";
+ emulatorFrame.src="./compatibility/?fw=felucca&script=../scripts/felucca-midi-smoke.fm1";
 });
 window.addEventListener("message",event=>{
  if(event.origin!==location.origin||event.source!==emulatorFrame.contentWindow)return;
