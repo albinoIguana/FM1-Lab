@@ -1,7 +1,7 @@
 diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 --- a/platforms/host/felucca_host.c
 +++ b/platforms/host/felucca_host.c
-@@ -380,6 +380,88 @@ FH_API void fh_boot(void)
+@@ -380,6 +380,89 @@ FH_API void fh_boot(void)
  FH_API const void *fh_plugin_host(void) { return &PLG_HOST; }
  FH_API uint32_t fh_plugin_add(const void *d, uint32_t no) { return fh_on ? 4u : (uint32_t)plg_add((const fe_plugin_t *)d, no); }
  
@@ -75,7 +75,8 @@ diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 +    uint8_t voice[FP_SIZE + 1u];
 +    if (!fh_on || track >= NTRK || !src || length != FP_SIZE)
 +        return 0u;
-+    host_preset_req(&trk[track], ENGI_FM6, 0u);
++    if (trk[track].eng_req != ENGI_FM6)
++        host_preset_req(&trk[track], ENGI_FM6, 0u);
 +    /* FM1-Lab edits the voice itself; clear Felucca's seven additive track macros
 +     * so hidden ALG/FB/MLVL/MRAT/MEG/VMOD/DTUN offsets cannot mask native bytes. */
 +    for (uint32_t i = 0; i < 7u; i++)
