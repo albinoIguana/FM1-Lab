@@ -1,27 +1,34 @@
 # FM1-Lab accelerated roadmap
 
 ## Sprint A — Foundation and playable workbench
-- [x] Responsive UI and geometric startup.
-- [x] Six-operator design model, editable parameters and routing studies.
-- [x] Patch persistence, mutation and JSON export.
-- [x] Real-time local two-operator FM voice using Web Audio API.
-- [ ] Browser smoke tests, accessibility and Pages deployment.
+- [x] Responsive UI, startup and operator editor.
+- [x] Six-operator design model and patch persistence/export.
+- [x] Real-time Web Audio FM voice.
+- [x] Six oscillators, three selectable FM routing graphs, carrier summing.
+- [x] Per-operator attack, decay, sustain and release envelopes.
+- [x] Delayed feedback loops and four performance macros.
+- [ ] Browser/device smoke tests, accessibility and GitHub Pages deployment.
 
 ## Sprint B — Emulator integration proof
-- [ ] Inspect upstream WASM exports, AudioWorklet and message flow.
-- [ ] Separate stable public host boundary from internal implementation details.
-- [ ] Verify embedding/launch path, boot, input, audio and MIDI input.
-- [ ] Document license and firmware handling.
-- [ ] Expose parameter writes only if a real source-backed path is proven.
+- [x] Inspect upstream WASM/UI and try-out source boundaries.
+- [x] Embed official emulator using documented `?embed=1` mode.
+- [x] Document same-origin and cross-origin constraints.
+- [ ] Test emulator iframe on desktop and iOS Safari.
+- [ ] If desired, propose a secure upstream host API rather than relying on private internals.
 
 ## Sprint C — FM engine v1
-- [x] First playable two-operator FM voice.
-- [ ] Canonical patch schema and migrations.
-- [ ] Six-operator graph execution and carrier summing.
-- [ ] Per-operator ADSR, note-off, velocity and polyphony.
-- [ ] Bounded feedback, aliasing review and audio regression tests.
+- [x] Modular local DSP engine in `src/fm-engine.js`.
+- [x] Six independently configurable operators.
+- [x] Three genuine audio-rate modulation topologies.
+- [x] Carrier summing, per-operator ADSR and delayed feedback.
+- [x] Brightness/body/motion/feedback macros.
+- [ ] Add held-note note-off and polyphonic voice stealing.
+- [ ] Normalize modulation index by algorithm and operator level.
+- [ ] Add oversampling/aliasing evaluation, audio regression tests and CPU profiling.
+- [ ] Add canonical patch schema validation and migration tests.
 
-Combined speedrun exit criteria: a stable workbench that produces sound from its own FM engine, exports patches, and has an evidence-based emulator integration report. The local DSP and stock firmware emulator remain separate engines.
+## Combined sprint exit criteria
+A stable standalone workbench that produces six-operator FM sound, exports patches, and embeds the official emulator without misrepresenting integration capabilities. Code syntax and mocked graph construction can be checked in CI; real browser/audio testing remains required.
 
 ## Later
-Algorithm-aware macros, four-layer hybrid architecture, sequencing/arpeggiation, automation, effects, presets and hardware compatibility.
+Algorithm-aware macro mapping, additional algorithms, four-layer hybrid architecture, sequencer/arpeggiator, automation, effects, presets and hardware compatibility matrix.
