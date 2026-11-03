@@ -3,6 +3,8 @@ name: Deploy FM1-Lab to GitHub Pages
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -27,6 +29,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Run FM1-Lab tests
+        run: npm test
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -93,6 +98,7 @@ jobs:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
