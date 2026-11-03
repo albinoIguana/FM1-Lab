@@ -289,6 +289,9 @@ function load() {
         try { library[id] = normalizeInstrument(candidate, id); }
         catch (error) { console.warn("Skipped invalid saved Instrument", id, error); }
       }
+      for (const [id, item] of Object.entries(library)) {
+        if (!factoryInstruments.some(factory => factory.id === id)) factoryInstruments.push(item);
+      }
       for (const item of factoryInstruments) {
         if (library[item.id] && !library[item.id].factorySlots && !library[item.id].patches.some(p => Array.isArray(p.nativePatch))) {
           library[item.id].factorySlots = [...item.factorySlots];
