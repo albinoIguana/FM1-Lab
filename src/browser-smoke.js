@@ -109,4 +109,5 @@ async function runBrowserSmokeTest() {
   }
 }
 
+button.dataset.nativeSmokeReady = "true";
 button.addEventListener("click", runBrowserSmokeTest);
