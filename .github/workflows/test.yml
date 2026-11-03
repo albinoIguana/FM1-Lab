@@ -15,6 +15,7 @@ jobs:
           node-version: 22
       - run: node --check src/main.js
       - run: node --check src/felucca-engine.js
+      - run: node --check src/browser-smoke.js
       - run: node --check src/felucca-worklet.js
       - run: node --check src/native-fm6.js
       - run: node --check src/instrument.js
