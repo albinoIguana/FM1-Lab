@@ -317,15 +317,19 @@ async function activateInstrument() {
     if (Array.isArray(candidate.nativePatch) && candidate.nativePatch.length === 155) {
       bytes = Uint8Array.from(candidate.nativePatch);
       await engine.writePatch(index, bytes);
+      await engine.writeDetune(index, candidate.detune || 0);
     } else if (Array.isArray(candidate.factoryNativePatch) && candidate.factoryNativePatch.length === 155) {
       bytes = Uint8Array.from(candidate.factoryNativePatch);
       await engine.writePatch(index, bytes);
+      await engine.writeDetune(index, candidate.detune || 0);
     } else if (instrument.factorySlots) {
       await engine.loadFactoryPreset(index, instrument.factorySlots[index]);
       bytes = await engine.readPatch(index);
+      candidate.detune = await engine.readDetune(index);
       candidate.factoryNativePatch = Array.from(bytes);
     } else {
       bytes = await engine.readPatch(index);
+      candidate.detune = await engine.readDetune(index);
       candidate.factoryNativePatch = Array.from(bytes);
     }
     const algorithm = (bytes[134] & 31) + 1;
@@ -537,6 +541,7 @@ $("#reset").onclick = async () => {
   try {
     const bytes = Uint8Array.from(patch.factoryNativePatch || patch.nativePatch);
     await engine.writePatch(selectedPatchIndex, bytes);
+    await engine.writeDetune(selectedPatchIndex, patch.detune || 0);
     instrument.patches[selectedPatchIndex] = decodeNativePatch(patch, bytes);
     const topology = await loadTopology(instrument.patches[selectedPatchIndex].algorithm);
     const resetPatch = instrument.patches[selectedPatchIndex];
