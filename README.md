@@ -2,7 +2,7 @@
 
 Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
 
-## Run locally
+## Live app\n\n[Open FM1-Lab](https://albinoiguana.github.io/FM1-Lab/) · [GitHub repository](https://github.com/albinoIguana/FM1-Lab)\n\nThe `main` branch automatically deploys to GitHub Pages through `.github/workflows/deploy-pages.yml`.\n\n## Run locally
 Clone the repository, then run `python3 -m http.server 8000` from its folder and open http://localhost:8000. No build tool or package install is required. Run `npm test` to execute the zero-dependency model and DSP tests.
 
 ## Current build
@@ -13,7 +13,7 @@ Clone the repository, then run `python3 -m http.server 8000` from its folder and
 - Local Instrument library persistence, legacy single-patch migration and complete Instrument JSON export.
 - Three local DSP topologies: six-stage cascade, three paired carriers, and split/converging tree.
 - Six sine oscillators per played note, audio-rate frequency modulation, summed carriers, per-operator ADSR and delayed feedback loops.
-- Lazy-loaded official firmware emulator iframe using its documented `?embed=1` mode.
+- Lazy-loaded official firmware emulator iframe using its documented `?embed=1` mode.\n- Public GitHub Pages deployment with automatic deploy on every `main` push.
 
 ## Firmware test console
 The [FM-1 Test Console](testing.html) embeds the full upstream emulator interface (not just its instrument-only embed). It provides the upstream firmware catalog, local `.fwsc` loading, emulated front-panel input, supported MIDI input, and browser flash save/backup controls. It is interactive firmware validation, not yet an automated regression runner: the upstream boot-script and flash-overlay try-out files are restricted to the emulator's own origin, and its internal state is not exposed to FM1-Lab.
