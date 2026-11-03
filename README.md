@@ -1,40 +1,54 @@
 # FM1-Lab
 
-Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
+**FM1-Lab is now emulator-first.** The main page runs the actual M-VAVE FM-1 emulator in the browser. The custom four-patch Instrument designer remains available as a secondary experiment.
 
-## Live app
+## Live
 
-[Open FM1-Lab](https://albinoiguana.github.io/FM1-Lab/) · [GitHub repository](https://github.com/albinoIguana/FM1-Lab)
+- [Play the FM-1 emulator](https://albinoiguana.github.io/FM1-Lab/) — the real emulated FM-1 CPU, screen, controls and audio running community firmware unchanged in WebAssembly.
+- [Experimental Instrument designer](https://albinoiguana.github.io/FM1-Lab/designer/) — the separate four-patch Instrument model and local six-operator DSP prototype.
+- [Firmware smoke-test console](https://albinoiguana.github.io/FM1-Lab/testing.html) — scripted Felucca test entry point.
+- [FM1-Lab source](https://github.com/albinoIguana/FM1-Lab).
 
-The `main` branch automatically deploys to GitHub Pages through `.github/workflows/deploy-pages.yml`.
+The upstream emulator is MIT-licensed and pinned as a recursive Git submodule at `vendor/fm1-emu`. Its original interface is built and served at the site root, so there is no iframe between the user and the audio engine. GitHub Pages builds the WebAssembly runtime, runs upstream Rust and browser tests, smoke-tests Felucca audio/MIDI, verifies flash persistence, and deploys automatically on pushes to `main`.
 
 ## Run locally
-Clone with `git clone --recurse-submodules https://github.com/albinoIguana/FM1-Lab.git`, then run `python3 -m http.server 8000` from its folder and open http://localhost:8000. If you already cloned without submodules, run `git submodule update --init --recursive`. No build tool or package install is required. Run `npm test` to execute the zero-dependency model and DSP tests.
 
-## Current build
-- Instrument home screen with four factory Instrument presets.
-- Each Instrument contains exactly four independent six-operator FM patches.
-- Preset selector changes the active Instrument; Knob 1–4 style controls select the four FM patches.
-- Each patch opens the existing six-operator routing map, operator editor, macro controls and play-test engine.
-- Local Instrument library persistence, legacy single-patch migration and complete Instrument JSON export.
-- Three local DSP topologies: six-stage cascade, three paired carriers, and split/converging tree.
-- Six sine oscillators per played note, audio-rate frequency modulation, summed carriers, per-operator ADSR and delayed feedback loops.
-- Lazy-loaded official firmware emulator iframe using its documented `?embed=1` mode.
-- Public GitHub Pages deployment with automatic deploy on every `main` push.
+Clone with submodules:
 
-## Upstream emulator
+```sh
+git clone --recurse-submodules https://github.com/albinoIguana/FM1-Lab.git
+cd FM1-Lab
+rustup target add wasm32-unknown-unknown
+vendor/fm1-emu/tools/build_site.sh _site
+mkdir -p _site/designer
+cp index.html _site/designer/index.html
+cp -R src _site/designer/
+cp testing.html _site/testing.html
+mkdir -p _site/scripts
+cp scripts/felucca-midi-smoke.fm1 _site/scripts/
+node scripts/inject-lab-link.mjs _site/index.html
+python3 -m http.server 8000 --directory _site
+```
 
-The MIT-licensed upstream FM-1 emulator is pinned as a recursive Git submodule at vendor/fm1-emu. The Pages workflow builds its WebAssembly runtime, runs upstream Rust and browser tests, smoke-tests Felucca audio/MIDI, verifies a flash persistence round trip, and serves the built emulator under the FM1-Lab site path on the same origin. Update the pinned commit deliberately and retain the upstream LICENSE.
+Open http://localhost:8000. The emulator needs to be served over HTTP; opening the HTML file directly will not work. Run `npm test` for FM1-Lab's model and integration checks.
 
-## Firmware test console
-The [FM-1 Test Console](testing.html) embeds the full upstream emulator interface (not just its instrument-only embed). It provides the upstream firmware catalog, local `.fwsc` loading, emulated front-panel input, supported MIDI input, and browser flash save/backup controls. It now supports a documented same-origin boot-time MIDI smoke scenario and lifecycle status messages. The current smoke result confirms scripted input delivery, not audible output or firmware correctness; deeper assertions and audio capture remain future work.
+## Product direction
 
-## Data model
-An **Instrument** is the saved preset and contains four **FM patches**. Each FM patch contains its own topology, macros, and six operator parameter sets. The four-patch model is now the home-screen/navigation structure; simultaneous layering, independent sequencing, and performance routing are future work.
+The upstream emulator is the source of truth for firmware behavior. It emulates the FM-1 itself—CPU, screen, keys, knobs and audio—and runs supported community firmware unchanged. Start with Felucca or another community firmware from its built-in catalog. M-VAVE stock firmware must be supplied by the user as an `.fwsc` package.
 
-## Engine boundaries
-The Web Audio engine is an independent six-operator FM implementation, not a bit-accurate emulation of M-VAVE stock firmware. Its three routing algorithms are FM1-Lab design choices, not claims about the stock instrument's internal algorithms. The official emulator runs separately in an iframe and remains the authority for stock-firmware behavior.
+The former FM1-Lab editor is retained at `/designer/` as a prototype, not presented as an emulation of stock FM-1. Its local Web Audio engine is an independent six-operator FM implementation. Its four-patch Instrument abstraction remains a possible higher-level authoring layer, but we will only connect it to real emulator behavior through a documented, testable interface—not by pretending its parameters already control firmware.
 
-The upstream iframe is directly interactive. Same-origin restrictions prevent FM1-Lab from reading its internal state or using the emulator's same-origin boot-script mechanism from this different origin. Arbitrary live parameter writes and MIDI output are not claimed.
+## Current emulator integration
 
-See [accelerated roadmap](docs/roadmap.md) and [emulator capability notes](docs/emulator-capabilities.md).
+- Upstream source pinned at `9de1ef053a3c4bf56f16f05b5f0de193f4608a1d`.
+- Upstream emulator and FM-1 SID site built from the recursive submodule.
+- Emulator served directly at the root of FM1-Lab, retaining its own firmware picker, Start control, keyboard/touch controls, MIDI input, flash saves and backups.
+- Same-origin try-out scripts can load scripted key/MIDI/encoder events and report lifecycle status.
+- CI tests the upstream Rust/browser code, builds WebAssembly, boots Felucca, checks LCD output and audible MIDI response, and verifies flash persistence.
+
+## Next work
+
+1. Test the root emulator on desktop and iOS Safari, including audio start and touch interaction.
+2. Add repeatable firmware scenarios and capture regression artifacts.
+3. Investigate a documented host API for telemetry and live parameter control.
+4. Only then connect the four-patch Instrument designer to actual emulator/firmware capabilities.
