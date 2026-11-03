@@ -18,7 +18,9 @@ test("FM1-Lab product page owns the root and references local application assets
   assert.match(html, /href="\.\/felucca\//);
   assert.match(html, /href="\.\/compatibility\//);
   assert.match(html, /FOUR PATCHES/);
-  assert.match(html, /LOCAL DSP PREVIEW/);
+  assert.match(html, /FELUCCA FM6/);
+  assert.match(html, /id="algorithm"/);
+  assert.match(html, /native-status/);
   assert.doesNotMatch(html, /src="\.\.\/?\?embed=1"/);
 });
 
@@ -50,10 +52,30 @@ test("FM1-Lab bridge patch exposes native FM6 state with a round-trip smoke test
   assert.match(patch, /fh_fm6_carrier_mask/);
   assert.match(patch, /fh_fm6_modulator_mask/);
   assert.match(patch, /fh_fm6_feedback_operator/);
+  assert.match(patch, /fh_fm6_factory_count/);
+  assert.match(patch, /fh_fm6_factory_load/);
+  assert.match(patch, /fh_fm6_patch_buffer/);
   assert.match(smoke, /fm6_patch_write/);
   assert.match(smoke, /native write\/read round trip/);
-  assert.match(smoke, /four synth parts/);
+  assert.match(smoke, /factory voice/);
+  assert.match(smoke, /factory_count/);
   assert.match(smoke, /algorithm = 1; algorithm <= 32/);
+});
+
+test("FM1-Lab uses Felucca's real AudioWorklet and native patch adapter", async () => {
+  const main = await read("src/main.js");
+  const engine = await read("src/felucca-engine.js");
+  const worklet = await read("src/felucca-worklet.js");
+  assert.match(main, /new FeluccaEngine/);
+  assert.match(main, /engine\.loadFactoryPreset/);
+  assert.match(main, /engine\.writePatch/);
+  assert.match(main, /engine\.getTopology/);
+  assert.match(engine, /AudioWorkletNode/);
+  assert.match(engine, /44100/);
+  assert.match(engine, /felucca\.wasm/);
+  assert.match(worklet, /fh_fm6_patch_read/);
+  assert.match(worklet, /fh_fm6_patch_write/);
+  assert.match(worklet, /fh_fm6_modulator_mask/);
 });
 
 test("firmware test console opens the compatibility route and retains its Felucca MIDI smoke script", async () => {
