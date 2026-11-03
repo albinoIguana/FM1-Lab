@@ -21,7 +21,7 @@ export function decodeNativePatch(patch, source) {
     // Felucca's native voice format stores OP6 first and OP1 last.
     const offset = (5 - index) * OP_SIZE;
     const mode = bytes[offset + 17] & 1;
-    const coarse = bytes[offset + 18] & 31;
+    const coarse = bytes[offset + 18] & (mode === 1 ? 3 : 31);
     const fine = bytes[offset + 19] % 100;
     let ratio;
     if (mode === 0) {
