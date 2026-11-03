@@ -101,6 +101,15 @@ export class FeluccaEngine {
     return new Uint8Array(result.patch);
   }
 
+  async readDetune(track) {
+    const result = await this.request("detune-read", { track });
+    return result.value;
+  }
+
+  async writeDetune(track, value) {
+    await this.request("detune-write", { track, value: Math.max(0, Math.min(127, Math.round(value))) });
+  }
+
   async writePatch(track, patch) {
     const bytes = patch instanceof Uint8Array ? patch : new Uint8Array(patch);
     if (bytes.length !== 155) throw new Error("Native FM6 patches are 155 bytes.");
