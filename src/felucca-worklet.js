@@ -101,7 +101,8 @@ class FM1LabFeluccaProcessor extends AudioWorkletProcessor {
     }
 
     // AudioWorklet quantum sizes vary by browser; Felucca accepts up to 1024 frames per render call.
-    const started = globalThis.performance.now();
+    const clock = () => globalThis.performance?.now?.() ?? currentTime * 1000;
+    const started = clock();
     let offset = 0;
     while (offset < left.length) {
       const count = Math.min(1024, left.length - offset);
@@ -111,7 +112,7 @@ class FM1LabFeluccaProcessor extends AudioWorkletProcessor {
       if (right) right.set(new Float32Array(memory, ex.fh_out_r(), count), offset);
       offset += count;
     }
-    this.busyMilliseconds += globalThis.performance.now() - started;
+    this.busyMilliseconds += clock() - started;
     this.renderedFrames += left.length;
     if (this.renderedFrames >= 44100) {
       const load = this.busyMilliseconds / (this.renderedFrames / 44.1);
