@@ -3,7 +3,7 @@
 Research snapshot: 2026-11-03. Upstream source is pinned as a Git submodule at vendor/fm1-emu (MIT license), currently commit 9de1ef053a3c4bf56f16f05b5f0de193f4608a1d.
 
 ## Integration architecture
-- The upstream FM-1 emulator is served from /FM1-Lab/vendor/fm1-emu/web/ on the same GitHub Pages origin as FM1-Lab.
+- The upstream FM-1 emulator is served from /FM1-Lab/vendor/fm1-emu/ on the same GitHub Pages origin as FM1-Lab.
 - The Pages deployment workflow checks out submodules so the upstream WebAssembly binary, JavaScript, firmware catalog and assets are deployed with the app.
 - The iframe uses the upstream embed-only mode for the main editor and the full page for the dedicated test console.
 - Same-origin hosting means documented try-out URL parameters can load test scripts from FM1-Lab's own scripts directory.
