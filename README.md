@@ -3,7 +3,7 @@
 Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
 
 ## Run locally
-`git clone https://github.com/albinoIguana/FM1-Lab.git`, check out the `speedrun/phase-1-3` branch, then run `python3 -m http.server 8000` and open http://localhost:8000. No build tool or package install is required.
+Clone the repository, then run `python3 -m http.server 8000` from its folder and open http://localhost:8000. No build tool or package install is required. Run `npm test` to execute the zero-dependency model and DSP tests.
 
 ## Current build
 - Instrument home screen with four factory Instrument presets.
