@@ -37,7 +37,8 @@ function selectInstrument(index){
 }
 function renderHome(){
  $("#instrument-name").value=instrument.name;
- const presetIndex=factoryInstruments.findIndex(item=>item.id===selectedInstrumentId);\n $("#preset-number").textContent=presetIndex<0?"USR":String(presetIndex+1).padStart(2,"0");
+ const presetIndex=factoryInstruments.findIndex(item=>item.id===selectedInstrumentId);
+ $("#preset-number").textContent=presetIndex<0?"USR":String(presetIndex+1).padStart(2,"0");
  $("#preset-name").textContent=instrument.name.toUpperCase();
  $("#preset-knob").value=Math.max(0,presetIndex);
  $("#patch-slots").innerHTML=instrument.patches.map((item,index)=>`
@@ -91,7 +92,8 @@ function renderSpectrum(){
 function renderAll(){
  $("#patch-name").value=patch.name;
  $("#topology").value=patch.topology;
- $("#editor-instrument-name").textContent=instrument.name.toUpperCase();\n $("#patch-id").textContent="FM PATCH 0"+(selectedPatchIndex+1);
+ $("#editor-instrument-name").textContent=instrument.name.toUpperCase();
+ $("#patch-id").textContent="FM PATCH 0"+(selectedPatchIndex+1);
  $("#editor-patch-label").textContent="FM PATCH 0"+(selectedPatchIndex+1);
  renderMap();renderTabs();renderEditor();renderMacros();renderSpectrum();
 }

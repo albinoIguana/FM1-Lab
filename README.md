@@ -3,7 +3,7 @@
 Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
 
 ## Run locally
-`git clone https://github.com/albinoIguana/FM1-Lab.git`, check out the `speedrun/phase-1-3` branch, then run `python3 -m http.server 8000` and open http://localhost:8000. No build tool or package install is required.
+Clone the repository, then run `python3 -m http.server 8000` from its folder and open http://localhost:8000. No build tool or package install is required. Run `npm test` to execute the zero-dependency model and DSP tests.
 
 ## Current build
 - Instrument home screen with four factory Instrument presets.
@@ -14,6 +14,9 @@ Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
 - Three local DSP topologies: six-stage cascade, three paired carriers, and split/converging tree.
 - Six sine oscillators per played note, audio-rate frequency modulation, summed carriers, per-operator ADSR and delayed feedback loops.
 - Lazy-loaded official firmware emulator iframe using its documented `?embed=1` mode.
+
+## Firmware test console
+The [FM-1 Test Console](testing.html) embeds the full upstream emulator interface (not just its instrument-only embed). It provides the upstream firmware catalog, local `.fwsc` loading, emulated front-panel input, supported MIDI input, and browser flash save/backup controls. It is interactive firmware validation, not yet an automated regression runner: the upstream boot-script and flash-overlay try-out files are restricted to the emulator's own origin, and its internal state is not exposed to FM1-Lab.
 
 ## Data model
 An **Instrument** is the saved preset and contains four **FM patches**. Each FM patch contains its own topology, macros, and six operator parameter sets. The four-patch model is now the home-screen/navigation structure; simultaneous layering, independent sequencing, and performance routing are future work.

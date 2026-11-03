@@ -2,7 +2,6 @@ name: FM1-Lab checks
 
 on:
   push:
-    branches: ["main", "speedrun/**"]
   pull_request:
     branches: ["main"]
 
@@ -14,4 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: node --check src/main.js
+      - run: node --check src/fm-engine.js
+      - run: node --check src/instrument.js
       - run: npm test

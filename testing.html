@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090b12">
+<title>FM1-Lab // Firmware Test Console</title>
+<style>
+:root{color-scheme:dark;--bg:#090b12;--panel:#111a29;--line:#29364b;--text:#e8eef8;--muted:#91a0b7;--cyan:#55e4ed;--pink:#ed78c5;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% -10%,#1b3150 0,transparent 42%),var(--bg);color:var(--text)}
+header{height:66px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,56px);gap:15px}
+.logo{font-weight:850;letter-spacing:.08em}.logo span{color:var(--cyan)}a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}
+nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap}nav a,.action{font:10px ui-monospace,monospace;letter-spacing:.07em;border:1px solid var(--line);padding:9px 12px;background:#111a29;color:var(--text)}
+main{max-width:1500px;margin:auto;padding:clamp(18px,3vw,38px)}
+.eyebrow{font:9px ui-monospace,monospace;letter-spacing:.16em;color:var(--cyan)}
+h1{font-size:clamp(30px,5vw,54px);line-height:1;margin:10px 0}h1 em{font-style:normal;color:var(--pink)}
+.intro{max-width:760px;color:var(--muted);font-size:13px;line-height:1.7}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
+.console{border:1px solid #34445e;background:#0b111c;box-shadow:0 15px 45px #0006}
+.console-head{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;border-bottom:1px solid var(--line);font:9px ui-monospace,monospace;letter-spacing:.1em;color:var(--muted);gap:12px}
+.status{color:var(--cyan)}iframe{display:block;width:100%;height:min(82vh,980px);min-height:650px;border:0;background:#090b12}
+.info{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:17px 0}
+.info article{border:1px solid var(--line);background:var(--panel);padding:15px}
+.info h2{font:11px ui-monospace,monospace;color:var(--cyan);letter-spacing:.08em;margin:0 0 8px}
+.info p{font-size:11px;color:var(--muted);line-height:1.6;margin:0}
+.warning{border-left:2px solid var(--pink);padding:10px 13px;background:#ed78c510;color:#b7c2d4;font-size:11px;line-height:1.6;margin:16px 0}
+footer{padding:24px 0;color:#65738a;font:9px ui-monospace,monospace;letter-spacing:.08em}
+@media(max-width:700px){header{height:auto;min-height:60px;padding:12px 16px;align-items:flex-start;flex-direction:column}.info{grid-template-columns:1fr}iframe{height:78vh;min-height:580px}.console-head{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header><a class="logo" href="./index.html">FM1<span>·</span>LAB</a><nav><a href="./index.html">← INSTRUMENT DESIGN</a><a href="https://joakimeriksson.github.io/fm1-emu/" target="_blank" rel="noopener">OPEN EMULATOR DIRECTLY ↗</a></nav></header>
+<main>
+<div class="eyebrow">09 / FIRMWARE VALIDATION ENVIRONMENT</div>
+<h1>FM-1 <em>Test Console.</em></h1>
+<p class="intro">Run the real FM-1 firmware emulator alongside FM1-Lab. This is the upstream emulator's full interface—not the stripped-down instrument-only embed. Pick community firmware, load a local .fwsc package, use the emulated controls, connect MIDI where supported, and save or export emulator flash backups.</p>
+<div class="toolbar"><a class="action" href="https://joakimeriksson.github.io/fm1-emu/" target="_blank" rel="noopener">LAUNCH FULL-SCREEN TEST BENCH ↗</a><a class="action" href="https://github.com/joakimeriksson/fm1-emu" target="_blank" rel="noopener">EMULATOR SOURCE ↗</a></div>
+<section class="console">
+<div class="console-head"><span>UPSTREAM FM-1 EMULATOR · FULL TEST INTERFACE</span><span class="status">LIVE WEBASSEMBLY FIRMWARE RUNTIME</span></div>
+<iframe src="https://joakimeriksson.github.io/fm1-emu/" title="Full M-VAVE FM-1 firmware emulator and test console" allow="autoplay; midi" loading="eager"></iframe>
+</section>
+<section class="info">
+<article><h2>FIRMWARE UNDER TEST</h2><p>Select from the community firmware catalog or use the emulator's Open control to load an .fwsc package from your computer. M-VAVE stock firmware requires your own downloaded package.</p></article>
+<article><h2>INTERACTION</h2><p>Use the emulated buttons, encoders and keyboard, or connect a supported MIDI input. The emulator runs the firmware unchanged in WebAssembly and renders its screen and audio.</p></article>
+<article><h2>SAVES & BACKUPS</h2><p>The emulator saves changed flash locally in the browser. Use its Save &amp; backup controls to export a portable backup. Clearing browser data can remove local saves.</p></article>
+</section>
+<p class="warning"><strong>Important boundary:</strong> this console runs the upstream emulator as a separate application inside an iframe. FM1-Lab cannot currently inspect its internal state or send arbitrary live parameter writes. The upstream boot-time test-script mechanism only accepts script files hosted on the emulator's own origin; our cross-origin app cannot supply those directly. This console is useful for interactive firmware validation, not yet automated regression testing.</p>
+<footer>FM1-LAB · TEST CONSOLE · UPSTREAM EMULATOR BY JOAKIM ERIKSSON · NO FIRMWARE MODIFICATIONS</footer>
+</main>
+</body>
+</html>
