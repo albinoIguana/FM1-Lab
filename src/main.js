@@ -136,11 +136,15 @@ function selectOp(number) {
 
 const fields = [
   ["ratio", "FREQUENCY RATIO", 0.5, 16, 0.01],
-  ["level", "OUTPUT LEVEL", 0, 100, 1],
-  ["attack", "ATTACK RATE", 0, 99, 1],
-  ["decay", "DECAY RATE", 0, 99, 1],
-  ["sustain", "SUSTAIN LEVEL", 0, 99, 1],
-  ["release", "RELEASE RATE", 0, 99, 1],
+  ["level", "OUTPUT LEVEL", 0, 99, 1],
+  ["rate1", "STAGE 1 RATE · ATTACK", 0, 99, 1],
+  ["level1", "STAGE 1 LEVEL", 0, 99, 1],
+  ["rate2", "STAGE 2 RATE", 0, 99, 1],
+  ["level2", "STAGE 2 LEVEL", 0, 99, 1],
+  ["rate3", "STAGE 3 RATE · SUSTAIN", 0, 99, 1],
+  ["level3", "STAGE 3 LEVEL", 0, 99, 1],
+  ["rate4", "STAGE 4 RATE · RELEASE", 0, 99, 1],
+  ["level4", "STAGE 4 LEVEL", 0, 99, 1],
   ["feedback", "ALGORITHM FEEDBACK", 0, 7, 1]
 ];
 
@@ -186,6 +190,10 @@ function renderEditor() {
       if (key === "feedback") {
         patch.feedback = value;
         operator.feedback = value;
+      } else if (/^rate[1-4]$/.test(key)) {
+        operator.rates[Number(key.slice(4)) - 1] = value;
+      } else if (/^level[1-4]$/.test(key)) {
+        operator.levels[Number(key.slice(5)) - 1] = value;
       } else {
         operator[key] = value;
       }
@@ -321,7 +329,7 @@ async function writeWholePatch() {
   bytes = writeNativeField(bytes, patch, "feedback");
   bytes = writeNativeField(bytes, patch, "name");
   for (let operator = 1; operator <= 6; operator++) {
-    for (const key of ["ratio", "level", "attack", "decay", "sustain", "release"]) {
+    for (const key of ["ratio", "level", "rate1", "level1", "rate2", "level2", "rate3", "level3", "rate4", "level4"]) {
       bytes = writeNativeField(bytes, patch, key, operator);
     }
   }
@@ -457,10 +465,8 @@ $("#mutate").onclick = async () => {
     ...operator,
     ratio: Number((0.5 + Math.random() * 7.5).toFixed(2)),
     level: 20 + Math.round(Math.random() * 80),
-    attack: Math.round(Math.random() * 70),
-    decay: 20 + Math.round(Math.random() * 75),
-    sustain: 15 + Math.round(Math.random() * 85),
-    release: 10 + Math.round(Math.random() * 70)
+    rates: Array.from({ length: 4 }, () => Math.round(Math.random() * 99)),
+    levels: Array.from({ length: 4 }, () => Math.round(Math.random() * 99))
   }));
   patch.feedback = Math.floor(Math.random() * 8);
   patch.name = "LAB " + (100 + Math.floor(Math.random() * 900));
