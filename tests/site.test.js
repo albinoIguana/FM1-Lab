@@ -20,6 +20,8 @@ test("FM1-Lab product page owns the root and references local application assets
   assert.match(html, /FOUR PATCHES/);
   assert.match(html, /FELUCCA FM6/);
   assert.match(html, /id="algorithm"/);
+  assert.match(html, /id="import-file"/);
+  assert.match(html, /id="preset-range-labels"/);
   assert.match(html, /native-status/);
   assert.doesNotMatch(html, /src="\.\.\/?\?embed=1"/);
 });
@@ -68,6 +70,9 @@ test("FM1-Lab uses Felucca's real AudioWorklet and native patch adapter", async 
   const worklet = await read("src/felucca-worklet.js");
   assert.match(main, /new FeluccaEngine/);
   assert.match(main, /engine\.loadFactoryPreset/);
+  assert.match(main, /normalizeInstrument\(parsed\)/);
+  assert.match(main, /factoryInstruments\.push\(imported\)/);
+  assert.match(main, /#import-file/);
   assert.match(main, /engine\.writePatch/);
   assert.match(main, /engine\.getTopology/);
   assert.match(main, /f-mode/);
