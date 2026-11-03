@@ -23,7 +23,7 @@
 - [x] Three genuine audio-rate modulation topologies.
 - [x] Carrier summing, per-operator ADSR and delayed feedback.
 - [x] Brightness/body/motion/feedback macros.
-- [ ] Add held-note note-off and polyphonic voice stealing.
+- [x] Add held-note note-off and bounded polyphonic voice stealing.
 - [ ] Normalize modulation index by algorithm and operator level.
 - [ ] Add oversampling/aliasing evaluation, audio regression tests and CPU profiling.
 - [x] Add malformed-patch guard and mocked routing/feedback tests.
