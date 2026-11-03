@@ -45,6 +45,11 @@ class FM1LabFeluccaProcessor extends AudioWorkletProcessor {
         track: message.track,
         message: ok ? undefined : "Felucca rejected factory preset."
       });
+    } else if (message.type === "detune-read") {
+      this.port.postMessage({ type: "detune", id: message.id, track: message.track, value: ex.fh_fm6_detune_read(message.track >>> 0) });
+    } else if (message.type === "detune-write") {
+      const ok = ex.fh_fm6_detune_write(message.track >>> 0, message.value >>> 0);
+      this.port.postMessage({ type: ok ? "detune-written" : "patch-error", id: message.id, track: message.track, message: ok ? undefined : "Felucca rejected DTUN write." });
     } else if (message.type === "patch-read") {
       const pointer = ex.fh_fm6_patch_buffer();
       const size = ex.fh_fm6_patch_size();
