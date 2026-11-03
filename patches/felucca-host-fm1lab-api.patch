@@ -1,0 +1,48 @@
+diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
+--- a/platforms/host/felucca_host.c
++++ b/platforms/host/felucca_host.c
+@@ -380,6 +380,49 @@ FH_API void fh_boot(void)
+ FH_API const void *fh_plugin_host(void) { return &PLG_HOST; }
+ FH_API uint32_t fh_plugin_add(const void *d, uint32_t no) { return fh_on ? 4u : (uint32_t)plg_add((const fe_plugin_t *)d, no); }
+ 
++/* FM1-Lab's narrow bridge to Felucca's real FM6 patch state.
++ * Tracks are zero-based (0..3); patches use Felucca's native 155-byte voice format.
++ * All calls are made on the AudioWorklet thread, alongside fh_render. */
++FH_API uint32_t fh_fm6_api_version(void) { return 1u; }
++FH_API uint32_t fh_fm6_track_count(void) { return NTRK; }
++FH_API uint32_t fh_fm6_patch_size(void) { return FP_SIZE; }
++
++/* Algorithm numbers are one-based in the UI and zero-based in fm6_core.c. Bit k
++ * in the result identifies operator k+1 as a carrier in Felucca's native order. */
++FH_API uint32_t fh_fm6_carrier_mask(uint32_t algorithm)
++{
++    return algorithm >= 1u && algorithm <= 32u ? fm6_carriers(algorithm - 1u) : 0u;
++}
++
++FH_API uint32_t fh_fm6_patch_read(uint32_t track, uint8_t *dst, uint32_t capacity)
++{
++    if (!fh_on || track >= NTRK || !dst || capacity < FP_SIZE)
++        return 0u;
++    memcpy(dst, fm6_patch[track], FP_SIZE);
++    return FP_SIZE;
++}
++
++/* Select FM6 on this part, start from its native factory defaults, then install
++ * the caller's sanitized native voice. fm6_adopt keeps SLOT/OWN bookkeeping in
++ * sync so the normal firmware poller does not overwrite the custom patch. */
++FH_API uint32_t fh_fm6_patch_write(uint32_t track, const uint8_t *src, uint32_t length)
++{
++    uint8_t voice[FP_SIZE + 1u];
++    if (!fh_on || track >= NTRK || !src || length != FP_SIZE)
++        return 0u;
++    host_preset_req(&trk[track], ENGI_FM6, 0u);
++    memcpy(voice, src, FP_SIZE);
++    fm6_sanitize(voice);
++    fm6_set_patch(track, voice);
++    fm6_adopt(track);
++    return 1u;
++}
++
+ /* input, by the printed labels: buttons bit b = B_FX .. B_OCTUP (panel.c), keys bit k = key k (F3 .. G5),
+  * encoders by role (EN_SELECT .. EN_K4), MASTER 0..1023 */
+ static uint32_t fh_btn_labels, fh_key_mask;
