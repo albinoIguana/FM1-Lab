@@ -80,7 +80,7 @@ if (typeof registerProcessor === "function") {
           ex.fh_boot();
           this.ex = ex;
           this.sentWrites = ex.fh_flash_writes();
-          this.port.postMessage({ type: "ready", rate: ex.fh_sample_rate(), fm6Api: ex.fh_fm6_api_version(), tracks: ex.fh_fm6_track_count(), patchSize: ex.fh_fm6_patch_size() });
+          this.port.postMessage({ type: "ready", rate: ex.fh_sample_rate(), fm6Api: ex.fh_fm6_api_version(), tracks: ex.fh_fm6_track_count(), patchSize: ex.fh_fm6_patch_size(), factoryCount: ex.fh_fm6_factory_count() });
         } catch (err) {
           this.port.postMessage({ type: "error", message: String(err && err.message || err) });
         }
@@ -88,7 +88,11 @@ if (typeof registerProcessor === "function") {
       }
       const ex = this.ex;
       if (!ex) return;
-      if (m.type === "patch-read") {
+      if (m.type === "factory-load") {
+        const ok = ex.fh_fm6_factory_load(m.track >>> 0, m.preset >>> 0);
+        this.port.postMessage({ type: ok ? "factory-loaded" : "patch-error", id: m.id, track: m.track,
+                                message: ok ? undefined : "Felucca rejected factory preset." });
+      } else if (m.type === "patch-read") {
         const ptr = ex.fh_fm6_patch_buffer(), size = ex.fh_fm6_patch_size();
         const count = ex.fh_fm6_patch_read(m.track >>> 0, ptr, size);
         if (count !== size) {
