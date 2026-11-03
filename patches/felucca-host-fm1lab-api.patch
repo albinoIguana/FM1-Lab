@@ -1,7 +1,7 @@
 diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 --- a/platforms/host/felucca_host.c
 +++ b/platforms/host/felucca_host.c
-@@ -380,6 +380,77 @@ FH_API void fh_boot(void)
+@@ -380,6 +380,84 @@ FH_API void fh_boot(void)
  FH_API const void *fh_plugin_host(void) { return &PLG_HOST; }
  FH_API uint32_t fh_plugin_add(const void *d, uint32_t no) { return fh_on ? 4u : (uint32_t)plg_add((const fe_plugin_t *)d, no); }
  
@@ -33,7 +33,14 @@ diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 + * in the result identifies operator k+1 as a carrier in Felucca's native order. */
 +FH_API uint32_t fh_fm6_carrier_mask(uint32_t algorithm)
 +{
-+    return algorithm >= 1u && algorithm <= 32u ? fm6_carriers(algorithm - 1u) : 0u;
++    uint32_t native, ui = 0u, k;
++    if (algorithm < 1u || algorithm > 32u)
++        return 0u;
++    native = fm6_carriers(algorithm - 1u);
++    /* fm6_carriers counts OP6 first; expose the UI's OP1..OP6 numbering. */
++    for (k = 0; k < 6u; k++)
++        ui |= ((native >> (5u - k)) & 1u) << k;
++    return ui;
 +}
 +
 +/* Exact FM6 topology from the renderer's routing table.
