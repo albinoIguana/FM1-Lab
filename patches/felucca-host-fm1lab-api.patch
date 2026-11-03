@@ -77,9 +77,9 @@ diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 +        return 0u;
 +    if (trk[track].eng_req != ENGI_FM6)
 +        host_preset_req(&trk[track], ENGI_FM6, 0u);
-+    /* FM1-Lab edits the voice itself; clear Felucca's seven additive track macros
-+     * so hidden ALG/FB/MLVL/MRAT/MEG/VMOD/DTUN offsets cannot mask native bytes. */
-+    for (uint32_t i = 0; i < 7u; i++)
++    /* FM1-Lab edits the native voice itself; clear ALG/FB/MLVL/MRAT/MEG/VMOD
++     * overrides so they cannot mask the patch bytes. Preserve preset DTUN. */
++    for (uint32_t i = 0; i < 6u; i++)
 +        trk[track].p[P_E0 + i] = 0;
 +    memcpy(voice, src, FP_SIZE);
 +    fm6_sanitize(voice);
