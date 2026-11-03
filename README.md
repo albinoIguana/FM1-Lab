@@ -15,6 +15,9 @@ Independent FM synthesis design environment for the M-VAVE FM-1 ecosystem.
 - Six sine oscillators per played note, audio-rate frequency modulation, summed carriers, per-operator ADSR and delayed feedback loops.
 - Lazy-loaded official firmware emulator iframe using its documented `?embed=1` mode.
 
+## Firmware test console
+The [FM-1 Test Console](testing.html) embeds the full upstream emulator interface (not just its instrument-only embed). It provides the upstream firmware catalog, local `.fwsc` loading, emulated front-panel input, supported MIDI input, and browser flash save/backup controls. It is interactive firmware validation, not yet an automated regression runner: the upstream boot-script and flash-overlay try-out files are restricted to the emulator's own origin, and its internal state is not exposed to FM1-Lab.
+
 ## Data model
 An **Instrument** is the saved preset and contains four **FM patches**. Each FM patch contains its own topology, macros, and six operator parameter sets. The four-patch model is now the home-screen/navigation structure; simultaneous layering, independent sequencing, and performance routing are future work.
 
