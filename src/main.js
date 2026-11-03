@@ -328,7 +328,13 @@ async function writeWholePatch() {
   await engine.writePatch(selectedPatchIndex, bytes);
   patch.nativePatch = Array.from(bytes);
   persist();
-  await loadTopology(patch.algorithm);
+  const topology = await loadTopology(patch.algorithm);
+  if (topology) {
+    patch.feedbackOperator = topology.feedback;
+    patch.operators.forEach((operator, index) => {
+      operator.feedback = index + 1 === topology.feedback ? Math.round(patch.feedback / 7 * 100) : 0;
+    });
+  }
   renderAll();
 }
 
