@@ -15,6 +15,7 @@ ex.fh_boot();
 assert.equal(ex.fh_fm6_api_version(), 1, "Unexpected FM1-Lab bridge API version");
 assert.equal(ex.fh_fm6_track_count(), 4, "Felucca should expose its four synth parts");
 assert.equal(ex.fh_fm6_patch_size(), 155, "FM6 voice size must match Felucca's native format");
+assert.equal(ex.fh_fm6_factory_count(), 8, "Felucca should expose its eight native FM6 factory voices");
 assert.equal(ex.fh_fm6_carrier_mask(0), 0, "Algorithm numbers are one-based");
 assert.equal(ex.fh_fm6_carrier_mask(33), 0, "Algorithm 33 must be rejected");
 
@@ -32,29 +33,33 @@ for (let algorithm = 1; algorithm <= 32; algorithm++) {
   }
 }
 
-const flash = ex.fh_nor();
-const sourcePtr = flash + 0x80000;
-const readbackPtr = flash + 0x81000;
+const scratchPtr = ex.fh_fm6_patch_buffer();
 const size = ex.fh_fm6_patch_size();
-const source = new Uint8Array(ex.memory.buffer, sourcePtr, size);
-const readback = new Uint8Array(ex.memory.buffer, readbackPtr, size);
+const scratch = new Uint8Array(ex.memory.buffer, scratchPtr, size);
 
-assert.equal(ex.fh_fm6_patch_read(0, readbackPtr, size), size, "Could not read track 1 patch");
-const before = readback.slice();
-assert.equal(ex.fh_fm6_patch_read(1, readbackPtr, size), size, "Could not read track 2 patch");
-const untouchedTrack = readback.slice();
+// Load native factory voices across the four Felucca parts, then test isolated edits.
+for (let track = 0; track < 4; track++) {
+  assert.equal(ex.fh_fm6_factory_load(track, track), 1, "Could not load factory voice " + (track + 1));
+}
+assert.equal(ex.fh_fm6_factory_load(4, 0), 0, "Track 5 must be rejected");
+assert.equal(ex.fh_fm6_factory_load(0, 8), 0, "Factory voice 9 must be rejected");
+
+assert.equal(ex.fh_fm6_patch_read(0, scratchPtr, size), size, "Could not read track 1 patch");
+const before = scratch.slice();
+assert.equal(ex.fh_fm6_patch_read(1, scratchPtr, size), size, "Could not read track 2 patch");
+const untouchedTrack = scratch.slice();
 
 const candidate = before.slice();
-candidate[134] = (candidate[134] + 1) & 31; // native FM6 algorithm byte
-candidate.set(new TextEncoder().encode("FM1LAB0001"), 145); // ten-byte native voice name
-source.set(candidate);
-assert.equal(ex.fh_fm6_patch_write(0, sourcePtr, size), 1, "Native FM6 patch write was rejected");
-assert.equal(ex.fh_fm6_patch_read(0, readbackPtr, size), size, "Could not read back the written patch");
-assert.deepEqual(readback, candidate, "FM6 patch did not survive a native write/read round trip");
+candidate[134] = (candidate[134] + 1) & 31;
+candidate.set(new TextEncoder().encode("FM1LAB0001"), 145);
+scratch.set(candidate);
+assert.equal(ex.fh_fm6_patch_write(0, scratchPtr, size), 1, "Native FM6 patch write was rejected");
+assert.equal(ex.fh_fm6_patch_read(0, scratchPtr, size), size, "Could not read back the written patch");
+assert.deepEqual(scratch, candidate, "FM6 patch did not survive a native write/read round trip");
 assert.notEqual(ex.fh_fm6_carrier_mask(candidate[134] + 1), 0, "The selected algorithm has no carrier operators");
 
-assert.equal(ex.fh_fm6_patch_read(1, readbackPtr, size), size, "Could not re-read track 2 patch");
-assert.deepEqual(readback, untouchedTrack, "Writing one patch unexpectedly changed another track");
+assert.equal(ex.fh_fm6_patch_read(1, scratchPtr, size), size, "Could not re-read track 2 patch");
+assert.deepEqual(scratch, untouchedTrack, "Writing one patch unexpectedly changed another track");
 assert.equal(ex.fh_sample_rate(), 44100, "Unexpected Felucca sample rate");
 
 console.log("FM1-Lab native bridge OK: 4 tracks, 155-byte FM6 patches, 32 native routing graphs, isolated patch round trip.");
