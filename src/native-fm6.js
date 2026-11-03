@@ -33,7 +33,7 @@ export function decodeNativePatch(patch, source) {
       decay: bytes[offset + 1],
       sustain: bytes[offset + 6],
       release: bytes[offset + 3],
-      feedback: index + 1 === (patch.feedbackOperator || 1) ? Math.round(feedback / 7 * 100) : 0,
+      feedback: index + 1 === (patch.feedbackOperator || 1) ? feedback : 0,
       nativeMode: mode,
       nativeCoarse: coarse,
       nativeFine: fine
