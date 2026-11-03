@@ -10,7 +10,9 @@ let selectedInstrumentId=factoryInstruments[0].id;
 let instrument=library[selectedInstrumentId];
 let selectedPatchIndex=0;
 let patch=instrument.patches[selectedPatchIndex];
-const engine=new FMEngine({onState:state=>$("#engine-status").textContent=state,maxVoices:12});\nconst heldNotes=new Map();
+const engine=new FMEngine({onState:state=>$("#engine-status").textContent=state,maxVoices:12});
+const heldNotes=new Map();
+const heldKeyIntents=new Set();
 const graphs={
  cascade:{caption:"SERIAL / each stage modulates the next",edges:[[6,5],[5,4],[4,3],[3,2],[2,1]],pos:[[70,45],[165,45],[260,45],[355,45],[450,45],[545,45]],carriers:[1]},
  pairs:{caption:"THREE PAIRS / three independent carrier voices",edges:[[2,1],[4,3],[6,5]],pos:[[110,30],[110,125],[305,30],[305,125],[500,30],[500,125]],carriers:[1,3,5]},
@@ -56,7 +58,7 @@ function openPatch(index){
  renderAll();
 }
 function showHome(){
- engine.allNotesOff();
+ stopAllHeldNotes();engine.allNotesOff();
  $("#editor-screen").hidden=true;
  $("#home-screen").hidden=false;
  renderHome();
@@ -131,10 +133,11 @@ function renderKeys(){
  });
 }
 async function startHeldNote(note,velocity=100){
- try{await engine.ready();const voice=engine.noteOn({note,velocity,patch,duration:null});heldNotes.set(note,voice)}
- catch(error){console.error(error);alert(error.message)}
+ heldKeyIntents.add(note);
+ try{await engine.ready();if(!heldKeyIntents.has(note))return;const voice=engine.noteOn({note,velocity,patch,duration:null});heldNotes.set(note,voice)}
+ catch(error){heldKeyIntents.delete(note);console.error(error);alert(error.message)}
 }
-function stopHeldNote(note){const voice=heldNotes.get(note);if(voice){engine.noteOff(voice);heldNotes.delete(note)}}
+function stopHeldNote(note){heldKeyIntents.delete(note);const voice=heldNotes.get(note);if(voice){engine.noteOff(voice);heldNotes.delete(note)}}
 function stopAllHeldNotes(){for(const note of [...heldNotes.keys()])stopHeldNote(note)}
 window.addEventListener("blur",stopAllHeldNotes);
 $("#enter").onclick=()=>{$("#boot").remove();$("#app").hidden=false};
