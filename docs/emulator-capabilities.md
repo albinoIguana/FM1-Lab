@@ -21,9 +21,9 @@ Research snapshot: 2026-11-03. Upstream source is pinned as a Git submodule at v
 | Run on same origin as FM1-Lab | Supported |
 | Load scripted MIDI / key / encoder events at boot | Supported via documented try-out API |
 | Receive documented try-out lifecycle events | Supported; origin and iframe source are validated |
-| Load a flash-sector overlay from this site | Supported by upstream format; tooling still to build |
+| Verify flash persistence / sector restore round trip | Implemented in upstream WASM CI test |
 | Read arbitrary internal WASM state | Not exposed as a stable host API |
-| Assert audible output or compare audio automatically | Not implemented |
+| Assert MIDI produces audio in upstream Felucca smoke test | Implemented in CI |\n| Compare audio against a stored reference across builds | Not implemented |
 | Arbitrary live parameter writes | Not documented / not implemented |
 | FM1-Lab local DSP engine | Independent implementation, not bit-accurate stock firmware |
 
