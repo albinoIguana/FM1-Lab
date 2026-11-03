@@ -40,6 +40,7 @@ try {
   await appPage.locator("#enter").click();
   await appPage.waitForFunction(
     () => /FELUCCA FM6 (ENGINE )?ACTIVE/.test(document.querySelector("#engine-status")?.textContent || ""),
+    null,
     { timeout: 120000 }
   );
   await appPage.waitForFunction(
