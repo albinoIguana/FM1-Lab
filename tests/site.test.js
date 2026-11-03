@@ -29,7 +29,9 @@ test("main page exposes the Instrument editor and test console", async () => {
 
 test("firmware test console embeds the upstream full emulator", async () => {
   const html = await read("testing.html");
-  assert.match(html, /joakimeriksson\.github\.io\/fm1-emu\//);
+  assert.match(html, /\.\/vendor\/fm1-emu\/web\//);
+  assert.match(html, /run-midi-smoke/);
   assert.match(html, /title="Full M-VAVE FM-1 firmware emulator and test console"/);
   assert.match(html, /same-origin|cross-origin/i);
+  assert.match(html, /felucca-midi-smoke\.fm1/);
 });
