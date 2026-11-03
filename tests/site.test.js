@@ -48,9 +48,12 @@ test("FM1-Lab bridge patch exposes native FM6 state with a round-trip smoke test
   assert.match(patch, /fh_fm6_patch_read/);
   assert.match(patch, /fh_fm6_patch_write/);
   assert.match(patch, /fh_fm6_carrier_mask/);
+  assert.match(patch, /fh_fm6_modulator_mask/);
+  assert.match(patch, /fh_fm6_feedback_operator/);
   assert.match(smoke, /fm6_patch_write/);
   assert.match(smoke, /native write\/read round trip/);
   assert.match(smoke, /four synth parts/);
+  assert.match(smoke, /algorithm = 1; algorithm <= 32/);
 });
 
 test("firmware test console opens the compatibility route and retains its Felucca MIDI smoke script", async () => {
