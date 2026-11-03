@@ -76,6 +76,9 @@ test("FM1-Lab uses Felucca's real AudioWorklet and native patch adapter", async 
   assert.match(worklet, /fh_fm6_patch_read/);
   assert.match(worklet, /fh_fm6_patch_write/);
   assert.match(worklet, /fh_fm6_modulator_mask/);
+  assert.match(worklet, /registerProcessor\("fm1lab-felucca"/);
+  assert.match(worklet, /fh_render\(count\)/);
+  assert.doesNotMatch(worklet, /fh_screen/);
 });
 
 test("firmware test console opens the compatibility route and retains its Felucca MIDI smoke script", async () => {
