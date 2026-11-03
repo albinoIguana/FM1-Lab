@@ -194,7 +194,8 @@ function renderEditor() {
     if (operator.nativeMode === 1) operator.nativeCoarse = Math.min(3, operator.nativeCoarse);
     else operator.ratio = Number(((operator.nativeCoarse === 0 ? 0.5 : operator.nativeCoarse) * (1 + operator.nativeFine / 100)).toFixed(2));
     await writeCurrentField("mode");
-    if (operator.nativeMode === 1) await writeCurrentField("coarse");
+    await writeCurrentField("coarse");
+    await writeCurrentField("fine");
     renderEditor();
   };
   const ratioInput = $("#f-ratio");
