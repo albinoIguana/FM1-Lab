@@ -335,7 +335,24 @@ async function activateInstrument() {
     } else {
       bytes = await engine.readPatch(index);
       candidate.detune = await engine.readDetune(index);
+      bytes = writeNativeField(bytes, candidate, "algorithm");
+      bytes = writeNativeField(bytes, candidate, "feedback");
+      bytes = writeNativeField(bytes, candidate, "name");
+      for (let operator = 1; operator <= 6; operator++) {
+        bytes = writeNativeField(bytes, candidate, "mode", operator);
+        if (candidate.operators[operator - 1].nativeMode === 1) {
+          bytes = writeNativeField(bytes, candidate, "coarse", operator);
+          bytes = writeNativeField(bytes, candidate, "fine", operator);
+        } else {
+          bytes = writeNativeField(bytes, candidate, "ratio", operator);
+        }
+        for (const key of ["level", "rate1", "level1", "rate2", "level2", "rate3", "level3", "rate4", "level4"]) {
+          bytes = writeNativeField(bytes, candidate, key, operator);
+        }
+      }
+      await engine.writePatch(index, bytes);
       candidate.factoryNativePatch = Array.from(bytes);
+      candidate.nativePatch = Array.from(bytes);
     }
     const algorithm = (bytes[134] & 31) + 1;
     const topology = await loadTopology(algorithm);
