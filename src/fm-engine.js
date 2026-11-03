@@ -46,7 +46,7 @@ export class FMEngine {
     const master=ctx.createGain();
     master.gain.value=0.65;
     master.connect(ctx.destination);
-    const oscillators=[], envelopes=[], feedbackNodes=[];
+    const oscillators=[], envelopes=[], feedbackNodes=[], envelopeParams=[];
     const velocityGain=Math.pow(clamp(velocity,1,127)/127,1.35);
     const ops=patch.operators;
     for(let i=0;i<6;i++){
@@ -55,7 +55,7 @@ export class FMEngine {
       const ratio=clamp(op.ratio??1,.25,16);
       const peak=clamp(op.level??70,0,100)/100;
       const attack=seconds(op.attack??10,.8,0.8);
-      const decay=seconds(op.decay??45,1.8,1.8);
+      const decay=seconds(op.decay??45,1.8,1.8)*(0.65+motion*.7);
       const sustain=clamp(op.sustain??55,0,100)/100;
       const release=seconds(op.release??30,2.5,2.5);
       osc.type="sine";
@@ -96,7 +96,7 @@ export class FMEngine {
       envelopes[i].connect(delay); delay.connect(fb); fb.connect(oscillators[i].frequency);
       feedbackNodes.push(delay,fb);
     }
-    const voice={oscillators,envelopes,feedbackNodes,master,stopped:false};
+    const voice={oscillators,envelopes,feedbackNodes,master,envelopeParams,stopped:false};
     this.voices.add(voice);
     this.noteOff(voice,duration);
     const longestRelease=Math.max(...ops.map(o=>seconds(o.release??30,2.5,2.5)));
