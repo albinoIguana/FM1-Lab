@@ -36,7 +36,8 @@ jobs:
         working-directory: vendor/fm1-emu
 
       - name: Run upstream browser-code tests
-        run: node --test vendor/fm1-emu/web/*.test.mjs
+        run: node --test web/*.test.mjs
+        working-directory: vendor/fm1-emu
 
       - name: Build upstream emulator and FM-1 SID pages
         run: vendor/fm1-emu/tools/build_site.sh _site/vendor/fm1-emu
