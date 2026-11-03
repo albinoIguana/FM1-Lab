@@ -79,7 +79,7 @@ async function loadTopology(algorithm) {
     if (patch.algorithm === algorithm) {
       patch.feedbackOperator = topology.feedback;
       patch.operators.forEach((op, index) => {
-        op.feedback = index + 1 === topology.feedback ? Math.round(patch.feedback / 7 * 100) : 0;
+        op.feedback = index + 1 === topology.feedback ? patch.feedback : 0;
       });
       renderMap();
       renderEditor();
@@ -141,7 +141,7 @@ const fields = [
   ["decay", "DECAY RATE", 0, 99, 1],
   ["sustain", "SUSTAIN LEVEL", 0, 99, 1],
   ["release", "RELEASE RATE", 0, 99, 1],
-  ["feedback", "ALGORITHM FEEDBACK", 0, 100, 1]
+  ["feedback", "ALGORITHM FEEDBACK", 0, 7, 1]
 ];
 
 async function writeCurrentField(key, operatorNumber = patch.selected) {
@@ -184,7 +184,7 @@ function renderEditor() {
       const output = $("#v-" + key);
       output.textContent = value;
       if (key === "feedback") {
-        patch.feedback = Math.round(value / 100 * 7);
+        patch.feedback = value;
         operator.feedback = value;
       } else {
         operator[key] = value;
@@ -332,7 +332,7 @@ async function writeWholePatch() {
   if (topology) {
     patch.feedbackOperator = topology.feedback;
     patch.operators.forEach((operator, index) => {
-      operator.feedback = index + 1 === topology.feedback ? Math.round(patch.feedback / 7 * 100) : 0;
+      operator.feedback = index + 1 === topology.feedback ? patch.feedback : 0;
     });
   }
   renderAll();
@@ -445,7 +445,7 @@ $("#algorithm").onchange = async event => {
   if (topology) {
     patch.feedbackOperator = topology.feedback;
     patch.operators.forEach((operator, index) => {
-      operator.feedback = index + 1 === topology.feedback ? Math.round(patch.feedback / 7 * 100) : 0;
+      operator.feedback = index + 1 === topology.feedback ? patch.feedback : 0;
     });
   }
   renderAll();
@@ -478,7 +478,7 @@ $("#reset").onclick = async () => {
     resetPatch.feedbackOperator = topology?.feedback || 1;
     resetPatch.operators.forEach((operator, index) => {
       operator.feedback = index + 1 === resetPatch.feedbackOperator
-        ? Math.round(resetPatch.feedback / 7 * 100) : 0;
+        ? resetPatch.feedback : 0;
     });
     setActivePatch(selectedPatchIndex);
     renderAll();
