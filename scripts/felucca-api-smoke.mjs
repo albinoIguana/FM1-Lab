@@ -44,6 +44,18 @@ for (let track = 0; track < 4; track++) {
 assert.equal(ex.fh_fm6_factory_load(4, 0), 0, "Track 5 must be rejected");
 assert.equal(ex.fh_fm6_factory_load(0, 8), 0, "Factory voice 9 must be rejected");
 
+// Render a real MIDI note through Felucca's native FM6 engine and require non-silent output.
+assert.equal(ex.fh_midi(0x90, 60, 100), 1, "Felucca rejected MIDI note-on");
+let audioPeak = 0;
+for (let block = 0; block < 12; block++) {
+  ex.fh_render(1024);
+  const samples = new Float32Array(ex.memory.buffer, ex.fh_out_l(), 1024);
+  for (const sample of samples) audioPeak = Math.max(audioPeak, Math.abs(sample));
+}
+assert.ok(audioPeak > 0.00001, "Felucca's FM6 renderer produced silent audio");
+assert.equal(ex.fh_midi(0x80, 60, 0), 1, "Felucca rejected MIDI note-off");
+for (let block = 0; block < 4; block++) ex.fh_render(1024);
+
 assert.equal(ex.fh_fm6_patch_read(0, scratchPtr, size), size, "Could not read track 1 patch");
 const before = scratch.slice();
 assert.equal(ex.fh_fm6_patch_read(1, scratchPtr, size), size, "Could not read track 2 patch");
@@ -62,4 +74,4 @@ assert.equal(ex.fh_fm6_patch_read(1, scratchPtr, size), size, "Could not re-read
 assert.deepEqual(scratch, untouchedTrack, "Writing one patch unexpectedly changed another track");
 assert.equal(ex.fh_sample_rate(), 44100, "Unexpected Felucca sample rate");
 
-console.log("FM1-Lab native bridge OK: 4 tracks, 155-byte FM6 patches, 32 native routing graphs, isolated patch round trip.");
+console.log("FM1-Lab native bridge OK: 4 tracks, 155-byte FM6 patches, 32 native routing graphs, live audio render, isolated patch round trip.");
