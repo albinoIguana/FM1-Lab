@@ -10,7 +10,7 @@ let selectedInstrumentId=factoryInstruments[0].id;
 let instrument=library[selectedInstrumentId];
 let selectedPatchIndex=0;
 let patch=instrument.patches[selectedPatchIndex];
-const engine=new FMEngine({onState:state=>$("#engine-status").textContent=state});
+const engine=new FMEngine({onState:state=>$("#engine-status").textContent=state,maxVoices:12});\nconst heldNotes=new Map();
 const graphs={
  cascade:{caption:"SERIAL / each stage modulates the next",edges:[[6,5],[5,4],[4,3],[3,2],[2,1]],pos:[[70,45],[165,45],[260,45],[355,45],[450,45],[545,45]],carriers:[1]},
  pairs:{caption:"THREE PAIRS / three independent carrier voices",edges:[[2,1],[4,3],[6,5]],pos:[[110,30],[110,125],[305,30],[305,125],[500,30],[500,125]],carriers:[1,3,5]},
