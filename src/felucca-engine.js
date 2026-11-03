@@ -53,6 +53,10 @@ export class FeluccaEngine {
   }
 
   onMessage(message) {
+    if (message.type === "load" && Number.isFinite(message.load)) {
+      this.onState("FELUCCA FM6 ACTIVE · DSP " + (message.load * 100).toFixed(1) + "%");
+      return;
+    }
     if (message.type === "error") {
       const boot = this.pending.get("boot");
       if (boot) { this.pending.delete("boot"); boot.reject(new Error(message.message)); }
