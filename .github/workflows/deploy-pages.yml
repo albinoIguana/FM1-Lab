@@ -18,16 +18,48 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out repository and pinned emulator
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install WebAssembly target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Run upstream emulator Rust tests
+        run: cargo test --release -p fm1-isa -p fm1-core -p fm1-soc -p fm1-web
+        working-directory: vendor/fm1-emu
+
+      - name: Run upstream browser-code tests
+        run: node --test vendor/fm1-emu/web/*.test.mjs
+
+      - name: Build upstream emulator and FM-1 SID pages
+        run: vendor/fm1-emu/tools/build_site.sh _site/vendor/fm1-emu
+
+      - name: Smoke-test emulated firmware and audio output
+        run: node vendor/fm1-emu/web/smoke.mjs _site/vendor/fm1-emu
+
+      - name: Verify emulator flash persistence round trip
+        run: node vendor/fm1-emu/web/persistence.wasm.mjs _site/vendor/fm1-emu
+
+      - name: Stage FM1-Lab host application
+        run: |
+          mkdir -p _site
+          cp index.html testing.html .nojekyll _site/
+          cp -R src scripts _site/
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
   deploy:
     environment:
