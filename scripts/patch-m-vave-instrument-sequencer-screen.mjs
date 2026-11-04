@@ -65,12 +65,14 @@ static void fm1lab_seq_draw(void)
         text(14, y + 5, lane ? "B / TRACK 2" : "A / TRACK 1", 1, accent, PANEL);
         text(142, y + 5, "PATCH", 1, DIM, PANEL);
         number(184, y + 5, fm1lab_seq_state.lanes[lane].patch_index + 1, 1, 1, TEXT, PANEL);
+        unsigned first_step = (fm1lab_seq_cursor / 16U) * 16U;
         for (unsigned step = 0; step < 16; ++step) {
+            unsigned absolute_step = first_step + step;
             unsigned x = 14U + step * 13U;
-            const fm1lab_sequence_step_t *v = &fm1lab_seq_state.lanes[lane].steps[step];
+            const fm1lab_sequence_step_t *v = &fm1lab_seq_state.lanes[lane].steps[absolute_step];
             uint16_t color = v->active ? colors[lane] : PANEL;
             paint_fill(x, y + 24, 10, 27, color);
-            if (lane == fm1lab_seq_state.selected_lane && step == fm1lab_seq_cursor)
+            if (lane == fm1lab_seq_state.selected_lane && absolute_step == fm1lab_seq_cursor)
                 frame(x - 1, y + 23, 12, 29, ACCENT);
             if (v->active) {
                 unsigned h = 4U + (unsigned)v->velocity * 17U / 127U;
@@ -82,7 +84,11 @@ static void fm1lab_seq_draw(void)
         text(88, y + 55, "SWING", 1, DIM, PANEL);
         number(132, y + 55, fm1lab_seq_state.swing, 2, 1, TEXT, PANEL);
     }
-    text(8, 210, "SELECT STEP  PRESETS LANE  ALGORITHM PATCH", 1, DIM, BACK);
+    text(8, 210, "STEPS", 1, DIM, BACK);
+    number(45, 210, (int)(fm1lab_seq_cursor / 16U) * 16, 2, 1, TEXT, BACK);
+    text(8, 210, "PAGE", 1, DIM, BACK);
+    number(45, 210, (int)(fm1lab_seq_cursor / 16U) + 1, 1, 1, TEXT, BACK);
+    text(88, 210, "SELECT STEP  PRESETS LANE", 1, DIM, BACK);
     text(8, 226, "KNOB 1 ON/OFF  2 PITCH  3 VELOCITY  4 GATE", 1, DIM, BACK);
 }
 \`;
