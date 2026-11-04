@@ -47,7 +47,7 @@ jobs:
           $clang = 'C:\JL\pi32\bin\clang.exe'
           if (!(Test-Path $clang)) {
             $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-latest.exe'
-            Invoke-WebRequest -Uri 'https://pkgman.jieliapp.com/s/win-toolchain' -OutFile $installer
+            Invoke-WebRequest -Uri 'https://jl-update.oss-cn-shenzhen.aliyuncs.com/2.5.3.exe' -OutFile $installer
             $item = Get-Item -LiteralPath $installer
             if ($item.Length -lt 1MB) {
               throw "JieLi installer download is unexpectedly small ($($item.Length) bytes)."
@@ -101,7 +101,11 @@ jobs:
           }
           & $clang --version
           if ($LASTEXITCODE -ne 0) { throw 'JieLi clang.exe failed to execute.' }
-          Get-FileHash $clang -Algorithm SHA256
+          $clangHash = (Get-FileHash $clang -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($clangHash -ne 'd4bc97cf421c1ccc373dd8924ce88720ff7457b3f1478d15df4aeda6ae923bce') {
+            throw "Wrong JieLi compiler build: $clangHash. FM1 SDK requires toolchain 2.5.3 / PI32v2 clang 4.0.1."
+          }
+          Write-Host "Verified JieLi PI32v2 clang 4.0.1 SHA-256: $clangHash"
 
       - name: Build the actual FM1 device firmware
         shell: pwsh
