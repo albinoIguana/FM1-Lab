@@ -21,6 +21,7 @@
     <a class="brand" href="#" id="brand-home">FM1<span>·</span>LAB</a>
     <div class="engine-state"><i></i><span id="engine-status">M-VAVE ENGINE STARTING</span></div>
     <div class="top-actions">
+      <button id="open-sequencer" class="quiet">SEQ · 2 TRACK</button>
       <button id="audio-start" class="primary small">START AUDIO</button>
       <button id="export-instrument" class="quiet">EXPORT</button>
       <button id="import-instrument" class="quiet">IMPORT</button>
@@ -63,6 +64,15 @@
       </section>
     </div>
     <p class="footnote">Engine: M-VAVE FM1 official DX7 implementation · 156-byte native voice data · six-operator algorithms.</p>
+  </section>
+  <section id="sequencer-screen" hidden>
+    <div class="editor-head">
+      <button id="seq-back" class="quiet">← INSTRUMENT</button>
+      <div><p class="eyebrow">02 / TWO-TRACK SEQUENCER</p><h2>SEQ <em>COMPOSE</em></h2></div>
+    </div>
+    <p class="muted">Both tracks stay visible. Select a lane, set its timing, then enter notes. The timeline remains 64 steps wide while each track's active length is independently adjustable.</p>
+    <div id="sequencer-view" class="sequencer-workspace"></div>
+    <p class="footnote">The sequencer data model and editing surface are in place. Native transport, clock synchronization and device control mapping remain integration work.</p>
   </section>
   <footer class="app-footer">FM1-LAB / INDEPENDENT INSTRUMENT DESIGN <span>BUILT ON M-VAVE OPEN FM1 SOURCE + SDK</span></footer>
 </main>
