@@ -63,9 +63,9 @@ export function normalizeInstrument(candidate) {
   };
 }
 
-export function renderPatch(patch, carrierMask) {
+export function renderPatch(patch, carrierMask, operatorDepths) {
   const normalized = normalizePatch(patch);
-  return applyMacros(Uint8Array.from(normalized.baseData), normalized.macros, carrierMask);
+  return applyMacros(Uint8Array.from(normalized.baseData), normalized.macros, carrierMask, operatorDepths);
 }
 
 export function patchAlgorithm(patch) {
