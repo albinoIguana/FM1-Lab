@@ -38,6 +38,12 @@ static void test_official_algorithm_carriers(void)
     assert(fm1lab_carrier_mask(32) == fm1lab_carrier_mask(0));
     assert(fm1lab_operator_depth(0, 2) == 1);
     assert(fm1lab_operator_depth(0, 0) == 0);
+    assert(fm1lab_operator_modulates(0, 6, 5) == 1);
+    assert(fm1lab_operator_modulates(0, 5, 4) == 1);
+    assert(fm1lab_operator_modulates(0, 4, 3) == 1);
+    assert(fm1lab_operator_modulates(0, 2, 1) == 1);
+    assert(fm1lab_operator_modulates(0, 6, 4) == 0);
+    assert(fm1lab_operator_modulates(0, 0, 1) == -1);
 }
 
 static void test_non_destructive_macro_render(void)
