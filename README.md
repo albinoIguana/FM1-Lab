@@ -25,11 +25,15 @@ The pinned submodule vendor/m-vave-fm1 points to [M-VAVE's official FM1 open-sou
 
 The browser workshop is a development and audition surface. The corresponding custom Instrument navigation and macro controls still need to be integrated into the FM1's on-device application and verified with the device toolchain before this can be called flashable firmware.
 
+## Native firmware core
+
+The `firmware/fm1lab_instrument.c` module is the first device-side implementation: a fixed four-patch Instrument contract, per-patch macro/mute/level state, M-VAVE algorithm carrier masks, and non-destructive macro rendering. It is compiled with the official application sources and has host-side C tests. It is not yet connected to device storage, the screen, physical controls, or the hardware voice/mixer path.
+
 ## Build and validation
 
 GitHub Actions checks the Instrument and macro models, applies the M-VAVE integration patch to the pinned source, builds the official browser simulator with WASI SDK 27, and verifies the FM1-Lab API exports.
 
-A device firmware build requires the matching JieLi Windows toolchain 2.5.3. See the official M-VAVE README for installation and packaging requirements.
+A device firmware build requires the matching JieLi Windows toolchain 2.5.3. The official source kit requires the exact 2.5.3 toolchain and validates its binaries against the SDK manifest. See the official M-VAVE README for installation and packaging requirements.
 
 ## Licensing
 
