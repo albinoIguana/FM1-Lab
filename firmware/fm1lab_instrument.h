@@ -46,6 +46,9 @@ int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument);
 /* Carrier mask bits are OP1..OP6 in bits 0..5, from M-VAVE's DX7 algorithm routing. */
 uint8_t fm1lab_carrier_mask(unsigned algorithm);
 
+/* Modulation stages from this operator to a carrier; operator is OP1..OP6. */
+uint8_t fm1lab_operator_depth(unsigned algorithm, unsigned operator_number);
+
 /* Render a non-destructive macro-adjusted voice. Returns 0 or -1 for invalid input. */
 int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch,
                         uint8_t output[FM1LAB_PATCH_BYTES]);
