@@ -6,7 +6,8 @@ METADATA_BIN="$(mktemp)"
 CONTROLS_BIN="$(mktemp)"
 LIBRARY_BIN="$(mktemp)"
 RUNTIME_BIN="$(mktemp)"
-trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN"' EXIT
+SEQUENCER_BIN="$(mktemp)"
+trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN"' EXIT
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/tests/fm1lab_instrument.test.c" -o "$INSTRUMENT_BIN"
@@ -35,3 +36,9 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/
   "$ROOT/tests/fm1lab_runtime.test.c" -o "$RUNTIME_BIN"
 "$RUNTIME_BIN"
 echo "FM1-Lab runtime control tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror \
+  -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
+  "$ROOT/firmware/fm1lab_sequencer.c" "$ROOT/tests/fm1lab_sequencer.test.c" -o "$SEQUENCER_BIN"
+"$SEQUENCER_BIN"
+echo "FM1-Lab native sequencer adapter tests passed."
