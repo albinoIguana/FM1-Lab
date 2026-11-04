@@ -15,8 +15,6 @@
 
 The pinned submodule vendor/m-vave-fm1 points to [M-VAVE's official FM1 open-source repository](https://github.com/m-vave/fm1_open). It contains the device application, board interfaces, FM1 SDK, official synthesis code, and browser simulator. The simulator is used as the sound engine for the browser workshop and for rapid verification of patch behavior.
 
-FM1-Lab does not depend on Felucca. Its code, tests and build no longer include Felucca.
-
 ## Current implementation
 
 - Four-patch Instrument data model with import/export.
