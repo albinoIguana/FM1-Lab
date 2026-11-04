@@ -6,7 +6,7 @@ SOURCE="$ROOT/vendor/m-vave-fm1"
 BIN="$(mktemp)"
 trap 'rm -f "$BIN"' EXIT
 
-cc -std=c11 -O2 -Wall -Wextra -Werror \
+cc -std=c11 -O2 -Wall -Wextra -Werror -Wno-array-parameter \
   -DFM1_HOST_TEST -DFM1_DSP_ENTRY= \
   -I"$ROOT/firmware" \
   -I"$SOURCE/app/synth" \
