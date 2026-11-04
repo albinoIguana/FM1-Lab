@@ -42,7 +42,7 @@ static uint8_t clamp_u8(int value, unsigned maximum)
 static int scaled_delta(int delta, unsigned percent)
 {
     int value = delta * (int)percent;
-    return value >= 0 ? (value + 50) / 100 : (value - 50) / 100;
+    return value >= 0 ? (value + 50) / 100 : -((-value + 50) / 100);
 }
 
 static void copy_name(char *destination, unsigned capacity, const char *source)
@@ -163,22 +163,22 @@ int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch_in
         const unsigned depth = fm1lab_operator_depth(base[VOICE_ALGORITHM], op);
         if (carrier) {
             /* BODY shapes sustained carrier presence. */
-            output[offset + 6] = clamp_u8((int)base[offset + 6] +
+            if (body) output[offset + 6] = clamp_u8((int)base[offset + 6] +
                 scaled_delta(body, 45), 99);
         } else {
             /* BRIGHTNESS changes modulation index through modulator output. */
-            output[offset + 16] = clamp_u8((int)base[offset + 16] +
+            if (brightness) output[offset + 16] = clamp_u8((int)base[offset + 16] +
                 scaled_delta(brightness, 55u / (depth ? depth : 1u)), 99);
             /* MOTION animates the modulator EG contour; preserve its timing. */
-            output[offset + 6] = clamp_u8((int)base[offset + 6] +
+            if (motion) output[offset + 6] = clamp_u8((int)base[offset + 6] +
                 scaled_delta(motion, 35u / (depth ? depth : 1u)), 99);
-            output[offset + 7] = clamp_u8((int)base[offset + 7] -
+            if (motion) output[offset + 7] = clamp_u8((int)base[offset + 7] -
                 scaled_delta(motion, 25u / (depth ? depth : 1u)), 99);
         }
     }
 
     /* DIRT is bounded feedback; ratio changes await topology-aware mapping. */
-    output[GLOBAL_FEEDBACK] = clamp_u8((int)base[GLOBAL_FEEDBACK] +
+    if (dirt) output[GLOBAL_FEEDBACK] = clamp_u8((int)base[GLOBAL_FEEDBACK] +
         scaled_delta(dirt, 8), 7);
     return 0;
 }
