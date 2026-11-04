@@ -29,6 +29,8 @@ The browser workshop is a development and audition surface. The corresponding cu
 
 The `firmware/fm1lab_instrument.c` module is the first device-side implementation: a fixed four-patch Instrument contract, per-patch macro/mute/level state, M-VAVE algorithm carrier masks, and non-destructive macro rendering. It is compiled with the official application sources and has host-side C tests. It is not yet connected to device storage, the screen, physical controls, or the hardware voice/mixer path.
 
+A separate tested metadata codec now defines eight named four-patch Instruments per existing 32-voice bank. Its 400-byte block fits after the current 3,604-byte v1 bank data inside the 4 KiB sector and has its own CRC. This is a layout/codec milestone only: the bank read/write/recovery path has not yet been upgraded to read or persist that block, so no device save/load behavior is claimed yet.
+
 ## Build and validation
 
 GitHub Actions checks the Instrument and macro models, applies the M-VAVE integration patch to the pinned source, builds the official browser simulator with WASI SDK 27, and verifies the FM1-Lab API exports.
