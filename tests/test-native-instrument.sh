@@ -14,7 +14,6 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/tests/fm1lab_bank_metadata.test.c" -o "$METADATA_BIN"
 "$METADATA_BIN"
 
-cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \\
-  "$ROOT/tests/fm1lab_physical_controls.test.c" -o "$CONTROLS_BIN"
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" "$ROOT/tests/fm1lab_physical_controls.test.c" -o "$CONTROLS_BIN"
 "$CONTROLS_BIN"
 echo "FM1-Lab physical control mapping tests passed."
