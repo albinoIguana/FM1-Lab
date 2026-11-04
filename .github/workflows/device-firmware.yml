@@ -54,22 +54,21 @@ jobs:
           Write-Host "Downloaded JieLi 2.5.3 installer: $($item.Length) bytes"
           Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
 
-          $sevenZip = @(
-            (Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
-            (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')
-          ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
-          if (!$sevenZip) {
-            choco install 7zip.install --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { throw 'Could not install 7-Zip to extract the JieLi toolchain payload.' }
-            $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
-          }
-          if (!(Test-Path -LiteralPath $sevenZip)) { throw '7-Zip executable was not found.' }
+          # 7-Zip recognizes the PE wrapper but does not unpack the Inno Setup payload.
+          # Use the upstream innoextract Windows release to extract the actual files.
+          $extractorZip = Join-Path $env:RUNNER_TEMP 'innoextract-1.9-windows.zip'
+          $extractorDir = Join-Path $env:RUNNER_TEMP 'innoextract'
+          Invoke-WebRequest -Uri 'https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip' -OutFile $extractorZip
+          Remove-Item -LiteralPath $extractorDir -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $extractorZip -DestinationPath $extractorDir -Force
+          $innoextract = Get-ChildItem -LiteralPath $extractorDir -Filter 'innoextract.exe' -File -Recurse | Select-Object -First 1
+          if (!$innoextract) { throw 'The pinned innoextract release did not contain innoextract.exe.' }
 
           Remove-Item -LiteralPath $extract -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $extract -Force | Out-Null
-          & $sevenZip x $installer "-o$extract" -y
+          & $innoextract.FullName '-d' $extract $installer
           if ($LASTEXITCODE -ne 0) {
-            throw "7-Zip could not extract the JieLi 2.5.3 installer payload (exit $LASTEXITCODE)."
+            throw "innoextract could not unpack the JieLi 2.5.3 Inno Setup payload (exit $LASTEXITCODE)."
           }
 
           $compiler = Get-ChildItem -LiteralPath $extract -Filter 'clang.exe' -File -Recurse |
