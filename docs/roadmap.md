@@ -8,6 +8,14 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Extract HOME patch-grid rendering into a pure, independently tested view module.
 - [ ] Extract patch-editor and reusable control rendering into independent UI modules before expanding the screen set.
 
+## Two-track sequencer foundation
+
+- [x] Define exactly two independent 64-step tracks with adjustable active lengths from 8–64.
+- [x] Define division choices from 1/4 through 1/32, including triplets; independent swing per track; global key shift.
+- [x] Model step note, velocity, gate, tie and slide independently, with selected-track state.
+- [ ] Add the combined two-lane SEQ screen and piano-roll editing interaction.
+- [ ] Map the native FM1 sequence engine to the two-track Instrument workflow and verify clock/transport behavior.
+
 ## Browser-side foundation
 
 - [x] Use M-VAVE's official FM1 source and SDK as the synthesis foundation.
