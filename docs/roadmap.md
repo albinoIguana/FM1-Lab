@@ -2,13 +2,18 @@
 
 Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 
+## Architecture boundaries
+
+- [x] Add an InstrumentSession application service between the data model and M-VAVE engine; centralize topology-aware rendering and serialize mutable-track writes.
+- [ ] Split HOME, patch-editor and reusable control rendering into independent UI modules before expanding the screen set.
+
 ## Browser-side foundation
 
 - [x] Use M-VAVE's official FM1 source and SDK as the synthesis foundation.
 - [x] Pin the official source as a Git submodule.
 - [x] Define one Instrument as exactly four independent six-operator DX7 patches.
 - [x] Store each voice in M-VAVE's expanded 156-byte DX7 format.
-- [x] Implement non-destructive Brightness, Body, Motion and Edge macro transforms.
+- [x] Implement non-destructive Brightness, Body, Motion and Dirt macro transforms.
 - [x] Derive carrier roles from M-VAVE's actual DX7 algorithm routing table.
 - [x] Add browser-side operator editing for oscillator mode, coarse/fine, output and four-stage envelopes.
 - [x] Connect the browser workshop to M-VAVE's official simulator and audio worklet.
