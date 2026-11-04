@@ -38,17 +38,15 @@ foreach ($file in $files) {
 Push-Location $root
 try {
     node (Join-Path $root 'scripts/patch-m-vave-instrument-storage.mjs')
-    node (Join-Path $root 'scripts/patch-m-vave-two-track-sequencer.mjs')
-    if ($LASTEXITCODE -ne 0) { throw 'Native two-track sequencer patch failed.' }
     if ($LASTEXITCODE -ne 0) { throw 'Instrument storage integration patch failed.' }
+    node (Join-Path $root 'scripts/patch-m-vave-two-track-sequencer.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Native two-track sequencer engine patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-physical-controls.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Physical control naming patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-instrument-home.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Instrument home screen patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-instrument-sequencer-screen.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Native sequencer screen patch failed.' }
-    if ($LASTEXITCODE -ne 0) { throw 'Instrument home screen patch failed.' }
-    if ($LASTEXITCODE -ne 0) { throw 'Physical control naming patch failed.' }
 } finally {
     Pop-Location
 }
