@@ -101,6 +101,9 @@ int fm1lab_audio_route_midi(const uint8_t *message, size_t bytes)
         return 0;
     }
     if (message[0] >= 0xf0u) return 0;
+    size_t expected = (message[0] & 0xe0u) == 0xc0u ? 2u : 3u;
+    if (bytes != expected || message[1] > 127u ||
+        (expected == 3u && message[2] > 127u)) return -1;
     return fm1lab_audio_engine_midi(&audio_engine, message, bytes, 0x0fu) == 0 ? 1 : -1;
 }
 
