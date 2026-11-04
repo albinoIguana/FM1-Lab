@@ -42,3 +42,9 @@ cc -std=c11 -Wall -Wextra -Werror \
   "$ROOT/firmware/fm1lab_sequencer.c" "$ROOT/tests/fm1lab_sequencer.test.c" -o "$SEQUENCER_BIN"
 "$SEQUENCER_BIN"
 echo "FM1-Lab native sequencer adapter tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
+  "$ROOT/firmware/fm1lab_instrument.c" "$ROOT/firmware/fm1lab_voice_editor.c" \
+  "$ROOT/tests/fm1lab_voice_editor.test.c" -o "$SEQUENCER_BIN"
+"$SEQUENCER_BIN"
+echo "FM1-Lab native voice editor tests passed."
