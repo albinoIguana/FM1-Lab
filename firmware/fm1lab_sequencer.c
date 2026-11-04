@@ -1,5 +1,6 @@
 #include "fm1lab_sequencer.h"
 #include "instrument.h"
+#include "fm1lab_instrument.h"
 #include <string.h>
 
 extern int groove_sequence_track_enable(unsigned track, unsigned enabled);
@@ -8,6 +9,7 @@ extern void groove_sequence_transport(uint8_t status);
 /* The alternate-tuning flag is part of the native step encoding. */
 static unsigned bound_tracks[FM1LAB_SEQUENCE_LANES] = {255U, 255U};
 static unsigned selected_lane;
+static uint8_t bound_patch[FM1LAB_SEQUENCE_LANES] = {0, 1};
 
 static int lane_track(unsigned lane, unsigned *track)
 {
@@ -28,16 +30,20 @@ int fm1lab_sequencer_bind(unsigned a, unsigned b)
         groove_track_role(b) != GROOVE_TRACK_NORMAL ||
         groove_source_type(a) != GROOVE_DX7 || groove_source_type(b) != GROOVE_DX7)
         return -2;
+    groove_sequence_transport(0xfcU);
     for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
         if (groove_sequence_track_enable(track, track == a || track == b)) return -3;
     bound_tracks[0] = a;
     bound_tracks[1] = b;
     selected_lane = 0;
+    bound_patch[0] = 0;
+    bound_patch[1] = 1;
     return 0;
 }
 
 int fm1lab_sequencer_unbind(void)
 {
+    groove_sequence_transport(0xfcU);
     for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
         if (groove_sequence_track_enable(track, 1U)) return -1;
     bound_tracks[0] = bound_tracks[1] = 255U;
@@ -63,6 +69,7 @@ int fm1lab_sequencer_read(fm1lab_sequence_state_t *state)
         struct groove_view view;
         groove_sequence_view(track, 0, &view);
         state->playing = view.playing;
+        out->patch_index = bound_patch[lane];
         groove_sequence_read(track, 0, native, FM1LAB_SEQUENCE_STEPS);
         for (unsigned step = 0; step < FM1LAB_SEQUENCE_STEPS; ++step) {
             fm1lab_sequence_step_t *dst = &out->steps[step];
@@ -103,6 +110,31 @@ int fm1lab_sequencer_set_length(unsigned lane, unsigned steps)
     if (steps != 16 && steps != 32 && steps != 48 && steps != 64) return -1;
     groove_sequence_length_set(track, steps);
     return groove_sequence_length(track) == steps ? 0 : -2;
+}
+
+int fm1lab_sequencer_set_patch(unsigned lane, const fm1lab_instrument_t *instrument,
+                                unsigned patch)
+{
+    unsigned track;
+    int result = lane_track(lane, &track);
+    if (result) return result;
+    if (!instrument || patch >= FM1LAB_PATCH_COUNT ||
+        !fm1lab_instrument_valid(instrument)) return -1;
+
+    uint8_t voice[FM1LAB_PATCH_BYTES];
+    if (fm1lab_render_patch(instrument, patch, voice)) return -1;
+    result = groove_fm_import(track, voice);
+    if (result) return result;
+
+    struct groove_view view;
+    groove_get_view(track, 0, &view);
+    int level_delta = (int)instrument->patches[patch].level - (int)view.volume;
+    if (level_delta) groove_control_edit(track, 0, level_delta, 0);
+    groove_get_view(track, 0, &view);
+    unsigned should_mute = !instrument->patches[patch].enabled;
+    if ((unsigned)view.muted != should_mute) groove_mix_toggle(track, 0);
+    bound_patch[lane] = (uint8_t)patch;
+    return 0;
 }
 
 int fm1lab_sequencer_set_step(unsigned lane, unsigned step,
