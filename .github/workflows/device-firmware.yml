@@ -39,41 +39,68 @@ jobs:
             throw "CodeBlocks installation failed; the JieLi toolchain requires it."
           }
 
-      - name: Install and verify JieLi Windows toolchain
+      - name: Download and install JieLi Windows toolchain
         shell: pwsh
+        timeout-minutes: 20
         run: |
           $ErrorActionPreference = 'Stop'
           $clang = 'C:\JL\pi32\bin\clang.exe'
           if (!(Test-Path $clang)) {
             $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-latest.exe'
             Invoke-WebRequest -Uri 'https://pkgman.jieliapp.com/s/win-toolchain' -OutFile $installer
+            $item = Get-Item -LiteralPath $installer
+            if ($item.Length -lt 1MB) {
+              throw "JieLi installer download is unexpectedly small ($($item.Length) bytes)."
+            }
+            Write-Host "Downloaded JieLi installer: $($item.Length) bytes"
+            Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
 
-            # The vendor installer behaves as a guided Windows installer; /S
-            # did not terminate on the hosted runner. Use standard Inno Setup
-            # unattended switches and allow the full toolchain install window.
+            # Installers can leave their parent process alive while a child
+            # installer or post-install helper runs. Detect the compiler as
+            # soon as it lands instead of waiting only for the parent process.
             $p = Start-Process -FilePath $installer -ArgumentList @(
               '/VERYSILENT',
               '/SUPPRESSMSGBOXES',
               '/NORESTART',
               '/SP-'
             ) -PassThru
-            if (!$p.WaitForExit(900000)) {
-              try { $p.Kill() } catch {}
-              throw 'JieLi installer exceeded the 15-minute unattended install limit.'
-            }
-            if ($p.ExitCode -ne 0) {
-              throw "JieLi installer exited with code $($p.ExitCode)."
+            $deadline = (Get-Date).AddMinutes(15)
+            while ((Get-Date) -lt $deadline) {
+              if (Test-Path -LiteralPath $clang) {
+                Write-Host 'JieLi clang.exe appeared at the SDK-required path.'
+                break
+              }
+              $p.Refresh()
+              if ($p.HasExited) {
+                if ($p.ExitCode -ne 0) {
+                  throw "JieLi installer exited with code $($p.ExitCode) before clang.exe appeared."
+                }
+                break
+              }
+              Start-Sleep -Seconds 10
             }
 
-            $deadline = (Get-Date).AddMinutes(5)
-            while ((Get-Date) -lt $deadline -and !(Test-Path $clang)) {
-              Start-Sleep -Seconds 5
+            if (!(Test-Path -LiteralPath $clang)) {
+              Write-Host 'Compiler not found. Installer process:'
+              try { $p.Refresh(); $p | Format-List Id,HasExited,ExitCode,StartTime,Path } catch {}
+              Write-Host 'Installer-related processes:'
+              Get-CimInstance Win32_Process |
+                Where-Object { $_.Name -match 'jieli|toolchain|setup|install|clang|codeblocks' } |
+                Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine |
+                Format-List
+              Write-Host 'Likely install roots:'
+              foreach ($path in @('C:\JL','C:\Program Files\Jieli','C:\Program Files (x86)\Jieli')) {
+                if (Test-Path $path) { Get-ChildItem $path -Force | Select-Object FullName,Length }
+              }
+              throw 'JieLi installer did not place clang.exe at C:\JL\pi32\bin\clang.exe within 15 minutes.'
+            }
+            if (!$p.HasExited) {
+              Write-Host 'Compiler is installed; stopping the still-running installer wrapper.'
+              try { $p.Kill() } catch {}
             }
           }
-          if (!(Test-Path $clang)) {
-            throw 'JieLi toolchain was not installed at C:\JL\pi32. Check the installer output and CodeBlocks prerequisite.'
-          }
           & $clang --version
+          if ($LASTEXITCODE -ne 0) { throw 'JieLi clang.exe failed to execute.' }
           Get-FileHash $clang -Algorithm SHA256
 
       - name: Build the actual FM1 device firmware
