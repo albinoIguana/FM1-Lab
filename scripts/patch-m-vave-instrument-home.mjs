@@ -151,6 +151,8 @@ if (!source.includes("FM1LAB_HOME && !(pressed")) {
 }
 
 source = source.replaceAll("page = music_page = OVERVIEW;", "page = music_page = FM1LAB_HOME;");
+source = source.replace("            else if (page == OVERVIEW) {",
+  "            else if (page == OVERVIEW || page == FM1LAB_HOME) {");
 source = source.replace("    if (page == OVERVIEW || page == STEPS) music_page = page;",
   "    if (page == OVERVIEW || page == STEPS || page == FM1LAB_HOME) music_page = page;");
 source = source.replace("            } else page = OVERVIEW;\n        } else if (pressed & BUTTON(SEQ)) {",
