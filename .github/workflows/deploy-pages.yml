@@ -1,8 +1,8 @@
-name: Deploy FM1-Lab to GitHub Pages
+name: FM1-Lab · M-VAVE native engine
 
 on:
   push:
-    branches: ["main", "feat/fm1lab-product-front-door"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -18,9 +18,9 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
-      - name: Check out repository and pinned emulator
+      - name: Check out FM1-Lab and official M-VAVE source
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -30,84 +30,36 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run FM1-Lab tests
-        run: npm test
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Set up Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: 3.1.64
-
-      - name: Fetch pinned Felucca firmware source
+      - name: Apply FM1-Lab extensions to M-VAVE simulator
+        shell: bash
         run: |
-          git clone https://github.com/hugelton/Felucca.git vendor/felucca
-          git -C vendor/felucca checkout 743551712c36b3984392eea1dbe13a309907e17a
-          git -C vendor/felucca submodule update --init --recursive
-          git -C vendor/felucca apply ../../patches/felucca-host-fm1lab-api.patch
+          git -C vendor/m-vave-fm1 apply --check ../../patches/m-vave-instrument-api.patch
+          git -C vendor/m-vave-fm1 apply ../../patches/m-vave-instrument-api.patch
 
-      - name: Build Felucca's browser-native firmware runtime
-        working-directory: vendor/felucca
+      - name: Test the Instrument and macro models
+        run: node --test tests/dx7-macros.test.js tests/instrument-model.test.js
+
+      - name: Build the official M-VAVE browser engine
+        shell: pwsh
+        run: ./vendor/m-vave-fm1/tools/Build-Web.ps1 -LocalPreview
+
+      - name: Verify the official engine API
+        run: node scripts/check-m-vave-api.mjs vendor/m-vave-fm1/build/web/simulator.wasm
+
+      - name: Assemble the FM1-Lab workshop
+        shell: pwsh
         run: |
-          python -m pip install --disable-pip-version-check Pillow fonttools
-          ./build.sh gen
-          ./build.sh web
-
-      - name: Verify FM1-Lab native FM6 bridge
-        run: node scripts/felucca-api-smoke.mjs vendor/felucca/build/web/felucca.wasm
-
-      - name: Run Felucca FM6 and browser-host regression suite
-        working-directory: vendor/felucca
-        run: sh tests/run_tests.sh
-
-      - name: Install WebAssembly target
-        run: rustup target add wasm32-unknown-unknown
-
-      - name: Run upstream emulator Rust tests
-        run: cargo test --release -p fm1-isa -p fm1-core -p fm1-soc -p fm1-web
-        working-directory: vendor/fm1-emu
-
-      - name: Run upstream emulator browser-code tests
-        run: node --test web/*.test.mjs
-        working-directory: vendor/fm1-emu
-
-      - name: Build the upstream emulator as a supporting compatibility bench
-        run: vendor/fm1-emu/tools/build_site.sh _compat
-
-      - name: Smoke-test emulated firmware and audio output
-        run: node vendor/fm1-emu/web/smoke.mjs _compat
-
-      - name: Verify emulator flash persistence round trip
-        run: node vendor/fm1-emu/web/persistence.wasm.mjs _compat
-
-      - name: Assemble FM1-Lab product site and supporting runtimes
-        run: |
-          mkdir -p _site/compatibility _site/felucca _site/src _site/scripts
-          cp -R _compat/. _site/compatibility/
-          cp -R vendor/felucca/build/web/. _site/felucca/
-          cp vendor/felucca/LICENSE vendor/felucca/LICENSING.md _site/felucca/
-          cp -R vendor/felucca/LICENSES _site/felucca/
-          cp index.html _site/index.html
-          cp -R src/. _site/src/
-          cp testing.html _site/testing.html
-          cp .nojekyll _site/
-          cp scripts/felucca-midi-smoke.fm1 _site/scripts/
-
-      - name: Verify the built product in headless Chromium
-        run: |
-          npm install --no-save --no-package-lock playwright
-          npx playwright install --with-deps chromium
-          python -m http.server 4173 --directory _site > /tmp/fm1lab-http.log 2>&1 &
-          node scripts/browser-e2e.mjs
+          New-Item -ItemType Directory -Force _site/src, _site/m-vave | Out-Null
+          Copy-Item index.html _site/index.html
+          Copy-Item .nojekyll _site/.nojekyll
+          Copy-Item src/* _site/src/
+          Copy-Item vendor/m-vave-fm1/sdk/Simulator.js _site/m-vave/Simulator.js
+          Copy-Item vendor/m-vave-fm1/build/web/simulator.wasm _site/m-vave/simulator.wasm
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload static site
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
@@ -117,9 +69,9 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: build
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy FM1-Lab
         id: deployment
         uses: actions/deploy-pages@v4
