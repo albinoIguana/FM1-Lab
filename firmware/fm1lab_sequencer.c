@@ -2,6 +2,9 @@
 #include "instrument.h"
 #include <string.h>
 
+extern int groove_sequence_track_enable(unsigned track, unsigned enabled);
+extern void groove_sequence_transport(uint8_t status);
+
 /* The alternate-tuning flag is part of the native step encoding. */
 static unsigned bound_tracks[FM1LAB_SEQUENCE_LANES] = {255U, 255U};
 static unsigned selected_lane;
@@ -25,14 +28,10 @@ int fm1lab_sequencer_bind(unsigned a, unsigned b)
         groove_track_role(b) != GROOVE_TRACK_NORMAL ||
         groove_source_type(a) != GROOVE_DX7 || groove_source_type(b) != GROOVE_DX7)
         return -2;
-    bound_tracks[0] = a;
-    bound_tracks[1] = b;
-    selected_lane = 0;
-    return 0;
+    for (unsigned track = 0; track < GROOVE_TRACKS; ++track)\n        if (groove_sequence_track_enable(track, track == a || track == b)) return -3;\n    bound_tracks[0] = a;\n    bound_tracks[1] = b;\n    selected_lane = 0;\n    return 0;
 }
 
-int fm1lab_sequencer_read(fm1lab_sequence_state_t *state)
-{
+int fm1lab_sequencer_unbind(void)\n{\n    for (unsigned track = 0; track < GROOVE_TRACKS; ++track)\n        if (groove_sequence_track_enable(track, 1U)) return -1;\n    bound_tracks[0] = bound_tracks[1] = 255U;\n    selected_lane = 0;\n    return 0;\n}\n\nint fm1lab_sequencer_read(fm1lab_sequence_state_t *state)\n{
     if (!state) return -1;
     unsigned track;
     memset(state, 0, sizeof *state);
@@ -45,7 +44,7 @@ int fm1lab_sequencer_read(fm1lab_sequence_state_t *state)
         fm1lab_sequence_lane_t *out = &state->lanes[lane];
         struct groove_step native[FM1LAB_SEQUENCE_STEPS];
         out->backend_track = (uint8_t)track;
-        out->length = (uint8_t)groove_sequence_length(track);
+        out->length = (uint8_t)groove_sequence_length(track);\n        struct groove_view view;\n        groove_sequence_view(track, 0, &view);\n        state->playing = view.playing;
         groove_sequence_read(track, 0, native, FM1LAB_SEQUENCE_STEPS);
         for (unsigned step = 0; step < FM1LAB_SEQUENCE_STEPS; ++step) {
             fm1lab_sequence_step_t *dst = &out->steps[step];
@@ -128,3 +127,4 @@ int fm1lab_sequencer_select_lane(unsigned lane)
     selected_lane = lane;
     return 0;
 }
+\nint fm1lab_sequencer_transport(unsigned playing)\n{\n    if (playing > 1U || bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;\n    groove_sequence_transport(playing ? 0xfaU : 0xfcU);\n    return 0;\n}\n
