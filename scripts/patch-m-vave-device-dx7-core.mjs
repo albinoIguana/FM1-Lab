@@ -23,9 +23,15 @@ for (const file of cFiles) {
   const input = path.join(source, file);
   if (!fs.existsSync(input)) throw new Error("Missing upstream FM6 source: " + input);
   const original = fs.readFileSync(input, "utf8");
-  const staged = original.includes('#include "fm1lab_dx7_rename.h"')
+  let staged = original.includes('#include "fm1lab_dx7_rename.h"')
     ? original
     : '#include "fm1lab_dx7_rename.h"\n' + original;
+  for (const [symbol, renamed] of Object.entries({
+    sim_fm_carriers: "fm1lab_sim_fm_carriers",
+    sim_fm_operator_depth: "fm1lab_sim_fm_operator_depth",
+    dx7_sin_log_table: "fm1lab_dx7_sin_log_table",
+    dx7_sin_exp_table: "fm1lab_dx7_sin_exp_table"
+  })) staged = staged.replaceAll(symbol, renamed);
   fs.writeFileSync(path.join(target, file), staged);
 }
 for (const file of hFiles) {
