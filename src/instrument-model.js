@@ -11,7 +11,8 @@ export function createPatch(name = "INIT VOICE", data = new Uint8Array(DX7_PATCH
     name: String(name || "INIT VOICE").slice(0, 10),
     baseData,
     macros: { ...DEFAULT_MACROS },
-    selectedOperator: 1
+    selectedOperator: 1,
+    enabled: true
   };
 }
 
@@ -44,7 +45,8 @@ export function normalizePatch(candidate, index = 0) {
     name: String(candidate.name || "PATCH " + (index + 1)).slice(0, 10),
     baseData: data,
     macros,
-    selectedOperator: Math.max(1, Math.min(OPERATOR_COUNT, Math.round(Number(candidate.selectedOperator) || 1)))
+    selectedOperator: Math.max(1, Math.min(OPERATOR_COUNT, Math.round(Number(candidate.selectedOperator) || 1))),
+    enabled: candidate.enabled !== false
   };
 }
 
