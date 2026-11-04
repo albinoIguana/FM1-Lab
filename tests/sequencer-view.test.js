@@ -10,6 +10,8 @@ test("SEQ view always displays two fixed-width 64-step lanes", () => {
   assert.match(html, /64-step timeline/);
   assert.match(html, /LEAD/);
   assert.match(html, /BASS/);
+  assert.match(html, /data-seq-patch="0"/);
+  assert.match(html, /data-seq-patch="1"/);
 });
 
 test("SEQ view shows active steps and disables positions beyond each track length", () => {
