@@ -23,7 +23,7 @@ if (!source.includes("static fm1lab_sequence_state_t fm1lab_seq_state"))
     "sequencer state");
 
 if (!source.includes("static void fm1lab_seq_draw(void)")) {
-  const helpers = String.raw\`
+  const helpers = String.raw`
 static int fm1lab_seq_bind_tracks(void)
 {
     unsigned found[2] = {GROOVE_TRACKS, GROOVE_TRACKS};
@@ -91,7 +91,7 @@ static void fm1lab_seq_draw(void)
     text(88, 210, "SELECT STEP  PRESETS LANE", 1, DIM, BACK);
     text(8, 226, "KNOB 1 ON/OFF  2 PITCH  3 VELOCITY  4 GATE", 1, DIM, BACK);
 }
-\`;
+`;
   replaceOnce("static void draw_page_body(const struct fm1_ble_status *ble)\n{",
     helpers + "\nstatic void draw_page_body(const struct fm1_ble_status *ble)\n{",
     "sequencer draw helpers");
