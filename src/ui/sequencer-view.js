@@ -4,7 +4,7 @@ const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 })[character]);
 
-function renderTrack(track, trackIndex, selectedTrack, selectedStep) {
+function renderTrack(track, trackIndex, selectedTrack, selectedStep, patchNames) {
   const selected = trackIndex === selectedTrack;
   const steps = track.steps.map((step, index) => {
     const inLength = index < track.length;
@@ -22,12 +22,12 @@ function renderTrack(track, trackIndex, selectedTrack, selectedStep) {
   return '<section class="seq-lane ' + (selected ? "selected" : "") + '" data-seq-lane="' + trackIndex + '">' +
     '<header><button data-seq-select="' + trackIndex + '" class="seq-track-select ' + (selected ? "selected" : "") +
     '">TRACK ' + (trackIndex + 1) + '</button><strong>' + escapeHtml(track.name) +
-    '</strong><span>' + track.length + ' STEPS</span><span>' + DIVISIONS[track.division].label +
+    '</strong><span>' + escapeHtml(patchNames[track.patchIndex] || ("PATCH " + (track.patchIndex + 1))) + '</span><span>' + track.length + ' STEPS</span><span>' + DIVISIONS[track.division].label +
     '</span></header><div class="seq-timeline" role="group" aria-label="Track ' + (trackIndex + 1) + ' 64-step timeline">' +
     steps + '</div></section>';
 }
 
-export function renderSequencer(sequence, selectedStep = 0, advanced = false) {
+export function renderSequencer(sequence, selectedStep = 0, advanced = false, patchNames = ["PATCH 1", "PATCH 2", "PATCH 3", "PATCH 4"]) {
   if (!sequence || !Array.isArray(sequence.tracks) || sequence.tracks.length !== 2) {
     throw new TypeError("The SEQ view requires exactly two tracks.");
   }
@@ -41,8 +41,8 @@ export function renderSequencer(sequence, selectedStep = 0, advanced = false) {
     return '<button class="seq-key ' + (step.note === note ? "active" : "") + '" data-seq-note="' + note +
       '">' + ["B","A#","A","G#","G","F#","F","E","D#","D","C#","C"][index] + '</button>';
   }).join("");
-  return '<div class="seq-function-bar"><div><small>SEQUENCER</small><strong>' + sequence.tempo +
-    ' BPM</strong></div><div class="seq-global-shift"><label>GLOBAL KEY SHIFT <output>' + sequence.keyShift +
+  return '<div class="seq-function-bar"><div class="seq-tempo"><small>SEQUENCER TEMPO</small><button data-seq-tempo="-1" aria-label="Decrease tempo">−</button><strong>' + sequence.tempo +
+    ' BPM</strong><button data-seq-tempo="1" aria-label="Increase tempo">+</button></div><div class="seq-global-shift"><label>GLOBAL KEY SHIFT <output>' + sequence.keyShift +
     '</output></label><input data-seq-key-shift type="range" min="-24" max="24" value="' + sequence.keyShift +
     '"></div><button data-seq-advanced>' + (advanced ? "CLOSE NOTE EDIT" : "HOLD SELECT · NOTE EDIT") + '</button></div>' +
     '<div class="seq-selected-controls"><div><small>SELECTED TRACK</small><strong>TRACK ' + (sequence.selectedTrack + 1) +
@@ -51,7 +51,7 @@ export function renderSequencer(sequence, selectedStep = 0, advanced = false) {
     '<label>SWING <output>' + track.swing + '</output><input data-seq-swing type="range" min="-75" max="75" value="' +
     track.swing + '"></label><span class="seq-knob-hint">KNOB 4 · GLOBAL KEY</span></div>' +
     '<div class="seq-lanes">' + sequence.tracks.map((item, index) =>
-      renderTrack(item, index, sequence.selectedTrack, selectedStep)
+      renderTrack(item, index, sequence.selectedTrack, selectedStep, patchNames)
     ).join("") + '</div>' +
     (advanced ? '<section class="seq-note-editor"><header><strong>NOTE EDIT · STEP ' + (selectedStep + 1) +
       '</strong><span>' + (step.active ? "ACTIVE" : "INACTIVE") + '</span></header><div class="seq-note-grid"><div class="seq-keyboard">' +
