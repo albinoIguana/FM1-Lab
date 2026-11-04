@@ -6,6 +6,9 @@ const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
 
 function renderTrack(track, trackIndex, selectedTrack, selectedStep, patchNames) {
   const selected = trackIndex === selectedTrack;
+  const patchOptions = patchNames.map((name, index) =>
+    '<option value="' + index + '" ' + (track.patchIndex === index ? "selected" : "") + '>' + escapeHtml(name) + '</option>'
+  ).join("");
   const steps = track.steps.map((step, index) => {
     const inLength = index < track.length;
     const classes = [
@@ -22,7 +25,7 @@ function renderTrack(track, trackIndex, selectedTrack, selectedStep, patchNames)
   return '<section class="seq-lane ' + (selected ? "selected" : "") + '" data-seq-lane="' + trackIndex + '">' +
     '<header><button data-seq-select="' + trackIndex + '" class="seq-track-select ' + (selected ? "selected" : "") +
     '">TRACK ' + (trackIndex + 1) + '</button><strong>' + escapeHtml(track.name) +
-    '</strong><span>' + escapeHtml(patchNames[track.patchIndex] || ("PATCH " + (track.patchIndex + 1))) + '</span><span>' + track.length + ' STEPS</span><span>' + DIVISIONS[track.division].label +
+    '</strong><label class="seq-patch-select">PATCH <select data-seq-patch="' + trackIndex + '">' + patchOptions + '</select></label><span>' + track.length + ' STEPS</span><span>' + DIVISIONS[track.division].label +
     '</span></header><div class="seq-timeline" role="group" aria-label="Track ' + (trackIndex + 1) + ' 64-step timeline">' +
     steps + '</div></section>';
 }
