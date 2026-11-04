@@ -31,217 +31,69 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install and initialize CodeBlocks prerequisite
+      - name: Extract the pinned JieLi toolchain without running its GUI installer
         shell: pwsh
+        timeout-minutes: 15
         run: |
           $ErrorActionPreference = 'Stop'
-          choco install codeblocks --yes --no-progress
+          $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-2.5.3.exe'
+          $extract = Join-Path $env:RUNNER_TEMP 'jieli-toolchain-extracted'
+          $target = 'C:\\JL\\pi32'
+          $clang = Join-Path $target 'bin\\clang.exe'
+
+          # The SDK build consumes the compiler and libraries from C:\\JL\\pi32.
+          # Code::Blocks is only an IDE prerequisite in JieLi's interactive
+          # installer; it is not used by the SDK's Build.ps1 command-line build.
+          # Extract the signed 2.5.3 Inno Setup payload directly so CI does not
+          # need a desktop session to answer Code::Blocks' first-run dialogs.
+          Invoke-WebRequest -Uri 'https://jl-update.oss-cn-shenzhen.aliyuncs.com/2.5.3.exe' -OutFile $installer
+          $item = Get-Item -LiteralPath $installer
+          if ($item.Length -lt 1MB) {
+            throw "JieLi installer download is unexpectedly small ($($item.Length) bytes)."
+          }
+          Write-Host "Downloaded JieLi 2.5.3 installer: $($item.Length) bytes"
+          Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
+
+          $sevenZip = @(
+            (Join-Path $env:ProgramFiles '7-Zip\\7z.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} '7-Zip\\7z.exe')
+          ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+          if (!$sevenZip) {
+            choco install 7zip.install --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Could not install 7-Zip to extract the JieLi toolchain payload.' }
+            $sevenZip = Join-Path $env:ProgramFiles '7-Zip\\7z.exe'
+          }
+          if (!(Test-Path -LiteralPath $sevenZip)) { throw '7-Zip executable was not found.' }
+
+          Remove-Item -LiteralPath $extract -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $extract -Force | Out-Null
+          & $sevenZip x $installer "-o$extract" -y
           if ($LASTEXITCODE -ne 0) {
-            throw "CodeBlocks installation failed; the JieLi toolchain requires it."
+            throw "7-Zip could not extract the JieLi 2.5.3 installer payload (exit $LASTEXITCODE)."
           }
 
-          $cb = Join-Path $env:ProgramFiles 'CodeBlocks\codeblocks.exe'
-          $cbConfig = Join-Path $env:APPDATA 'CodeBlocks\default.conf'
-          if (!(Test-Path -LiteralPath $cb)) {
-            throw "Code::Blocks executable not found at $cb"
+          $compiler = Get-ChildItem -LiteralPath $extract -Filter 'clang.exe' -File -Recurse |
+            Where-Object { $_.FullName -match '[\\/]pi32[\\/]bin[\\/]clang\\.exe$' } |
+            Select-Object -First 1
+          if (!$compiler) {
+            Write-Host 'Extracted installer contents:'
+            Get-ChildItem -LiteralPath $extract -Force | Select-Object Name,Mode
+            throw 'The JieLi installer archive did not expose pi32/bin/clang.exe; refusing to guess an installation layout.'
           }
 
-          # The Code::Blocks manual documents that its first launch creates
-          # the user's personality config under %APPDATA%\CodeBlocks.
-          # Use the default personality explicitly; suppress the splash screen.
-          Remove-Item -LiteralPath $cbConfig -Force -ErrorAction SilentlyContinue
-          $cbProcess = Start-Process -FilePath $cb -ArgumentList @('--no-splash-screen','--personality=default') -PassThru
-          $startupDeadline = (Get-Date).AddSeconds(45)
-          while ((Get-Date) -lt $startupDeadline -and !(Test-Path -LiteralPath $cbConfig)) {
-            $cbProcess.Refresh()
-            if ($cbProcess.HasExited) { break }
-            Start-Sleep -Seconds 2
-          }
+          $pi32Root = Split-Path -Parent (Split-Path -Parent $compiler.FullName)
+          New-Item -ItemType Directory -Path 'C:\\JL' -Force | Out-Null
+          Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item -LiteralPath $pi32Root -Destination $target -Recurse -Force
+          if (!(Test-Path -LiteralPath $clang)) { throw "Extracted toolchain did not produce $clang" }
 
-          if (!$cbProcess.HasExited) {
-            [void]$cbProcess.CloseMainWindow()
-            if (!$cbProcess.WaitForExit(15000)) {
-              # Hosted Windows runners have no interactive desktop for a human
-              # to close a first-run dialog. Send WM_CLOSE to this process's
-              # top-level windows rather than treating an unconditional kill
-              # as successful initialization.
-              Add-Type -TypeDefinition @'
-          using System;
-          using System.Runtime.InteropServices;
-          public static class CbWindowCloser {
-            delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-            [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr extra);
-            [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
-            [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
-            public static int CloseForProcess(int targetPid) {
-              int count = 0;
-              EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
-                uint pid;
-                GetWindowThreadProcessId(hWnd, out pid);
-                if (pid == (uint)targetPid && PostMessage(hWnd, 0x0010, IntPtr.Zero, IntPtr.Zero)) count++;
-                return true;
-              }, IntPtr.Zero);
-              return count;
-            }
-          }
-          '@
-              $closed = [CbWindowCloser]::CloseForProcess($cbProcess.Id)
-              Write-Host "Sent WM_CLOSE to $closed Code::Blocks window(s)."
-              if (!$cbProcess.WaitForExit(10000)) {
-                throw 'Code::Blocks did not exit after its windows were closed; refusing to claim first-run initialization succeeded.'
-              }
-            }
-          }
-
-          if (!(Test-Path -LiteralPath $cbConfig)) {
-            throw "Code::Blocks exited but did not create its first-run config at $cbConfig."
-          }
-          $config = Get-Item -LiteralPath $cbConfig
-          if ($config.Length -lt 1) {
-            throw "Code::Blocks config exists but is empty: $cbConfig"
-          }
-          Write-Host "Verified Code::Blocks first-run config: $cbConfig ($($config.Length) bytes)."
-
-      - name: Download and install JieLi Windows toolchain
-        shell: pwsh
-        timeout-minutes: 40
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $clang = 'C:\JL\pi32\bin\clang.exe'
-          if (!(Test-Path $clang)) {
-            $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-latest.exe'
-            $installLog = Join-Path $env:RUNNER_TEMP 'jieli-installer.log'
-            Invoke-WebRequest -Uri 'https://jl-update.oss-cn-shenzhen.aliyuncs.com/2.5.3.exe' -OutFile $installer
-            $item = Get-Item -LiteralPath $installer
-            if ($item.Length -lt 1MB) {
-              throw "JieLi installer download is unexpectedly small ($($item.Length) bytes)."
-            }
-            Write-Host "Downloaded JieLi installer: $($item.Length) bytes"
-            Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
-
-            # Capture Inno Setup's own install log. The previous run proved
-            # that both the parent and extracted child remain alive; this
-            # distinguishes slow extraction from a blocked setup stage.
-            # /SUPPRESSMSGBOXES cannot suppress custom MsgBox calls made by
-            # an Inno Setup [Code] section. JieLi's installer uses exactly
-            # such a custom OK dialog for its Code::Blocks prerequisite.
-            # Detect that specific dialog by its child text and click OK via
-            # Win32; do not blindly dismiss unrelated installer errors.
-            Add-Type -TypeDefinition @'
-          using System;
-          using System.Text;
-          using System.Runtime.InteropServices;
-          public static class JieLiDialogHandler {
-            delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-            delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
-            [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr extra);
-            [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumChildProc cb, IntPtr extra);
-            [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
-            [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hWnd, StringBuilder text, int max);
-            [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
-            [DllImport("user32.dll", SetLastError=true)] static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
-            static bool ContainsCodeBlocksText(IntPtr dialog) {
-              bool found = false;
-              EnumChildWindows(dialog, delegate(IntPtr child, IntPtr unused) {
-                StringBuilder text = new StringBuilder(512);
-                GetWindowText(child, text, text.Capacity);
-                if (text.ToString().IndexOf("CodeBlocks", StringComparison.OrdinalIgnoreCase) >= 0) found = true;
-                return !found;
-              }, IntPtr.Zero);
-              return found;
-            }
-            public static int DismissExpectedWarning(int targetPid) {
-              int dismissed = 0;
-              EnumWindows(delegate(IntPtr hWnd, IntPtr unused) {
-                uint pid;
-                GetWindowThreadProcessId(hWnd, out pid);
-                if (pid != (uint)targetPid) return true;
-                StringBuilder cls = new StringBuilder(128);
-                GetClassName(hWnd, cls, cls.Capacity);
-                if (cls.ToString() != "#32770" || !ContainsCodeBlocksText(hWnd)) return true;
-                IntPtr result;
-                SendMessageTimeout(hWnd, 0x0111, new IntPtr(1), IntPtr.Zero, 0x0002, 2000, out result); // WM_COMMAND / IDOK
-                dismissed++;
-                return true;
-              }, IntPtr.Zero);
-              return dismissed;
-            }
-          }
-          '@
-
-            $arguments = @(
-              '/VERYSILENT',
-              '/SUPPRESSMSGBOXES',
-              '/NORESTART',
-              '/SP-',
-              "/LOG=$installLog"
-            )
-            $p = Start-Process -FilePath $installer -ArgumentList $arguments -PassThru
-            $deadline = (Get-Date).AddMinutes(15)
-            $lastReport = Get-Date
-            while ((Get-Date) -lt $deadline) {
-              if (Test-Path -LiteralPath $clang) {
-                Write-Host 'JieLi clang.exe appeared at the SDK-required path.'
-                break
-              }
-              $p.Refresh()
-              if ($p.HasExited -and $p.ExitCode -ne 0) {
-                throw "JieLi installer exited with code $($p.ExitCode) before clang.exe appeared."
-              }
-
-              if (!$p.HasExited) {
-                $dismissed = [JieLiDialogHandler]::DismissExpectedWarning($p.Id)
-                if ($dismissed -gt 0) {
-                  Write-Host "Dismissed JieLi's documented Code::Blocks prerequisite warning ($dismissed dialog(s))."
-                }
-              }
-
-              if (((Get-Date) - $lastReport).TotalSeconds -ge 30) {
-                $lastReport = Get-Date
-                $proc = Get-Process -Id $p.Id -ErrorAction SilentlyContinue
-                if ($proc) {
-                  Write-Host ("Installer still running; CPU seconds: {0}; working set MB: {1}" -f [math]::Round($proc.CPU,1),[math]::Round($proc.WorkingSet64 / 1MB,1))
-                }
-                if (Test-Path -LiteralPath $installLog) {
-                  Write-Host 'Latest JieLi installer log entries:'
-                  Get-Content -LiteralPath $installLog -Tail 8
-                } else {
-                  Write-Host 'Inno Setup log has not been created yet.'
-                }
-              }
-              Start-Sleep -Seconds 3
-            }
-
-            if (!(Test-Path -LiteralPath $clang)) {
-              Write-Host 'Compiler not found. Installer process:'
-              try { $p.Refresh(); $p | Format-List Id,HasExited,ExitCode,StartTime,Path } catch {}
-              Write-Host 'Installer-related processes:'
-              Get-CimInstance Win32_Process |
-                Where-Object { $_.Name -match 'jieli|toolchain|setup|install|clang|codeblocks' } |
-                Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine |
-                Format-List
-              Write-Host 'Likely install roots:'
-              foreach ($path in @('C:\JL','C:\Program Files\Jieli','C:\Program Files (x86)\Jieli')) {
-                if (Test-Path $path) { Get-ChildItem $path -Force | Select-Object FullName,Length }
-              }
-              if (Test-Path -LiteralPath $installLog) {
-                Write-Host 'Final JieLi installer log:'
-                Get-Content -LiteralPath $installLog -Tail 100
-              }
-              throw 'JieLi installer did not place clang.exe at C:\JL\pi32\bin\clang.exe within 15 minutes.'
-            }
-            if (!$p.HasExited) {
-              Write-Host 'Compiler is installed; stopping the still-running installer wrapper.'
-              try { $p.Kill() } catch {}
-            }
-          }
           & $clang --version
-          if ($LASTEXITCODE -ne 0) { throw 'JieLi clang.exe failed to execute.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Extracted JieLi clang.exe failed to execute.' }
           $clangHash = (Get-FileHash $clang -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($clangHash -ne 'd4bc97cf421c1ccc373dd8924ce88720ff7457b3f1478d15df4aeda6ae923bce') {
             throw "Wrong JieLi compiler build: $clangHash. FM1 SDK requires toolchain 2.5.3 / PI32v2 clang 4.0.1."
           }
-          Write-Host "Verified JieLi PI32v2 clang 4.0.1 SHA-256: $clangHash"
+          Write-Host "Verified extracted JieLi PI32v2 clang 4.0.1 SHA-256: $clangHash"
 
       - name: Build the actual FM1 device firmware
         shell: pwsh
