@@ -36,7 +36,7 @@ Gate value zero is the native 50% default; values 1–14 represent shorter gates
 
 ## Adapter API
 
-`firmware/fm1lab_sequencer.c` provides bind/unbind, state read, tempo/swing/length editing, step editing, lane selection, and transport start/stop. All functions are control-task operations. The adapter does not perform flash I/O; the existing project system remains responsible for persistence and undo.
+`firmware/fm1lab_sequencer.c` provides bind/unbind, state read, tempo/swing/length editing, step editing, lane selection, patch assignment from the four-patch Instrument, patch level and mute application, and transport start/stop. Patch assignment renders the selected Instrument patch through the macro renderer, imports the resulting DX7 voice into the bound track, then applies its level and enabled state. All functions are control-task operations. The adapter does not perform flash I/O; the existing project system remains responsible for persistence and undo.
 
 ## Remaining integration
 
