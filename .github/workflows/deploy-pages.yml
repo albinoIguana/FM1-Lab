@@ -2,7 +2,7 @@ name: Deploy FM1-Lab to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feat/fm1lab-product-front-door"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
