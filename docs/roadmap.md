@@ -5,7 +5,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 ## Architecture boundaries
 
 - [x] Add an InstrumentSession application service between the data model and M-VAVE engine; centralize topology-aware rendering and serialize mutable-track writes.
-- [ ] Split HOME, patch-editor and reusable control rendering into independent UI modules before expanding the screen set.
+- [x] Extract HOME patch-grid rendering into a pure, independently tested view module.
+- [ ] Extract patch-editor and reusable control rendering into independent UI modules before expanding the screen set.
 
 ## Browser-side foundation
 
