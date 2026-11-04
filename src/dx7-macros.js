@@ -18,7 +18,7 @@ function adjusted(base, amount, min = 0, max = 99) {
  * carrierMask uses bit 0 for OP1 through bit 5 for OP6, from M-VAVE's
  * official algorithm routing table. Macro edits never modify the saved patch.
  */
-export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x3f) {
+export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x3f, operatorDepths = [1, 1, 1, 1, 1, 1]) {
   if (!basePatch || basePatch.length !== 156) throw new Error("M-VAVE DX7 patches must be exactly 156 bytes.");
   const base = Uint8Array.from(basePatch);
   const bytes = base.slice();
@@ -33,12 +33,14 @@ export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x
       bytes[offset + 6] = adjusted(base[offset + 6], delta.body * 0.45);
     } else {
       // BRIGHTNESS changes modulation index by raising/lowering modulator output.
-      bytes[offset + 16] = adjusted(base[offset + 16], delta.brightness * 0.55);
+      const depth = Math.max(1, Math.min(6, Number(operatorDepths[operator - 1]) || 1));
+      const depthWeight = 1 / depth;
+      bytes[offset + 16] = adjusted(base[offset + 16], delta.brightness * 0.55 * depthWeight);
       // MOTION changes the modulator's evolving spectrum through its EG contour.
       // Level 3 and level 4 move in opposite directions to create a controllable
       // transition; untouched rates preserve the original patch's timing.
-      bytes[offset + 6] = adjusted(base[offset + 6], delta.motion * 0.35);
-      bytes[offset + 7] = adjusted(base[offset + 7], -delta.motion * 0.25);
+      bytes[offset + 6] = adjusted(base[offset + 6], delta.motion * 0.35 * depthWeight);
+      bytes[offset + 7] = adjusted(base[offset + 7], -delta.motion * 0.25 * depthWeight);
     }
   }
 
