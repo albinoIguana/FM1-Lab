@@ -6,10 +6,10 @@ const $ = s => document.querySelector(s);
 const KEY = "fm1lab.native-instruments.v1";
 const BANKS = [{name:"GLASS CURRENT",programs:[0,1,2,3]},{name:"NEON ORCHARD",programs:[4,5,6,7]}];
 const MACROS = [
-  ["brightness","BRIGHTNESS","Carrier output level"],
-  ["body","BODY","Carrier sustain"],
-  ["motion","MOTION","Native LFO rate and depth"],
-  ["edge","EDGE","Modulator index and feedback"]
+  ["brightness","BRIGHTNESS","Modulator output / harmonic energy"],
+  ["body","BODY","Carrier sustain / presence"],
+  ["motion","MOTION","Modulator envelope movement"],
+  ["dirt","DIRT","Bounded feedback / spectral aggression"]
 ];
 let engine, library=[], instrument, instrumentIndex=0, selectedPatchIndex=0, selectedOperator=1, writeQueue=Promise.resolve();
 
