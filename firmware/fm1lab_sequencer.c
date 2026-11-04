@@ -91,10 +91,10 @@ int fm1lab_sequencer_set_step(unsigned lane, unsigned step,
     int result = lane_track(lane, &track);
     if (result) return result;
     if (!value || step >= FM1LAB_SEQUENCE_STEPS || value->note > 127 ||
-        value->velocity > 127 || value->gate > 15 || value->tie > 1 || value->alt > 1)
+        value->active > 1 || value->velocity > 127 || value->gate > 15 || value->tie > 1 || value->alt > 1)
         return -1;
 
-    unsigned velocity = value->active ? value->velocity : 0;
+    unsigned velocity = value->active ? (value->velocity ? value->velocity : 1U) : 0U;
     groove_sequence_edit(track, step, value->note, velocity);
 
     int gate_delta = (int)value->gate - (int)groove_step_setting(track, step, 1);
