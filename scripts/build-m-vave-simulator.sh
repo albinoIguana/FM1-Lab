@@ -26,6 +26,7 @@ node "$ROOT/scripts/patch-m-vave-instrument-storage.mjs"
 node "$ROOT/scripts/patch-m-vave-two-track-sequencer.mjs"
 node "$ROOT/scripts/patch-m-vave-physical-controls.mjs"
 node "$ROOT/scripts/patch-m-vave-instrument-home.mjs"
+node "$ROOT/scripts/patch-m-vave-instrument-sequencer-screen.mjs"
 node "$ROOT/scripts/patch-m-vave-simulator-api.mjs"
 
 if [[ ! -x "$SDK_ROOT/bin/clang" ]]; then
