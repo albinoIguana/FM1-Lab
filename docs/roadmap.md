@@ -16,8 +16,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Add the combined two-lane SEQ screen, patch assignment, and 24-row piano-roll editing surface.
 - [x] Add a native C adapter for two explicit normal DX7 tracks, including tempo, shared swing, loop length, note/gate/tie/alternate-tuning edits, lane selection and transport.
 - [x] Add a runtime-only native playback mask so the two bound lanes play while the other six project tracks remain stored and untouched; unbind restores all eight.
-- [ ] Wire the physical two-lane device screen to the adapter and rebind after project load.
-- [ ] Verify clock/transport and save/load behavior on the device.
+- [x] Wire the physical two-lane device screen to the adapter, with a central exit hook that stops transport and restores all eight project tracks.
+- [ ] Verify project-load rebinding, clock/transport and save/load behavior on the device.
 
 ## Browser-side foundation
 
