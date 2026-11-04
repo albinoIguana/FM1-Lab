@@ -106,6 +106,14 @@ unsigned fm1lab_voice_operator_depth(const uint8_t voice[FM1LAB_PATCH_BYTES],
     return fm1lab_operator_depth(voice[GLOBAL_ALGORITHM] & 31U, operator_number);
 }
 
+int fm1lab_voice_operator_modulates(const uint8_t voice[FM1LAB_PATCH_BYTES],
+                                    unsigned source_operator, unsigned target_operator)
+{
+    if (!voice) return -1;
+    return fm1lab_operator_modulates(voice[GLOBAL_ALGORITHM] & 31U,
+                                     source_operator, target_operator);
+}
+
 int fm1lab_voice_name_get(const uint8_t voice[FM1LAB_PATCH_BYTES], char name[11])
 {
     if (!voice || !name) return -1;
