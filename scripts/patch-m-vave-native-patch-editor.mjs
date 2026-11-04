@@ -17,7 +17,7 @@ if (!source.includes('#include "fm1lab_voice_editor.h"')) {
     '#include "fm1lab_runtime.h"\n#include "fm1lab_voice_editor.h"\n',
     "voice editor include");
 }
-if (!source.includes("FM1LAB_PATCH")) {
+if (!source.includes("FM1LAB_HOME, FM1LAB_SEQ, FM1LAB_PATCH")) {
   replaceOnce("FM1LAB_HOME, FM1LAB_SEQ };",
     "FM1LAB_HOME, FM1LAB_SEQ, FM1LAB_PATCH };", "patch editor page");
 }
