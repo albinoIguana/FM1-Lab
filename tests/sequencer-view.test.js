@@ -12,25 +12,28 @@ test("SEQ view always displays two fixed-width 64-step lanes", () => {
   assert.match(html, /BASS/);
   assert.match(html, /data-seq-patch="0"/);
   assert.match(html, /data-seq-patch="1"/);
+  assert.match(html, /GLOBAL SWING/);
+  assert.doesNotMatch(html, /DIVISION|KEY SHIFT/);
 });
 
 test("SEQ view shows active steps and disables positions beyond each track length", () => {
-  let sequence = createTwoTrackSequence();
-  sequence.tracks[0].length = 8;
-  sequence = setStep(sequence, 0, 3, {active:true});
-  const html = renderSequencer(sequence, 3);
+  const sequence = createTwoTrackSequence();
+  sequence.tracks[0].length = 16;
+  const edited = setStep(sequence, 0, 3, {active:true});
+  const html = renderSequencer(edited, 3);
   assert.match(html, /class="seq-step active chosen"/);
   assert.match(html, /class="seq-step beyond-length"/);
 });
 
-test("advanced note edit exposes pitch, velocity, gate, tie and slide", () => {
+test("advanced note edit exposes native pitch, velocity, gate, tie and alternate tuning", () => {
   const html = renderSequencer(createTwoTrackSequence(), 0, true, true);
   assert.match(html, /data-seq-note/);
   assert.match(html, /data-seq-piano-step/);
   assert.match(html, /data-seq-velocity/);
   assert.match(html, /data-seq-gate/);
   assert.match(html, /data-seq-tie/);
-  assert.match(html, /data-seq-slide/);
+  assert.match(html, /data-seq-alt/);
+  assert.doesNotMatch(html, /data-seq-slide/);
 });
 
 test("SEQ view rejects any model other than exactly two tracks", () => {
