@@ -4,55 +4,47 @@ const OPERATOR_COUNT = 6;
 const OPERATOR_STRIDE = 21;
 const GLOBAL = Object.freeze({ algorithm: 134, feedback: 135, lfoSpeed: 137, lfoDelay: 138, lfoPitchDepth: 139, lfoAmpDepth: 140 });
 
-export const MACRO_NAMES = Object.freeze(["brightness", "body", "motion", "edge"]);
-export const DEFAULT_MACROS = Object.freeze({ brightness: 50, body: 50, motion: 50, edge: 50 });
+export const MACRO_NAMES = Object.freeze(["brightness", "body", "motion", "dirt"]);
+export const DEFAULT_MACROS = Object.freeze({ brightness: 50, body: 50, motion: 50, dirt: 50 });
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Math.round(Number(value) || 0)));
 const operatorOffset = number => (OPERATOR_COUNT - number) * OPERATOR_STRIDE;
-
 function adjusted(base, amount, min = 0, max = 99) {
   return clamp(base + amount, min, max);
-}
-
-function writeOperatorMacro(bytes, base, carrierMask, macro, delta) {
-  for (let operator = 1; operator <= OPERATOR_COUNT; operator++) {
-    const carrier = Boolean(carrierMask & (1 << (operator - 1)));
-    const offset = operatorOffset(operator);
-    if (macro === "brightness" && carrier) {
-      // Carrier output is the direct loudness/harmonic balance control.
-      bytes[offset + 16] = adjusted(base[offset + 16], delta * 0.55);
-    } else if (macro === "body" && carrier) {
-      // DX7 EG level 3 is the sustain body of the note.
-      bytes[offset + 6] = adjusted(base[offset + 6], delta * 0.45);
-    } else if (macro === "edge" && !carrier) {
-      // Modulator output changes modulation index without flattening carriers.
-      bytes[offset + 16] = adjusted(base[offset + 16], delta * 0.45);
-    }
-  }
 }
 
 /**
  * Derive a live patch from its saved/base patch and four macro positions.
  * carrierMask uses bit 0 for OP1 through bit 5 for OP6, from M-VAVE's
- * algorithm routing table (sim_fm_carriers).
+ * official algorithm routing table. Macro edits never modify the saved patch.
  */
 export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x3f) {
   if (!basePatch || basePatch.length !== 156) throw new Error("M-VAVE DX7 patches must be exactly 156 bytes.");
   const base = Uint8Array.from(basePatch);
   const bytes = base.slice();
   const macros = Object.fromEntries(MACRO_NAMES.map(name => [name, clamp(values[name] ?? 50, 0, 100)]));
-  for (const name of MACRO_NAMES) {
-    const delta = macros[name] - 50;
-    if (name === "brightness" || name === "body" || name === "edge") {
-      writeOperatorMacro(bytes, base, carrierMask, name, delta);
-    } else if (name === "motion") {
-      // A centered macro preserves the source patch; positive motion opens
-      // the LFO rate and amplitude depth, negative motion calms both.
-      bytes[GLOBAL.lfoSpeed] = adjusted(base[GLOBAL.lfoSpeed], delta * 0.55);
-      bytes[GLOBAL.lfoAmpDepth] = adjusted(base[GLOBAL.lfoAmpDepth], delta * 0.45);
+  const delta = Object.fromEntries(MACRO_NAMES.map(name => [name, macros[name] - 50]));
+
+  for (let operator = 1; operator <= OPERATOR_COUNT; operator++) {
+    const isCarrier = Boolean(carrierMask & (1 << (operator - 1)));
+    const offset = operatorOffset(operator);
+    if (isCarrier) {
+      // BODY shapes the carrier's sustained presence, not its oscillator ratio.
+      bytes[offset + 6] = adjusted(base[offset + 6], delta.body * 0.45);
+    } else {
+      // BRIGHTNESS changes modulation index by raising/lowering modulator output.
+      bytes[offset + 16] = adjusted(base[offset + 16], delta.brightness * 0.55);
+      // MOTION changes the modulator's evolving spectrum through its EG contour.
+      // Level 3 and level 4 move in opposite directions to create a controllable
+      // transition; untouched rates preserve the original patch's timing.
+      bytes[offset + 6] = adjusted(base[offset + 6], delta.motion * 0.35);
+      bytes[offset + 7] = adjusted(base[offset + 7], -delta.motion * 0.25);
     }
   }
-  bytes[GLOBAL.feedback] = adjusted(base[GLOBAL.feedback], (macros.edge - 50) * 0.08, 0, 7);
+
+  // DIRT is deliberately a bounded feedback control in this first experiment.
+  // Frequency ratios remain untouched until topology-aware ratio mapping exists.
+  bytes[GLOBAL.feedback] = adjusted(base[GLOBAL.feedback], delta.dirt * 0.08, 0, 7);
   return bytes;
 }
 
