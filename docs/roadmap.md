@@ -10,13 +10,13 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 
 ## Two-track sequencer foundation
 
-- [x] Define exactly two independent 64-step tracks with adjustable active lengths from 8–64.
-- [x] Define division choices from 1/4 through 1/32, including triplets; independent swing per track; global key shift.
-- [x] Model step note, velocity, gate, tie and slide independently, with selected-track state.
-- [x] Add the combined two-lane SEQ screen, fixed 64-step timelines, patch assignment, and 24-row piano-roll editing surface.
-- [x] Add selected-track controls for length, division, swing and global key shift; add note velocity, pitch, gate, tie and slide editing.
-- [ ] Bind tempo, transport, swing and step data to the native clock/sequence engine; validate the device's current 16-step length granularity against the agreed 8–64-step design.
-- [ ] Map the native FM1 sequence engine to the two-track Instrument workflow and verify clock/transport behavior.
+- [x] Define exactly two user-facing lanes on independent 64-step timelines.
+- [x] Align active lengths to native 16-step increments (16/32/48/64), shared tempo (30–300 BPM), and shared swing (0–50).
+- [x] Align step fields to native note, velocity, gate, tie and alternate-tuning data; remove unsupported per-track division/swing and slide controls.
+- [x] Add the combined two-lane SEQ screen, patch assignment, and 24-row piano-roll editing surface.
+- [ ] Bind tempo, transport, swing and step data to the native clock/sequence engine.
+- [ ] Add a non-destructive adapter that binds two explicit normal project tracks while preserving the other six tracks and all existing project data.
+- [ ] Verify clock/transport and save/load behavior on the device.
 
 ## Browser-side foundation
 
