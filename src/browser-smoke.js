@@ -36,6 +36,7 @@ async function runBrowserSmokeTest() {
 
   activeEngine = new FeluccaEngine({ onState: setStatus });
   let voice = null;
+  let testPassed = false;
 
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -97,7 +98,7 @@ async function runBrowserSmokeTest() {
     const rms = Math.sqrt(squareSum / Math.max(1, sampleCount));
     assert(peak > 0.00001 && rms > 0.000001, "The AudioWorklet returned silence (peak " + peak.toExponential(2) + ", RMS " + rms.toExponential(2) + ").");
     result("LIVE AUDIO RENDER", "MIDI C4 produced non-silent AudioWorklet samples · peak " + peak.toFixed(5) + " · RMS " + rms.toFixed(5) + ".");
-    setStatus("NATIVE BROWSER SELF-TEST PASSED · AUDIO VERIFIED");
+    testPassed = true;
   } catch (error) {
     if (voice) activeEngine?.noteOff(voice);
     result("BROWSER SELF-TEST", error?.message || String(error), false);
@@ -105,6 +106,9 @@ async function runBrowserSmokeTest() {
   } finally {
     await activeEngine?.close().catch(() => {});
     activeEngine = null;
+    setStatus(testPassed
+      ? "NATIVE BROWSER SELF-TEST PASSED · AUDIO VERIFIED"
+      : "NATIVE BROWSER SELF-TEST FAILED");
     button.disabled = false;
   }
 }
