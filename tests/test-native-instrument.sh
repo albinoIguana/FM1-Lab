@@ -21,7 +21,7 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" "$ROOT/tests/fm1lab_physica
 echo "FM1-Lab physical control mapping tests passed."
 
 cc -std=c11 -Wall -Wextra -Werror \
-  -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
+  -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/firmware/fm1lab_bank_metadata.c" \
   "$ROOT/firmware/fm1lab_library.c" \
@@ -29,7 +29,7 @@ cc -std=c11 -Wall -Wextra -Werror \
 "$LIBRARY_BIN"
 echo "FM1-Lab four-patch library integration tests passed."
 
-cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" \
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
   "$ROOT/firmware/fm1lab_instrument.c" "$ROOT/firmware/fm1lab_bank_metadata.c" \
   "$ROOT/firmware/fm1lab_library.c" "$ROOT/firmware/fm1lab_runtime.c" \
   "$ROOT/tests/fm1lab_runtime.test.c" -o "$RUNTIME_BIN"
