@@ -14,8 +14,9 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Align active lengths to native 16-step increments (16/32/48/64), shared tempo (30–300 BPM), and shared swing (0–50).
 - [x] Align step fields to native note, velocity, gate, tie and alternate-tuning data; remove unsupported per-track division/swing and slide controls.
 - [x] Add the combined two-lane SEQ screen, patch assignment, and 24-row piano-roll editing surface.
-- [ ] Bind tempo, transport, swing and step data to the native clock/sequence engine.
-- [ ] Add a non-destructive adapter that binds two explicit normal project tracks while preserving the other six tracks and all existing project data.
+- [x] Add a native C adapter for two explicit normal DX7 tracks, including tempo, shared swing, loop length, note/gate/tie/alternate-tuning edits, lane selection and transport.
+- [x] Add a runtime-only native playback mask so the two bound lanes play while the other six project tracks remain stored and untouched; unbind restores all eight.
+- [ ] Wire the physical two-lane device screen to the adapter and rebind after project load.
 - [ ] Verify clock/transport and save/load behavior on the device.
 
 ## Browser-side foundation
