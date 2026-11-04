@@ -17,6 +17,8 @@ typedef struct {
     uint8_t patch_mask;
     uint8_t enabled;
     uint8_t level;
+    uint8_t midi_bytes;
+    uint8_t midi[3];
     uint8_t voice[FM1LAB_PATCH_BYTES];
 } fm1lab_audio_command_t;
 
@@ -66,6 +68,9 @@ int fm1lab_audio_engine_note_on_mask(fm1lab_audio_engine_t *engine,
 int fm1lab_audio_engine_note_off_mask(fm1lab_audio_engine_t *engine,
                                       uint8_t note, uint8_t patch_mask);
 int fm1lab_audio_engine_all_notes_off(fm1lab_audio_engine_t *engine);
+int fm1lab_audio_engine_midi(fm1lab_audio_engine_t *engine,
+                             const uint8_t *message, size_t bytes,
+                             uint8_t patch_mask);
 
 /* Clears and renders 64 or FM1_BLOCK_FRAMES samples into signed Q24 output. */
 int fm1lab_audio_engine_render(fm1lab_audio_engine_t *engine,
