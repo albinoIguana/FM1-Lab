@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = process.cwd();
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const app = path.join(root, "vendor/m-vave-fm1/app");
 const libraryPath = path.join(app, "fm_library.c");
 const instrumentPath = path.join(app, "instrument.h");
