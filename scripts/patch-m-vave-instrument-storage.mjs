@@ -43,6 +43,10 @@ if (!library.includes('#include "fm1lab_bank_metadata.h"')) {
     '    if (!r) r=groove_fm_library_recover();\n    fm1_engine_resume(); return r;\n}',
     '    if (!r) r=groove_fm_library_recover();\n    fm1_engine_resume(); return r;\n}\n\nint groove_fm_library_write(unsigned index, const uint8_t raw[4096])\n{\n    return library_write_internal(index,raw,NULL);\n}\n\nint groove_fm_library_metadata_read(unsigned index, uint8_t metadata[META_BYTES])\n{\n    if (index>=4 || !metadata) return GROOVE_PROJECT_INVALID;\n    if (blocked) { groove_fm_library_init(); if (blocked) return blocked; }\n    if (banks[index] && banks[index]->version>=2) memcpy(metadata,banks[index]->metadata,META_BYTES);\n    else { fm1lab_bank_metadata_t defaults; fm1lab_bank_metadata_init(&defaults);\n        if (fm1lab_bank_metadata_encode(&defaults,metadata)) return GROOVE_PROJECT_INVALID; }\n    return 0;\n}\n\nint groove_fm_library_metadata_write(unsigned index, const uint8_t metadata[META_BYTES])\n{\n    if (index>=4 || !metadata) return GROOVE_PROJECT_INVALID;\n    fm1lab_bank_metadata_t decoded;\n    if (fm1lab_bank_metadata_decode(&decoded,metadata)) return GROOVE_PROJECT_INVALID;\n    uint8_t raw[4096];\n    int r=groove_fm_library_read(index,raw);\n    if (r) return r;\n    return library_write_internal(index,raw,metadata);\n}',
     "public metadata APIs");
+  library = replaceOnce(library,
+    '    return library_write_internal(index,raw,metadata);\n}',
+    '    return library_write_internal(index,raw,metadata);\n}\n\nint groove_fm_library_instrument_write(unsigned index, const uint8_t raw[4096], const uint8_t metadata[META_BYTES])\n{\n    if (index>=4 || !raw || !metadata) return GROOVE_PROJECT_INVALID;\n    fm1lab_bank_metadata_t decoded;\n    if (fm1lab_bank_metadata_decode(&decoded,metadata)) return GROOVE_PROJECT_INVALID;\n    return library_write_internal(index,raw,metadata);\n}',
+    "atomic Instrument bank writer");
   fs.writeFileSync(libraryPath, library);
 }
 
@@ -50,7 +54,7 @@ let instrument = fs.readFileSync(instrumentPath, "utf8");
 if (!instrument.includes("GROOVE_FM_METADATA_BYTES")) {
   instrument = replaceOnce(instrument,
     'enum { GROOVE_PROJECT_SLOTS = 16, GROOVE_PROJECT_BYTES = 4064,\n       GROOVE_PROJECT_LEGACY_BYTES = 4048 };',
-    'enum { GROOVE_PROJECT_SLOTS = 16, GROOVE_PROJECT_BYTES = 4064,\n       GROOVE_PROJECT_LEGACY_BYTES = 4048, GROOVE_FM_METADATA_BYTES = 400 };\n/* Eight four-patch Instrument records live in the unused tail of each DX7 bank sector. */\nint groove_fm_library_metadata_read(unsigned index, uint8_t metadata[GROOVE_FM_METADATA_BYTES]);\nint groove_fm_library_metadata_write(unsigned index, const uint8_t metadata[GROOVE_FM_METADATA_BYTES]);',
+    'enum { GROOVE_PROJECT_SLOTS = 16, GROOVE_PROJECT_BYTES = 4064,\n       GROOVE_PROJECT_LEGACY_BYTES = 4048, GROOVE_FM_METADATA_BYTES = 400 };\n/* Eight four-patch Instrument records live in the unused tail of each DX7 bank sector. */\nint groove_fm_library_metadata_read(unsigned index, uint8_t metadata[GROOVE_FM_METADATA_BYTES]);\nint groove_fm_library_metadata_write(unsigned index, const uint8_t metadata[GROOVE_FM_METADATA_BYTES]);\nint groove_fm_library_instrument_write(unsigned index, const uint8_t raw[4096], const uint8_t metadata[GROOVE_FM_METADATA_BYTES]);',
     "public storage declarations");
   fs.writeFileSync(instrumentPath, instrument);
 }
