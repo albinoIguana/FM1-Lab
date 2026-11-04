@@ -88,7 +88,7 @@ static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
             if (command->patch_mask & (1u << p))
                 if (synth_dx7_midi(engine->synth[p], engine->voice[p],
                                message, sizeof message) != 0)
-                    __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
+                    engine->errors++;
         break;
     case CMD_ALL_NOTES_OFF:
         panic_all(engine);
@@ -98,7 +98,7 @@ static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
             if ((command->patch_mask & (1u << p)) && engine->enabled[p] && engine->level[p] &&
                 synth_dx7_midi(engine->synth[p], engine->voice[p],
                                command->midi, command->midi_bytes) != 0)
-                __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
+                engine->errors++;
         break;
     case CMD_SET_PATCH: {
         unsigned p = command->patch;
@@ -108,7 +108,7 @@ static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
             for (unsigned i = 0; i < FM1LAB_PATCH_BYTES; ++i)
                 engine->voice[p][i] = command->voice[i];
         } else {
-            __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
+            engine->errors++;
         }
         break;
     }
@@ -116,7 +116,7 @@ static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
         unsigned p = command->patch;
         if (!command->enabled) fm1_dx7_panic(engine->synth[p]);
         else if (synth_dx7_lfo_reset(engine->synth[p], engine->voice[p]) != 0) {
-            __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
+            engine->errors++;
             break;
         }
         engine->enabled[p] = command->enabled;
@@ -128,7 +128,7 @@ static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
         engine->level[command->patch] = command->level;
         break;
     default:
-        __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
+        engine->errors++;
         break;
     }
 }
@@ -259,7 +259,7 @@ int fm1lab_audio_engine_all_notes_off(fm1lab_audio_engine_t *engine)
     fm1lab_audio_command_t command = {0};
     command.type = CMD_ALL_NOTES_OFF;
     int result = enqueue(engine, &command);
-    if (result) __atomic_store_n(&engine->panic_pending, 1u, __ATOMIC_RELEASE);
+    if (result) engine->panic_pending = 1u; audio_barrier();
     return result;
 }
 
@@ -281,7 +281,7 @@ int fm1lab_audio_engine_midi(fm1lab_audio_engine_t *engine,
     int result = enqueue(engine, &command);
     if (result && ((message[0] & 0xf0u) == 0x80u ||
         ((message[0] & 0xf0u) == 0x90u && bytes == 3u && message[2] == 0u)))
-        __atomic_store_n(&engine->panic_pending, 1u, __ATOMIC_RELEASE);
+        engine->panic_pending = 1u; audio_barrier();
     return result;
 }
 
@@ -316,15 +316,16 @@ FM1_AUDIO_CODE int fm1lab_audio_engine_render(fm1lab_audio_engine_t *engine,
         if (!engine->enabled[p] || !engine->level[p]) continue;
         for (size_t i = 0; i < samples; ++i) patch_output[i] = 0;
         if (synth_dx7_render(engine->synth[p], patch_output, samples) != 0) {
-            __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
+            engine->errors++;
             continue;
         }
+        int32_t gain_q15 = (int32_t)((uint32_t)engine->level[p] * 32768u /
+                                       (127u * active));
         for (size_t i = 0; i < samples; ++i) {
-            int32_t quotient = patch_output[i] / denominator;
-            int32_t remainder = patch_output[i] % denominator;
-            int32_t level = engine->level[p];
-            int32_t contribution = quotient * level +
-                (remainder * level) / denominator;
+            int32_t high = patch_output[i] >> 15;
+            int32_t low = patch_output[i] & 0x7fff;
+            int32_t contribution = high * gain_q15 +
+                ((low * gain_q15) >> 15);
             if (contribution > 0 && output[i] > INT32_MAX - contribution)
                 output[i] = INT32_MAX;
             else if (contribution < 0 && output[i] < INT32_MIN - contribution)
