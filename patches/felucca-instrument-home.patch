@@ -234,3 +234,12 @@ diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
  #include "../../firmware/src/upreset.c"
 +#include "../../firmware/src/instrument.c"
  #include "../../firmware/src/project.c"
+
+diff --git a/tests/ui_test.c b/tests/ui_test.c
+--- a/tests/ui_test.c
++++ b/tests/ui_test.c
+@@ -159,6 +159,7 @@
+ #include "../firmware/src/ui_layer.c"
+ #include "../firmware/src/upreset.c"
++#include "../firmware/src/instrument.c"
+ #include "../firmware/src/project.c"
