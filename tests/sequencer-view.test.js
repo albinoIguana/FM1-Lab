@@ -24,8 +24,9 @@ test("SEQ view shows active steps and disables positions beyond each track lengt
 });
 
 test("advanced note edit exposes pitch, velocity, gate, tie and slide", () => {
-  const html = renderSequencer(createTwoTrackSequence(), 0, true);
+  const html = renderSequencer(createTwoTrackSequence(), 0, true, true);
   assert.match(html, /data-seq-note/);
+  assert.match(html, /data-seq-piano-step/);
   assert.match(html, /data-seq-velocity/);
   assert.match(html, /data-seq-gate/);
   assert.match(html, /data-seq-tie/);
