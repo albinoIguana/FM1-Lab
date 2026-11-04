@@ -42,6 +42,10 @@ test("step values use the native note, velocity, gate, tie and alternate-tuning 
   );
   assert.equal(sequence.tracks[1].steps[7].active, false);
   assert.equal(setStep(sequence, 0, 7, {gate:99}).tracks[0].steps[7].gate, 15);
+  const zeroVelocity = setStep(sequence, 0, 7, {velocity:0});
+  assert.equal(zeroVelocity.tracks[0].steps[7].active, false);
+  const reactivated = setStep(zeroVelocity, 0, 7, {active:true});
+  assert.equal(reactivated.tracks[0].steps[7].velocity, 1);
 });
 
 test("selected track is a two-value state and normalization rejects other track counts", () => {
