@@ -4,6 +4,6 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/dx7-macros.test.js tests/instrument-model.test.js tests/instrument-session.test.js && bash tests/test-native-instrument.sh"
+    "test": "node --test tests/dx7-macros.test.js tests/instrument-model.test.js tests/instrument-session.test.js tests/home-view.test.js && bash tests/test-native-instrument.sh"
   }
 }
