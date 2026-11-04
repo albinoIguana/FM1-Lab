@@ -22,6 +22,8 @@ $files = @(
     'fm1lab_instrument.c',
     'fm1lab_library.h',
     'fm1lab_library.c',
+    'fm1lab_runtime.h',
+    'fm1lab_runtime.c',
     'fm1lab_bank_metadata.h',
     'fm1lab_bank_metadata.c',
     'fm1lab_physical_controls.h'
