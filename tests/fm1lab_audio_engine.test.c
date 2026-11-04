@@ -85,6 +85,16 @@ int main(void)
     assert(fm1lab_audio_engine_active_voices(&engine, 3) == 0);
     assert(engine.voice[3][134] == 31);
 
+    /* General MIDI messages (including controllers and pitch bend) share the same patch pools. */
+    const uint8_t midi_note[3] = {0x90u, 67u, 100u};
+    const uint8_t midi_bend[3] = {0xe0u, 0u, 96u};
+    const uint8_t midi_mod[3] = {0xb0u, 1u, 72u};
+    assert(fm1lab_audio_engine_midi(&engine, midi_note, 3, 0x01u) == 0);
+    assert(fm1lab_audio_engine_midi(&engine, midi_bend, 3, 0x01u) == 0);
+    assert(fm1lab_audio_engine_midi(&engine, midi_mod, 3, 0x01u) == 0);
+    assert(fm1lab_audio_engine_render(&engine, output, FM1_BLOCK_FRAMES) == 0);
+    assert(fm1lab_audio_engine_active_voices(&engine, 0) == 2);
+
     /* A full command queue must not lose note-offs silently: overflow schedules
        an audio-thread panic and drops stale queued note-ons. */
     for (unsigned i = 0; i < FM1LAB_AUDIO_QUEUE_CAPACITY - 1u; ++i)
