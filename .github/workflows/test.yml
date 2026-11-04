@@ -29,6 +29,8 @@ jobs:
         run: |
           node scripts/patch-m-vave-simulator-api.mjs
           node scripts/patch-m-vave-two-track-sequencer.mjs
+          node scripts/patch-m-vave-instrument-home.mjs
+          node --check scripts/patch-m-vave-instrument-home.mjs
       - name: Check application modules
         run: |
           node --check src/main-native.js
