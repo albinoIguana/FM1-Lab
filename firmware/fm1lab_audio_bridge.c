@@ -12,6 +12,7 @@ static fm1lab_audio_engine_t audio_engine;
 static fm1lab_instrument_t audio_shadow;
 static uint8_t live_voice[FM1LAB_AUDIO_PATCHES][FM1LAB_PATCH_BYTES];
 static volatile uint32_t audio_ready;
+static volatile uint32_t keyboard_mode;
 
 static int32_t limit_q23(int64_t value)
 {
@@ -86,13 +87,21 @@ int fm1lab_audio_sync_instrument(const fm1lab_instrument_t *instrument)
     return result;
 }
 
-int fm1lab_audio_midi(const uint8_t *message, size_t bytes)
+void fm1lab_audio_set_keyboard_mode(int enabled)
 {
-    if (!fm1lab_audio_is_ready() || !message || !bytes) return 0;
-    if (message[0] == 0xffu)
-        return fm1lab_audio_engine_all_notes_off(&audio_engine);
+    __atomic_store_n(&keyboard_mode, enabled ? 1u : 0u, __ATOMIC_RELEASE);
+}
+
+int fm1lab_audio_route_midi(const uint8_t *message, size_t bytes)
+{
+    if (!message || !bytes || !fm1lab_audio_is_ready() ||
+        !__atomic_load_n(&keyboard_mode, __ATOMIC_ACQUIRE)) return 0;
+    if (message[0] == 0xffu) {
+        (void)fm1lab_audio_engine_all_notes_off(&audio_engine);
+        return 0;
+    }
     if (message[0] >= 0xf0u) return 0;
-    return fm1lab_audio_engine_midi(&audio_engine, message, bytes, 0x0fu);
+    return fm1lab_audio_engine_midi(&audio_engine, message, bytes, 0x0fu) == 0 ? 1 : -1;
 }
 
 void fm1lab_audio_mix(int32_t *stereo_q23)
