@@ -3,7 +3,7 @@ import { createPatch, createInstrument, normalizeInstrument, patchAlgorithm } fr
 import { InstrumentSession } from "./instrument-session.js";
 import { renderPatchGrid } from "./ui/home-view.js";
 import { renderSequencer } from "./ui/sequencer-view.js";
-import { createTwoTrackSequence, normalizeSequence, setTrackLength, setTrackDivision, setTrackSwing, setStep, selectSequenceTrack, setGlobalKeyShift, setTempo, setTrackPatch } from "./sequencer-model.js";
+import { createTwoTrackSequence, normalizeSequence, setTrackLength, setGlobalSwing, setStep, selectSequenceTrack, setTempo, setTrackPatch } from "./sequencer-model.js";
 import { patchName, setPatchName, readOperator, writeOperator, readGlobal, writeGlobal } from "./dx7-voice.js";
 
 const $ = s => document.querySelector(s);
@@ -74,16 +74,10 @@ function renderSequence(){
     selectedStep=step;sequence=selectSequenceTrack(sequence,track);renderSequence();persistSequence();
   });
   const length=$("#sequencer-view [data-seq-length]");
-  length.oninput=()=>{length.previousElementSibling.textContent=length.value;};
   length.onchange=()=>{sequence=setTrackLength(sequence,sequence.selectedTrack,+length.value);renderSequence();persistSequence();};
-  const division=$("#sequencer-view [data-seq-division]");
-  division.onchange=()=>{sequence=setTrackDivision(sequence,sequence.selectedTrack,+division.value);renderSequence();persistSequence();};
   const swing=$("#sequencer-view [data-seq-swing]");
   swing.oninput=()=>{swing.previousElementSibling.textContent=swing.value;};
-  swing.onchange=()=>{sequence=setTrackSwing(sequence,sequence.selectedTrack,+swing.value);renderSequence();persistSequence();};
-  const keyShift=$("#sequencer-view [data-seq-key-shift]");
-  keyShift.oninput=()=>{keyShift.previousElementSibling.querySelector("output").textContent=keyShift.value;};
-  keyShift.onchange=()=>{sequence=setGlobalKeyShift(sequence,+keyShift.value);renderSequence();persistSequence();};
+  swing.onchange=()=>{sequence=setGlobalSwing(sequence,+swing.value);renderSequence();persistSequence();};
   const pianoToggle=$("#sequencer-view [data-seq-piano-roll]");
   pianoToggle.onclick=()=>{sequencePianoRoll=!sequencePianoRoll;sequenceAdvanced=false;renderSequence();};
   const advancedToggle=$("#sequencer-view [data-seq-advanced]");
@@ -103,8 +97,8 @@ function renderSequence(){
   if(gate){gate.oninput=()=>{gate.previousElementSibling.querySelector("output").textContent=gate.value;};gate.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{gate:+gate.value});renderSequence();persistSequence();};}
   const tie=$("#sequencer-view [data-seq-tie]");
   if(tie)tie.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{tie:tie.checked});persistSequence();};
-  const slide=$("#sequencer-view [data-seq-slide]");
-  if(slide)slide.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{slide:slide.checked});persistSequence();};
+  const alt=$("#sequencer-view [data-seq-alt]");
+  if(alt)alt.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{alt:alt.checked});persistSequence();};
 }
 function showSequencer(){
   $("#home-screen").hidden=true;$("#editor-screen").hidden=true;$("#sequencer-screen").hidden=false;renderSequence();
