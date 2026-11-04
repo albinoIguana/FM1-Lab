@@ -122,28 +122,30 @@ int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch_in
     const int brightness = (int)patch->macros[FM1LAB_BRIGHTNESS] - 50;
     const int body = (int)patch->macros[FM1LAB_BODY] - 50;
     const int motion = (int)patch->macros[FM1LAB_MOTION] - 50;
-    const int edge = (int)patch->macros[FM1LAB_EDGE] - 50;
+    const int dirt = (int)patch->macros[FM1LAB_DIRT] - 50;
     const uint8_t carriers = fm1lab_carrier_mask(base[VOICE_ALGORITHM]);
 
     for (unsigned op = 1; op <= OPERATOR_COUNT; ++op) {
         const unsigned offset = (OPERATOR_COUNT - op) * OPERATOR_STRIDE;
         const unsigned carrier = !!(carriers & (1u << (op - 1u)));
         if (carrier) {
-            output[offset + 16] = clamp_u8((int)base[offset + 16] +
-                scaled_delta(brightness, 55), 99);
+            /* BODY shapes sustained carrier presence. */
             output[offset + 6] = clamp_u8((int)base[offset + 6] +
                 scaled_delta(body, 45), 99);
         } else {
+            /* BRIGHTNESS changes modulation index through modulator output. */
             output[offset + 16] = clamp_u8((int)base[offset + 16] +
-                scaled_delta(edge, 45), 99);
+                scaled_delta(brightness, 55), 99);
+            /* MOTION animates the modulator EG contour; preserve its timing. */
+            output[offset + 6] = clamp_u8((int)base[offset + 6] +
+                scaled_delta(motion, 35), 99);
+            output[offset + 7] = clamp_u8((int)base[offset + 7] -
+                scaled_delta(motion, 25), 99);
         }
     }
 
-    output[GLOBAL_LFO_SPEED] = clamp_u8((int)base[GLOBAL_LFO_SPEED] +
-        scaled_delta(motion, 55), 99);
-    output[GLOBAL_LFO_AMP_DEPTH] = clamp_u8((int)base[GLOBAL_LFO_AMP_DEPTH] +
-        scaled_delta(motion, 45), 99);
+    /* DIRT is bounded feedback; ratio changes await topology-aware mapping. */
     output[GLOBAL_FEEDBACK] = clamp_u8((int)base[GLOBAL_FEEDBACK] +
-        scaled_delta(edge, 8), 7);
+        scaled_delta(dirt, 8), 7);
     return 0;
 }
