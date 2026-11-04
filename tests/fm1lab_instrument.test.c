@@ -36,6 +36,8 @@ static void test_official_algorithm_carriers(void)
     assert(fm1lab_carrier_mask(18) == 0b011001);
     assert(fm1lab_carrier_mask(31) == 0b111111);
     assert(fm1lab_carrier_mask(32) == fm1lab_carrier_mask(0));
+    assert(fm1lab_operator_depth(0, 2) == 1);
+    assert(fm1lab_operator_depth(0, 0) == 0);
 }
 
 static void test_non_destructive_macro_render(void)
