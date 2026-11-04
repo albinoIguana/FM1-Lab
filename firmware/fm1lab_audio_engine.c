@@ -311,7 +311,6 @@ FM1_AUDIO_CODE int fm1lab_audio_engine_render(fm1lab_audio_engine_t *engine,
 
     int32_t patch_output[FM1_BLOCK_FRAMES > SYNTH_DX7_BLOCK_SAMPLES
                              ? FM1_BLOCK_FRAMES : SYNTH_DX7_BLOCK_SAMPLES];
-    const int32_t denominator = (int32_t)(127u * active);
     for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p) {
         if (!engine->enabled[p] || !engine->level[p]) continue;
         for (size_t i = 0; i < samples; ++i) patch_output[i] = 0;
