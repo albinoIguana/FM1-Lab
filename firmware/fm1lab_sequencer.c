@@ -10,7 +10,8 @@ static int lane_track(unsigned lane, unsigned *track)
 {
     if (lane >= FM1LAB_SEQUENCE_LANES || bound_tracks[lane] >= GROOVE_TRACKS)
         return -1;
-    if (groove_track_role(bound_tracks[lane]) != GROOVE_TRACK_NORMAL)
+    if (groove_track_role(bound_tracks[lane]) != GROOVE_TRACK_NORMAL ||
+        groove_source_type(bound_tracks[lane]) != GROOVE_DX7)
         return -2;
     *track = bound_tracks[lane];
     return 0;
@@ -21,7 +22,8 @@ int fm1lab_sequencer_bind(unsigned a, unsigned b)
     if (a >= GROOVE_TRACKS || b >= GROOVE_TRACKS || a == b)
         return -1;
     if (groove_track_role(a) != GROOVE_TRACK_NORMAL ||
-        groove_track_role(b) != GROOVE_TRACK_NORMAL)
+        groove_track_role(b) != GROOVE_TRACK_NORMAL ||
+        groove_source_type(a) != GROOVE_DX7 || groove_source_type(b) != GROOVE_DX7)
         return -2;
     bound_tracks[0] = a;
     bound_tracks[1] = b;
@@ -60,6 +62,7 @@ int fm1lab_sequencer_read(fm1lab_sequence_state_t *state)
 
 int fm1lab_sequencer_set_tempo(int bpm)
 {
+    if (bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
     if (bpm < 30 || bpm > 300) return -1;
     int delta = bpm - (int)groove_tempo_saved();
     groove_tempo_edit(delta);
@@ -68,6 +71,7 @@ int fm1lab_sequencer_set_tempo(int bpm)
 
 int fm1lab_sequencer_set_swing(unsigned swing)
 {
+    if (bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
     if (swing > 50) return -1;
     int delta = (int)swing - (int)groove_sequence_setting(0);
     groove_sequence_setting_edit(0, delta);
