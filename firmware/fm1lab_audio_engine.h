@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "fm1lab_instrument.h"
-#include "synth_dx7.h"
+#include "fm1lab_dx7_api.h"
 
 #define FM1LAB_AUDIO_PATCHES FM1LAB_PATCH_COUNT
 #define FM1LAB_AUDIO_QUEUE_CAPACITY 32u
