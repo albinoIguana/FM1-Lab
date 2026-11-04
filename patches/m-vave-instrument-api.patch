@@ -12,9 +12,41 @@ diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
 +    return 0;
 +}
 +
+ int fm1_usb_audio_read(int32_t *pcm, unsigned frames, uint16_t gains[2])
+ {
+diff --git a/sdk/Simulator.js b/sdk/Simulator.js
+--- a/sdk/Simulator.js
++++ b/sdk/Simulator.js
+@@ -202,5 +202,5 @@
+   globalThis.FM1SimulatorCore=coreRuntime();
+   globalThis.FM1SimulatorAudioSource='('+coreRuntime.toString()+')('+audioThread.toString()+');';
+ 
+-  if (typeof document === 'undefined') return;
++  if (typeof document === 'undefined' || globalThis.FM1_LAB_MODE) return;
+   const $ = id=>document.getElementById(id), sources=['DX7','303','808','PSG','PLUCK','SAMPLER'];
+diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
+--- a/web/synth/dx7core.c
++++ b/web/synth/dx7core.c
+@@ -67,5 +67,56 @@
+     { 0xc1, 0x14, 0x04, 0x04, 0x04, 0x04 }, // 31
+     { 0xc4, 0x04, 0x04, 0x04, 0x04, 0x04 }, // 32
+ };
+ 
++/* The low two bits select the destination bus. Bus zero is final audio output. */
++#ifdef __wasm__
++__attribute__((export_name("sim_fm_carriers")))
++#endif
++unsigned sim_fm_carriers(unsigned algorithm)
++{
++    const u8 *flags = algorithms[algorithm & 31U];
++    unsigned mask = 0;
++    for (unsigned op = 0; op < FM_OP_CNT; ++op)
++        if ((flags[op] & 3U) == 0) mask |= 1U << (5U - op);
++    return mask;
++}
 +
-+/* Return the number of modulation stages between an operator and a carrier.
-+ * Operator numbers are physical DX7 names: OP1..OP6. */
++/* Return modulation stages between an operator and a carrier.
++ * Operator numbers use the printed DX7 labels OP1..OP6. */
 +#ifdef __wasm__
 +__attribute__((export_name("sim_fm_operator_depth")))
 +#endif
@@ -49,40 +81,5 @@ diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
 +                    depth[op] = (u8)(depth[next] + 1U);
 +    return depth[FM_OP_CNT - operator_number];
 +}
-+
- /* The browser has no hardware streams; the same APP mixer still runs. */
- int fm1_usb_audio_read(int32_t *pcm, unsigned frames, uint16_t gains[2])
- {
-diff --git a/sdk/Simulator.js b/sdk/Simulator.js
---- a/sdk/Simulator.js
-+++ b/sdk/Simulator.js
-@@ -202,5 +202,5 @@
-   globalThis.FM1SimulatorCore=coreRuntime();
-   globalThis.FM1SimulatorAudioSource='('+audioThread.toString()+')('+coreRuntime.toString()+');';
- 
--  if (typeof document === 'undefined') return;
-+  if (typeof document === 'undefined' || globalThis.FM1_LAB_MODE) return;
-   const $ = id=>document.getElementById(id), sources=['DX7','303','808','PSG','PLUCK','SAMPLER'];
-diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
---- a/web/synth/dx7core.c
-+++ b/web/synth/dx7core.c
-@@ -67,5 +67,19 @@
-     { 0xc1, 0x14, 0x04, 0x04, 0x04, 0x04 }, // 31
-     { 0xc4, 0x04, 0x04, 0x04, 0x04, 0x04 }, // 32
- };
- 
-+/* The low two bits select the destination bus. Bus zero is the final
-+ * audio output, so these are the algorithm's actual carrier operators. */
-+#ifdef __wasm__
-+__attribute__((export_name("sim_fm_carriers")))
-+#endif
-+unsigned sim_fm_carriers(unsigned algorithm)
-+{
-+    const u8 *flags = algorithms[algorithm & 31U];
-+    unsigned mask = 0;
-+    for (unsigned op = 0; op < FM_OP_CNT; ++op)
-+        if ((flags[op] & 3U) == 0) mask |= 1U << (5U - op);
-+    return mask;
-+}
-+
  FM1_DSP_CODE static void compute_fb4(int *output,t_dx7op_params *params,int gaincur, int gaindst,int *fb_buf, int feedback_shift)
+ {
