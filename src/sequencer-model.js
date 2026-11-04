@@ -80,6 +80,19 @@ export function normalizeSequence(sequence) {
   };
 }
 
+export function setTempo(sequence, tempo) {
+  const next = normalizeSequence(sequence);
+  next.tempo = clamp(tempo, 30, 300);
+  return next;
+}
+
+export function setTrackPatch(sequence, trackIndex, patchIndex) {
+  const next = normalizeSequence(sequence);
+  if (!Number.isInteger(trackIndex) || trackIndex < 0 || trackIndex > 1) throw new RangeError("Sequencer track must be 1 or 2.");
+  next.tracks[trackIndex].patchIndex = clamp(patchIndex, 0, 3);
+  return next;
+}
+
 export function setTrackLength(sequence, trackIndex, length) {
   const next = normalizeSequence(sequence);
   if (!Number.isInteger(trackIndex) || trackIndex < 0 || trackIndex > 1) throw new RangeError("Sequencer track must be 1 or 2.");
