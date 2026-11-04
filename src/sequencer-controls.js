@@ -15,9 +15,9 @@ export const FM1_PANEL_ENCODERS = Object.freeze({
 const LANE_ACTIONS = Object.freeze({
   SELECT: "select-track",
   "KNOB 1": "sequence-length",
-  "KNOB 2": "division",
-  "KNOB 3": "swing",
-  "KNOB 4": "global-key-shift"
+  "KNOB 2": "global-swing",
+  "KNOB 3": "tempo",
+  "KNOB 4": "patch-assignment"
 });
 
 const PIANO_ACTIONS = Object.freeze({
@@ -29,7 +29,7 @@ const HELD_SELECT_ACTIONS = Object.freeze({
   "KNOB 1": "note-velocity",
   "KNOB 2": "note-pitch",
   "KNOB 3": "note-gate",
-  "KNOB 4": "note-tie-slide"
+  "KNOB 4": "note-tie-alt"
 });
 
 export function resolveSequencerEncoder(physicalName, { pianoRoll = false, selectHeld = false } = {}) {
