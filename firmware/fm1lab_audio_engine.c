@@ -61,7 +61,7 @@ static void apply_command(fm1lab_audio_engine_t *engine,
     case CMD_NOTE_ON:
         message[0] = 0x90u; message[1] = command->note; message[2] = command->velocity;
         for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
-            if ((command->patch_mask & (1u << p)) && engine->enabled[p] &&
+            if ((command->patch_mask & (1u << p)) && engine->enabled[p] && engine->level[p] &&
                 synth_dx7_midi(engine->synth[p], engine->voice[p],
                            message, sizeof message) != 0)
                 __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
@@ -79,7 +79,7 @@ static void apply_command(fm1lab_audio_engine_t *engine,
         break;
     case CMD_MIDI:
         for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
-            if ((command->patch_mask & (1u << p)) && engine->enabled[p] &&
+            if ((command->patch_mask & (1u << p)) && engine->enabled[p] && engine->level[p] &&
                 synth_dx7_midi(engine->synth[p], engine->voice[p],
                                command->midi, command->midi_bytes) != 0)
                 __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
