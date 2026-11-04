@@ -8,6 +8,7 @@ trap 'rm -f "$BIN"' EXIT
 
 cc -std=c11 -O2 -Wall -Wextra -Werror -Wno-array-parameter \
   -DFM1_HOST_TEST -DFM1_DSP_ENTRY= \
+  -include "$ROOT/firmware/fm1lab_dx7_rename.h" \
   -I"$ROOT/firmware" \
   -I"$SOURCE/app/synth" \
   -I"$SOURCE/sdk/include" \
