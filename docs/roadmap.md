@@ -29,8 +29,9 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Add a version-2 bank format and metadata read/write API to the existing four-bank DX7 voice library; preserve version-1 bank reads and stage/recovery flow.
 - [ ] Verify version-1 to version-2 upgrade, metadata persistence, and interrupted-write recovery on the device flash implementation.
 - [ ] Store named four-patch Instruments and macro state; preserve existing project slots and user data.
-- [ ] Map the physical preset encoder to Instrument selection.
-- [ ] Map physical controls 1–4 to the four patches.
+- [x] Verify and name the printed panel controls (MASTER, SELECT, ALGORITHM, KNOB 1–4, PRESETS) against upstream scan indices.
+- [x] Replace numeric native screen encoder references with named physical-control constants in the simulator source build.
+- [ ] Map PRESETS to the new four-patch Instrument selector and KNOB 1–4 to patch slots in the redesigned HOME screen.
 - [ ] Implement the HOME Instrument screen with four patch tiles, names, active state and selection.
 - [ ] Add four macro controls with algorithm-aware carrier/modulator behavior.
 - [ ] Complete the deep six-operator editor and immediate FX controls on-device.
