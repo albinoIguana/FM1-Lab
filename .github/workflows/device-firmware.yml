@@ -71,12 +71,11 @@ jobs:
                 break
               }
               $p.Refresh()
-              if ($p.HasExited) {
-                if ($p.ExitCode -ne 0) {
-                  throw "JieLi installer exited with code $($p.ExitCode) before clang.exe appeared."
-                }
-                break
+              if ($p.HasExited -and $p.ExitCode -ne 0) {
+                throw "JieLi installer exited with code $($p.ExitCode) before clang.exe appeared."
               }
+              # Do not assume the top-level installer owns the full install
+              # lifetime; it may hand off to a child process and exit cleanly.
               Start-Sleep -Seconds 10
             }
 
