@@ -24,6 +24,8 @@ int main(void)
 
     assert(fm1lab_voice_operator_is_carrier(voice, 1) == 1);
     assert(fm1lab_voice_operator_depth(voice, 1) == fm1lab_operator_depth(31, 1));
+    assert(fm1lab_voice_operator_modulates(voice, 1, 2) ==
+           fm1lab_operator_modulates(31, 1, 2));
     assert(fm1lab_voice_operator_is_carrier(voice, 7) == -1);
 
     assert(fm1lab_voice_name_set(voice, "deep bass") == 0);
