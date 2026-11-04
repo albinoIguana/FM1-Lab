@@ -45,6 +45,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Physical control naming patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-instrument-home.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Instrument home screen patch failed.' }
+    node (Join-Path $root 'scripts/patch-m-vave-instrument-sequencer-screen.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Native sequencer screen patch failed.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Instrument home screen patch failed.' }
     if ($LASTEXITCODE -ne 0) { throw 'Physical control naming patch failed.' }
 } finally {
     Pop-Location
