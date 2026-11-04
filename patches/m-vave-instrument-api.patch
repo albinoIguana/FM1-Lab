@@ -49,4 +49,4 @@ diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
 +    return mask;
 +}
 +
- FM1_DSP_CODE static void compute_fb4(int *output,t_dx7op_params *params, int gaincur, int gaindst,int *fb_buf, int feedback_shift)
+ 
