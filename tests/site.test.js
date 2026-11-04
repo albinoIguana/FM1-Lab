@@ -32,7 +32,12 @@ test("deployment publishes FM1-Lab at root and keeps runtimes in supporting rout
   assert.match(workflow, /smoke\.mjs _compat/);
   assert.match(workflow, /persistence\.wasm\.mjs _compat/);
   assert.match(workflow, /github\.com\/hugelton\/Felucca/);
-  assert.match(workflow, /checkout [0-9a-f]{40}/);
+  assert.match(workflow, /codeload\.github\.com\/hugelton\/Felucca\/tar\.gz\/\$\{FELUCCA_SHA\}/);
+  assert.match(workflow, /FELUCCA_SHA=743551712c36b3984392eea1dbe13a309907e17a/);
+  assert.match(workflow, /ENGINES_SHA=0f015add84d77d8ae0ead08de901b7ecf3686f18/);
+  assert.match(workflow, /BSP_SHA=5942e68b89ab9ccd23f2c541d712ca38fe635f11/);
+  assert.match(workflow, /git -C vendor\/felucca init/);
+  assert.doesNotMatch(workflow, /git clone https:\/\/github\.com\/hugelton\/Felucca\.git/);
   assert.match(workflow, /setup-emsdk/);
   assert.match(workflow, /\.\/build\.sh gen/);
   assert.match(workflow, /\.\/build\.sh web/);
