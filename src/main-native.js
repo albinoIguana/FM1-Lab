@@ -1,6 +1,7 @@
 import { MvaveEngine } from "./m-vave-engine.js";
 import { createPatch, createInstrument, normalizeInstrument, patchAlgorithm } from "./instrument-model.js";
 import { InstrumentSession } from "./instrument-session.js";
+import { renderPatchGrid } from "./ui/home-view.js";
 import { patchName, setPatchName, readOperator, writeOperator, readGlobal, writeGlobal } from "./dx7-voice.js";
 
 const $ = s => document.querySelector(s);
@@ -16,7 +17,6 @@ let engine, session, library=[], instrument, instrumentIndex=0, selectedPatchInd
 
 const patch=()=>instrument.patches[selectedPatchIndex];
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({version:1,instrumentIndex,library}));}catch(e){console.warn(e);}};
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function writeCurrent(){
   persist();
   return session.writePatch(selectedPatchIndex,patch()).catch(e=>{
@@ -45,10 +45,7 @@ async function loadInstrument(){
 function renderHome(){
   $("#instrument-index").textContent=String(instrumentIndex+1).padStart(2,"0")+" / "+String(library.length).padStart(2,"0");
   $("#instrument-name").value=instrument.name;
-  $("#patch-grid").innerHTML=instrument.patches.map((p,i)=>`<article class="patch-card ${i===selectedPatchIndex?"selected":""}">
-    <div class="patch-card-top"><span>PATCH 0${i+1}</span><span>ALG ${String(patchAlgorithm(p)+1).padStart(2,"0")}</span></div>
-    <div class="patch-card-main"><b class="patch-number">0${i+1}</b><div><h3>${esc(p.name)}</h3><p>6 OPERATOR DX7 VOICE</p></div></div>
-    <button class="open-patch" data-patch="${i}">OPEN PATCH ↗</button></article>`).join("");
+  $("#patch-grid").innerHTML=renderPatchGrid(instrument.patches,selectedPatchIndex);
   $("#patch-grid").querySelectorAll("[data-patch]").forEach(b=>b.onclick=()=>openPatch(+b.dataset.patch));
 }
 function renderMacros(){
