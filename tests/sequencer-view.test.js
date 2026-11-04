@@ -4,10 +4,12 @@ import { createTwoTrackSequence, setStep } from "../src/sequencer-model.js";
 import { renderSequencer } from "../src/ui/sequencer-view.js";
 
 test("SEQ view always displays two fixed-width 64-step lanes", () => {
-  const html = renderSequencer(createTwoTrackSequence());
+  const html = renderSequencer(createTwoTrackSequence(), 0, false, ["LEAD", "BASS", "PAD", "FX"]);
   assert.equal((html.match(/class="seq-step/g) || []).length, 128);
   assert.equal((html.match(/class="seq-lane /g) || []).length, 2);
   assert.match(html, /64-step timeline/);
+  assert.match(html, /LEAD/);
+  assert.match(html, /BASS/);
 });
 
 test("SEQ view shows active steps and disables positions beyond each track length", () => {
