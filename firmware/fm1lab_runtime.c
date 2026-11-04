@@ -41,7 +41,8 @@ int fm1lab_runtime_set_level(fm1lab_runtime_t *runtime, unsigned patch, int delt
 {
     if (!runtime || !runtime->loaded || patch >= FM1LAB_PATCH_COUNT) return -1;
     int value = (int)runtime->instrument.patches[patch].level + delta;
-    if (value < 0) value = 0; if (value > 127) value = 127;
+    if (value < 0) value = 0;
+    if (value > 127) value = 127;
     if (runtime->instrument.patches[patch].level != (uint8_t)value) {
         runtime->instrument.patches[patch].level = (uint8_t)value; runtime->dirty = 1;
     }
