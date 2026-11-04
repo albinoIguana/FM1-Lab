@@ -30,12 +30,17 @@ $files = @(
     'fm1lab_voice_editor.c',
     'fm1lab_bank_metadata.h',
     'fm1lab_bank_metadata.c',
-    'fm1lab_physical_controls.h'
+    'fm1lab_physical_controls.h',
+    'fm1lab_audio_engine.h',
+    'fm1lab_audio_engine.c',
+    'fm1lab_audio_bridge.h',
+    'fm1lab_audio_bridge.c'
 )
 $app = Join-Path $vendor 'app'
 foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $root "firmware/$file") -Destination $app -Force
 }
+Copy-Item -LiteralPath (Join-Path $vendor 'web/synth/synth_dx7.h') -Destination (Join-Path $app 'synth/synth_dx7.h') -Force
 
 Push-Location $root
 try {
@@ -51,6 +56,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Native sequencer screen patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-native-patch-editor.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Native patch editor screen patch failed.' }
+    node (Join-Path $root 'scripts/patch-m-vave-audio-mixer.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Native FM6 audio integration patch failed.' }
 } finally {
     Pop-Location
 }
