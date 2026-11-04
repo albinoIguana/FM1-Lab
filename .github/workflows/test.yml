@@ -1,22 +1,22 @@
-name: FM1-Lab checks
+name: FM1-Lab native model checks
 
 on:
   push:
+    branches: ["feat/m-vave-native-instrument"]
   pull_request:
     branches: ["main"]
 
 jobs:
-  fm-engine-tests:
+  instrument-model:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --check src/main.js
-      - run: node --check src/felucca-engine.js
-      - run: node --check src/browser-smoke.js
-      - run: node --check src/felucca-worklet.js
-      - run: node --check src/native-fm6.js
-      - run: node --check src/instrument.js
-      - run: npm test
+      - run: node --check src/main-native.js
+      - run: node --check src/m-vave-engine.js
+      - run: node --check src/dx7-macros.js
+      - run: node --check src/dx7-voice.js
+      - run: node --check src/instrument-model.js
+      - run: node --test tests/dx7-macros.test.js tests/instrument-model.test.js
