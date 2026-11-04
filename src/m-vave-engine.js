@@ -11,6 +11,7 @@ export class MvaveEngine {
     this.pending = new Map();
     this.sequence = 0;
     this.carrierMasks = [];
+    this.operatorDepths = [];
     this.voices = new Set();
     this.readyPromise = null;
   }
@@ -41,6 +42,7 @@ export class MvaveEngine {
       this.core = new globalThis.FM1SimulatorCore(this.wasm, null);
       for (let algorithm = 0; algorithm < 32; algorithm++) {
         this.carrierMasks[algorithm] = this.core.c.sim_fm_carriers(algorithm);
+        this.operatorDepths[algorithm] = Array.from({ length: 6 }, (_, i) => this.core.c.sim_fm_operator_depth(algorithm, i + 1));
       }
       this.onState("M-VAVE FM1 ENGINE READY · DX7 / 6 OPERATORS");
       return this;
@@ -96,6 +98,10 @@ export class MvaveEngine {
     if (bytes.length !== 156) throw new Error("M-VAVE DX7 patches are 156 bytes.");
     await this.selectTrack(track);
     await this.command({ type: "import", patch: true, data: bytes });
+  }
+
+  operatorDepth(algorithm, operator) {
+    return this.operatorDepths[Math.max(0, Math.min(31, algorithm | 0))]?.[operator - 1] ?? 1;
   }
 
   carrierMask(algorithm) {
