@@ -40,7 +40,7 @@ test("queued writes snapshot the voice at request time", async () => {
   const first = session.writePatch(0, patch);
   patch.baseData.fill(88);
   const second = session.writePatch(1, patch);
-  await Promise.resolve();
+  while (!release) await Promise.resolve();
   release();
   await Promise.all([first, second]);
   assert.equal(engine.writes[0].voice[0], 12);
