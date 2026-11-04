@@ -37,6 +37,8 @@ A patch opens into a focused editor. The four musical macros are the first layer
 
 The six-operator editor is a deeper layer of the same patch, not a separate page with a separate data model. It exposes algorithm topology, carrier/modulator role, ratio or fixed frequency, output, envelope rates and levels, and feedback. Selecting a different algorithm updates topology and role indicators from the engine's authoritative routing data.
 
+The first native patch-editor pass is a hardware page backed by the same Instrument runtime. HOME/EDIT opens it; HOME or EDIT returns to the four-patch performance surface. SELECT chooses OP1–OP6, PRESETS chooses one of the four patches, and ALGORITHM changes the current patch algorithm. SCL cycles ENVELOPE / OSCILLATOR / GLOBAL parameter groups; ENV switches envelope RATE / LEVEL editing. KNOB 1–4 address the four values shown on the current group, and SAVE writes the Instrument library record rather than a project slot. The topology strip identifies each operator's carrier/modulator role and modulation depth from the official algorithm routing table. This first pass is intentionally a role/depth map, not yet a drawn connection graph; a full routing graph and undo/compare workflow remain future work.
+
 ### FX / Performance effects
 
 Effects should be a reusable module with a small set of immediate performance controls and a deeper parameter view only where needed. It must not be embedded as special-case controls in every patch page.
