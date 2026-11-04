@@ -3,7 +3,7 @@ import { createPatch, createInstrument, normalizeInstrument, patchAlgorithm } fr
 import { InstrumentSession } from "./instrument-session.js";
 import { renderPatchGrid } from "./ui/home-view.js";
 import { renderSequencer } from "./ui/sequencer-view.js";
-import { createTwoTrackSequence, normalizeSequence, setTrackLength, setTrackDivision, setTrackSwing, setStep, selectSequenceTrack, setGlobalKeyShift } from "./sequencer-model.js";
+import { createTwoTrackSequence, normalizeSequence, setTrackLength, setTrackDivision, setTrackSwing, setStep, selectSequenceTrack, setGlobalKeyShift, setTempo, setTrackPatch } from "./sequencer-model.js";
 import { patchName, setPatchName, readOperator, writeOperator, readGlobal, writeGlobal } from "./dx7-voice.js";
 
 const $ = s => document.querySelector(s);
@@ -62,7 +62,8 @@ function loadSequence(){
   }catch(error){console.warn("Saved sequence could not be loaded",error);sequence=createTwoTrackSequence();}
 }
 function renderSequence(){
-  $("#sequencer-view").innerHTML=renderSequencer(sequence,selectedStep,sequenceAdvanced);
+  $("#sequencer-view").innerHTML=renderSequencer(sequence,selectedStep,sequenceAdvanced,instrument.patches.map(item=>item.name));
+  $("#sequencer-view").querySelectorAll("[data-seq-tempo]").forEach(button=>button.onclick=()=>{sequence=setTempo(sequence,sequence.tempo+(+button.dataset.seqTempo));renderSequence();persistSequence();});
   $("#sequencer-view").querySelectorAll("[data-seq-select]").forEach(button=>button.onclick=()=>{
     sequence=selectSequenceTrack(sequence,+button.dataset.seqSelect);selectedStep=0;renderSequence();persistSequence();
   });
