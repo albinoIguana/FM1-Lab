@@ -64,6 +64,7 @@ function loadSequence(){
 function renderSequence(){
   $("#sequencer-view").innerHTML=renderSequencer(sequence,selectedStep,sequenceAdvanced,instrument.patches.map(item=>item.name));
   $("#sequencer-view").querySelectorAll("[data-seq-tempo]").forEach(button=>button.onclick=()=>{sequence=setTempo(sequence,sequence.tempo+(+button.dataset.seqTempo));renderSequence();persistSequence();});
+  $("#sequencer-view").querySelectorAll("[data-seq-patch]").forEach(select=>select.onchange=()=>{sequence=setTrackPatch(sequence,+select.dataset.seqPatch,+select.value);renderSequence();persistSequence();});
   $("#sequencer-view").querySelectorAll("[data-seq-select]").forEach(button=>button.onclick=()=>{
     sequence=selectSequenceTrack(sequence,+button.dataset.seqSelect);selectedStep=0;renderSequence();persistSequence();
   });
