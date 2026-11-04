@@ -49,6 +49,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Instrument home screen patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-instrument-sequencer-screen.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Native sequencer screen patch failed.' }
+    node (Join-Path $root 'scripts/patch-m-vave-native-patch-editor.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Native patch editor screen patch failed.' }
 } finally {
     Pop-Location
 }
