@@ -106,6 +106,8 @@ static void apply_command(fm1lab_audio_engine_t *engine,
         break;
     }
     case CMD_SET_LEVEL:
+        if (!command->level && engine->level[command->patch])
+            fm1_dx7_panic(engine->synth[command->patch]);
         engine->level[command->patch] = command->level;
         break;
     default:
@@ -251,6 +253,9 @@ int fm1lab_audio_engine_midi(fm1lab_audio_engine_t *engine,
     if (!engine || !engine->ready || !message || !bytes || bytes > 3u ||
         message[0] < 0x80u || message[0] >= 0xf0u ||
         !patch_mask || (patch_mask & 0xf0u)) return -1;
+    size_t expected = (message[0] & 0xe0u) == 0xc0u ? 2u : 3u;
+    if (bytes != expected || message[1] > 127u ||
+        (expected == 3u && message[2] > 127u)) return -1;
     fm1lab_audio_command_t command = {0};
     command.type = CMD_MIDI;
     command.patch_mask = patch_mask;
