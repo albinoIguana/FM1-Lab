@@ -2,6 +2,8 @@ name: Deploy FM1-Lab to GitHub Pages
 
 on:
   push:
+    branches: ["main", "feat/fm1lab-product-front-door"]
+  pull_request:
     branches: ["main"]
   workflow_dispatch:
 
@@ -11,7 +13,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +30,40 @@ jobs:
         with:
           node-version: 22
 
+      - name: Run FM1-Lab tests
+        run: npm test
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.64
+
+      - name: Fetch pinned Felucca firmware source
+        run: |
+          git clone https://github.com/hugelton/Felucca.git vendor/felucca
+          git -C vendor/felucca checkout 743551712c36b3984392eea1dbe13a309907e17a
+          git -C vendor/felucca submodule update --init --recursive
+          git -C vendor/felucca apply ../../patches/felucca-host-fm1lab-api.patch
+
+      - name: Build Felucca's browser-native firmware runtime
+        working-directory: vendor/felucca
+        run: |
+          python -m pip install --disable-pip-version-check Pillow fonttools
+          ./build.sh gen
+          ./build.sh web
+
+      - name: Verify FM1-Lab native FM6 bridge
+        run: node scripts/felucca-api-smoke.mjs vendor/felucca/build/web/felucca.wasm
+
+      - name: Run Felucca FM6 and browser-host regression suite
+        working-directory: vendor/felucca
+        run: sh tests/run_tests.sh
+
       - name: Install WebAssembly target
         run: rustup target add wasm32-unknown-unknown
 
@@ -35,28 +71,38 @@ jobs:
         run: cargo test --release -p fm1-isa -p fm1-core -p fm1-soc -p fm1-web
         working-directory: vendor/fm1-emu
 
-      - name: Run upstream browser-code tests
+      - name: Run upstream emulator browser-code tests
         run: node --test web/*.test.mjs
         working-directory: vendor/fm1-emu
 
-      - name: Build the upstream emulator as the primary site
-        run: vendor/fm1-emu/tools/build_site.sh _site
+      - name: Build the upstream emulator as a supporting compatibility bench
+        run: vendor/fm1-emu/tools/build_site.sh _compat
 
       - name: Smoke-test emulated firmware and audio output
-        run: node vendor/fm1-emu/web/smoke.mjs _site
+        run: node vendor/fm1-emu/web/smoke.mjs _compat
 
       - name: Verify emulator flash persistence round trip
-        run: node vendor/fm1-emu/web/persistence.wasm.mjs _site
+        run: node vendor/fm1-emu/web/persistence.wasm.mjs _compat
 
-      - name: Stage the experimental Instrument designer and test console
+      - name: Assemble FM1-Lab product site and supporting runtimes
         run: |
-          mkdir -p _site/designer _site/scripts
-          cp index.html _site/designer/index.html
-          cp -R src _site/designer/
+          mkdir -p _site/compatibility _site/felucca _site/src _site/scripts
+          cp -R _compat/. _site/compatibility/
+          cp -R vendor/felucca/build/web/. _site/felucca/
+          cp vendor/felucca/LICENSE vendor/felucca/LICENSING.md _site/felucca/
+          cp -R vendor/felucca/LICENSES _site/felucca/
+          cp index.html _site/index.html
+          cp -R src/. _site/src/
           cp testing.html _site/testing.html
           cp .nojekyll _site/
           cp scripts/felucca-midi-smoke.fm1 _site/scripts/
-          node scripts/inject-lab-link.mjs _site/index.html
+
+      - name: Verify the built product in headless Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+          python -m http.server 4173 --directory _site > /tmp/fm1lab-http.log 2>&1 &
+          node scripts/browser-e2e.mjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -67,6 +113,7 @@ jobs:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

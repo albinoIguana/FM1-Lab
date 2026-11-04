@@ -1,54 +1,48 @@
 # FM1-Lab
 
-**FM1-Lab is now emulator-first.** The main page runs the actual M-VAVE FM-1 emulator in the browser. The custom four-patch Instrument designer remains available as a secondary experiment.
+**FM1-Lab is our own instrument-first FM sound-design environment.** Its interface and workflow are the product; Felucca's firmware engine is the synthesis foundation, and the upstream emulator remains a supporting compatibility tool.
 
-## Live
+## Instrument model
 
-- [Play the FM-1 emulator](https://albinoiguana.github.io/FM1-Lab/) — the real emulated FM-1 CPU, screen, controls and audio running community firmware unchanged in WebAssembly.
-- [Experimental Instrument designer](https://albinoiguana.github.io/FM1-Lab/designer/) — the separate four-patch Instrument model and local six-operator DSP prototype.
-- [Firmware smoke-test console](https://albinoiguana.github.io/FM1-Lab/testing.html) — scripted Felucca test entry point.
-- [FM1-Lab source](https://github.com/albinoIguana/FM1-Lab).
+- An **Instrument** is one preset containing exactly four independent FM patches.
+- The first two Instrument banks are backed by Felucca's eight actual FM6 factory voices: slots 1–4 and 5–8.
+- Selecting an Instrument loads its four voices into Felucca's four native synth parts.
+- Selecting a patch selects the corresponding native part for playback and editing.
+- Instrument edits are saved locally, including the complete 155-byte native FM6 voice data for each patch.
 
-The upstream emulator is MIT-licensed and pinned as a recursive Git submodule at `vendor/fm1-emu`. Its original interface is built and served at the site root, so there is no iframe between the user and the audio engine. GitHub Pages builds the WebAssembly runtime, runs upstream Rust and browser tests, smoke-tests Felucca audio/MIDI, verifies flash persistence, and deploys automatically on pushes to `main`.
+## Native engine integration
 
-## Run locally
+FM1-Lab runs Felucca's own browser-native WebAssembly firmware inside its AudioWorklet. Felucca owns the audio rendering, voice allocation, FM6 algorithms, envelopes, modulation and effects; FM1-Lab does not substitute a parallel Web Audio FM engine.
 
-Clone with submodules:
+A narrow patch overlay against the pinned Felucca host exposes:
+- Four native FM6 tracks.
+- Native 155-byte patch read/write and a dedicated scratch buffer.
+- Felucca's eight factory FM6 voices.
+- The actual carrier masks, modulation routing masks and feedback operator for all 32 algorithms.
 
-```sh
-git clone --recurse-submodules https://github.com/albinoIguana/FM1-Lab.git
-cd FM1-Lab
-rustup target add wasm32-unknown-unknown
-vendor/fm1-emu/tools/build_site.sh _site
-mkdir -p _site/designer
-cp index.html _site/designer/index.html
-cp -R src _site/designer/
-cp testing.html _site/testing.html
-mkdir -p _site/scripts
-cp scripts/felucca-midi-smoke.fm1 _site/scripts/
-node scripts/inject-lab-link.mjs _site/index.html
-python3 -m http.server 8000 --directory _site
-```
+The custom UI maps operator ratio or fixed-frequency mode, output level, all four native envelope rates and levels, algorithm, feedback and voice name into the native patch bytes. Algorithm diagrams and carrier/modulator roles come from Felucca's own routing tables.
 
-Open http://localhost:8000. The emulator needs to be served over HTTP; opening the HTML file directly will not work. Run `npm test` for FM1-Lab's model and integration checks.
+The current editor deliberately exposes the native voice fields that have direct UI controls. The remaining native voice fields are preserved when these controls are changed. Modulation matrix, LFO and FX pages, plus broader Instrument management, are subsequent work.
 
-## Product direction
+## Site layout
 
-The upstream emulator is the source of truth for firmware behavior. It emulates the FM-1 itself—CPU, screen, keys, knobs and audio—and runs supported community firmware unchanged. Start with Felucca or another community firmware from its built-in catalog. M-VAVE stock firmware must be supplied by the user as an `.fwsc` package.
+- **FM1-Lab** — the main application and custom Instrument workflow.
+- **[Felucca runtime](https://albinoiguana.github.io/FM1-Lab/felucca/)** — Felucca's own browser-native firmware reference.
+- **[Compatibility bench](https://albinoiguana.github.io/FM1-Lab/compatibility/)** — upstream FM-1 emulator for firmware compatibility and regression work. It is not the FM1-Lab product UI.
+- **[Test console](https://albinoiguana.github.io/FM1-Lab/testing.html)** — firmware test utilities.
+- **[Source repository](https://github.com/albinoIguana/FM1-Lab)**.
 
-The former FM1-Lab editor is retained at `/designer/` as a prototype, not presented as an emulation of stock FM-1. Its local Web Audio engine is an independent six-operator FM implementation. Its four-patch Instrument abstraction remains a possible higher-level authoring layer, but we will only connect it to real emulator behavior through a documented, testable interface—not by pretending its parameters already control firmware.
+## Supporting source pins
 
-## Current emulator integration
+- Felucca: `743551712c36b3984392eea1dbe13a309907e17a`.
+- Upstream FM-1 emulator submodule: `9de1ef053a3c4bf56f16f05b5f0de193f4608a1d`.
 
-- Upstream source pinned at `9de1ef053a3c4bf56f16f05b5f0de193f4608a1d`.
-- Upstream emulator and FM-1 SID site built from the recursive submodule.
-- Emulator served directly at the root of FM1-Lab, retaining its own firmware picker, Start control, keyboard/touch controls, MIDI input, flash saves and backups.
-- Same-origin try-out scripts can load scripted key/MIDI/encoder events and report lifecycle status.
-- CI tests the upstream Rust/browser code, builds WebAssembly, boots Felucca, checks LCD output and audible MIDI response, and verifies flash persistence.
+## Build and tests
 
-## Next work
+The Pages workflow runs the FM1-Lab unit tests, builds Felucca's browser runtime with the FM1-Lab host API overlay, boots the resulting WASM in a smoke test, checks all 32 native routing graphs, loads all eight factory voices, verifies native patch read/write isolation, and runs Felucca's broader regression suite. It also runs the upstream emulator's tests and compatibility checks.
 
-1. Test the root emulator on desktop and iOS Safari, including audio start and touch interaction.
-2. Add repeatable firmware scenarios and capture regression artifacts.
-3. Investigate a documented host API for telemetry and live parameter control.
-4. Only then connect the four-patch Instrument designer to actual emulator/firmware capabilities.
+Run `npm test` for the application and native patch mapping tests. Building Felucca's browser runtime requires Python 3 with Pillow/fontTools and Emscripten; the upstream emulator also requires its Rust/WebAssembly toolchain.
+
+## Licensing
+
+Felucca is GPL-3.0-only. Its engine library is MIT and its FM-1 board layer is MPL-2.0. The separate upstream FM-1 emulator is MIT-licensed. Preserve source attribution and corresponding source obligations when distributing builds.

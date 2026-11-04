@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createFactoryInstruments, createDefaultPatch, normalizeInstrument, migrateLegacyPatch } from "../src/instrument.js";
 
-test("factory creates four Instruments with four independent six-operator patches each",()=>{
+test("factory creates two four-voice Instruments from Felucca factory slots",()=>{
   const instruments=createFactoryInstruments();
-  assert.equal(instruments.length,4);
+  assert.equal(instruments.length,2);
+  assert.deepEqual(instruments.map(item=>item.factorySlots),[[0,1,2,3],[4,5,6,7]]);
   for(const instrument of instruments){
     assert.equal(instrument.patches.length,4);
     for(const patch of instrument.patches)assert.equal(patch.operators.length,6);
