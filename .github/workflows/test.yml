@@ -33,6 +33,8 @@ jobs:
           node --check scripts/patch-m-vave-instrument-home.mjs
           node scripts/patch-m-vave-instrument-sequencer-screen.mjs
           node --check scripts/patch-m-vave-instrument-sequencer-screen.mjs
+          node scripts/patch-m-vave-native-patch-editor.mjs
+          node --check scripts/patch-m-vave-native-patch-editor.mjs
       - name: Check application modules
         run: |
           node --check src/main-native.js
