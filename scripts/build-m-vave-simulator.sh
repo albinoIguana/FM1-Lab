@@ -13,6 +13,8 @@ OUT="$SOURCE/build/web"
 # Compile the FM1-Lab native Instrument and bank-metadata modules with the official app sources.
 cp "$ROOT/firmware/fm1lab_instrument.h" "$SOURCE/app/fm1lab_instrument.h"
 cp "$ROOT/firmware/fm1lab_instrument.c" "$SOURCE/app/fm1lab_instrument.c"
+cp "$ROOT/firmware/fm1lab_library.h" "$SOURCE/app/fm1lab_library.h"
+cp "$ROOT/firmware/fm1lab_library.c" "$SOURCE/app/fm1lab_library.c"
 cp "$ROOT/firmware/fm1lab_bank_metadata.h" "$SOURCE/app/fm1lab_bank_metadata.h"
 cp "$ROOT/firmware/fm1lab_bank_metadata.c" "$SOURCE/app/fm1lab_bank_metadata.c"
 cp "$ROOT/firmware/fm1lab_physical_controls.h" "$SOURCE/app/fm1lab_physical_controls.h"
