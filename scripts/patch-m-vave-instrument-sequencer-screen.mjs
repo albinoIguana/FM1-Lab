@@ -116,8 +116,8 @@ source = source.replace("    if (page == OVERVIEW || page == STEPS) music_page =
 source = source.replace("            } else page = OVERVIEW;\n        } else if (pressed & BUTTON(SEQ)) {",
   "            } else page = FM1LAB_HOME;\n        } else if (pressed & BUTTON(SEQ)) {");
 if (!source.includes("old_page == FM1LAB_SEQ && page != FM1LAB_SEQ")) {
-  replaceOnce("controls_done:\\n    if (page != old_page) {",
-    "controls_done:\\n    /* Leaving the FM1-Lab sequencer stops its clock and restores all eight project tracks. */\\n    if (old_page == FM1LAB_SEQ && page != FM1LAB_SEQ) {\\n        (void)fm1lab_sequencer_transport(0);\\n        (void)fm1lab_sequencer_unbind();\\n        fm1lab_seq_signature = 0;\\n    }\\n    if (page != old_page) {",
+  replaceOnce("controls_done:\n    if (page != old_page) {",
+    "controls_done:\n    /* Leaving the FM1-Lab sequencer stops its clock and restores all eight project tracks. */\n    if (old_page == FM1LAB_SEQ && page != FM1LAB_SEQ) {\n        (void)fm1lab_sequencer_transport(0);\n        (void)fm1lab_sequencer_unbind();\n        fm1lab_seq_signature = 0;\n    }\n    if (page != old_page) {",
     "sequencer exit cleanup");
 }
 fs.writeFileSync(screenPath, source);
