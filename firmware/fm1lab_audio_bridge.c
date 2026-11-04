@@ -48,7 +48,8 @@ int fm1lab_audio_init(void)
 
     audio_shadow = runtime.instrument;
     memcpy(live_voice, voices, sizeof live_voice);
-    audio_barrier();\n    audio_ready = 1u;
+    audio_barrier();
+    audio_ready = 1u;
     return 0;
 }
 
@@ -93,7 +94,8 @@ int fm1lab_audio_sync_instrument(const fm1lab_instrument_t *instrument)
 
 void fm1lab_audio_set_keyboard_mode(int enabled)
 {
-    audio_barrier();\n    keyboard_mode = enabled ? 1u : 0u;
+    audio_barrier();
+    keyboard_mode = enabled ? 1u : 0u;
 }
 
 int fm1lab_audio_route_midi(const uint8_t *message, size_t bytes)
