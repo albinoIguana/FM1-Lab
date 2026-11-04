@@ -1,0 +1,41 @@
+name: M-VAVE native engine validation
+
+on:
+  push:
+    branches: ["feat/m-vave-native-instrument"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m-vave-engine:
+    runs-on: windows-latest
+    steps:
+      - name: Check out FM1-Lab and official M-VAVE source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check and apply the FM1-Lab M-VAVE integration
+        shell: bash
+        run: |
+          git -C vendor/m-vave-fm1 apply --check ../../patches/m-vave-instrument-api.patch
+          git -C vendor/m-vave-fm1 apply ../../patches/m-vave-instrument-api.patch
+
+      - name: Test the Instrument and macro layers
+        run: node --test tests/dx7-macros.test.js tests/instrument-model.test.js
+
+      - name: Build the official M-VAVE browser engine
+        shell: pwsh
+        run: ./vendor/m-vave-fm1/tools/Build-Web.ps1 -LocalPreview
+
+      - name: Verify FM1-Lab's required engine API
+        run: node scripts/check-m-vave-api.mjs vendor/m-vave-fm1/build/web/simulator.wasm
