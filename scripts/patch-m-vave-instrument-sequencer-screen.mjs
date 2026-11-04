@@ -98,9 +98,9 @@ if (!source.includes("if (visible == FM1LAB_SEQ) { fm1lab_seq_draw(); return; }"
   replaceOnce("    if (visible == FM1LAB_HOME) { fm1lab_home_draw(); return; }",
     "    if (visible == FM1LAB_HOME) { fm1lab_home_draw(); return; }\n    if (visible == FM1LAB_SEQ) { fm1lab_seq_draw(); return; }",
     "sequencer render dispatch");
-if (!source.includes("page = FM1LAB_SEQ; seq_page = 0;"))
-  replaceOnce("        } else if (pressed & BUTTON(SEQ)) {\n            page = STEPS; seq_page = 0; step_follow = 1; cache->shown_page = ~0U;",
-    "        } else if (pressed & BUTTON(SEQ)) {\n            if (page == FM1LAB_HOME || page == FM1LAB_SEQ) {\n                if (page == FM1LAB_SEQ) { (void)fm1lab_sequencer_transport(0); (void)fm1lab_sequencer_unbind(); page = FM1LAB_HOME; }\n                else { fm1lab_seq_status = fm1lab_seq_bind_tracks(); page = FM1LAB_SEQ; fm1lab_seq_cursor = 0; }\n            } else { page = STEPS; seq_page = 0; step_follow = 1; }\n            cache->shown_page = ~0U;",
+if (!source.includes("fm1lab_seq_status = fm1lab_seq_bind_tracks(); page = FM1LAB_SEQ;"))
+  replaceOnce("            page = STEPS; seq_page = 0; step_follow = 1; cache->shown_page = ~0U;",
+    "            if (page == FM1LAB_HOME || page == FM1LAB_SEQ) {\n                if (page == FM1LAB_SEQ) { (void)fm1lab_sequencer_transport(0); (void)fm1lab_sequencer_unbind(); page = FM1LAB_HOME; }\n                else { fm1lab_seq_status = fm1lab_seq_bind_tracks(); page = FM1LAB_SEQ; fm1lab_seq_cursor = 0; }\n            } else { page = STEPS; seq_page = 0; step_follow = 1; }\n            cache->shown_page = ~0U;",
     "SEQ navigation");
 if (!source.includes("if (page == FM1LAB_SEQ && (pressed & BUTTON(PLAY)))"))
   replaceOnce("    if ((pressed & BUTTON(PLAY)) && !play_handled) {",
