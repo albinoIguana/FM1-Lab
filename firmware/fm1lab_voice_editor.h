@@ -45,6 +45,8 @@ int fm1lab_voice_operator_is_carrier(const uint8_t voice[FM1LAB_PATCH_BYTES],
                                      unsigned operator_number);
 unsigned fm1lab_voice_operator_depth(const uint8_t voice[FM1LAB_PATCH_BYTES],
                                      unsigned operator_number);
+int fm1lab_voice_operator_modulates(const uint8_t voice[FM1LAB_PATCH_BYTES],
+                                    unsigned source_operator, unsigned target_operator);
 int fm1lab_voice_name_get(const uint8_t voice[FM1LAB_PATCH_BYTES], char name[11]);
 int fm1lab_voice_name_set(uint8_t voice[FM1LAB_PATCH_BYTES], const char *name);
 
