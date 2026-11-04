@@ -26,6 +26,8 @@ $files = @(
     'fm1lab_runtime.c',
     'fm1lab_sequencer.h',
     'fm1lab_sequencer.c',
+    'fm1lab_voice_editor.h',
+    'fm1lab_voice_editor.c',
     'fm1lab_bank_metadata.h',
     'fm1lab_bank_metadata.c',
     'fm1lab_physical_controls.h'
