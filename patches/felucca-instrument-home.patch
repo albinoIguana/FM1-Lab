@@ -186,9 +186,10 @@ index 0000000..0000000
 +    uint8_t voice[FP_SIZE + 1u];
 +    uint32_t tr, i;
 +    slot %= FM1_INSTRUMENT_COUNT;
++    mom_back(0);
++    undo.trk = 0;
 +    for (tr = 0; tr < NTRK; tr++) {
 +        track_t *t = &trk[tr];
-+        load_begin(t, UNDO_SOUND);
 +        panic_req |= (uint8_t)(1u << tr);
 +        fm1_irq_off();
 +        t->eng_req = ENGI_FM6;
@@ -201,7 +202,6 @@ index 0000000..0000000
 +        fm6_unpack(FM6_FACTORY[slot * 4u + tr], voice);
 +        fm6_set_patch(tr, voice);
 +        fm6_adopt(tr);
-+        load_end(t);
 +    }
 +    song.sel = 0;
 +    sync_reload = 1;
