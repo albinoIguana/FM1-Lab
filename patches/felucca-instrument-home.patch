@@ -163,7 +163,7 @@ index 0000000..0000000
 +++ b/firmware/src/instrument.c
 @@ -0,0 +1,63 @@
 +/* SPDX-License-Identifier: GPL-3.0-only
-+ * Copyright (C) 2026 OpenAI FM1-Lab contributors
++ * Copyright (C) 2026 FM1-Lab contributors
 + */
 +/* FM1 factory Instruments: four native FM6 voices, kept as one selection.
 + * EN_PRESET changes the Instrument on HOME; KNOB 1..4 select its four parts. */
