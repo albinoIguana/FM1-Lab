@@ -39,7 +39,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 
 ## Firmware build and hardware validation
 
-- [ ] Integrate the FM1-Lab C module into the native device build.
+- [x] Add a reproducible Windows entrypoint that stages the FM1-Lab C modules and patches into the pinned native app tree before invoking the SDK firmware-only build.
+- [ ] Integrate the Instrument model with device note allocation, mixer routing and HOME UI in the native device build.
 - [ ] Build with the matching JieLi Windows toolchain 2.5.3.
 - [ ] Produce and inspect a device firmware image without touching the live/main branch.
 - [ ] Test patch isolation, macro limits, mute/level, save/load integrity, MIDI and rollback on actual FM1 hardware.
