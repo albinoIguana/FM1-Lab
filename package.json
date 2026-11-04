@@ -4,6 +4,6 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test tests/dx7-macros.test.js tests/instrument-model.test.js"
   }
 }

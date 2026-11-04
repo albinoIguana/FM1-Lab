@@ -1,36 +1,28 @@
-# FM1-Lab roadmap
+# FM1-Lab implementation roadmap
 
-## Priority 1 — Real firmware foundations
-- [x] Pin the upstream MIT-licensed FM-1 emulator as a recursive Git submodule.
-- [x] Build the generic FM-1 emulator and smoke-test community firmware, LCD output, MIDI audio and flash persistence.
-- [x] Publish the generic emulator as the compatibility bench.
-- [x] Fetch Felucca source at a pinned commit in CI, including its nested engine and board dependencies.
-- [x] Build Felucca's own browser-native firmware runtime with Emscripten.
-- [x] Publish the Felucca runtime separately from the generic emulator.
-- [ ] Verify Felucca browser runtime audio, controls and persistence on desktop and iOS Safari.
-- [ ] Add repeatable Felucca runtime tests and retained regression artifacts.
+## In place
+- [x] Use M-VAVE's official FM1 open-source repository and SDK as the source foundation.
+- [x] Pin the official source as a Git submodule.
+- [x] Define one Instrument as exactly four independent six-operator DX7 patches.
+- [x] Store each patch in M-VAVE's native 156-byte expanded voice format.
+- [x] Build non-destructive Brightness, Body, Motion and Edge macro transforms.
+- [x] Derive carrier roles from M-VAVE's actual algorithm routing table.
+- [x] Add operator editing for oscillator mode, coarse/fine, output, and four-stage envelopes.
+- [x] Connect the browser workshop to M-VAVE's own simulator and audio worklet.
 
-## Priority 2 — FM1-Lab interaction and design language
-- [x] Preserve the accepted FM1-Lab boot animation.
-- [ ] Replace the generic dashboard feel with a hardware-oriented FM-1 control surface and screen hierarchy.
-- [ ] Build a page/parameter navigation model around Felucca's real controls and parameter descriptions.
-- [ ] Adapt Felucca's existing FX page and quick layer to the Clipper-inspired workflow: select, page, tweak, hear immediately; clear bypass.
-- [x] Use Felucca's existing 32-algorithm FM6 topology graph, carrier/modulator/feedback roles and operator/envelope edit pages as the baseline.
-- [ ] Extend role-specific macro controls in the FM1-Lab layer while retaining Felucca's tested operator editor.
-- [ ] Add a bridge from the custom front end to the Felucca host runtime; use its exported host API rather than a separate Web Audio synth.
+## Next: finish the Instrument workflow
+- [ ] Verify the browser build and sound path end-to-end on desktop and iOS Safari.
+- [ ] Add patch enable/mute, patch level and per-patch performance state.
+- [ ] Complete Instrument library save/load, rename, duplicate and export/import behavior.
+- [ ] Add macro range/scaling controls and saveable per-Instrument macro assignments.
 
-## Priority 3 — Four-patch Instrument
-- [x] Prototype an Instrument as a preset containing four FM patches.
-- [ ] Map the four patches to Felucca's four independent tracks/parts, validating voice behavior and parameter boundaries.
-- [ ] Define a sound-only Instrument save/load format separately from full sequencer projects.
-- [ ] Implement per-patch mute/solo, level, pan and selection controls.
-- [ ] Add stacked/split/velocity-zone behavior only where the actual voice and MIDI model supports it.
-- [ ] Implement reliable Instrument import/export and regression tests.
+## Device firmware integration
+- [ ] Move the four-patch Instrument data model into M-VAVE's on-device application layer.
+- [ ] Map the physical preset encoder to Instrument selection.
+- [ ] Map the four physical patch controls to patch selection.
+- [ ] Add the four macro controls to the device UI with algorithm-aware carrier/modulator behavior.
+- [ ] Persist Instruments in FM1 storage without breaking existing projects, samples or DX7 voice banks.
+- [ ] Add device-side tests for patch isolation, macro limits, save/load integrity and MIDI behavior.
+- [ ] Build with JieLi toolchain 2.5.3 and verify on actual FM1 hardware before calling it flashable.
 
-## Reference projects
-- **Felucca** is the firmware and DSP foundation.
-- **Clipper** is an interaction/workflow reference for effects and deep editing, not a code dependency.
-- **FM-1 emulator** is the independent compatibility bench for running supported firmware packages unchanged.
-
-## Deferred
-The old FM1-Lab local Web Audio engine is an isolated prototype, not the Felucca or stock FM-1 sound engine. Do not build new features on top of it. Retain it only as a temporary visual/interaction reference until the Felucca host bridge is in place.
+The browser simulator is a test and audition harness built from M-VAVE's official source. It is not a substitute for implementing the custom Instrument workflow in the device application.
