@@ -21,6 +21,17 @@ static const uint8_t carrier_masks[32] = {
     31, 11, 11, 37, 23, 39, 31, 63
 };
 
+static const uint8_t algorithm_flags[32][6] = {
+{0xc1,0x11,0x11,0x14,0x01,0x14},{0x01,0x11,0x11,0x14,0xc1,0x14},{0xc1,0x11,0x14,0x01,0x11,0x14},{0x41,0x11,0x94,0x01,0x11,0x14},
+{0xc1,0x14,0x01,0x14,0x01,0x14},{0x41,0x94,0x01,0x14,0x01,0x14},{0xc1,0x11,0x05,0x14,0x01,0x14},{0x01,0x11,0xc5,0x14,0x01,0x14},
+{0x01,0x11,0x05,0x14,0xc1,0x14},{0x01,0x05,0x14,0xc1,0x11,0x14},{0xc1,0x05,0x14,0x01,0x11,0x14},{0x01,0x05,0x05,0x14,0xc1,0x14},
+{0xc1,0x05,0x05,0x14,0x01,0x14},{0xc1,0x05,0x11,0x14,0x01,0x14},{0x01,0x05,0x11,0x14,0xc1,0x14},{0xc1,0x11,0x02,0x25,0x05,0x14},
+{0x01,0x11,0x02,0x25,0xc5,0x14},{0x01,0x11,0x11,0xc5,0x05,0x14},{0xc1,0x14,0x14,0x01,0x11,0x14},{0x01,0x05,0x14,0xc1,0x14,0x14},
+{0x01,0x14,0x14,0xc1,0x14,0x14},{0xc1,0x14,0x14,0x14,0x01,0x14},{0xc1,0x14,0x14,0x01,0x14,0x04},{0xc1,0x14,0x14,0x14,0x04,0x04},
+{0xc1,0x14,0x14,0x04,0x04,0x04},{0xc1,0x05,0x14,0x01,0x14,0x04},{0x01,0x05,0x14,0xc1,0x14,0x04},{0x04,0xc1,0x11,0x14,0x01,0x14},
+{0xc1,0x14,0x01,0x14,0x04,0x04},{0x04,0xc1,0x11,0x14,0x04,0x04},{0xc1,0x14,0x04,0x04,0x04,0x04},{0xc4,0x04,0x04,0x04,0x04,0x04}
+};
+
 static uint8_t clamp_u8(int value, unsigned maximum)
 {
     if (value < 0) return 0;
@@ -108,6 +119,27 @@ uint8_t fm1lab_carrier_mask(unsigned algorithm)
     return carrier_masks[algorithm & 31u];
 }
 
+uint8_t fm1lab_operator_depth(unsigned algorithm, unsigned operator_number)
+{
+    if (operator_number < 1u || operator_number > 6u) return 0u;
+    const uint8_t *flags = algorithm_flags[algorithm & 31u];
+    uint8_t producers[3][6] = {{0}}, counts[3] = {0};
+    uint8_t edges[6][6] = {{0}}, carrier[6] = {0}, depth[6] = {0};
+    for (unsigned op = 0; op < 6; ++op) {
+        unsigned inbus = (flags[op] >> 4) & 3u, outbus = flags[op] & 3u;
+        unsigned add = (flags[op] & 4u) != 0u;
+        if (inbus) for (unsigned n = 0; n < counts[inbus]; ++n) edges[producers[inbus][n]][op] = 1u;
+        if (!outbus) carrier[op] = 1u;
+        else { if (!add) counts[outbus] = 0u; producers[outbus][counts[outbus]++] = (uint8_t)op; }
+    }
+    for (unsigned op = 0; op < 6; ++op) depth[op] = carrier[op] ? 0u : 1u;
+    for (unsigned pass = 0; pass < 6; ++pass)
+        for (unsigned op = 0; op < 6; ++op)
+            for (unsigned next = 0; next < 6; ++next)
+                if (edges[op][next] && depth[next] + 1u > depth[op]) depth[op] = (uint8_t)(depth[next] + 1u);
+    return depth[6u - operator_number];
+}
+
 int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch_index,
                         uint8_t output[FM1LAB_PATCH_BYTES])
 {
@@ -128,6 +160,7 @@ int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch_in
     for (unsigned op = 1; op <= OPERATOR_COUNT; ++op) {
         const unsigned offset = (OPERATOR_COUNT - op) * OPERATOR_STRIDE;
         const unsigned carrier = !!(carriers & (1u << (op - 1u)));
+        const unsigned depth = fm1lab_operator_depth(base[VOICE_ALGORITHM], op);
         if (carrier) {
             /* BODY shapes sustained carrier presence. */
             output[offset + 6] = clamp_u8((int)base[offset + 6] +
@@ -135,12 +168,12 @@ int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch_in
         } else {
             /* BRIGHTNESS changes modulation index through modulator output. */
             output[offset + 16] = clamp_u8((int)base[offset + 16] +
-                scaled_delta(brightness, 55), 99);
+                scaled_delta(brightness, 55u / (depth ? depth : 1u)), 99);
             /* MOTION animates the modulator EG contour; preserve its timing. */
             output[offset + 6] = clamp_u8((int)base[offset + 6] +
-                scaled_delta(motion, 35), 99);
+                scaled_delta(motion, 35u / (depth ? depth : 1u)), 99);
             output[offset + 7] = clamp_u8((int)base[offset + 7] -
-                scaled_delta(motion, 25), 99);
+                scaled_delta(motion, 25u / (depth ? depth : 1u)), 99);
         }
     }
 
