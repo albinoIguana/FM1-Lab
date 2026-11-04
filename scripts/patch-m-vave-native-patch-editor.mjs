@@ -95,6 +95,20 @@ static void fm1lab_patch_draw(void)
              carrier ? GREEN : AMBER, PANEL);
         number(x + 13, 80, (int)depth, 1, 1, DIM, PANEL);
     }
+    char routes[40];
+    unsigned route_length = 0;
+    for (unsigned from = 6; from >= 1; --from) {
+        for (unsigned to = 6; to >= 1; --to) {
+            if (fm1lab_voice_operator_modulates(voice, from, to) == 1) {
+                if (route_length) routes[route_length++] = ' ';
+                routes[route_length++] = (char)('0' + from);
+                routes[route_length++] = '>';
+                routes[route_length++] = (char)('0' + to);
+            }
+        }
+    }
+    routes[route_length] = '\\0';
+    text(8, 94, routes[0] ? routes : "PARALLEL", 1, ACCENT, BACK);
     text(8, 101, "TOPOLOGY", 1, DIM, BACK);
     text(74, 101, "CARRIER / MODULATOR DEPTH", 1, DIM, BACK);
     text(8, 120, fm1lab_patch_bank == 0 ? "ENVELOPE" :
