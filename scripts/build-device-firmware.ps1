@@ -40,7 +40,8 @@ $app = Join-Path $vendor 'app'
 foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $root "firmware/$file") -Destination $app -Force
 }
-Copy-Item -LiteralPath (Join-Path $vendor 'web/synth/synth_dx7.h') -Destination (Join-Path $app 'synth/synth_dx7.h') -Force
+node (Join-Path $root 'scripts/patch-m-vave-device-dx7-core.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'FM6 source staging failed.' }
 
 Push-Location $root
 try {
