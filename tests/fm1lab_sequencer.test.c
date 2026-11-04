@@ -3,12 +3,15 @@
 #include <assert.h>
 #include <string.h>
 
-static unsigned roles[8], sources[8], lengths[8], tempo = 120, swing;
+static unsigned roles[8], sources[8], lengths[8], tempo = 120, swing, enabled_mask = 0xffU, playing;
 static struct groove_step steps[8][64];
 static unsigned settings[8][64][7];
 
 unsigned groove_track_role(unsigned t) { return t < 8 ? roles[t] : GROOVE_TRACK_OFF; }
 unsigned groove_source_type(unsigned t) { return t < 8 ? sources[t] : GROOVE_SOURCES; }
+int groove_sequence_track_enable(unsigned t, unsigned on) { if (t >= 8) return -1; if (on) enabled_mask |= 1U << t; else enabled_mask &= ~(1U << t); return 0; }
+void groove_sequence_transport(uint8_t status) { playing = status == 0xfaU; }
+void groove_sequence_view(unsigned t, unsigned s, struct groove_view *v) { (void)t; (void)s; memset(v, 0, sizeof *v); v->playing = (uint8_t)playing; }
 unsigned groove_tempo_saved(void) { return tempo; }
 void groove_tempo_edit(int delta) { tempo = (unsigned)((int)tempo + delta); }
 unsigned groove_sequence_setting(unsigned s) { return s == 0 ? swing : 0; }
@@ -30,6 +33,7 @@ int main(void)
 {
     for (unsigned i = 0; i < 8; ++i) lengths[i] = 64;
     assert(fm1lab_sequencer_bind(2, 5) == 0);
+    assert(enabled_mask == ((1U << 2) | (1U << 5)));
     assert(fm1lab_sequencer_bind(2, 2) == -1);
     roles[5] = GROOVE_TRACK_PLAY;
     assert(fm1lab_sequencer_bind(2, 5) == -2);
@@ -42,6 +46,9 @@ int main(void)
     fm1lab_sequence_state_t state;
     assert(fm1lab_sequencer_read(&state) == 0);
     assert(state.lanes[0].backend_track == 2 && state.lanes[1].backend_track == 5);
+    assert(fm1lab_sequencer_transport(1) == 0 && playing == 1);
+    assert(fm1lab_sequencer_read(&state) == 0 && state.playing == 1);
+    assert(fm1lab_sequencer_transport(0) == 0 && playing == 0);
     assert(state.lanes[0].length == 64 && state.tempo == 120);
 
     assert(fm1lab_sequencer_set_tempo(240) == 0 && tempo == 240);
@@ -66,5 +73,7 @@ int main(void)
     assert(steps[0][7].note == 0 && steps[1][7].note == 0);
     assert(steps[3][7].note == 0 && steps[4][7].note == 0);
     assert(steps[6][7].note == 0 && steps[7][7].note == 0);
+    assert(fm1lab_sequencer_unbind() == 0 && enabled_mask == 0xffU);
+    assert(fm1lab_sequencer_transport(1) == -1);
     return 0;
 }
