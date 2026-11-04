@@ -15,6 +15,7 @@ cp "$ROOT/firmware/fm1lab_instrument.h" "$SOURCE/app/fm1lab_instrument.h"
 cp "$ROOT/firmware/fm1lab_instrument.c" "$SOURCE/app/fm1lab_instrument.c"
 cp "$ROOT/firmware/fm1lab_bank_metadata.h" "$SOURCE/app/fm1lab_bank_metadata.h"
 cp "$ROOT/firmware/fm1lab_bank_metadata.c" "$SOURCE/app/fm1lab_bank_metadata.c"
+node "$ROOT/scripts/patch-m-vave-instrument-storage.mjs"
 
 if [[ ! -x "$SDK_ROOT/bin/clang" ]]; then
   mkdir -p "$SDK_PARENT"
