@@ -30,7 +30,7 @@ static uint32_t fm1lab_home_signature;",
 }
 
 if (!source.includes("static void fm1lab_home_draw(void)")) {
-  const draw = String.raw\`
+  const draw = String.raw`
 static void fm1lab_home_draw(void)
 {
     if (!paint_rendering) {
@@ -91,7 +91,7 @@ static void fm1lab_home_draw(void)
     text(8, 222, "SELECT PATCH   ALGORITHM EDIT   PRESETS INSTRUMENT", 1, DIM, BACK);
     text(8, 233, "KNOB 1-4 = PATCH LEVEL     SAVE = STORE INSTRUMENT", 1, DIM, BACK);
 }
-\`;
+`;
   replaceOnce("static void draw_page_body(const struct fm1_ble_status *ble)\n{",
     draw + "\nstatic void draw_page_body(const struct fm1_ble_status *ble)\n{",
     "Instrument home drawing");
@@ -113,7 +113,7 @@ if (!source.includes("fm1lab_runtime_load(&fm1lab_home_runtime, 0)")) {
 }
 
 if (!source.includes("FM1LAB_HOME && !(pressed")) {
-  const controls = String.raw\`
+  const controls = String.raw`
     if (page == FM1LAB_HOME && (pressed & (BUTTON(EDIT) | BUTTON(SCL)))) {
         notice = "PATCH EDITOR NEXT - SAFE BANK MODE";
         notice_until = now + 1800U;
@@ -159,7 +159,7 @@ if (!source.includes("FM1LAB_HOME && !(pressed")) {
         if (encoder_active(controls->encoders) || (pressed & BUTTON(SAVE)))
             goto controls_done;
     }
-\`;
+`;
   replaceOnce("    if (pressed & BUTTON(SAVE)) {\n        project_return = page; page = PROJECT;",
     controls + "\n    if (pressed & BUTTON(SAVE)) {\n        project_return = page; page = PROJECT;",
     "Instrument home controls");
