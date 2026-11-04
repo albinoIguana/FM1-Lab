@@ -27,7 +27,7 @@ One Instrument at a time, always exactly four patch slots. Show the Instrument n
 
 ### SEQ / Two-track composition
 
-The main SEQ view always displays both lanes on a fixed 64-step timeline. Each track has an independently adjustable active length from 8–64 steps. SELECT chooses the active lane; SEQ enters its piano-roll editor. The piano roll displays 64 steps against 24 chromatic note rows. The selected lane's four encoder controls are length, division (1/4–1/32 including triplets), swing, and live global key shift. Holding SELECT exposes per-note velocity, pitch, gate/length, and tie/slide editing. The SEL tap action remains unused. Sequencer state is its own domain module and communicates with the Instrument/session layer through an adapter; it does not own voice bytes or duplicate patch data.
+The main SEQ view always displays both lanes on a fixed 64-step timeline. Each track has an independently adjustable active length from 8–64 steps. SELECT chooses the active lane; SEQ enters its piano-roll editor. The piano roll displays 64 steps against 24 chromatic note rows. The selected lane's four encoder controls are length, division (1/4–1/32 including triplets), swing, and live global key shift. The top 1/12 of the screen is the power/function bar; the next 2/12 holds selected-track controls; the remaining display area keeps both lanes visible. SELECT chooses the lane; SEQ enters the piano roll. Holding SELECT exposes per-note velocity, pitch, gate/length, and tie/slide editing. The SEL tap action remains unused. Sequencer state is its own domain module and communicates with the Instrument/session layer through an adapter; it does not own voice bytes or duplicate patch data.
 
 ### PATCH / Focused sound shaping
 
