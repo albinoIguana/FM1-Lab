@@ -2,7 +2,7 @@ name: Deploy FM1-Lab to GitHub Pages
 
 on:
   push:
-    branches: ["main", "feat/fm1lab-product-front-door"]
+    branches: ["main", "feat/fm1lab-product-front-door", "feat/fm1-custom-firmware"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -67,6 +67,7 @@ jobs:
           tar -xzf /tmp/felucca-bsp.tar.gz --strip-components=1 -C vendor/felucca/firmware/bsp
           git -C vendor/felucca init --quiet
           git -C vendor/felucca apply ../../patches/felucca-host-fm1lab-api.patch
+          git -C vendor/felucca apply ../../patches/felucca-instrument-home.patch
 
       - name: Build Felucca's browser-native firmware runtime
         working-directory: vendor/felucca
