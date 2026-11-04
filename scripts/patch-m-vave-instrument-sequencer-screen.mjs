@@ -116,8 +116,8 @@ source = source.replace("    if (page == OVERVIEW || page == STEPS) music_page =
 source = source.replace("            } else page = OVERVIEW;\n        } else if (pressed & BUTTON(SEQ)) {",
   "            } else page = FM1LAB_HOME;\n        } else if (pressed & BUTTON(SEQ)) {");
 if (!source.includes("FM1LAB_SEQ emergency-stop cleanup")) {
-  replaceOnce("        page = music_page = FM1LAB_HOME;\n        writing = glo_down = glo_used = project_reload = edit_down = edit_long = 0;",
-    "        if (page == FM1LAB_SEQ) {\n            (void)fm1lab_sequencer_transport(0);\n            (void)fm1lab_sequencer_unbind();\n            fm1lab_seq_signature = 0;\n        }\n        page = music_page = FM1LAB_HOME;\n        writing = glo_down = glo_used = project_reload = edit_down = edit_long = 0;",
+  replaceOnce("    if ((controls->buttons & (BUTTON(HOME) | BUTTON(PLAY))) ==\\n            (BUTTON(HOME) | BUTTON(PLAY)) && (pressed & (BUTTON(HOME) | BUTTON(PLAY)))) {",
+    "    if ((controls->buttons & (BUTTON(HOME) | BUTTON(PLAY))) ==\\n            (BUTTON(HOME) | BUTTON(PLAY)) && (pressed & (BUTTON(HOME) | BUTTON(PLAY)))) {\\n        /* FM1-Lab emergency exit bypasses controls_done. Restore every track here. */\\n        if (page == FM1LAB_SEQ) {\\n            (void)fm1lab_sequencer_transport(0);\\n            (void)fm1lab_sequencer_unbind();\\n            fm1lab_seq_signature = 0;\\n        }",
     "FM1LAB_SEQ emergency-stop cleanup");
 }
 if (!source.includes("old_page == FM1LAB_SEQ && page != FM1LAB_SEQ")) {
