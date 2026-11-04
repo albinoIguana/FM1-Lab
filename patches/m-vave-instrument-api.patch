@@ -1,7 +1,7 @@
 diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
 --- a/web/engine/Simulator.c
 +++ b/web/engine/Simulator.c
-@@ -462,5 +462,13 @@
+@@ -462,2 +462,10 @@
  EXPORT("sim_midi") int sim_midi(unsigned bytes) { return sim_midi_from(FM1_MIDI_USB, bytes); }
  
 +/* FM1-Lab reads official M-VAVE DX7 factory voices through the same
@@ -18,7 +18,7 @@ diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
 diff --git a/sdk/Simulator.js b/sdk/Simulator.js
 --- a/sdk/Simulator.js
 +++ b/sdk/Simulator.js
-@@ -56,4 +56,8 @@
+@@ -56,1 +56,5 @@
 +          case 'fm-factory':
 +            result=c.sim_fm_factory(message.program);
 +            if(!result)data=new Uint8Array(c.memory.buffer,c.sim_file(),156).slice();
