@@ -25,6 +25,10 @@ InstrumentSession is the first enforced boundary between the data model and the 
 
 One Instrument at a time, always exactly four patch slots. Show the Instrument name and four patch tiles. Each tile communicates patch identity, enabled state, level and selection. The physical PRESETS control changes Instrument; the four named patch encoders address the four patch slots. HOME is a performance surface, not a file browser.
 
+### SEQ / Two-track composition
+
+The main SEQ view always displays both lanes on a fixed 64-step timeline. Each track has an independently adjustable active length from 8–64 steps. SELECT chooses the active lane; SEQ enters its piano-roll editor. The selected lane's four encoder controls are length, division (1/4–1/32 including triplets), swing, and live global key shift. Holding SELECT exposes per-note velocity, pitch, gate/length, and tie/slide editing. The SEL tap action remains unused. Sequencer state is its own domain module and communicates with the Instrument/session layer through an adapter; it does not own voice bytes or duplicate patch data.
+
 ### PATCH / Focused sound shaping
 
 A patch opens into a focused editor. The four musical macros are the first layer. Algorithm, feedback, output level and a compact topology view provide context without requiring six operators to be visible immediately.
