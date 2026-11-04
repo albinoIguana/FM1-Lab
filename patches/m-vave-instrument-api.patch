@@ -27,7 +27,7 @@ diff --git a/sdk/Simulator.js b/sdk/Simulator.js
 diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
 --- a/web/synth/dx7core.c
 +++ b/web/synth/dx7core.c
-@@ -67,5 +67,56 @@
+@@ -67,5 +67,55 @@
      { 0xc1, 0x14, 0x04, 0x04, 0x04, 0x04 }, // 31
      { 0xc4, 0x04, 0x04, 0x04, 0x04, 0x04 }, // 32
  };
@@ -82,4 +82,3 @@ diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
 +    return depth[FM_OP_CNT - operator_number];
 +}
  FM1_DSP_CODE static void compute_fb4(int *output,t_dx7op_params *params,int gaincur, int gaindst,int *fb_buf, int feedback_shift)
- {
