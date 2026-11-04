@@ -15,7 +15,8 @@ enum fm1lab_macro {
     FM1LAB_BRIGHTNESS,
     FM1LAB_BODY,
     FM1LAB_MOTION,
-    FM1LAB_EDGE
+    FM1LAB_DIRT,
+    FM1LAB_EDGE = FM1LAB_DIRT /* compatibility: serialized macro slot 3 */
 };
 
 typedef struct {
