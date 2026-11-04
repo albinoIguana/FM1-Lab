@@ -244,8 +244,11 @@ int fm1lab_audio_engine_render(fm1lab_audio_engine_t *engine,
         (samples != SYNTH_DX7_BLOCK_SAMPLES && samples != FM1_BLOCK_FRAMES))
         return -1;
 
-    if (__atomic_exchange_n(&engine->panic_pending, 0u, __ATOMIC_ACQ_REL))
+    if (__atomic_exchange_n(&engine->panic_pending, 0u, __ATOMIC_ACQ_REL)) {
+        uint32_t head = __atomic_load_n(&engine->queue_head, __ATOMIC_ACQUIRE);
+        __atomic_store_n(&engine->queue_tail, head, __ATOMIC_RELEASE);
         panic_all(engine);
+    }
 
     fm1lab_audio_command_t command;
     while (dequeue(engine, &command)) apply_command(engine, &command);
