@@ -26,7 +26,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 
 ## Device storage and controls
 
-- [ ] Wire the metadata codec into the existing four-bank DX7 voice library with a versioned format, preserving legacy bank import/export and recovery.
+- [x] Add a version-2 bank format and metadata read/write API to the existing four-bank DX7 voice library; preserve version-1 bank reads and stage/recovery flow.
+- [ ] Verify version-1 to version-2 upgrade, metadata persistence, and interrupted-write recovery on the device flash implementation.
 - [ ] Store named four-patch Instruments and macro state; preserve existing project slots and user data.
 - [ ] Map the physical preset encoder to Instrument selection.
 - [ ] Map physical controls 1–4 to the four patches.
