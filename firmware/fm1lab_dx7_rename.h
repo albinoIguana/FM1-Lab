@@ -29,6 +29,8 @@
 
 #define dx7_sin_log_table                fm1lab_dx7_sin_log_table
 #define dx7_sin_exp_table                fm1lab_dx7_sin_exp_table
+#define sim_fm_carriers                  fm1lab_sim_fm_carriers
+#define sim_fm_operator_depth            fm1lab_sim_fm_operator_depth
 #define dx7core_compute_64               fm1lab_dx7core_compute_64
 #define dx7note_init                     fm1lab_dx7note_init
 #define dx7note_compute_64               fm1lab_dx7note_compute_64
