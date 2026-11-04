@@ -3,7 +3,7 @@ diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
 +++ b/web/engine/Simulator.c
 @@ -462,5 +462,13 @@
  EXPORT("sim_midi") int sim_midi(unsigned bytes) { return sim_midi_from(FM1_MIDI_USB, bytes); }
-
+ 
 +/* FM1-Lab reads official M-VAVE DX7 factory voices through the same
 + * expanded 156-byte patch representation used by the device firmware. */
 +EXPORT("sim_fm_factory") int sim_fm_factory(unsigned program)
@@ -18,22 +18,19 @@ diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
 diff --git a/sdk/Simulator.js b/sdk/Simulator.js
 --- a/sdk/Simulator.js
 +++ b/sdk/Simulator.js
-@@ -56,4 +56,8 @@
-+          case 'fm-factory':
-+            result=c.sim_fm_factory(message.program);
-+            if(!result)data=new Uint8Array(c.memory.buffer,c.sim_file(),156).slice();
-+            break;
-           case 'factory':
-             result=c.sim_factory_project(message.index);
-             if(!result)data=new Uint8Array(c.memory.buffer,c.sim_file(),4264).slice();
-             break;
-@@ -205,1 +209,1 @@
+@@ -202,5 +202,5 @@
+   globalThis.FM1SimulatorCore=coreRuntime();
+   globalThis.FM1SimulatorAudioSource='('+audioThread.toString()+')('+coreRuntime.toString()+');';
+ 
 -  if (typeof document === 'undefined') return;
 +  if (typeof document === 'undefined' || globalThis.FM1_LAB_MODE) return;
+   const $ = id=>document.getElementById(id), sources=['DX7','303','808','PSG','PLUCK','SAMPLER'];
 diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
 --- a/web/synth/dx7core.c
 +++ b/web/synth/dx7core.c
-@@ -69,2 +69,16 @@
+@@ -67,5 +67,19 @@
+     { 0xc1, 0x14, 0x04, 0x04, 0x04, 0x04 }, // 31
+     { 0xc4, 0x04, 0x04, 0x04, 0x04, 0x04 }, // 32
  };
  
 +/* The low two bits select the destination bus. Bus zero is the final
@@ -50,3 +47,4 @@ diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
 +    return mask;
 +}
 +
+ FM1_DSP_CODE static void compute_fb4(int *output,t_dx7op_params *params,int gaincur, int gaindst,int *fb_buf, int feedback_shift)
