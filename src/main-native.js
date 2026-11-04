@@ -1,5 +1,5 @@
 import { MvaveEngine } from "./m-vave-engine.js";
-import { createPatch, createInstrument, normalizeInstrument } from "./instrument-model.js";
+import { createPatch, createInstrument, normalizeInstrument, patchAlgorithm } from "./instrument-model.js";
 import { InstrumentSession } from "./instrument-session.js";
 import { patchName, setPatchName, readOperator, writeOperator, readGlobal, writeGlobal } from "./dx7-voice.js";
 
