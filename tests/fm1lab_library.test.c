@@ -59,6 +59,7 @@ static void test_instrument_bank_mapping(void)
     for (unsigned p = 0; p < 4; ++p) {
         memset(source.patches[p].voice, (int)(40u + p), FM1LAB_PATCH_BYTES);
         source.patches[p].voice[134] = 3;
+        source.patches[p].voice[135] = 3;
         source.patches[p].macros[FM1LAB_BRIGHTNESS] = (uint8_t)(60u + p);
         source.patches[p].level = (uint8_t)(90u + p);
     }
