@@ -4,6 +4,8 @@
 #include <string.h>
 
 static unsigned roles[8], sources[8], lengths[8], tempo = 120, swing, enabled_mask = 0xffU, playing;
+static unsigned track_volumes[8], muted[8];
+static uint8_t imported_voices[8][FM1LAB_PATCH_BYTES];
 static struct groove_step steps[8][64];
 static unsigned settings[8][64][7];
 
@@ -12,6 +14,12 @@ unsigned groove_source_type(unsigned t) { return t < 8 ? sources[t] : GROOVE_SOU
 int groove_sequence_track_enable(unsigned t, unsigned on) { if (t >= 8) return -1; if (on) enabled_mask |= 1U << t; else enabled_mask &= ~(1U << t); return 0; }
 void groove_sequence_transport(uint8_t status) { playing = status == 0xfaU; }
 void groove_sequence_view(unsigned t, unsigned s, struct groove_view *v) { (void)t; (void)s; memset(v, 0, sizeof *v); v->playing = (uint8_t)playing; }
+int fm1lab_instrument_valid(const fm1lab_instrument_t *i) { return i && i->magic == FM1LAB_INSTRUMENT_MAGIC && i->version == FM1LAB_INSTRUMENT_VERSION; }
+int fm1lab_render_patch(const fm1lab_instrument_t *i, unsigned p, uint8_t out[FM1LAB_PATCH_BYTES]) { if (!fm1lab_instrument_valid(i) || p >= FM1LAB_PATCH_COUNT) return -1; memcpy(out, i->patches[p].voice, FM1LAB_PATCH_BYTES); return 0; }
+int groove_fm_import(unsigned t, const uint8_t voice[156]) { if (t >= 8) return -1; memcpy(imported_voices[t], voice, 156); return 0; }
+void groove_get_view(unsigned t, unsigned s, struct groove_view *v) { (void)s; memset(v, 0, sizeof *v); v->volume = (uint8_t)track_volumes[t]; v->muted = (uint8_t)muted[t]; }
+void groove_control_edit(unsigned t, int program, int volume, int cutoff) { (void)program; (void)cutoff; track_volumes[t] = (unsigned)((int)track_volumes[t] + volume); }
+void groove_mix_toggle(unsigned t, int solo) { (void)solo; muted[t] ^= 1U; }
 unsigned groove_tempo_saved(void) { return tempo; }
 void groove_tempo_edit(int delta) { tempo = (unsigned)((int)tempo + delta); }
 unsigned groove_sequence_setting(unsigned s) { return s == 0 ? swing : 0; }
@@ -46,6 +54,7 @@ int main(void)
     fm1lab_sequence_state_t state;
     assert(fm1lab_sequencer_read(&state) == 0);
     assert(state.lanes[0].backend_track == 2 && state.lanes[1].backend_track == 5);
+    assert(state.lanes[0].patch_index == 2 && state.lanes[1].patch_index == 1);
     assert(fm1lab_sequencer_transport(1) == 0 && playing == 1);
     assert(fm1lab_sequencer_read(&state) == 0 && state.playing == 1);
     assert(fm1lab_sequencer_transport(0) == 0 && playing == 0);
@@ -57,6 +66,23 @@ int main(void)
     assert(fm1lab_sequencer_set_swing(51) == -1 && swing == 35);
     assert(fm1lab_sequencer_set_length(0, 32) == 0 && lengths[2] == 32);
     assert(fm1lab_sequencer_set_length(1, 24) == -1 && lengths[5] == 64);
+
+    fm1lab_instrument_t instrument = {0};
+    instrument.magic = FM1LAB_INSTRUMENT_MAGIC;
+    instrument.version = FM1LAB_INSTRUMENT_VERSION;
+    instrument.patches[2].voice[0] = 0x5a;
+    instrument.patches[2].enabled = 0;
+    instrument.patches[2].level = 77;
+    instrument.patches[1].voice[0] = 0x2b;
+    instrument.patches[1].enabled = 1;
+    instrument.patches[1].level = 99;
+    track_volumes[2] = 40;
+    track_volumes[5] = 60;
+    muted[5] = 1;
+    assert(fm1lab_sequencer_set_patch(0, &instrument, 2) == 0);
+    assert(imported_voices[2][0] == 0x5a && track_volumes[2] == 77 && muted[2] == 1);
+    assert(fm1lab_sequencer_set_patch(1, &instrument, 1) == 0);
+    assert(imported_voices[5][0] == 0x2b && track_volumes[5] == 99 && muted[5] == 0);
 
     fm1lab_sequence_step_t step = {1, 69, 101, 12, 1, 1};
     assert(fm1lab_sequencer_set_step(0, 7, &step) == 0);
