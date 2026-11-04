@@ -5,6 +5,10 @@
 
 #include <string.h>
 
+/* Added to the upstream library by patch-m-vave-instrument-storage.mjs. */
+extern int groove_fm_library_instrument_write(unsigned bank, const uint8_t raw[4096],
+                                               const uint8_t metadata[FM1LAB_BANK_META_BYTES]);
+
 static unsigned bank_for(unsigned index) { return index / FM1LAB_INSTRUMENTS_PER_BANK; }
 static unsigned slot_for(unsigned index) { return index % FM1LAB_INSTRUMENTS_PER_BANK; }
 
