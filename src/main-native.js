@@ -17,7 +17,7 @@ const MACROS = [
   ["dirt","DIRT","Bounded feedback / spectral aggression"]
 ];
 let engine, session, library=[], instrument, instrumentIndex=0, selectedPatchIndex=0, selectedOperator=1;
-let sequence=createTwoTrackSequence(), selectedStep=0, sequenceAdvanced=false;
+let sequence=createTwoTrackSequence(), selectedStep=0, sequencePianoRoll=false, sequenceAdvanced=false;
 
 const patch=()=>instrument.patches[selectedPatchIndex];
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({version:1,instrumentIndex,library}));}catch(e){console.warn(e);}};
@@ -62,7 +62,7 @@ function loadSequence(){
   }catch(error){console.warn("Saved sequence could not be loaded",error);sequence=createTwoTrackSequence();}
 }
 function renderSequence(){
-  $("#sequencer-view").innerHTML=renderSequencer(sequence,selectedStep,sequenceAdvanced,instrument.patches.map(item=>item.name));
+  $("#sequencer-view").innerHTML=renderSequencer(sequence,selectedStep,sequencePianoRoll,sequenceAdvanced,instrument.patches.map(item=>item.name));
   $("#sequencer-view").querySelectorAll("[data-seq-tempo]").forEach(button=>button.onclick=()=>{sequence=setTempo(sequence,sequence.tempo+(+button.dataset.seqTempo));renderSequence();persistSequence();});
   $("#sequencer-view").querySelectorAll("[data-seq-patch]").forEach(select=>select.onchange=()=>{sequence=setTrackPatch(sequence,+select.dataset.seqPatch,+select.value);renderSequence();persistSequence();});
   $("#sequencer-view").querySelectorAll("[data-seq-select]").forEach(button=>button.onclick=()=>{
@@ -84,7 +84,16 @@ function renderSequence(){
   const keyShift=$("#sequencer-view [data-seq-key-shift]");
   keyShift.oninput=()=>{keyShift.previousElementSibling.querySelector("output").textContent=keyShift.value;};
   keyShift.onchange=()=>{sequence=setGlobalKeyShift(sequence,+keyShift.value);renderSequence();persistSequence();};
-  $("#sequencer-view [data-seq-advanced]").onclick=()=>{sequenceAdvanced=!sequenceAdvanced;renderSequence();};
+  const pianoToggle=$("#sequencer-view [data-seq-piano-roll]");
+  pianoToggle.onclick=()=>{sequencePianoRoll=!sequencePianoRoll;sequenceAdvanced=false;renderSequence();};
+  const advancedToggle=$("#sequencer-view [data-seq-advanced]");
+  if(advancedToggle)advancedToggle.onclick=()=>{sequenceAdvanced=!sequenceAdvanced;renderSequence();};
+  $("#sequencer-view").querySelectorAll("[data-seq-piano-step]").forEach(button=>button.onclick=()=>{
+    const step=+button.dataset.seqPianoStep,note=+button.dataset.seqPianoNote;
+    const current=sequence.tracks[sequence.selectedTrack].steps[step];
+    sequence=setStep(sequence,sequence.selectedTrack,step,{note,active:current.active&&current.note===note?false:true});
+    selectedStep=step;renderSequence();persistSequence();
+  });
   $("#sequencer-view").querySelectorAll("[data-seq-note]").forEach(button=>button.onclick=()=>{
     sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{note:+button.dataset.seqNote});renderSequence();persistSequence();
   });
