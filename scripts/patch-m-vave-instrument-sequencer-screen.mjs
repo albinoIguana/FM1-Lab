@@ -84,8 +84,6 @@ static void fm1lab_seq_draw(void)
         text(88, y + 55, "SWING", 1, DIM, PANEL);
         number(132, y + 55, fm1lab_seq_state.swing, 2, 1, TEXT, PANEL);
     }
-    text(8, 210, "STEPS", 1, DIM, BACK);
-    number(45, 210, (int)(fm1lab_seq_cursor / 16U) * 16, 2, 1, TEXT, BACK);
     text(8, 210, "PAGE", 1, DIM, BACK);
     number(45, 210, (int)(fm1lab_seq_cursor / 16U) + 1, 1, 1, TEXT, BACK);
     text(88, 210, "SELECT STEP  PRESETS LANE", 1, DIM, BACK);
