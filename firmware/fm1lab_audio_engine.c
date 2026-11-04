@@ -4,7 +4,10 @@
 #include <string.h>
 #include "fm1.h"
 
-static inline void audio_barrier(void) { __asm__ volatile("" ::: "memory"); }
+static inline __attribute__((always_inline)) void audio_barrier(void)
+{
+    __asm__ volatile("" ::: "memory");
+}
 
 enum {
     CMD_NOTE_ON = 1,
