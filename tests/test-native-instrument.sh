@@ -48,3 +48,6 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/tests/fm1lab_voice_editor.test.c" -o "$SEQUENCER_BIN"
 "$SEQUENCER_BIN"
 echo "FM1-Lab native voice editor tests passed."
+
+# Exercise the actual six-operator M-VAVE DSP core through the four-layer mixer.
+bash "$ROOT/tests/test-audio-engine.sh"
