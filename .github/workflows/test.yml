@@ -25,10 +25,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Apply the M-VAVE integration patch
+      - name: Apply idempotent M-VAVE simulator integration
         run: |
-          git -C vendor/m-vave-fm1 apply --check ../../patches/m-vave-instrument-api.patch
-          git -C vendor/m-vave-fm1 apply ../../patches/m-vave-instrument-api.patch
+          node scripts/patch-m-vave-simulator-api.mjs
       - name: Check application modules
         run: |
           node --check src/main-native.js
