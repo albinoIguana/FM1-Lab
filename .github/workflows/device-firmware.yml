@@ -38,10 +38,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-2.5.3.exe'
           $extract = Join-Path $env:RUNNER_TEMP 'jieli-toolchain-extracted'
-          $target = 'C:\\JL\\pi32'
-          $clang = Join-Path $target 'bin\\clang.exe'
+          $target = 'C:\JL\pi32'
+          $clang = Join-Path $target 'bin\clang.exe'
 
-          # The SDK build consumes the compiler and libraries from C:\\JL\\pi32.
+          # The SDK build consumes the compiler and libraries from C:\JL\pi32.
           # Code::Blocks is only an IDE prerequisite in JieLi's interactive
           # installer; it is not used by the SDK's Build.ps1 command-line build.
           # Extract the signed 2.5.3 Inno Setup payload directly so CI does not
@@ -55,13 +55,13 @@ jobs:
           Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
 
           $sevenZip = @(
-            (Join-Path $env:ProgramFiles '7-Zip\\7z.exe'),
-            (Join-Path ${env:ProgramFiles(x86)} '7-Zip\\7z.exe')
+            (Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')
           ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
           if (!$sevenZip) {
             choco install 7zip.install --yes --no-progress
             if ($LASTEXITCODE -ne 0) { throw 'Could not install 7-Zip to extract the JieLi toolchain payload.' }
-            $sevenZip = Join-Path $env:ProgramFiles '7-Zip\\7z.exe'
+            $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
           }
           if (!(Test-Path -LiteralPath $sevenZip)) { throw '7-Zip executable was not found.' }
 
@@ -73,7 +73,7 @@ jobs:
           }
 
           $compiler = Get-ChildItem -LiteralPath $extract -Filter 'clang.exe' -File -Recurse |
-            Where-Object { $_.FullName -match '[\\/]pi32[\\/]bin[\\/]clang\\.exe$' } |
+            Where-Object { $_.FullName -match '[\/]pi32[\/]bin[\/]clang\.exe$' } |
             Select-Object -First 1
           if (!$compiler) {
             Write-Host 'Extracted installer contents:'
@@ -82,7 +82,7 @@ jobs:
           }
 
           $pi32Root = Split-Path -Parent (Split-Path -Parent $compiler.FullName)
-          New-Item -ItemType Directory -Path 'C:\\JL' -Force | Out-Null
+          New-Item -ItemType Directory -Path 'C:\JL' -Force | Out-Null
           Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
           Copy-Item -LiteralPath $pi32Root -Destination $target -Recurse -Force
           if (!(Test-Path -LiteralPath $clang)) { throw "Extracted toolchain did not produce $clang" }
