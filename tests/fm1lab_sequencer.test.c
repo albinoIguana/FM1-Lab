@@ -54,7 +54,6 @@ int main(void)
     fm1lab_sequence_state_t state;
     assert(fm1lab_sequencer_read(&state) == 0);
     assert(state.lanes[0].backend_track == 2 && state.lanes[1].backend_track == 5);
-    assert(state.lanes[0].patch_index == 2 && state.lanes[1].patch_index == 1);
     assert(fm1lab_sequencer_transport(1) == 0 && playing == 1);
     assert(fm1lab_sequencer_read(&state) == 0 && state.playing == 1);
     assert(fm1lab_sequencer_transport(0) == 0 && playing == 0);
@@ -83,6 +82,8 @@ int main(void)
     assert(imported_voices[2][0] == 0x5a && track_volumes[2] == 77 && muted[2] == 1);
     assert(fm1lab_sequencer_set_patch(1, &instrument, 1) == 0);
     assert(imported_voices[5][0] == 0x2b && track_volumes[5] == 99 && muted[5] == 0);
+    assert(fm1lab_sequencer_read(&state) == 0);
+    assert(state.lanes[0].patch_index == 2 && state.lanes[1].patch_index == 1);
 
     fm1lab_sequence_step_t step = {1, 69, 101, 12, 1, 1};
     assert(fm1lab_sequencer_set_step(0, 7, &step) == 0);
