@@ -32,10 +32,12 @@ jobs:
       - name: Check application modules
         run: |
           node --check src/main-native.js
+          node --check src/instrument-session.js
           node --check src/m-vave-engine.js
           node --check src/dx7-macros.js
           node --check src/dx7-voice.js
           node --check src/instrument-model.js
+          node --test tests/instrument-session.test.js
       - name: Test Instrument and macro behavior
         run: npm test
       - name: Build official M-VAVE browser simulator
