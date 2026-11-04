@@ -27,6 +27,8 @@
 #define synth_dx7_active                 fm1lab_synth_dx7_active
 #define fm1_dx7_panic                    fm1lab_synth_dx7_panic
 
+#define dx7_sin_log_table                fm1lab_dx7_sin_log_table
+#define dx7_sin_exp_table                fm1lab_dx7_sin_exp_table
 #define dx7core_compute_64               fm1lab_dx7core_compute_64
 #define dx7note_init                     fm1lab_dx7note_init
 #define dx7note_compute_64               fm1lab_dx7note_compute_64
