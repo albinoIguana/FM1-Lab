@@ -161,5 +161,67 @@ new file mode 100644
 index 0000000..0000000
 --- /dev/null
 +++ b/firmware/src/instrument.c
-@@ -0,0 +1,1 @@
-+/* FM1 Instrument implementation follows. */
+@@ -0,0 +1,63 @@
++/* SPDX-License-Identifier: GPL-3.0-only
++ * Copyright (C) 2026 OpenAI FM1-Lab contributors
++ */
++/* FM1 factory Instruments: four native FM6 voices, kept as one selection.
++ * EN_PRESET changes the Instrument on HOME; KNOB 1..4 select its four parts. */
++#define FM1_INSTRUMENT_COUNT 2u
++#define FM1_INSTRUMENT_PREF (favorites.factory[14][0])
++
++static uint32_t instrument_slot(void)
++{
++    return FM1_INSTRUMENT_PREF % FM1_INSTRUMENT_COUNT;
++}
++
++static void instrument_name(char *b)
++{
++    str_cpy(b, "INSTRUMENT ", 20);
++    fmt_int(b + 11, (int32_t)instrument_slot() + 1);
++}
++
++static void instrument_load(uint32_t slot)
++{
++    uint8_t voice[FP_SIZE + 1u];
++    uint32_t tr, i;
++    slot %= FM1_INSTRUMENT_COUNT;
++    for (tr = 0; tr < NTRK; tr++) {
++        track_t *t = &trk[tr];
++        load_begin(t, UNDO_SOUND);
++        panic_req |= (uint8_t)(1u << tr);
++        fm1_irq_off();
++        t->eng_req = ENGI_FM6;
++        for (i = 0; i < P_COUNT; i++)
++            if (!param_kept(i))
++                t->p[i] = param_desc_of(ENGI_FM6, i)->def;
++        t->preset = 0;
++        t->user = 0;
++        fm1_irq_on();
++        fm6_unpack(FM6_FACTORY[slot * 4u + tr], voice);
++        fm6_set_patch(tr, voice);
++        fm6_adopt(tr);
++        load_end(t);
++    }
++    song.sel = 0;
++    sync_reload = 1;
++    ui.force = 1;
++}
++
++static void instrument_turn(int32_t s)
++{
++    uint32_t slot = instrument_slot();
++    uint32_t n = (uint32_t)(s > 0 ? s : -s);
++    if (!n)
++        return;
++    while (n--)
++        slot = s > 0 ? (slot + 1u) % FM1_INSTRUMENT_COUNT :
++                       (slot + FM1_INSTRUMENT_COUNT - 1u) % FM1_INSTRUMENT_COUNT;
++    FM1_INSTRUMENT_PREF = (uint8_t)slot;
++    instrument_load(slot);
++    {
++        char b[4];
++        fmt_int(b, (int32_t)slot + 1);
++        ui_say("INSTRUMENT ", b);
++    }
++}
