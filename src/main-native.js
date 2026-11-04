@@ -92,9 +92,9 @@ function renderSequence(){
     sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{note:+button.dataset.seqNote});renderSequence();persistSequence();
   });
   const velocity=$("#sequencer-view [data-seq-velocity]");
-  if(velocity){velocity.oninput=()=>{velocity.previousElementSibling.querySelector("output").textContent=velocity.value;};velocity.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{velocity:+velocity.value});renderSequence();persistSequence();};}
+  if(velocity){velocity.oninput=()=>{velocity.previousElementSibling.textContent=velocity.value;};velocity.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{velocity:+velocity.value});renderSequence();persistSequence();};}
   const gate=$("#sequencer-view [data-seq-gate]");
-  if(gate){gate.oninput=()=>{gate.previousElementSibling.querySelector("output").textContent=gate.value;};gate.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{gate:+gate.value});renderSequence();persistSequence();};}
+  if(gate){gate.oninput=()=>{const raw=+gate.value;gate.previousElementSibling.textContent=(raw===0?50:raw===15?100:Math.round(raw*100/16))+"%";};gate.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{gate:+gate.value});renderSequence();persistSequence();};}
   const tie=$("#sequencer-view [data-seq-tie]");
   if(tie)tie.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{tie:tie.checked});persistSequence();};
   const alt=$("#sequencer-view [data-seq-alt]");
