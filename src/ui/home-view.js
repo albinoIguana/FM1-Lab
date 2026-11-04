@@ -6,7 +6,7 @@ function escapeHtml(value) {
     "<": "&lt;",
     ">": "&gt;",
     '"' : "&quot;",
-    "\'": "&#39;"
+    "'": "&#39;"
   })[character]);
 }
 
