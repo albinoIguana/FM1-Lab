@@ -33,7 +33,7 @@ diff --git a/sdk/Simulator.js b/sdk/Simulator.js
 diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
 --- a/web/synth/dx7core.c
 +++ b/web/synth/dx7core.c
-@@ -69,3 +69,13 @@
+@@ -69,3 +69,17 @@
  };
  
 +/* The low two bits select the destination bus. Bus zero is the final
