@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  createTwoTrackSequence, normalizeSequence, setTempo, setTrackPatch, setTrackLength, setTrackDivision,
-  setTrackSwing, setStep, selectSequenceTrack, setGlobalKeyShift, DIVISIONS
+  createTwoTrackSequence, normalizeSequence, setTempo, setGlobalSwing, setTrackPatch,
+  setTrackLength, setStep, selectSequenceTrack, SEQUENCE_LENGTHS
 } from "../src/sequencer-model.js";
 
 test("sequencer contract is exactly two independent 64-step tracks", () => {
@@ -13,44 +13,35 @@ test("sequencer contract is exactly two independent 64-step tracks", () => {
   assert.notEqual(sequence.tracks[0].steps, sequence.tracks[1].steps);
 });
 
-test("tempo and track patch assignment are bounded and independent", () => {
+test("tempo, global swing and patch assignment match native bounds", () => {
   const sequence = createTwoTrackSequence();
   assert.equal(setTempo(sequence, 400).tempo, 300);
+  assert.equal(setTempo(sequence, 2).tempo, 30);
+  assert.equal(setGlobalSwing(sequence, 80).swing, 50);
   assert.equal(setTrackPatch(sequence, 1, 3).tracks[1].patchIndex, 3);
   assert.equal(sequence.tracks[0].patchIndex, 0);
 });
 
-test("track length clamps to 8–64 without resizing the fixed timeline", () => {
+test("track lengths use native 16-step increments without resizing the timeline", () => {
   const sequence = createTwoTrackSequence();
-  const next = setTrackLength(sequence, 0, 100);
-  assert.equal(next.tracks[0].length, 64);
-  assert.equal(next.tracks[0].steps.length, 64);
-  assert.equal(next.tracks[1].length, 16);
-  assert.equal(setTrackLength(sequence, 1, 2).tracks[1].length, 8);
+  assert.deepEqual(SEQUENCE_LENGTHS, [16, 32, 48, 64]);
+  assert.equal(setTrackLength(sequence, 0, 63).tracks[0].length, 64);
+  assert.equal(setTrackLength(sequence, 0, 40).tracks[0].length, 32);
+  assert.equal(setTrackLength(sequence, 1, 8).tracks[1].length, 16);
+  assert.equal(sequence.tracks[1].length, 16);
 });
 
-test("division options include straight and triplet timing", () => {
-  assert.deepEqual(DIVISIONS.map(item => item.label), ["1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/32T"]);
-  assert.equal(setTrackDivision(createTwoTrackSequence(), 0, 6).tracks[0].division, 6);
-});
-
-test("swing and global key shift are bounded and independent of per-track settings", () => {
-  const sequence = setTrackSwing(createTwoTrackSequence(), 1, 90);
-  assert.equal(sequence.tracks[1].swing, 75);
-  assert.equal(sequence.tracks[0].swing, 0);
-  assert.equal(setGlobalKeyShift(sequence, -99).keyShift, -24);
-});
-
-test("step edits preserve velocity, note, gate, tie and slide as independent properties", () => {
+test("step values use the native note, velocity, gate, tie and alternate-tuning fields", () => {
   const sequence = setStep(createTwoTrackSequence(), 0, 7, {
-    active: true, note: 72, velocity: 91, gate: 110, tie: true, slide: true
+    active: true, note: 72, velocity: 91, gate: 15, tie: true, alt: true
   });
   const step = sequence.tracks[0].steps[7];
   assert.deepEqual(
-    {active:step.active,note:step.note,velocity:step.velocity,gate:step.gate,tie:step.tie,slide:step.slide},
-    {active:true,note:72,velocity:91,gate:110,tie:true,slide:true}
+    {active:step.active,note:step.note,velocity:step.velocity,gate:step.gate,tie:step.tie,alt:step.alt},
+    {active:true,note:72,velocity:91,gate:15,tie:true,alt:true}
   );
   assert.equal(sequence.tracks[1].steps[7].active, false);
+  assert.equal(setStep(sequence, 0, 7, {gate:99}).tracks[0].steps[7].gate, 15);
 });
 
 test("selected track is a two-value state and normalization rejects other track counts", () => {
