@@ -28,7 +28,7 @@ if (!source.includes("static unsigned fm1lab_patch_operator")) {
 }
 
 if (!source.includes("static void fm1lab_patch_draw(void)")) {
-  const helpers = String.raw\`
+  const helpers = String.raw`
 static uint8_t *fm1lab_patch_voice(void)
 {
     if (!fm1lab_home_runtime.loaded ||
@@ -155,7 +155,7 @@ static void fm1lab_patch_draw(void)
     }
     text(8, 231, "SELECT OP   PRESETS PATCH   SCL SECTION   SAVE STORE", 1, DIM, BACK);
 }
-\`;
+`;
   replaceOnce("static void draw_page_body(const struct fm1_ble_status *ble)\n{",
     helpers + "\nstatic void draw_page_body(const struct fm1_ble_status *ble)\n{",
     "native patch editor draw helpers");
@@ -168,7 +168,7 @@ if (!source.includes("if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return
 }
 
 if (!source.includes("FM1-LAB native patch editor controls")) {
-  const controls = String.raw\`
+  const controls = String.raw`
     /* All edits target the selected Instrument patch, never project tracks. */
     if (page == FM1LAB_HOME && (pressed & (BUTTON(EDIT) | BUTTON(SCL)))) {
         if (fm1lab_home_runtime.loaded) {
@@ -243,7 +243,7 @@ if (!source.includes("FM1-LAB native patch editor controls")) {
         }
         if (encoder_active(controls->encoders)) goto controls_done;
     }
-\`;
+`;
   replaceOnce("    if ((controls->buttons & (BUTTON(SEQ) | BUTTON(EDIT))) == (BUTTON(SEQ) | BUTTON(EDIT)) &&",
     "    /* FM1-LAB native patch editor controls */\n" + controls +
     "\n    if ((controls->buttons & (BUTTON(SEQ) | BUTTON(EDIT))) == (BUTTON(SEQ) | BUTTON(EDIT)) &&",
