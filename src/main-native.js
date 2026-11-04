@@ -147,9 +147,9 @@ function renderEditor(){
 }
 async function openPatch(i){
   selectedPatchIndex=i;selectedOperator=1;await session.selectPatch(i);
-  $("#home-screen").hidden=true;$("#editor-screen").hidden=false;renderEditor();
+  $("#home-screen").hidden=true;$("#sequencer-screen").hidden=true;$("#editor-screen").hidden=false;renderEditor();
 }
-function showHome(){$("#editor-screen").hidden=true;$("#home-screen").hidden=false;renderHome();}
+function showHome(){$("#editor-screen").hidden=true;$("#sequencer-screen").hidden=true;$("#home-screen").hidden=false;renderHome();}
 async function changeInstrument(i){
   instrumentIndex=(i+library.length)%library.length;instrument=library[instrumentIndex];
   selectedPatchIndex=0;await loadInstrument();renderHome();persist();
