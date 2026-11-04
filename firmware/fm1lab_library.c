@@ -6,6 +6,7 @@
 #include <string.h>
 
 /* Added to the upstream library by patch-m-vave-instrument-storage.mjs. */
+extern int groove_fm_library_metadata_read(unsigned bank, uint8_t metadata[FM1LAB_BANK_META_BYTES]);
 extern int groove_fm_library_instrument_write(unsigned bank, const uint8_t raw[4096],
                                                const uint8_t metadata[FM1LAB_BANK_META_BYTES]);
 
