@@ -2,6 +2,7 @@
 #define FM1LAB_SEQUENCER_H
 
 #include <stdint.h>
+#include "fm1lab_instrument.h"
 
 enum { FM1LAB_SEQUENCE_LANES = 2, FM1LAB_SEQUENCE_STEPS = 64 };
 
@@ -17,6 +18,7 @@ typedef struct {
 typedef struct {
     uint8_t backend_track; /* Explicit underlying M-VAVE project track, 0..7. */
     uint8_t length;        /* Native 16, 32, 48 or 64-step loop. */
+    uint8_t patch_index;   /* One of the Instrument's four FM patches. */
     fm1lab_sequence_step_t steps[FM1LAB_SEQUENCE_STEPS];
 } fm1lab_sequence_lane_t;
 
@@ -36,6 +38,7 @@ int fm1lab_sequencer_read(fm1lab_sequence_state_t *state);
 int fm1lab_sequencer_set_tempo(int bpm);
 int fm1lab_sequencer_set_swing(unsigned swing);
 int fm1lab_sequencer_set_length(unsigned lane, unsigned steps);
+int fm1lab_sequencer_set_patch(unsigned lane, const fm1lab_instrument_t *instrument, unsigned patch);
 int fm1lab_sequencer_set_step(unsigned lane, unsigned step,
                               const fm1lab_sequence_step_t *value);
 int fm1lab_sequencer_select_lane(unsigned lane);
