@@ -125,7 +125,7 @@ int fm1lab_audio_engine_init(
         engine->enabled[p] = enabled[p];
         engine->level[p] = levels[p];
         engine->synth[p] = synth_dx7_create(max_voices, sample_rate,
-                                             SYNTH_DX7_BLOCK_SAMPLES);
+                                             FM1_BLOCK_FRAMES);
         if (!engine->synth[p] ||
             synth_dx7_lfo_reset(engine->synth[p], engine->voice[p]) != 0)
             goto fail;
