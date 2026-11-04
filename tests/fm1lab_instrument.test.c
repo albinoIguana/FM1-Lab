@@ -48,7 +48,9 @@ static void test_non_destructive_macro_render(void)
     voice[135] = 2;
     voice[105 + 16] = 40; /* OP1 carrier output. */
     voice[84 + 16] = 40;  /* OP2 modulator output. */
-    voice[105 + 6] = 50;  /* OP1 envelope level 3. */
+    voice[105 + 6] = 50;  /* OP1 carrier envelope level 3. */
+    voice[84 + 6] = 40;   /* OP2 modulator envelope level 3. */
+    voice[84 + 7] = 60;   /* OP2 modulator envelope level 4. */
     voice[137] = 40;
     voice[140] = 20;
     assert(fm1lab_patch_set_voice(&instrument, 0, voice) == 0);
@@ -56,7 +58,7 @@ static void test_non_destructive_macro_render(void)
     instrument.patches[0].macros[FM1LAB_BRIGHTNESS] = 100;
     instrument.patches[0].macros[FM1LAB_BODY] = 100;
     instrument.patches[0].macros[FM1LAB_MOTION] = 100;
-    instrument.patches[0].macros[FM1LAB_EDGE] = 100;
+    instrument.patches[0].macros[FM1LAB_DIRT] = 100;
     assert(fm1lab_render_patch(&instrument, 0, rendered) == 0);
     assert(rendered[105 + 16] > voice[105 + 16]);
     assert(rendered[84 + 16] > voice[84 + 16]);
@@ -72,9 +74,9 @@ static void test_validation_rejects_bad_state(void)
 {
     fm1lab_instrument_t instrument;
     fm1lab_instrument_init(&instrument, "VALIDATE");
-    instrument.patches[2].macros[FM1LAB_EDGE] = 101;
+    instrument.patches[2].macros[FM1LAB_DIRT] = 101;
     assert(!fm1lab_instrument_valid(&instrument));
-    instrument.patches[2].macros[FM1LAB_EDGE] = 50;
+    instrument.patches[2].macros[FM1LAB_DIRT] = 50;
     instrument.patches[2].enabled = 2;
     assert(!fm1lab_instrument_valid(&instrument));
     instrument.patches[2].enabled = 1;
