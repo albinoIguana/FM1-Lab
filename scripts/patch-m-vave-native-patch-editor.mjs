@@ -119,6 +119,9 @@ static void fm1lab_patch_draw(void)
         }
         text(8, 218, "ENV TOGGLES RATE / LEVEL VIEW", 1, DIM, BACK);
     } else if (fm1lab_patch_bank == 1) {
+        uint8_t mode = 0;
+        (void)fm1lab_voice_operator_get(voice, fm1lab_patch_operator, FM1LAB_OP_MODE, &mode);
+        text(8, 145, mode ? "FIXED FREQUENCY" : "RATIO MODE", 1, DIM, BACK);
         static const fm1lab_operator_field_t fields[4] = {
             FM1LAB_OP_OUTPUT, FM1LAB_OP_COARSE, FM1LAB_OP_FINE, FM1LAB_OP_DETUNE
         };
@@ -193,6 +196,16 @@ if (!source.includes("FM1-LAB native patch editor controls")) {
         }
         if (pressed & BUTTON(ENV)) {
             fm1lab_patch_env_levels ^= 1U;
+            goto controls_done;
+        }
+        if ((pressed & BUTTON(LFO)) && fm1lab_patch_bank == 1) {
+            uint8_t *voice = fm1lab_patch_voice();
+            uint8_t mode = 0;
+            if (voice && !fm1lab_voice_operator_get(voice, fm1lab_patch_operator,
+                    FM1LAB_OP_MODE, &mode) &&
+                !fm1lab_voice_operator_set(voice, fm1lab_patch_operator,
+                    FM1LAB_OP_MODE, mode ? 0U : 1U))
+                fm1lab_home_runtime.dirty = 1;
             goto controls_done;
         }
         if (pressed & BUTTON(SAVE)) {
