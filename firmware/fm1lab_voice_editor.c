@@ -118,11 +118,12 @@ int fm1lab_voice_name_get(const uint8_t voice[FM1LAB_PATCH_BYTES], char name[11]
 int fm1lab_voice_name_set(uint8_t voice[FM1LAB_PATCH_BYTES], const char *name)
 {
     if (!voice || !name) return -1;
-    memset(voice + VOICE_NAME_OFFSET, ' ', VOICE_NAME_BYTES);
     for (unsigned i = 0; i < VOICE_NAME_BYTES && name[i]; ++i) {
         unsigned char ch = (unsigned char)name[i];
         if (ch < 32 || ch > 126) return -1;
-        voice[VOICE_NAME_OFFSET + i] = (uint8_t)toupper(ch);
     }
+    memset(voice + VOICE_NAME_OFFSET, ' ', VOICE_NAME_BYTES);
+    for (unsigned i = 0; i < VOICE_NAME_BYTES && name[i]; ++i)
+        voice[VOICE_NAME_OFFSET + i] = (uint8_t)toupper((unsigned char)name[i]);
     return 0;
 }
