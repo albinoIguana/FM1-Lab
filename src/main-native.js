@@ -1,5 +1,6 @@
 import { MvaveEngine } from "./m-vave-engine.js";
-import { createPatch, createInstrument, normalizeInstrument, renderPatch, patchAlgorithm } from "./instrument-model.js";
+import { createPatch, createInstrument, normalizeInstrument } from "./instrument-model.js";
+import { InstrumentSession } from "./instrument-session.js";
 import { patchName, setPatchName, readOperator, writeOperator, readGlobal, writeGlobal } from "./dx7-voice.js";
 
 const $ = s => document.querySelector(s);
@@ -11,20 +12,20 @@ const MACROS = [
   ["motion","MOTION","Modulator envelope movement"],
   ["dirt","DIRT","Bounded feedback / spectral aggression"]
 ];
-let engine, library=[], instrument, instrumentIndex=0, selectedPatchIndex=0, selectedOperator=1, writeQueue=Promise.resolve();
+let engine, session, library=[], instrument, instrumentIndex=0, selectedPatchIndex=0, selectedOperator=1;
 
 const patch=()=>instrument.patches[selectedPatchIndex];
-const carrierMask=()=>engine.carrierMask(patchAlgorithm(patch()));
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({version:1,instrumentIndex,library}));}catch(e){console.warn(e);}};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function writeCurrent(){
   persist();
-  writeQueue=writeQueue.then(()=>engine.writePatch(selectedPatchIndex,renderPatch(patch(),carrierMask(),Array.from({length:6},(_,i)=>engine.operatorDepth(patchAlgorithm(patch()),i+1)))))
-    .catch(e=>{$("#engine-status").textContent="PATCH WRITE ERROR";console.error(e);});
-  return writeQueue;
+  return session.writePatch(selectedPatchIndex,patch()).catch(e=>{
+    $("#engine-status").textContent="PATCH WRITE ERROR";
+    console.error(e);
+  });
 }
 async function factoryLibrary(){
-  const voices=await Promise.all(Array.from({length:8},(_,i)=>engine.factoryPatch(i)));
+  const voices=await session.factoryVoices(8);
   return BANKS.map(bank=>createInstrument(bank.name,bank.programs.map(i=>createPatch(patchName(voices[i]),voices[i]))));
 }
 async function loadLibrary(){
@@ -39,10 +40,7 @@ async function loadLibrary(){
   instrument=library[instrumentIndex];persist();
 }
 async function loadInstrument(){
-  for(let i=0;i<4;i++){
-    const p=instrument.patches[i];
-    await engine.writePatch(i,renderPatch(p,engine.carrierMask(patchAlgorithm(p)),Array.from({length:6},(_,i)=>engine.operatorDepth(patchAlgorithm(p),i+1))));
-  }
+  await session.loadInstrument(instrument);
 }
 function renderHome(){
   $("#instrument-index").textContent=String(instrumentIndex+1).padStart(2,"0")+" / "+String(library.length).padStart(2,"0");
@@ -98,7 +96,7 @@ function renderEditor(){
   renderMacros();renderOperator();
 }
 async function openPatch(i){
-  selectedPatchIndex=i;selectedOperator=1;await engine.selectTrack(i);
+  selectedPatchIndex=i;selectedOperator=1;await session.selectPatch(i);
   $("#home-screen").hidden=true;$("#editor-screen").hidden=false;renderEditor();
 }
 function showHome(){$("#editor-screen").hidden=true;$("#home-screen").hidden=false;renderHome();}
@@ -113,6 +111,7 @@ async function playNote(){
 }
 async function initialize(){
   engine=new MvaveEngine({onState:s=>{$("#engine-status").textContent=s;$("#boot-status").textContent=s;}});
+  session=new InstrumentSession(engine,{onError:error=>console.error("Instrument session:",error)});
   await engine.ready();await loadLibrary();await loadInstrument();
   $("#boot").hidden=true;$("#app").hidden=false;renderHome();
 }
