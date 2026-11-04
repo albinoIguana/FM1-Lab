@@ -24,7 +24,8 @@ if (!source.includes("FM1LAB_HOME")) {
 }
 if (!source.includes("static fm1lab_runtime_t fm1lab_home_runtime")) {
   replaceOnce("static uint8_t frame_patch[156];",
-    "static uint8_t frame_patch[156];\nstatic fm1lab_runtime_t fm1lab_home_runtime;\nstatic int fm1lab_home_status;",
+    "static uint8_t frame_patch[156];\nstatic fm1lab_runtime_t fm1lab_home_runtime;\nstatic int fm1lab_home_status;
+static uint32_t fm1lab_home_signature;",
     "runtime state");
 }
 
@@ -32,6 +33,15 @@ if (!source.includes("static void fm1lab_home_draw(void)")) {
   const draw = String.raw\`
 static void fm1lab_home_draw(void)
 {
+    if (!paint_rendering) {
+        uint32_t state[3] = {fm1lab_home_runtime.instrument_index,
+            fm1lab_home_runtime.selected_patch, fm1lab_home_runtime.dirty};
+        uint32_t sig = signature(2166136261U, &fm1lab_home_runtime.instrument,
+                                 sizeof fm1lab_home_runtime.instrument);
+        sig = signature(sig, state, sizeof state);
+        if (sig == fm1lab_home_signature) return;
+        fm1lab_home_signature = sig;
+    }
     paint_fill(0, 0, FM1_SCREEN_WIDTH, FM1_SCREEN_HEIGHT, BACK);
     paint_fill(0, 29, FM1_SCREEN_WIDTH, 1, PANEL);
     if (!fm1lab_home_runtime.loaded) {
@@ -104,6 +114,11 @@ if (!source.includes("fm1lab_runtime_load(&fm1lab_home_runtime, 0)")) {
 
 if (!source.includes("FM1LAB_HOME && !(pressed")) {
   const controls = String.raw\`
+    if (page == FM1LAB_HOME && (pressed & (BUTTON(EDIT) | BUTTON(SCL)))) {
+        notice = "PATCH EDITOR NEXT - SAFE BANK MODE";
+        notice_until = now + 1800U;
+        goto controls_done;
+    }
     if (page == FM1LAB_HOME && !(pressed & (BUTTON(HOME) | BUTTON(SEQ) | BUTTON(FX) |
         BUTTON(SCL) | BUTTON(EDIT) | BUTTON(ENV) | BUTTON(LFO) | BUTTON(PLAY)))) {
         if (pressed & BUTTON(SAVE)) {
