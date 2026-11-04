@@ -15,9 +15,12 @@ static uint8_t live_voice[FM1LAB_AUDIO_PATCHES][FM1LAB_PATCH_BYTES];
 static volatile uint32_t audio_ready;
 static volatile uint32_t keyboard_mode;
 
-static inline void audio_barrier(void) { __asm__ volatile("" ::: "memory"); }
+static inline __attribute__((always_inline)) void audio_barrier(void)
+{
+    __asm__ volatile("" ::: "memory");
+}
 
-static inline int32_t add_sat32(int32_t a, int32_t b)
+static inline __attribute__((always_inline)) int32_t add_sat32(int32_t a, int32_t b)
 {
     if (b > 0 && a > INT32_MAX - b) return INT32_MAX;
     if (b < 0 && a < INT32_MIN - b) return INT32_MIN;
@@ -116,6 +119,9 @@ int fm1lab_audio_route_midi(const uint8_t *message, size_t bytes)
     return fm1lab_audio_engine_midi(&audio_engine, message, bytes, 0x0fu) == 0 ? 1 : -1;
 }
 
+/* DMA callback contract: stereo is interleaved Q23. This runs after the
+ * stock synth render and before fm1_output_mix applies master gain, USB/BT
+ * inputs and final 24-bit clipping. Keep this call chain allocation/Flash-free. */
 FM1_AUDIO_CODE void fm1lab_audio_mix(int32_t *stereo_q23)
 {
     if (!fm1lab_audio_is_ready() || !stereo_q23) return;
@@ -126,7 +132,7 @@ FM1_AUDIO_CODE void fm1lab_audio_mix(int32_t *stereo_q23)
         return;
 
     for (unsigned frame = 0; frame < FM1_BLOCK_FRAMES; ++frame) {
-        int32_t sample = mono_q24[frame] >> 1; /* Q24 FM voice to Q23 device mix */
+        int32_t sample = mono_q24[frame] >> 1;
         stereo_q23[frame * 2u] = add_sat32(stereo_q23[frame * 2u], sample);
         stereo_q23[frame * 2u + 1u] =
             add_sat32(stereo_q23[frame * 2u + 1u], sample);
