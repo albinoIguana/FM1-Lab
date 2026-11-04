@@ -28,6 +28,7 @@ jobs:
       - name: Apply idempotent M-VAVE simulator integration
         run: |
           node scripts/patch-m-vave-simulator-api.mjs
+          node scripts/patch-m-vave-two-track-sequencer.mjs
       - name: Check application modules
         run: |
           node --check src/main-native.js
