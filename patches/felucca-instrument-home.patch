@@ -229,7 +229,7 @@ index 0000000..0000000
 diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
 --- a/platforms/host/felucca_host.c
 +++ b/platforms/host/felucca_host.c
-@@ -? +? @@
+@@ -213,3 +213,4 @@
  #include "../../firmware/src/storage.c"
  #include "../../firmware/src/upreset.c"
 +#include "../../firmware/src/instrument.c"
