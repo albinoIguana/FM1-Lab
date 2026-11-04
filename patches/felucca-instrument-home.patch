@@ -225,3 +225,12 @@ index 0000000..0000000
 +        ui_say("INSTRUMENT ", b);
 +    }
 +}
+
+diff --git a/platforms/host/felucca_host.c b/platforms/host/felucca_host.c
+--- a/platforms/host/felucca_host.c
++++ b/platforms/host/felucca_host.c
+@@ -? +? @@
+ #include "../../firmware/src/storage.c"
+ #include "../../firmware/src/upreset.c"
++#include "../../firmware/src/instrument.c"
+ #include "../../firmware/src/project.c"
