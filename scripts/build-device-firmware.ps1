@@ -2,8 +2,6 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Toolchain,
-    [Parameter(Mandatory = $true)]
-    [string]$SourceUrl
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,10 +15,6 @@ if (!(Test-Path -LiteralPath $sdkBuild)) {
 if (!(Test-Path -LiteralPath $Toolchain)) {
     throw 'The matching JieLi toolchain directory does not exist.'
 }
-if ([string]::IsNullOrWhiteSpace($SourceUrl) -or $SourceUrl -notmatch '^https://') {
-    throw 'SourceUrl must be the HTTPS URL for the matching M-VAVE source archive.'
-}
-
 # Stage the same FM1-Lab C modules and source transformations used by CI's
 # official simulator build. The SDK recursively compiles every app/*.c unit.
 $files = @(
@@ -45,5 +39,5 @@ try {
     Pop-Location
 }
 
-& $sdkBuild -FirmwareOnly -Toolchain $Toolchain -SourceUrl $SourceUrl
+& $sdkBuild -FirmwareOnly -Toolchain $Toolchain
 if ($LASTEXITCODE -ne 0) { throw "M-VAVE device firmware build failed ($LASTEXITCODE)." }
