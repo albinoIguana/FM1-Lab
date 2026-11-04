@@ -41,7 +41,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Add a native library adapter that loads/saves four consecutive DX7 voices as one Instrument and carries its name, macro values, enabled state and level.
 - [x] Add a live Instrument runtime for PRESETS selection, four patch selection, enable/mute, level and macro editing, with unsaved-edit protection and no flash I/O in the render accessor.
 - [x] Add a native six-operator voice-editing API with verified OP1–OP6 byte mapping, bounded envelope/output/mode/ratio/detune fields, global algorithm/feedback/LFO fields, and topology-aware carrier/depth queries.
-- [ ] Build the native patch-editor screen on top of this API, editing the Instrument patch data directly without borrowing or overwriting a project track.
+- [x] Add the first native six-operator patch-editor screen, editing the selected Instrument patch directly; expose algorithm-aware carrier/modulator roles and depth, envelope rates/levels, oscillator output/ratio/detune, global feedback/LFO, patch selection and Instrument save.
+- [ ] Add a true operator connection graph, undo/compare, and patch audition/voice-engine integration; the current topology strip reports roles/depth but does not yet draw every routing edge.
 - [x] Save the four voice records and metadata together through one version-2 bank transaction, preserving the other seven Instruments in that bank.
 - [ ] Integrate the native model with the FM1 device app and actual voice engine.
 - [ ] Connect patch enable and level state to the device mixer / voice routing.
