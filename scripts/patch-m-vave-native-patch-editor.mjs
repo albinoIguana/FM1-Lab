@@ -107,7 +107,7 @@ static void fm1lab_patch_draw(void)
             }
         }
     }
-    routes[route_length] = '\\0';
+    routes[route_length] = '\0';
     text(8, 94, routes[0] ? routes : "PARALLEL", 1, ACCENT, BACK);
     text(8, 101, "TOPOLOGY", 1, DIM, BACK);
     text(74, 101, "CARRIER / MODULATOR DEPTH", 1, DIM, BACK);
