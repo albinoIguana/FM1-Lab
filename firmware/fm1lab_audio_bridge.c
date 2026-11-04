@@ -1,6 +1,7 @@
 #include "fm1lab_audio_bridge.h"
 
-#include <limits.h>\n#include <string.h>
+#include <limits.h>
+#include <string.h>
 #include "fm1.h"
 #include "fm1lab_audio_engine.h"
 #include "fm1lab_instrument.h"
