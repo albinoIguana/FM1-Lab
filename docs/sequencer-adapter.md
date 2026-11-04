@@ -38,6 +38,12 @@ Gate value zero is the native 50% default; values 1–14 represent shorter gates
 
 `firmware/fm1lab_sequencer.c` provides bind/unbind, state read, tempo/swing/length editing, step editing, lane selection, patch assignment from the four-patch Instrument, patch level and mute application, and transport start/stop. Patch assignment renders the selected Instrument patch through the macro renderer, imports the resulting DX7 voice into the bound track, then applies its level and enabled state. All functions are control-task operations. The adapter does not perform flash I/O; the existing project system remains responsible for persistence and undo.
 
+## Native screen integration
+
+The build-time screen patch adds a dedicated two-lane page entered with the physical SEQ button from the Instrument home screen. SELECT moves the 64-step cursor; PRESETS selects lane A/B; ALGORITHM selects one of the four Instrument patches for that lane; KNOB 1 enables/disables the selected step, KNOB 2 changes pitch, KNOB 3 changes velocity, and KNOB 4 changes gate. PLAY toggles the native sequencer transport. The display shows a 16-step window of the selected lane position, with a fixed 64-step timeline and the native loop length.
+
+The sequencer page binds the first two normal DX7 tracks in the current project. Binding changes only the runtime playback mask; it does not rewrite other six tracks. Explicit step edits change the selected steps on the two bound tracks. Selecting an Instrument patch for a lane imports that patch into the corresponding project track, as expected for a sequencer track assignment. Leaving the sequencer stops playback and restores the normal all-track playback mask.
+
 ## Remaining integration
 
-The adapter and engine isolation layer are implemented and covered by host-side tests. The native device screen is not yet wired to these APIs. The next device work is to add the two-lane screen and named-panel input handling, bind after project load, and unbind when leaving the FM1-Lab sequencer. Browser editing remains a development surface, not the physical firmware deliverable.
+The native screen patch and sequencer adapter are included in both the simulator build and the Windows device-build staging script. CI compiles the official M-VAVE browser engine and exercises the host-side C adapter tests. This is not yet a verified JieLi device firmware build or a flashable hardware image. The device build still requires the matching JieLi toolchain, and actual FM1 hardware validation remains outstanding. Browser editing remains a development surface, not the physical firmware deliverable.
