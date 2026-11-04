@@ -5,7 +5,8 @@ INSTRUMENT_BIN="$(mktemp)"
 METADATA_BIN="$(mktemp)"
 CONTROLS_BIN="$(mktemp)"
 LIBRARY_BIN="$(mktemp)"
-trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN"' EXIT
+RUNTIME_BIN="$(mktemp)"
+trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN"' EXIT
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/tests/fm1lab_instrument.test.c" -o "$INSTRUMENT_BIN"
@@ -27,3 +28,10 @@ cc -std=c11 -Wall -Wextra -Werror \
   "$ROOT/tests/fm1lab_library.test.c" -o "$LIBRARY_BIN"
 "$LIBRARY_BIN"
 echo "FM1-Lab four-patch library integration tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" \
+  "$ROOT/firmware/fm1lab_instrument.c" "$ROOT/firmware/fm1lab_bank_metadata.c" \
+  "$ROOT/firmware/fm1lab_library.c" "$ROOT/firmware/fm1lab_runtime.c" \
+  "$ROOT/tests/fm1lab_runtime.test.c" -o "$RUNTIME_BIN"
+"$RUNTIME_BIN"
+echo "FM1-Lab runtime control tests passed."
