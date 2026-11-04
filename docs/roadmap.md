@@ -20,12 +20,13 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Add per-patch macro values, enabled/mute state and level state to the native model.
 - [x] Add native carrier-mask lookup derived from the official M-VAVE algorithm routing table.
 - [x] Add non-destructive native macro rendering and host-side C unit tests.
+- [x] Define and test a CRC-protected 400-byte metadata block for eight named Instruments (32 patches) in the unused tail of each 4 KiB voice-bank sector.
 - [ ] Integrate the native model with the FM1 device app and actual voice engine.
 - [ ] Connect patch enable and level state to the device mixer / voice routing.
 
 ## Device storage and controls
 
-- [ ] Extend the existing four-bank DX7 voice library without breaking legacy bank import/export or recovery.
+- [ ] Wire the metadata codec into the existing four-bank DX7 voice library with a versioned format, preserving legacy bank import/export and recovery.
 - [ ] Store named four-patch Instruments and macro state; preserve existing project slots and user data.
 - [ ] Map the physical preset encoder to Instrument selection.
 - [ ] Map physical controls 1–4 to the four patches.
