@@ -24,5 +24,12 @@ for (let index = 0; index < names.length; index++) {
     source = source.split(before).join(prefix + "[" + replacement + "]");
   }
 }
+/* Parameter pages address the four physical patch knobs as a contiguous range. */
+for (const prefix of ["controls->encoders", "controls.encoders"]) {
+  source = source.split(prefix + "[2 + col]").join(prefix + "[FM1LAB_ENCODER_KNOB_1 + col]");
+  source = source.split(prefix + "[2+col]").join(prefix + "[FM1LAB_ENCODER_KNOB_1 + col]");
+  source = source.split(prefix + "[2 + i]").join(prefix + "[FM1LAB_ENCODER_KNOB_1 + i]");
+  source = source.split(prefix + "[2+i]").join(prefix + "[FM1LAB_ENCODER_KNOB_1 + i]");
+}
 fs.writeFileSync(screenPath, source);
 console.log("Mapped native screen encoder references to printed FM1 panel names.");
