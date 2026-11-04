@@ -24,8 +24,7 @@ if (!source.includes("FM1LAB_HOME")) {
 }
 if (!source.includes("static fm1lab_runtime_t fm1lab_home_runtime")) {
   replaceOnce("static uint8_t frame_patch[156];",
-    "static uint8_t frame_patch[156];\nstatic fm1lab_runtime_t fm1lab_home_runtime;\nstatic int fm1lab_home_status;
-static uint32_t fm1lab_home_signature;",
+    "static uint8_t frame_patch[156];\nstatic fm1lab_runtime_t fm1lab_home_runtime;\nstatic int fm1lab_home_status;\nstatic uint32_t fm1lab_home_signature;",
     "runtime state");
 }
 
