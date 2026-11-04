@@ -1,48 +1,38 @@
 # FM1-Lab
 
-**FM1-Lab is our own instrument-first FM sound-design environment.** Its interface and workflow are the product; Felucca's firmware engine is the synthesis foundation, and the upstream emulator remains a supporting compatibility tool.
+**FM1-Lab is an independent four-patch Instrument design environment for the M-VAVE FM1.** The firmware foundation is M-VAVE's own open FM1 source and SDK. The Instrument model, macro system, editor and workflow are our own.
 
-## Instrument model
+## Product model
 
-- An **Instrument** is one preset containing exactly four independent FM patches.
-- The first two Instrument banks are backed by Felucca's eight actual FM6 factory voices: slots 1–4 and 5–8.
-- Selecting an Instrument loads its four voices into Felucca's four native synth parts.
-- Selecting a patch selects the corresponding native part for playback and editing.
-- Instrument edits are saved locally, including the complete 155-byte native FM6 voice data for each patch.
+- One **Instrument** contains exactly four independent six-operator FM patches.
+- Each patch uses M-VAVE's expanded 156-byte DX7 voice format.
+- The Instrument selector changes the four-patch bank; patch selection chooses one of its four voices.
+- Four performance macros are implemented as non-destructive transformations of the saved patch: **Brightness**, **Body**, **Motion** and **Edge**.
+- Brightness and Body act on carrier operators; Edge acts on modulators and algorithm feedback. Carrier roles come from M-VAVE's actual DX7 algorithm routing table.
+- Operator editing changes the underlying patch; macro positions are applied as a separate live layer.
 
-## Native engine integration
+## Official firmware foundation
 
-FM1-Lab runs Felucca's own browser-native WebAssembly firmware inside its AudioWorklet. Felucca owns the audio rendering, voice allocation, FM6 algorithms, envelopes, modulation and effects; FM1-Lab does not substitute a parallel Web Audio FM engine.
+The pinned submodule vendor/m-vave-fm1 points to [M-VAVE's official FM1 open-source repository](https://github.com/m-vave/fm1_open). It contains the device application, board interfaces, FM1 SDK, official synthesis code, and browser simulator. The simulator is used as the sound engine for the browser workshop and for rapid verification of patch behavior.
 
-A narrow patch overlay against the pinned Felucca host exposes:
-- Four native FM6 tracks.
-- Native 155-byte patch read/write and a dedicated scratch buffer.
-- Felucca's eight factory FM6 voices.
-- The actual carrier masks, modulation routing masks and feedback operator for all 32 algorithms.
+FM1-Lab does not depend on Felucca. Its code, tests and build no longer include Felucca.
 
-The custom UI maps operator ratio or fixed-frequency mode, output level, all four native envelope rates and levels, algorithm, feedback and voice name into the native patch bytes. Algorithm diagrams and carrier/modulator roles come from Felucca's own routing tables.
+## Current implementation
 
-The current editor deliberately exposes the native voice fields that have direct UI controls. The remaining native voice fields are preserved when these controls are changed. Modulation matrix, LFO and FX pages, plus broader Instrument management, are subsequent work.
+- Four-patch Instrument data model with import/export.
+- M-VAVE's official DX7 factory voices as the starting library.
+- Native 156-byte voice editing: algorithm, feedback, operator mode/coarse/fine, output, and four-stage envelopes.
+- Algorithm-aware macro transforms.
+- Browser audio powered by the official M-VAVE simulator and its own WASM audio worklet.
 
-## Site layout
+The browser workshop is a development and audition surface. The corresponding custom Instrument navigation and macro controls still need to be integrated into the FM1's on-device application and verified with the device toolchain before this can be called flashable firmware.
 
-- **FM1-Lab** — the main application and custom Instrument workflow.
-- **[Felucca runtime](https://albinoiguana.github.io/FM1-Lab/felucca/)** — Felucca's own browser-native firmware reference.
-- **[Compatibility bench](https://albinoiguana.github.io/FM1-Lab/compatibility/)** — upstream FM-1 emulator for firmware compatibility and regression work. It is not the FM1-Lab product UI.
-- **[Test console](https://albinoiguana.github.io/FM1-Lab/testing.html)** — firmware test utilities.
-- **[Source repository](https://github.com/albinoIguana/FM1-Lab)**.
+## Build and validation
 
-## Supporting source pins
+GitHub Actions checks the Instrument and macro models, applies the M-VAVE integration patch to the pinned source, builds the official browser simulator with WASI SDK 27, and verifies the FM1-Lab API exports.
 
-- Felucca: `743551712c36b3984392eea1dbe13a309907e17a`.
-- Upstream FM-1 emulator submodule: `9de1ef053a3c4bf56f16f05b5f0de193f4608a1d`.
-
-## Build and tests
-
-The Pages workflow runs the FM1-Lab unit tests, builds Felucca's browser runtime with the FM1-Lab host API overlay, boots the resulting WASM in a smoke test, checks all 32 native routing graphs, loads all eight factory voices, verifies native patch read/write isolation, and runs Felucca's broader regression suite. It also runs the upstream emulator's tests and compatibility checks.
-
-Run `npm test` for the application and native patch mapping tests. Building Felucca's browser runtime requires Python 3 with Pillow/fontTools and Emscripten; the upstream emulator also requires its Rust/WebAssembly toolchain.
+A device firmware build requires the matching JieLi Windows toolchain 2.5.3. See the official M-VAVE README for installation and packaging requirements.
 
 ## Licensing
 
-Felucca is GPL-3.0-only. Its engine library is MIT and its FM-1 board layer is MPL-2.0. The separate upstream FM-1 emulator is MIT-licensed. Preserve source attribution and corresponding source obligations when distributing builds.
+The M-VAVE application is GPLv3 with its FM1 SDK linking exception. The proprietary engine is supplied as a binary SDK with an explicit FM1-only linking and redistribution grant. Preserve M-VAVE's license, third-party notices and SDK terms when distributing any build. See the license and third-party notices in vendor/m-vave-fm1.
