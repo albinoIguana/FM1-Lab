@@ -39,6 +39,24 @@ jobs:
             throw "CodeBlocks installation failed; the JieLi toolchain requires it."
           }
 
+          # JieLi explicitly requires one first launch and close of Code::Blocks.
+          $cb = Join-Path $env:ProgramFiles 'CodeBlocks\\codeblocks.exe'
+          if (!(Test-Path -LiteralPath $cb)) {
+            throw "Code::Blocks executable not found at $cb"
+          }
+          $cbProcess = Start-Process -FilePath $cb -PassThru
+          Start-Sleep -Seconds 12
+          $cbProcess.Refresh()
+          if (!$cbProcess.HasExited) {
+            [void]$cbProcess.CloseMainWindow()
+            if (!$cbProcess.WaitForExit(10000)) {
+              Write-Host 'Code::Blocks did not close gracefully; stopping its process.'
+              $cbProcess.Kill()
+              $cbProcess.WaitForExit()
+            }
+          }
+          Write-Host 'Code::Blocks first launch completed and the application is closed.'
+
       - name: Download and install JieLi Windows toolchain
         shell: pwsh
         timeout-minutes: 40
