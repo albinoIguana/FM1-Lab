@@ -22,14 +22,17 @@ int main(void)
     assert(fm1lab_voice_global_set(voice, FM1LAB_GLOBAL_ALGORITHM, 0) == -1);
     assert(fm1lab_voice_global_set(voice, FM1LAB_GLOBAL_FEEDBACK, 8) == -1);
 
-    assert(fm1lab_voice_operator_is_carrier(voice, 1) >= 0);
-    assert(fm1lab_voice_operator_depth(voice, 1) > 0);
+    assert(fm1lab_voice_operator_is_carrier(voice, 1) == 1);
+    assert(fm1lab_voice_operator_depth(voice, 1) == fm1lab_operator_depth(31, 1));
     assert(fm1lab_voice_operator_is_carrier(voice, 7) == -1);
 
     assert(fm1lab_voice_name_set(voice, "deep bass") == 0);
     char name[11];
     assert(fm1lab_voice_name_get(voice, name) == 0);
     assert(strcmp(name, "DEEP BASS") == 0);
+    uint8_t before[FM1LAB_PATCH_BYTES];
+    memcpy(before, voice, sizeof before);
     assert(fm1lab_voice_name_set(voice, "bad\nname") == -1);
+    assert(memcmp(before, voice, sizeof before) == 0);
     return 0;
 }
