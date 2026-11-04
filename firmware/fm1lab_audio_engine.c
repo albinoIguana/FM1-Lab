@@ -238,7 +238,10 @@ int fm1lab_audio_engine_note_off_mask(fm1lab_audio_engine_t *engine,
     command.note = note;
     command.patch_mask = patch_mask;
     int result = enqueue(engine, &command);
-    if (result) engine->panic_pending = 1u; audio_barrier();
+    if (result) {
+        engine->panic_pending = 1u;
+        audio_barrier();
+    }
     return result;
 }
 
@@ -259,7 +262,10 @@ int fm1lab_audio_engine_all_notes_off(fm1lab_audio_engine_t *engine)
     fm1lab_audio_command_t command = {0};
     command.type = CMD_ALL_NOTES_OFF;
     int result = enqueue(engine, &command);
-    if (result) engine->panic_pending = 1u; audio_barrier();
+    if (result) {
+        engine->panic_pending = 1u;
+        audio_barrier();
+    }
     return result;
 }
 
@@ -280,8 +286,10 @@ int fm1lab_audio_engine_midi(fm1lab_audio_engine_t *engine,
     memcpy(command.midi, message, bytes);
     int result = enqueue(engine, &command);
     if (result && ((message[0] & 0xf0u) == 0x80u ||
-        ((message[0] & 0xf0u) == 0x90u && bytes == 3u && message[2] == 0u)))
-        engine->panic_pending = 1u; audio_barrier();
+        ((message[0] & 0xf0u) == 0x90u && bytes == 3u && message[2] == 0u))) {
+        engine->panic_pending = 1u;
+        audio_barrier();
+    }
     return result;
 }
 
