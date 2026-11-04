@@ -9,6 +9,10 @@ export const DEFAULT_MACROS = Object.freeze({ brightness: 50, body: 50, motion: 
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Math.round(Number(value) || 0)));
 const operatorOffset = number => (OPERATOR_COUNT - number) * OPERATOR_STRIDE;
+const scaledDelta = (delta, percent) => {
+  const value = delta * percent;
+  return value >= 0 ? Math.floor(value + 0.5) : Math.ceil(value - 0.5);
+};
 function adjusted(base, amount, min = 0, max = 99) {
   return clamp(base + amount, min, max);
 }
@@ -34,13 +38,15 @@ export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x
     } else {
       // BRIGHTNESS changes modulation index by raising/lowering modulator output.
       const depth = Math.max(1, Math.min(6, Number(operatorDepths[operator - 1]) || 1));
-      const depthWeight = 1 / depth;
-      bytes[offset + 16] = adjusted(base[offset + 16], delta.brightness * 0.55 * depthWeight);
+      const brightnessScale = Math.trunc(55 / depth);
+      const motionLevelScale = Math.trunc(35 / depth);
+      const motionReleaseScale = Math.trunc(25 / depth);
+      bytes[offset + 16] = adjusted(base[offset + 16], scaledDelta(delta.brightness, brightnessScale));
       // MOTION changes the modulator's evolving spectrum through its EG contour.
       // Level 3 and level 4 move in opposite directions to create a controllable
       // transition; untouched rates preserve the original patch's timing.
-      bytes[offset + 6] = adjusted(base[offset + 6], delta.motion * 0.35 * depthWeight);
-      bytes[offset + 7] = adjusted(base[offset + 7], -delta.motion * 0.25 * depthWeight);
+      bytes[offset + 6] = adjusted(base[offset + 6], scaledDelta(delta.motion, motionLevelScale));
+      bytes[offset + 7] = adjusted(base[offset + 7], -scaledDelta(delta.motion, motionReleaseScale));
     }
   }
 
