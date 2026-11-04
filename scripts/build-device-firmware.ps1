@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Toolchain,
+    [string]$Toolchain
 )
 
 $ErrorActionPreference = 'Stop'
