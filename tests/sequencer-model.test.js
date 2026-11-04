@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  createTwoTrackSequence, normalizeSequence, setTrackLength, setTrackDivision,
+  createTwoTrackSequence, normalizeSequence, setTempo, setTrackPatch, setTrackLength, setTrackDivision,
   setTrackSwing, setStep, selectSequenceTrack, setGlobalKeyShift, DIVISIONS
 } from "../src/sequencer-model.js";
 
@@ -11,6 +11,13 @@ test("sequencer contract is exactly two independent 64-step tracks", () => {
   assert.equal(sequence.tracks[0].steps.length, 64);
   assert.equal(sequence.tracks[1].steps.length, 64);
   assert.notEqual(sequence.tracks[0].steps, sequence.tracks[1].steps);
+});
+
+test("tempo and track patch assignment are bounded and independent", () => {
+  const sequence = createTwoTrackSequence();
+  assert.equal(setTempo(sequence, 400).tempo, 300);
+  assert.equal(setTrackPatch(sequence, 1, 3).tracks[1].patchIndex, 3);
+  assert.equal(sequence.tracks[0].patchIndex, 0);
 });
 
 test("track length clamps to 8–64 without resizing the fixed timeline", () => {
