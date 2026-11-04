@@ -45,9 +45,27 @@ jobs:
 
       - name: Fetch pinned Felucca firmware source
         run: |
-          git clone https://github.com/hugelton/Felucca.git vendor/felucca
-          git -C vendor/felucca checkout 743551712c36b3984392eea1dbe13a309907e17a
-          git -C vendor/felucca submodule update --init --recursive
+          # The pinned preview commit was withdrawn from upstream's advertised refs.
+          # Fetch immutable source archives by SHA so the build does not depend on a
+          # branch/tag continuing to point at this historical browser-host snapshot.
+          FELUCCA_SHA=743551712c36b3984392eea1dbe13a309907e17a
+          ENGINES_SHA=0f015add84d77d8ae0ead08de901b7ecf3686f18
+          BSP_SHA=5942e68b89ab9ccd23f2c541d712ca38fe635f11
+          mkdir -p vendor/felucca
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://codeload.github.com/hugelton/Felucca/tar.gz/${FELUCCA_SHA}" \
+            --output /tmp/felucca.tar.gz
+          tar -xzf /tmp/felucca.tar.gz --strip-components=1 -C vendor/felucca
+          mkdir -p vendor/felucca/firmware/engines vendor/felucca/firmware/bsp
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://codeload.github.com/hugelton/Felucca-Engines/tar.gz/${ENGINES_SHA}" \
+            --output /tmp/felucca-engines.tar.gz
+          tar -xzf /tmp/felucca-engines.tar.gz --strip-components=1 -C vendor/felucca/firmware/engines
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://codeload.github.com/hugelton/felucca-bsp/tar.gz/${BSP_SHA}" \
+            --output /tmp/felucca-bsp.tar.gz
+          tar -xzf /tmp/felucca-bsp.tar.gz --strip-components=1 -C vendor/felucca/firmware/bsp
+          git -C vendor/felucca init --quiet
           git -C vendor/felucca apply ../../patches/felucca-host-fm1lab-api.patch
 
       - name: Build Felucca's browser-native firmware runtime
