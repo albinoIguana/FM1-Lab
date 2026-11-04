@@ -34,25 +34,25 @@ export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x
     const offset = operatorOffset(operator);
     if (isCarrier) {
       // BODY shapes the carrier's sustained presence, not its oscillator ratio.
-      bytes[offset + 6] = adjusted(base[offset + 6], scaledDelta(delta.body, 45));
+      if (delta.body) bytes[offset + 6] = adjusted(base[offset + 6], scaledDelta(delta.body, 45));
     } else {
       // BRIGHTNESS changes modulation index by raising/lowering modulator output.
       const depth = Math.max(1, Math.min(6, Number(operatorDepths[operator - 1]) || 1));
       const brightnessScale = Math.trunc(55 / depth);
       const motionLevelScale = Math.trunc(35 / depth);
       const motionReleaseScale = Math.trunc(25 / depth);
-      bytes[offset + 16] = adjusted(base[offset + 16], scaledDelta(delta.brightness, brightnessScale));
+      if (delta.brightness) bytes[offset + 16] = adjusted(base[offset + 16], scaledDelta(delta.brightness, brightnessScale));
       // MOTION changes the modulator's evolving spectrum through its EG contour.
       // Level 3 and level 4 move in opposite directions to create a controllable
       // transition; untouched rates preserve the original patch's timing.
-      bytes[offset + 6] = adjusted(base[offset + 6], scaledDelta(delta.motion, motionLevelScale));
-      bytes[offset + 7] = adjusted(base[offset + 7], -scaledDelta(delta.motion, motionReleaseScale));
+      if (delta.motion) bytes[offset + 6] = adjusted(base[offset + 6], scaledDelta(delta.motion, motionLevelScale));
+      if (delta.motion) bytes[offset + 7] = adjusted(base[offset + 7], -scaledDelta(delta.motion, motionReleaseScale));
     }
   }
 
   // DIRT is deliberately a bounded feedback control in this first experiment.
   // Frequency ratios remain untouched until topology-aware ratio mapping exists.
-  bytes[GLOBAL.feedback] = adjusted(base[GLOBAL.feedback], scaledDelta(delta.dirt, 8), 0, 7);
+  if (delta.dirt) bytes[GLOBAL.feedback] = adjusted(base[GLOBAL.feedback], scaledDelta(delta.dirt, 8), 0, 7);
   return bytes;
 }
 
