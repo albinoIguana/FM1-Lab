@@ -21,7 +21,7 @@ if (!library.includes('#include "fm1lab_bank_metadata.h"')) {
     '#include "fm_patch.h"\n#include "fm1lab_bank_metadata.h"\n', "library include");
   library = replaceOnce(library,
     'enum { BANK_MAGIC=0x31424d46U, STAGE=GROOVE_PROJECT_SLOTS*4096, PACKED_VOICE=112 };\nstruct bank { uint32_t magic, version, index, crc, commit; uint8_t voice[32][PACKED_VOICE]; };',
-    'enum { BANK_MAGIC=0x31424d46U, STAGE=GROOVE_PROJECT_SLOTS*4096, PACKED_VOICE=112, META_BYTES=FM1LAB_BANK_META_BYTES };\nstruct bank { uint32_t magic, version, index, crc, commit; uint8_t voice[32][PACKED_VOICE]; uint8_t metadata[META_BYTES]; };',
+    'enum { BANK_MAGIC=0x31424d46U, STAGE=GROOVE_PROJECT_SLOTS*4096, PACKED_VOICE=112, META_BYTES=FM1LAB_BANK_META_BYTES };\nstruct bank { uint32_t magic, version, index, crc, commit; uint8_t voice[32][PACKED_VOICE]; uint8_t metadata[META_BYTES]; };\n_Static_assert(offsetof(struct bank,metadata)==FM1LAB_BANK_META_OFFSET, "Instrument metadata offset");',
     "bank layout");
   library = replaceOnce(library,
     '    return ~groove_crc32(crc,b->voice,sizeof b->voice);\n}',
