@@ -12,6 +12,44 @@ diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
 +    return 0;
 +}
 +
++
++/* Return the number of modulation stages between an operator and a carrier.
++ * Operator numbers are physical DX7 names: OP1..OP6. */
++#ifdef __wasm__
++__attribute__((export_name("sim_fm_operator_depth")))
++#endif
++unsigned sim_fm_operator_depth(unsigned algorithm, unsigned operator_number)
++{
++    if (operator_number < 1U || operator_number > FM_OP_CNT) return 0U;
++    const u8 *flags = algorithms[algorithm & 31U];
++    u8 producers[3][FM_OP_CNT] = {{0}};
++    u8 counts[3] = {0};
++    u8 edges[FM_OP_CNT][FM_OP_CNT] = {{0}};
++    u8 carrier[FM_OP_CNT] = {0};
++    u8 depth[FM_OP_CNT] = {0};
++    for (unsigned op = 0; op < FM_OP_CNT; ++op) {
++        unsigned inbus = (flags[op] >> 4) & 3U;
++        unsigned outbus = flags[op] & 3U;
++        unsigned add = (flags[op] & 4U) != 0U;
++        if (inbus)
++            for (unsigned n = 0; n < counts[inbus]; ++n)
++                edges[producers[inbus][n]][op] = 1U;
++        if (!outbus) carrier[op] = 1U;
++        else {
++            if (!add) counts[outbus] = 0U;
++            producers[outbus][counts[outbus]++] = (u8)op;
++        }
++    }
++    for (unsigned op = 0; op < FM_OP_CNT; ++op)
++        depth[op] = carrier[op] ? 0U : 1U;
++    for (unsigned pass = 0; pass < FM_OP_CNT; ++pass)
++        for (unsigned op = 0; op < FM_OP_CNT; ++op)
++            for (unsigned next = 0; next < FM_OP_CNT; ++next)
++                if (edges[op][next] && depth[next] + 1U > depth[op])
++                    depth[op] = (u8)(depth[next] + 1U);
++    return depth[FM_OP_CNT - operator_number];
++}
++
  /* The browser has no hardware streams; the same APP mixer still runs. */
  int fm1_usb_audio_read(int32_t *pcm, unsigned frames, uint16_t gains[2])
  {
