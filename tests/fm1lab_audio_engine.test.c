@@ -76,6 +76,7 @@ int main(void)
     assert(fm1lab_audio_engine_set_level(&engine, 2, 0) == 0);
     assert(fm1lab_audio_engine_render(&engine, output, FM1_BLOCK_FRAMES) == 0);
     assert(engine.level[2] == 0);
+    assert(fm1lab_audio_engine_active_voices(&engine, 2) == 0);
 
     /* A patch edit resets only its own voice pool and changes its live voice. */
     make_voice(voices[3], 31);
