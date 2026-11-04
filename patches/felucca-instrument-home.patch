@@ -112,3 +112,54 @@ index bf04d53..0000000 100644
          } else {
              edit_param(k, s);
          }
+
+diff --git a/firmware/src/ui.c b/firmware/src/ui.c
+index b8c6b85..0000000 100644
+--- a/firmware/src/ui.c
++++ b/firmware/src/ui.c
+@@ -7,3 +7,5 @@
+ static int project_save(uint32_t slot);
++static void instrument_turn(int32_t s);
++static void instrument_name(char *b);
+ static void panel_setup(void);
+ static void project_load(uint32_t slot);
+diff --git a/firmware/src/ui_draw.c b/firmware/src/ui_draw.c
+index ff7f0ea..0000000 100644
+--- a/firmware/src/ui_draw.c
++++ b/firmware/src/ui_draw.c
+@@ -849,5 +849,5 @@ static void draw_foot(void)
+     sound_name(t, pn);
+     if (ui.home)
+-        str_cpy(ti, "HOME", sizeof ti);
++        instrument_name(ti);
+     else                                               /* page title + number in its family: "ENV DEST 2/2" */
+         page_title(ti);
+diff --git a/firmware/src/ui_input.c b/firmware/src/ui_input.c
+index bf04d53..0000000 100644
+--- a/firmware/src/ui_input.c
++++ b/firmware/src/ui_input.c
+@@ -1804,5 +1804,7 @@ static void ui_input(void)
+     kq |= lay;
+-    if (!lay && (s = panel_enc(EN_PRESET)) != 0)
+-        presets_turn(s);
++    if (!lay && (s = panel_enc(EN_PRESET)) != 0) {
++        if (ui.home) instrument_turn(s);
++        else presets_turn(s);
++    }
+     if (!lay && (s = panel_enc(EN_ALGO)) != 0)     /* ALGORITHM: the selected track, on every page */
+         track_select((uint32_t)clamp((int32_t)song.sel + (s > 0 ? 1 : -1), 0, NTRK - 1));
+diff --git a/firmware/src/felucca.c b/firmware/src/felucca.c
+index 594e4e8..0000000 100644
+--- a/firmware/src/felucca.c
++++ b/firmware/src/felucca.c
+@@ -126,2 +126,3 @@
+ #include "upreset.c"             /* user presets (RAM mirror; flash with FELUCCA_FLASH) */
++#include "instrument.c"          /* FM1: four FM6 voices as one Instrument */
+ #include "project.c"
+diff --git a/firmware/src/instrument.c b/firmware/src/instrument.c
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/firmware/src/instrument.c
+@@ -0,0 +1,1 @@
++/* FM1 Instrument implementation follows. */
