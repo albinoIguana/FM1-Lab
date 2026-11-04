@@ -2,10 +2,13 @@ import { MvaveEngine } from "./m-vave-engine.js";
 import { createPatch, createInstrument, normalizeInstrument, patchAlgorithm } from "./instrument-model.js";
 import { InstrumentSession } from "./instrument-session.js";
 import { renderPatchGrid } from "./ui/home-view.js";
+import { renderSequencer } from "./ui/sequencer-view.js";
+import { createTwoTrackSequence, normalizeSequence, setTrackLength, setTrackDivision, setTrackSwing, setStep, selectSequenceTrack, setGlobalKeyShift } from "./sequencer-model.js";
 import { patchName, setPatchName, readOperator, writeOperator, readGlobal, writeGlobal } from "./dx7-voice.js";
 
 const $ = s => document.querySelector(s);
 const KEY = "fm1lab.native-instruments.v1";
+const SEQ_KEY = "fm1lab.two-track-sequencer.v1";
 const BANKS = [{name:"GLASS CURRENT",programs:[0,1,2,3]},{name:"NEON ORCHARD",programs:[4,5,6,7]}];
 const MACROS = [
   ["brightness","BRIGHTNESS","Modulator output / harmonic energy"],
@@ -14,6 +17,7 @@ const MACROS = [
   ["dirt","DIRT","Bounded feedback / spectral aggression"]
 ];
 let engine, session, library=[], instrument, instrumentIndex=0, selectedPatchIndex=0, selectedOperator=1;
+let sequence=createTwoTrackSequence(), selectedStep=0, sequenceAdvanced=false;
 
 const patch=()=>instrument.patches[selectedPatchIndex];
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({version:1,instrumentIndex,library}));}catch(e){console.warn(e);}};
@@ -47,6 +51,55 @@ function renderHome(){
   $("#instrument-name").value=instrument.name;
   $("#patch-grid").innerHTML=renderPatchGrid(instrument.patches,selectedPatchIndex);
   $("#patch-grid").querySelectorAll("[data-patch]").forEach(b=>b.onclick=()=>openPatch(+b.dataset.patch));
+}
+function persistSequence(){
+  try{localStorage.setItem(SEQ_KEY,JSON.stringify(sequence));}catch(error){console.warn("Sequencer state could not be saved",error);}
+}
+function loadSequence(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(SEQ_KEY)||"null");
+    if(saved)sequence=normalizeSequence(saved);
+  }catch(error){console.warn("Saved sequence could not be loaded",error);sequence=createTwoTrackSequence();}
+}
+function renderSequence(){
+  $("#sequencer-view").innerHTML=renderSequencer(sequence,selectedStep,sequenceAdvanced);
+  $("#sequencer-view").querySelectorAll("[data-seq-select]").forEach(button=>button.onclick=()=>{
+    sequence=selectSequenceTrack(sequence,+button.dataset.seqSelect);selectedStep=0;renderSequence();persistSequence();
+  });
+  $("#sequencer-view").querySelectorAll("[data-seq-step]").forEach(button=>button.onclick=()=>{
+    const track=+button.dataset.seqTrack,step=+button.dataset.seqStep;
+    sequence=setStep(sequence,track,step,{active:!sequence.tracks[track].steps[step].active});
+    selectedStep=step;sequence=selectSequenceTrack(sequence,track);renderSequence();persistSequence();
+  });
+  const length=$("#sequencer-view [data-seq-length]");
+  length.oninput=()=>{length.previousElementSibling.textContent=length.value;};
+  length.onchange=()=>{sequence=setTrackLength(sequence,sequence.selectedTrack,+length.value);renderSequence();persistSequence();};
+  const division=$("#sequencer-view [data-seq-division]");
+  division.onchange=()=>{sequence=setTrackDivision(sequence,sequence.selectedTrack,+division.value);renderSequence();persistSequence();};
+  const swing=$("#sequencer-view [data-seq-swing]");
+  swing.oninput=()=>{swing.previousElementSibling.textContent=swing.value;};
+  swing.onchange=()=>{sequence=setTrackSwing(sequence,sequence.selectedTrack,+swing.value);renderSequence();persistSequence();};
+  const keyShift=$("#sequencer-view [data-seq-key-shift]");
+  keyShift.oninput=()=>{keyShift.previousElementSibling.querySelector("output").textContent=keyShift.value;};
+  keyShift.onchange=()=>{sequence=setGlobalKeyShift(sequence,+keyShift.value);renderSequence();persistSequence();};
+  $("#sequencer-view [data-seq-advanced]").onclick=()=>{sequenceAdvanced=!sequenceAdvanced;renderSequence();};
+  $("#sequencer-view").querySelectorAll("[data-seq-note]").forEach(button=>button.onclick=()=>{
+    sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{note:+button.dataset.seqNote});renderSequence();persistSequence();
+  });
+  const velocity=$("#sequencer-view [data-seq-velocity]");
+  if(velocity){velocity.oninput=()=>{velocity.previousElementSibling.querySelector("output").textContent=velocity.value;};velocity.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{velocity:+velocity.value});renderSequence();persistSequence();};}
+  const gate=$("#sequencer-view [data-seq-gate]");
+  if(gate){gate.oninput=()=>{gate.previousElementSibling.querySelector("output").textContent=gate.value;};gate.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{gate:+gate.value});renderSequence();persistSequence();};}
+  const tie=$("#sequencer-view [data-seq-tie]");
+  if(tie)tie.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{tie:tie.checked});persistSequence();};
+  const slide=$("#sequencer-view [data-seq-slide]");
+  if(slide)slide.onchange=()=>{sequence=setStep(sequence,sequence.selectedTrack,selectedStep,{slide:slide.checked});persistSequence();};
+}
+function showSequencer(){
+  $("#home-screen").hidden=true;$("#editor-screen").hidden=true;$("#sequencer-screen").hidden=false;renderSequence();
+}
+function closeSequencer(){
+  $("#sequencer-screen").hidden=true;$("#home-screen").hidden=false;renderHome();
 }
 function renderMacros(){
   const p=patch();
@@ -109,14 +162,14 @@ async function playNote(){
 async function initialize(){
   engine=new MvaveEngine({onState:s=>{$("#engine-status").textContent=s;$("#boot-status").textContent=s;}});
   session=new InstrumentSession(engine,{onError:error=>console.error("Instrument session:",error)});
-  await engine.ready();await loadLibrary();await loadInstrument();
+  await engine.ready();loadSequence();await loadLibrary();await loadInstrument();
   $("#boot").hidden=true;$("#app").hidden=false;renderHome();
 }
 $("#enter").onclick=async()=>{ $("#enter").disabled=true;try{await initialize();}catch(e){$("#boot-status").textContent=e.message;$("#enter").disabled=false;} };
 $("#instrument-prev").onclick=()=>changeInstrument(instrumentIndex-1);
 $("#instrument-next").onclick=()=>changeInstrument(instrumentIndex+1);
 $("#instrument-name").onchange=e=>{instrument.name=String(e.target.value||"UNTITLED").slice(0,24);persist();renderHome();};
-$("#back-home").onclick=showHome;$("#brand-home").onclick=e=>{e.preventDefault();showHome();};
+$("#back-home").onclick=showHome;$("#open-sequencer").onclick=showSequencer;$("#seq-back").onclick=closeSequencer;$("#brand-home").onclick=e=>{e.preventDefault();showHome();};
 $("#algorithm").innerHTML=Array.from({length:32},(_,i)=>`<option value="${i+1}">ALGORITHM ${String(i+1).padStart(2,"0")}</option>`).join("");
 $("#algorithm").onchange=e=>{patch().baseData=Array.from(writeGlobal(Uint8Array.from(patch().baseData),"algorithm",+e.target.value-1));renderEditor();writeCurrent();};
 $("#feedback").oninput=e=>{patch().baseData=Array.from(writeGlobal(Uint8Array.from(patch().baseData),"feedback",+e.target.value));$("#feedback-value").textContent=e.target.value;writeCurrent();};
