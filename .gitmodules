@@ -1,3 +1,6 @@
 [submodule "vendor/fm1-emu"]
 	path = vendor/fm1-emu
 	url = https://github.com/joakimeriksson/fm1-emu.git
+[submodule "vendor/m-vave-fm1"]
+	path = vendor/m-vave-fm1
+	url = https://github.com/m-vave/fm1_open.git
