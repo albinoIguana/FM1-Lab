@@ -49,6 +49,10 @@ uint8_t fm1lab_carrier_mask(unsigned algorithm);
 /* Modulation stages from this operator to a carrier; operator is OP1..OP6. */
 uint8_t fm1lab_operator_depth(unsigned algorithm, unsigned operator_number);
 
+/* Returns 1 when source OP modulates target OP, 0 when not, -1 for invalid OPs. */
+int fm1lab_operator_modulates(unsigned algorithm, unsigned source_operator,
+                              unsigned target_operator);
+
 /* Render a non-destructive macro-adjusted voice. Returns 0 or -1 for invalid input. */
 int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch,
                         uint8_t output[FM1LAB_PATCH_BYTES]);
