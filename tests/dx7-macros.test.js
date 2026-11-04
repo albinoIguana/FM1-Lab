@@ -50,6 +50,13 @@ test("dirt raises bounded feedback without changing carrier or modulator levels"
   assert.equal(result[operatorByteOffset(2, 16)], 45);
 });
 
+test("deeper modulation chains receive a gentler macro response", () => {
+  const base = new Uint8Array(156); base[operatorByteOffset(2,16)] = 40;
+  const direct = applyMacros(base, { ...DEFAULT_MACROS, brightness: 100 }, 1, [1,1,1,1,1,1]);
+  const deep = applyMacros(base, { ...DEFAULT_MACROS, brightness: 100 }, 1, [1,2,1,1,1,1]);
+  assert.ok(direct[operatorByteOffset(2,16)] > deep[operatorByteOffset(2,16)]);
+});
+
 test("operator byte mapping follows M-VAVE's OP6-first storage order", () => {
   assert.equal(operatorByteOffset(1, 16), 121);
   assert.equal(operatorByteOffset(6, 16), 16);
