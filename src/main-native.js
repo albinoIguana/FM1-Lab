@@ -19,7 +19,7 @@ const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({version:1,instru
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function writeCurrent(){
   persist();
-  writeQueue=writeQueue.then(()=>engine.writePatch(selectedPatchIndex,renderPatch(patch(),carrierMask())))
+  writeQueue=writeQueue.then(()=>engine.writePatch(selectedPatchIndex,renderPatch(patch(),carrierMask(),Array.from({length:6},(_,i)=>engine.operatorDepth(patchAlgorithm(patch()),i+1)))))
     .catch(e=>{$("#engine-status").textContent="PATCH WRITE ERROR";console.error(e);});
   return writeQueue;
 }
@@ -41,7 +41,7 @@ async function loadLibrary(){
 async function loadInstrument(){
   for(let i=0;i<4;i++){
     const p=instrument.patches[i];
-    await engine.writePatch(i,renderPatch(p,engine.carrierMask(patchAlgorithm(p))));
+    await engine.writePatch(i,renderPatch(p,engine.carrierMask(patchAlgorithm(p)),Array.from({length:6},(_,i)=>engine.operatorDepth(patchAlgorithm(p),i+1))));
   }
 }
 function renderHome(){
