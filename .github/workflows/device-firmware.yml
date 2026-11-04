@@ -228,7 +228,7 @@ jobs:
                 Write-Host 'Final JieLi installer log:'
                 Get-Content -LiteralPath $installLog -Tail 100
               }
-              throw 'JieLi installer did not place clang.exe at C:\JL\pi32\bin\clang.exe within 35 minutes.'
+              throw 'JieLi installer did not place clang.exe at C:\JL\pi32\bin\clang.exe within 15 minutes.'
             }
             if (!$p.HasExited) {
               Write-Host 'Compiler is installed; stopping the still-running installer wrapper.'
