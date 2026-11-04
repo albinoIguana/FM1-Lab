@@ -41,12 +41,13 @@ jobs:
 
       - name: Download and install JieLi Windows toolchain
         shell: pwsh
-        timeout-minutes: 20
+        timeout-minutes: 40
         run: |
           $ErrorActionPreference = 'Stop'
           $clang = 'C:\JL\pi32\bin\clang.exe'
           if (!(Test-Path $clang)) {
             $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-latest.exe'
+            $installLog = Join-Path $env:RUNNER_TEMP 'jieli-installer.log'
             Invoke-WebRequest -Uri 'https://jl-update.oss-cn-shenzhen.aliyuncs.com/2.5.3.exe' -OutFile $installer
             $item = Get-Item -LiteralPath $installer
             if ($item.Length -lt 1MB) {
@@ -55,16 +56,19 @@ jobs:
             Write-Host "Downloaded JieLi installer: $($item.Length) bytes"
             Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
 
-            # Installers can leave their parent process alive while a child
-            # installer or post-install helper runs. Detect the compiler as
-            # soon as it lands instead of waiting only for the parent process.
-            $p = Start-Process -FilePath $installer -ArgumentList @(
+            # Capture Inno Setup's own install log. The previous run proved
+            # that both the parent and extracted child remain alive; this
+            # distinguishes slow extraction from a blocked setup stage.
+            $arguments = @(
               '/VERYSILENT',
               '/SUPPRESSMSGBOXES',
               '/NORESTART',
-              '/SP-'
-            ) -PassThru
-            $deadline = (Get-Date).AddMinutes(15)
+              '/SP-',
+              "/LOG=$installLog"
+            )
+            $p = Start-Process -FilePath $installer -ArgumentList $arguments -PassThru
+            $deadline = (Get-Date).AddMinutes(35)
+            $lastReport = Get-Date
             while ((Get-Date) -lt $deadline) {
               if (Test-Path -LiteralPath $clang) {
                 Write-Host 'JieLi clang.exe appeared at the SDK-required path.'
@@ -74,8 +78,19 @@ jobs:
               if ($p.HasExited -and $p.ExitCode -ne 0) {
                 throw "JieLi installer exited with code $($p.ExitCode) before clang.exe appeared."
               }
-              # Do not assume the top-level installer owns the full install
-              # lifetime; it may hand off to a child process and exit cleanly.
+              if (((Get-Date) - $lastReport).TotalSeconds -ge 60) {
+                $lastReport = Get-Date
+                $proc = Get-Process -Id $p.Id -ErrorAction SilentlyContinue
+                if ($proc) {
+                  Write-Host ("Installer still running; CPU seconds: {0}; working set MB: {1}" -f [math]::Round($proc.CPU,1),[math]::Round($proc.WorkingSet64 / 1MB,1))
+                }
+                if (Test-Path -LiteralPath $installLog) {
+                  Write-Host 'Latest JieLi installer log entries:'
+                  Get-Content -LiteralPath $installLog -Tail 8
+                } else {
+                  Write-Host 'Inno Setup log has not been created yet.'
+                }
+              }
               Start-Sleep -Seconds 10
             }
 
@@ -91,7 +106,11 @@ jobs:
               foreach ($path in @('C:\JL','C:\Program Files\Jieli','C:\Program Files (x86)\Jieli')) {
                 if (Test-Path $path) { Get-ChildItem $path -Force | Select-Object FullName,Length }
               }
-              throw 'JieLi installer did not place clang.exe at C:\JL\pi32\bin\clang.exe within 15 minutes.'
+              if (Test-Path -LiteralPath $installLog) {
+                Write-Host 'Final JieLi installer log:'
+                Get-Content -LiteralPath $installLog -Tail 100
+              }
+              throw 'JieLi installer did not place clang.exe at C:\JL\pi32\bin\clang.exe within 35 minutes.'
             }
             if (!$p.HasExited) {
               Write-Host 'Compiler is installed; stopping the still-running installer wrapper.'
@@ -130,5 +149,6 @@ jobs:
             vendor/m-vave-fm1/build/dx7/sdk.map
             vendor/m-vave-fm1/build/dx7/generated/firmware-report.json
             vendor/m-vave-fm1/build/dx7/generated/package-report.json
+            ${{ runner.temp }}/jieli-installer.log
           if-no-files-found: warn
           retention-days: 14
