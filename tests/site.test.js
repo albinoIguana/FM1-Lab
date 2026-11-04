@@ -47,7 +47,7 @@ test("deployment publishes FM1-Lab at root and keeps runtimes in supporting rout
   const firmwarePatch = await read("patches/felucca-instrument-home.patch");
   assert.match(firmwarePatch, /draw_home_instrument/);
   assert.match(firmwarePatch, /KNOB 1..4 select PATCH 1..4/);
-  assert.match(firmwarePatch, /track_select\\(k\\)/);
+  assert.match(firmwarePatch, /track_select\(k\)/);
   assert.match(workflow, /felucca-api-smoke\.mjs/);
   assert.match(workflow, /_site\/compatibility/);
   assert.match(workflow, /_site\/felucca/);
