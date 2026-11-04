@@ -48,10 +48,21 @@ jobs:
             $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-latest.exe'
             Invoke-WebRequest -Uri 'https://pkgman.jieliapp.com/s/win-toolchain' -OutFile $installer
 
-            $p = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru
-            if (!$p.WaitForExit(300000)) {
+            # The vendor installer behaves as a guided Windows installer; /S
+            # did not terminate on the hosted runner. Use standard Inno Setup
+            # unattended switches and allow the full toolchain install window.
+            $p = Start-Process -FilePath $installer -ArgumentList @(
+              '/VERYSILENT',
+              '/SUPPRESSMSGBOXES',
+              '/NORESTART',
+              '/SP-'
+            ) -PassThru
+            if (!$p.WaitForExit(900000)) {
               try { $p.Kill() } catch {}
-              throw 'JieLi installer did not complete with the silent /S switch.'
+              throw 'JieLi installer exceeded the 15-minute unattended install limit.'
+            }
+            if ($p.ExitCode -ne 0) {
+              throw "JieLi installer exited with code $($p.ExitCode)."
             }
 
             $deadline = (Get-Date).AddMinutes(5)
@@ -60,7 +71,7 @@ jobs:
             }
           }
           if (!(Test-Path $clang)) {
-            throw 'JieLi toolchain was not installed at C:\JL\pi32. Check the installer and CodeBlocks prerequisite.'
+            throw 'JieLi toolchain was not installed at C:\JL\pi32. Check the installer output and CodeBlocks prerequisite.'
           }
           & $clang --version
           Get-FileHash $clang -Algorithm SHA256
