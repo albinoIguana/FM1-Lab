@@ -7,7 +7,7 @@
 #include "synth_dx7.h"
 
 #define FM1LAB_AUDIO_PATCHES FM1LAB_PATCH_COUNT
-#define FM1LAB_AUDIO_QUEUE_CAPACITY 16u
+#define FM1LAB_AUDIO_QUEUE_CAPACITY 32u
 
 typedef struct {
     uint8_t type;
