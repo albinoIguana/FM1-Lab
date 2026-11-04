@@ -31,31 +31,76 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install CodeBlocks prerequisite
+      - name: Install and initialize CodeBlocks prerequisite
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           choco install codeblocks --yes --no-progress
           if ($LASTEXITCODE -ne 0) {
             throw "CodeBlocks installation failed; the JieLi toolchain requires it."
           }
 
-          # JieLi explicitly requires one first launch and close of Code::Blocks.
-          $cb = Join-Path $env:ProgramFiles 'CodeBlocks\\codeblocks.exe'
+          $cb = Join-Path $env:ProgramFiles 'CodeBlocks\codeblocks.exe'
+          $cbConfig = Join-Path $env:APPDATA 'CodeBlocks\default.conf'
           if (!(Test-Path -LiteralPath $cb)) {
             throw "Code::Blocks executable not found at $cb"
           }
-          $cbProcess = Start-Process -FilePath $cb -PassThru
-          Start-Sleep -Seconds 12
-          $cbProcess.Refresh()
+
+          # The Code::Blocks manual documents that its first launch creates
+          # the user's personality config under %APPDATA%\CodeBlocks.
+          # Use the default personality explicitly; suppress the splash screen.
+          Remove-Item -LiteralPath $cbConfig -Force -ErrorAction SilentlyContinue
+          $cbProcess = Start-Process -FilePath $cb -ArgumentList @('--no-splash-screen','--personality=default') -PassThru
+          $startupDeadline = (Get-Date).AddSeconds(45)
+          while ((Get-Date) -lt $startupDeadline -and !(Test-Path -LiteralPath $cbConfig)) {
+            $cbProcess.Refresh()
+            if ($cbProcess.HasExited) { break }
+            Start-Sleep -Seconds 2
+          }
+
           if (!$cbProcess.HasExited) {
             [void]$cbProcess.CloseMainWindow()
-            if (!$cbProcess.WaitForExit(10000)) {
-              Write-Host 'Code::Blocks did not close gracefully; stopping its process.'
-              $cbProcess.Kill()
-              $cbProcess.WaitForExit()
+            if (!$cbProcess.WaitForExit(15000)) {
+              # Hosted Windows runners have no interactive desktop for a human
+              # to close a first-run dialog. Send WM_CLOSE to this process's
+              # top-level windows rather than treating an unconditional kill
+              # as successful initialization.
+              Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class CbWindowCloser {
+            delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+            [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr extra);
+            [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+            [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+            public static int CloseForProcess(int targetPid) {
+              int count = 0;
+              EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
+                uint pid;
+                GetWindowThreadProcessId(hWnd, out pid);
+                if (pid == (uint)targetPid && PostMessage(hWnd, 0x0010, IntPtr.Zero, IntPtr.Zero)) count++;
+                return true;
+              }, IntPtr.Zero);
+              return count;
             }
           }
-          Write-Host 'Code::Blocks first launch completed and the application is closed.'
+          '@
+              $closed = [CbWindowCloser]::CloseForProcess($cbProcess.Id)
+              Write-Host "Sent WM_CLOSE to $closed Code::Blocks window(s)."
+              if (!$cbProcess.WaitForExit(10000)) {
+                throw 'Code::Blocks did not exit after its windows were closed; refusing to claim first-run initialization succeeded.'
+              }
+            }
+          }
+
+          if (!(Test-Path -LiteralPath $cbConfig)) {
+            throw "Code::Blocks exited but did not create its first-run config at $cbConfig."
+          }
+          $config = Get-Item -LiteralPath $cbConfig
+          if ($config.Length -lt 1) {
+            throw "Code::Blocks config exists but is empty: $cbConfig"
+          }
+          Write-Host "Verified Code::Blocks first-run config: $cbConfig ($($config.Length) bytes)."
 
       - name: Download and install JieLi Windows toolchain
         shell: pwsh
@@ -77,6 +122,53 @@ jobs:
             # Capture Inno Setup's own install log. The previous run proved
             # that both the parent and extracted child remain alive; this
             # distinguishes slow extraction from a blocked setup stage.
+            # /SUPPRESSMSGBOXES cannot suppress custom MsgBox calls made by
+            # an Inno Setup [Code] section. JieLi's installer uses exactly
+            # such a custom OK dialog for its Code::Blocks prerequisite.
+            # Detect that specific dialog by its child text and click OK via
+            # Win32; do not blindly dismiss unrelated installer errors.
+            Add-Type -TypeDefinition @'
+          using System;
+          using System.Text;
+          using System.Runtime.InteropServices;
+          public static class JieLiDialogHandler {
+            delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+            delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+            [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr extra);
+            [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumChildProc cb, IntPtr extra);
+            [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+            [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hWnd, StringBuilder text, int max);
+            [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
+            [DllImport("user32.dll", SetLastError=true)] static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
+            static bool ContainsCodeBlocksText(IntPtr dialog) {
+              bool found = false;
+              EnumChildWindows(dialog, delegate(IntPtr child, IntPtr unused) {
+                StringBuilder text = new StringBuilder(512);
+                GetWindowText(child, text, text.Capacity);
+                if (text.ToString().IndexOf("CodeBlocks", StringComparison.OrdinalIgnoreCase) >= 0) found = true;
+                return !found;
+              }, IntPtr.Zero);
+              return found;
+            }
+            public static int DismissExpectedWarning(int targetPid) {
+              int dismissed = 0;
+              EnumWindows(delegate(IntPtr hWnd, IntPtr unused) {
+                uint pid;
+                GetWindowThreadProcessId(hWnd, out pid);
+                if (pid != (uint)targetPid) return true;
+                StringBuilder cls = new StringBuilder(128);
+                GetClassName(hWnd, cls, cls.Capacity);
+                if (cls.ToString() != "#32770" || !ContainsCodeBlocksText(hWnd)) return true;
+                IntPtr result;
+                SendMessageTimeout(hWnd, 0x0111, new IntPtr(1), IntPtr.Zero, 0x0002, 2000, out result); // WM_COMMAND / IDOK
+                dismissed++;
+                return true;
+              }, IntPtr.Zero);
+              return dismissed;
+            }
+          }
+          '@
+
             $arguments = @(
               '/VERYSILENT',
               '/SUPPRESSMSGBOXES',
@@ -85,7 +177,7 @@ jobs:
               "/LOG=$installLog"
             )
             $p = Start-Process -FilePath $installer -ArgumentList $arguments -PassThru
-            $deadline = (Get-Date).AddMinutes(35)
+            $deadline = (Get-Date).AddMinutes(15)
             $lastReport = Get-Date
             while ((Get-Date) -lt $deadline) {
               if (Test-Path -LiteralPath $clang) {
@@ -96,7 +188,15 @@ jobs:
               if ($p.HasExited -and $p.ExitCode -ne 0) {
                 throw "JieLi installer exited with code $($p.ExitCode) before clang.exe appeared."
               }
-              if (((Get-Date) - $lastReport).TotalSeconds -ge 60) {
+
+              if (!$p.HasExited) {
+                $dismissed = [JieLiDialogHandler]::DismissExpectedWarning($p.Id)
+                if ($dismissed -gt 0) {
+                  Write-Host "Dismissed JieLi's documented Code::Blocks prerequisite warning ($dismissed dialog(s))."
+                }
+              }
+
+              if (((Get-Date) - $lastReport).TotalSeconds -ge 30) {
                 $lastReport = Get-Date
                 $proc = Get-Process -Id $p.Id -ErrorAction SilentlyContinue
                 if ($proc) {
@@ -109,7 +209,7 @@ jobs:
                   Write-Host 'Inno Setup log has not been created yet.'
                 }
               }
-              Start-Sleep -Seconds 10
+              Start-Sleep -Seconds 3
             }
 
             if (!(Test-Path -LiteralPath $clang)) {
