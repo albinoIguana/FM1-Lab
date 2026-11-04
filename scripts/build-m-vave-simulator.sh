@@ -10,9 +10,11 @@ SDK_PARENT="${RUNNER_TEMP:-$ROOT/.cache}"
 SDK_ROOT="$SDK_PARENT/wasi-sdk-${SDK_VERSION}-x86_64-linux"
 OUT="$SOURCE/build/web"
 
-# Compile the FM1-Lab device-side Instrument core with the official app sources.
+# Compile the FM1-Lab native Instrument and bank-metadata modules with the official app sources.
 cp "$ROOT/firmware/fm1lab_instrument.h" "$SOURCE/app/fm1lab_instrument.h"
 cp "$ROOT/firmware/fm1lab_instrument.c" "$SOURCE/app/fm1lab_instrument.c"
+cp "$ROOT/firmware/fm1lab_bank_metadata.h" "$SOURCE/app/fm1lab_bank_metadata.h"
+cp "$ROOT/firmware/fm1lab_bank_metadata.c" "$SOURCE/app/fm1lab_bank_metadata.c"
 
 if [[ ! -x "$SDK_ROOT/bin/clang" ]]; then
   mkdir -p "$SDK_PARENT"
