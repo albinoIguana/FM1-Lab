@@ -1,6 +1,6 @@
 #include "fm1lab_audio_bridge.h"
 
-#include <string.h>
+#include <limits.h>\n#include <string.h>
 #include "fm1.h"
 #include "fm1lab_audio_engine.h"
 #include "fm1lab_instrument.h"
@@ -98,8 +98,10 @@ void fm1lab_audio_set_keyboard_mode(int enabled)
 
 int fm1lab_audio_route_midi(const uint8_t *message, size_t bytes)
 {
-    if (!message || !bytes || !fm1lab_audio_is_ready() ||
-        !(audio_barrier(), keyboard_mode)) return 0;
+    if (!message || !bytes || !fm1lab_audio_is_ready()) return 0;
+    uint32_t mode = keyboard_mode;
+    audio_barrier();
+    if (!mode) return 0;
     if (message[0] == 0xffu) {
         (void)fm1lab_audio_engine_all_notes_off(&audio_engine);
         return 0;
