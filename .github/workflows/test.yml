@@ -33,6 +33,7 @@ jobs:
         run: |
           node --check src/main-native.js
           node --check src/instrument-session.js
+          node --check src/ui/home-view.js
           node --check src/m-vave-engine.js
           node --check src/dx7-macros.js
           node --check src/dx7-voice.js
