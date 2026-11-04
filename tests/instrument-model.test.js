@@ -26,7 +26,7 @@ test("rendering applies macros to a derived voice without overwriting saved patc
   bytes[121] = 40;
   const patch = createPatch("BRIGHT", bytes);
   patch.macros.brightness = 100;
-  const rendered = renderPatch(patch, 1);
+  const rendered = renderPatch(patch, 2);
   assert.ok(rendered[121] > 40);
   assert.equal(patch.baseData[121], 40);
 });
