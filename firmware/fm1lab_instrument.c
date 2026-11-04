@@ -119,6 +119,28 @@ uint8_t fm1lab_carrier_mask(unsigned algorithm)
     return carrier_masks[algorithm & 31u];
 }
 
+int fm1lab_operator_modulates(unsigned algorithm, unsigned source_operator,
+                              unsigned target_operator)
+{
+    if (source_operator < 1u || source_operator > 6u ||
+        target_operator < 1u || target_operator > 6u) return -1;
+    const uint8_t *flags = algorithm_flags[algorithm & 31u];
+    uint8_t producers[3][6] = {{0}}, counts[3] = {0};
+    uint8_t edges[6][6] = {{0}};
+    for (unsigned op = 0; op < 6; ++op) {
+        unsigned inbus = (flags[op] >> 4) & 3u, outbus = flags[op] & 3u;
+        unsigned add = (flags[op] & 4u) != 0u;
+        if (inbus)
+            for (unsigned n = 0; n < counts[inbus]; ++n)
+                edges[producers[inbus][n]][op] = 1u;
+        if (outbus) {
+            if (!add) counts[outbus] = 0u;
+            producers[outbus][counts[outbus]++] = (uint8_t)op;
+        }
+    }
+    return edges[6u - source_operator][6u - target_operator] ? 1 : 0;
+}
+
 uint8_t fm1lab_operator_depth(unsigned algorithm, unsigned operator_number)
 {
     if (operator_number < 1u || operator_number > 6u) return 0u;
