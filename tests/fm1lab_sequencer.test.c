@@ -3,11 +3,12 @@
 #include <assert.h>
 #include <string.h>
 
-static unsigned roles[8], lengths[8], tempo = 120, swing;
+static unsigned roles[8], sources[8], lengths[8], tempo = 120, swing;
 static struct groove_step steps[8][64];
 static unsigned settings[8][64][7];
 
 unsigned groove_track_role(unsigned t) { return t < 8 ? roles[t] : GROOVE_TRACK_OFF; }
+unsigned groove_source_type(unsigned t) { return t < 8 ? sources[t] : GROOVE_SOURCES; }
 unsigned groove_tempo_saved(void) { return tempo; }
 void groove_tempo_edit(int delta) { tempo = (unsigned)((int)tempo + delta); }
 unsigned groove_sequence_setting(unsigned s) { return s == 0 ? swing : 0; }
@@ -33,6 +34,9 @@ int main(void)
     roles[5] = GROOVE_TRACK_PLAY;
     assert(fm1lab_sequencer_bind(2, 5) == -2);
     roles[5] = GROOVE_TRACK_NORMAL;
+    sources[5] = GROOVE_303;
+    assert(fm1lab_sequencer_bind(2, 5) == -2);
+    sources[5] = GROOVE_DX7;
     assert(fm1lab_sequencer_bind(2, 5) == 0);
 
     fm1lab_sequence_state_t state;
