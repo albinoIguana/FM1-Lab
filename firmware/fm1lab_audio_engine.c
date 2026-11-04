@@ -2,7 +2,9 @@
 
 #include <limits.h>
 #include <string.h>
-#include "fm1_block.h"
+#include "fm1.h"
+
+static inline void audio_barrier(void) { __asm__ volatile("" ::: "memory"); }
 
 enum {
     CMD_NOTE_ON = 1,
@@ -25,35 +27,49 @@ static int voice_header_valid(const uint8_t *voice)
 static int enqueue(fm1lab_audio_engine_t *engine,
                    const fm1lab_audio_command_t *command)
 {
-    uint32_t head = __atomic_load_n(&engine->queue_head, __ATOMIC_RELAXED);
+    uint32_t head = engine->queue_head;
+    audio_barrier();
     uint32_t next = (head + 1u) & (FM1LAB_AUDIO_QUEUE_CAPACITY - 1u);
-    uint32_t tail = __atomic_load_n(&engine->queue_tail, __ATOMIC_ACQUIRE);
+    uint32_t tail = engine->queue_tail;
     if (next == tail) return -2;
     engine->queue[head] = *command;
-    __atomic_store_n(&engine->queue_head, next, __ATOMIC_RELEASE);
+    audio_barrier();
+    engine->queue_head = next;
     return 0;
 }
 
-static int dequeue(fm1lab_audio_engine_t *engine,
-                   fm1lab_audio_command_t *command)
+static FM1_AUDIO_CODE int dequeue(fm1lab_audio_engine_t *engine,
+                                   fm1lab_audio_command_t *command)
 {
-    uint32_t tail = __atomic_load_n(&engine->queue_tail, __ATOMIC_RELAXED);
-    uint32_t head = __atomic_load_n(&engine->queue_head, __ATOMIC_ACQUIRE);
+    uint32_t tail = engine->queue_tail;
+    audio_barrier();
+    uint32_t head = engine->queue_head;
     if (tail == head) return 0;
-    *command = engine->queue[tail];
-    __atomic_store_n(&engine->queue_tail,
-                     (tail + 1u) & (FM1LAB_AUDIO_QUEUE_CAPACITY - 1u),
-                     __ATOMIC_RELEASE);
+    const fm1lab_audio_command_t *source = &engine->queue[tail];
+    command->type = source->type;
+    command->patch = source->patch;
+    command->note = source->note;
+    command->velocity = source->velocity;
+    command->patch_mask = source->patch_mask;
+    command->enabled = source->enabled;
+    command->level = source->level;
+    command->midi_bytes = source->midi_bytes;
+    for (unsigned i = 0; i < sizeof command->midi; ++i)
+        command->midi[i] = source->midi[i];
+    for (unsigned i = 0; i < FM1LAB_PATCH_BYTES; ++i)
+        command->voice[i] = source->voice[i];
+    audio_barrier();
+    engine->queue_tail = (tail + 1u) & (FM1LAB_AUDIO_QUEUE_CAPACITY - 1u);
     return 1;
 }
 
-static void panic_all(fm1lab_audio_engine_t *engine)
+static FM1_AUDIO_CODE void panic_all(fm1lab_audio_engine_t *engine)
 {
     for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
         if (engine->synth[p]) fm1_dx7_panic(engine->synth[p]);
 }
 
-static void apply_command(fm1lab_audio_engine_t *engine,
+static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
                           const fm1lab_audio_command_t *command)
 {
     uint8_t message[3];
@@ -64,7 +80,7 @@ static void apply_command(fm1lab_audio_engine_t *engine,
             if ((command->patch_mask & (1u << p)) && engine->enabled[p] && engine->level[p] &&
                 synth_dx7_midi(engine->synth[p], engine->voice[p],
                            message, sizeof message) != 0)
-                __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
+                engine->errors++;
         break;
     case CMD_NOTE_OFF:
         message[0] = 0x80u; message[1] = command->note; message[2] = 0u;
@@ -89,7 +105,8 @@ static void apply_command(fm1lab_audio_engine_t *engine,
         fm1_dx7_panic(engine->synth[p]);
         if (synth_dx7_lfo_reset(engine->synth[p],
                                 (uint8_t *)command->voice) == 0) {
-            memcpy(engine->voice[p], command->voice, FM1LAB_PATCH_BYTES);
+            for (unsigned i = 0; i < FM1LAB_PATCH_BYTES; ++i)
+                engine->voice[p][i] = command->voice[i];
         } else {
             __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
         }
@@ -221,7 +238,7 @@ int fm1lab_audio_engine_note_off_mask(fm1lab_audio_engine_t *engine,
     command.note = note;
     command.patch_mask = patch_mask;
     int result = enqueue(engine, &command);
-    if (result) __atomic_store_n(&engine->panic_pending, 1u, __ATOMIC_RELEASE);
+    if (result) engine->panic_pending = 1u; audio_barrier();
     return result;
 }
 
@@ -268,16 +285,17 @@ int fm1lab_audio_engine_midi(fm1lab_audio_engine_t *engine,
     return result;
 }
 
-int fm1lab_audio_engine_render(fm1lab_audio_engine_t *engine,
+FM1_AUDIO_CODE int fm1lab_audio_engine_render(fm1lab_audio_engine_t *engine,
                                int32_t *output, size_t samples)
 {
     if (!engine || !engine->ready || !output ||
         (samples != SYNTH_DX7_BLOCK_SAMPLES && samples != FM1_BLOCK_FRAMES))
         return -1;
 
-    if (__atomic_exchange_n(&engine->panic_pending, 0u, __ATOMIC_ACQ_REL)) {
-        uint32_t head = __atomic_load_n(&engine->queue_head, __ATOMIC_ACQUIRE);
-        __atomic_store_n(&engine->queue_tail, head, __ATOMIC_RELEASE);
+    if (engine->panic_pending) {
+        engine->panic_pending = 0u;
+        audio_barrier();
+        engine->queue_tail = engine->queue_head;
         panic_all(engine);
     }
 
@@ -288,25 +306,31 @@ int fm1lab_audio_engine_render(fm1lab_audio_engine_t *engine,
     for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
         active += engine->enabled[p] && engine->level[p] != 0u;
 
-    memset(output, 0, samples * sizeof *output);
+    for (size_t i = 0; i < samples; ++i) output[i] = 0;
     if (!active) return 0;
 
     int32_t patch_output[FM1_BLOCK_FRAMES > SYNTH_DX7_BLOCK_SAMPLES
                              ? FM1_BLOCK_FRAMES : SYNTH_DX7_BLOCK_SAMPLES];
+    const int32_t denominator = (int32_t)(127u * active);
     for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p) {
         if (!engine->enabled[p] || !engine->level[p]) continue;
-        memset(patch_output, 0, samples * sizeof *patch_output);
+        for (size_t i = 0; i < samples; ++i) patch_output[i] = 0;
         if (synth_dx7_render(engine->synth[p], patch_output, samples) != 0) {
             __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
             continue;
         }
         for (size_t i = 0; i < samples; ++i) {
-            int64_t contribution = (int64_t)patch_output[i] * engine->level[p];
-            contribution /= (int64_t)(127u * active);
-            int64_t mixed = (int64_t)output[i] + contribution;
-            if (mixed > INT32_MAX) mixed = INT32_MAX;
-            if (mixed < INT32_MIN) mixed = INT32_MIN;
-            output[i] = (int32_t)mixed;
+            int32_t quotient = patch_output[i] / denominator;
+            int32_t remainder = patch_output[i] % denominator;
+            int32_t level = engine->level[p];
+            int32_t contribution = quotient * level +
+                (remainder * level) / denominator;
+            if (contribution > 0 && output[i] > INT32_MAX - contribution)
+                output[i] = INT32_MAX;
+            else if (contribution < 0 && output[i] < INT32_MIN - contribution)
+                output[i] = INT32_MIN;
+            else
+                output[i] += contribution;
         }
     }
     return 0;
@@ -321,5 +345,7 @@ unsigned fm1lab_audio_engine_active_voices(const fm1lab_audio_engine_t *engine,
 
 uint32_t fm1lab_audio_engine_error_count(const fm1lab_audio_engine_t *engine)
 {
-    return engine ? __atomic_load_n(&engine->errors, __ATOMIC_RELAXED) : 0u;
+    if (!engine) return 0u;
+    audio_barrier();
+    return engine->errors;
 }
