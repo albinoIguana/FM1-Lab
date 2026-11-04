@@ -24,12 +24,14 @@ typedef struct {
     uint16_t tempo; /* Shared native tempo, 30..300 BPM. */
     uint8_t swing;  /* Shared native swing, 0..50. */
     uint8_t selected_lane;
+    uint8_t playing;
     fm1lab_sequence_lane_t lanes[FM1LAB_SEQUENCE_LANES];
 } fm1lab_sequence_state_t;
 
 /* Bind two distinct, normal M-VAVE project tracks. The other six tracks are
  * never read-modified-written by this adapter. No implicit track assignment. */
 int fm1lab_sequencer_bind(unsigned backend_track_a, unsigned backend_track_b);
+int fm1lab_sequencer_unbind(void);
 int fm1lab_sequencer_read(fm1lab_sequence_state_t *state);
 int fm1lab_sequencer_set_tempo(int bpm);
 int fm1lab_sequencer_set_swing(unsigned swing);
@@ -37,5 +39,6 @@ int fm1lab_sequencer_set_length(unsigned lane, unsigned steps);
 int fm1lab_sequencer_set_step(unsigned lane, unsigned step,
                               const fm1lab_sequence_step_t *value);
 int fm1lab_sequencer_select_lane(unsigned lane);
+int fm1lab_sequencer_transport(unsigned playing);
 
 #endif
