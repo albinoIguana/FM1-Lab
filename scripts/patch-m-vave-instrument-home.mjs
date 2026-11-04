@@ -159,8 +159,8 @@ if (!source.includes("FM1LAB_HOME && !(pressed")) {
             goto controls_done;
     }
 `;
-  replaceOnce("    if (pressed & BUTTON(SAVE)) {\n        project_return = page; page = PROJECT;",
-    controls + "\n    if (pressed & BUTTON(SAVE)) {\n        project_return = page; page = PROJECT;",
+  replaceOnce("    if ((pressed & BUTTON(SAVE)) && page != PROJECT && page != BLE &&\n        page != SOURCE && page != ACTIONS) {",
+    controls + "\n    if ((pressed & BUTTON(SAVE)) && page != PROJECT && page != BLE &&\n        page != SOURCE && page != ACTIONS) {",
     "Instrument home controls");
 }
 
