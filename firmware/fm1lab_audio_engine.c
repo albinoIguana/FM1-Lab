@@ -10,7 +10,8 @@ enum {
     CMD_ALL_NOTES_OFF,
     CMD_SET_PATCH,
     CMD_SET_ENABLED,
-    CMD_SET_LEVEL
+    CMD_SET_LEVEL,
+    CMD_MIDI
 };
 
 static int voice_header_valid(const uint8_t *voice)
@@ -61,21 +62,27 @@ static void apply_command(fm1lab_audio_engine_t *engine,
         message[0] = 0x90u; message[1] = command->note; message[2] = command->velocity;
         for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
             if ((command->patch_mask & (1u << p)) && engine->enabled[p] &&
-                synth_dx7_midi_tuned(engine->synth[p], engine->voice[p],
-                                     message, sizeof message, 0) != 0)
+                synth_dx7_midi(engine->synth[p], engine->voice[p],
+                           message, sizeof message) != 0)
                 __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
         break;
     case CMD_NOTE_OFF:
         message[0] = 0x80u; message[1] = command->note; message[2] = 0u;
         for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
             if (command->patch_mask & (1u << p))
-                if (synth_dx7_midi_tuned(engine->synth[p], engine->voice[p],
-                                         message, sizeof message, 0) != 0)
+                if (synth_dx7_midi(engine->synth[p], engine->voice[p],
+                               message, sizeof message) != 0)
                     __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
         break;
     case CMD_ALL_NOTES_OFF:
+        panic_all(engine);
+        break;
+    case CMD_MIDI:
         for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
-            synth_dx7_all_notes_off(engine->synth[p]);
+            if ((command->patch_mask & (1u << p)) && engine->enabled[p] &&
+                synth_dx7_midi(engine->synth[p], engine->voice[p],
+                               command->midi, command->midi_bytes) != 0)
+                __atomic_add_fetch(&engine->errors, 1u, __ATOMIC_RELAXED);
         break;
     case CMD_SET_PATCH: {
         unsigned p = command->patch;
@@ -234,6 +241,25 @@ int fm1lab_audio_engine_all_notes_off(fm1lab_audio_engine_t *engine)
     command.type = CMD_ALL_NOTES_OFF;
     int result = enqueue(engine, &command);
     if (result) __atomic_store_n(&engine->panic_pending, 1u, __ATOMIC_RELEASE);
+    return result;
+}
+
+int fm1lab_audio_engine_midi(fm1lab_audio_engine_t *engine,
+                             const uint8_t *message, size_t bytes,
+                             uint8_t patch_mask)
+{
+    if (!engine || !engine->ready || !message || !bytes || bytes > 3u ||
+        message[0] < 0x80u || message[0] >= 0xf0u ||
+        !patch_mask || (patch_mask & 0xf0u)) return -1;
+    fm1lab_audio_command_t command = {0};
+    command.type = CMD_MIDI;
+    command.patch_mask = patch_mask;
+    command.midi_bytes = (uint8_t)bytes;
+    memcpy(command.midi, message, bytes);
+    int result = enqueue(engine, &command);
+    if (result && ((message[0] & 0xf0u) == 0x80u ||
+        ((message[0] & 0xf0u) == 0x90u && bytes == 3u && message[2] == 0u)))
+        __atomic_store_n(&engine->panic_pending, 1u, __ATOMIC_RELEASE);
     return result;
 }
 
