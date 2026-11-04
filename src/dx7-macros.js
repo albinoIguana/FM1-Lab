@@ -10,7 +10,7 @@ export const DEFAULT_MACROS = Object.freeze({ brightness: 50, body: 50, motion: 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Math.round(Number(value) || 0)));
 const operatorOffset = number => (OPERATOR_COUNT - number) * OPERATOR_STRIDE;
 const scaledDelta = (delta, percent) => {
-  const value = delta * percent;
+  const value = delta * percent / 100;
   return value >= 0 ? Math.floor(value + 0.5) : Math.ceil(value - 0.5);
 };
 function adjusted(base, amount, min = 0, max = 99) {
@@ -34,7 +34,7 @@ export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x
     const offset = operatorOffset(operator);
     if (isCarrier) {
       // BODY shapes the carrier's sustained presence, not its oscillator ratio.
-      bytes[offset + 6] = adjusted(base[offset + 6], delta.body * 0.45);
+      bytes[offset + 6] = adjusted(base[offset + 6], scaledDelta(delta.body, 45));
     } else {
       // BRIGHTNESS changes modulation index by raising/lowering modulator output.
       const depth = Math.max(1, Math.min(6, Number(operatorDepths[operator - 1]) || 1));
@@ -52,7 +52,7 @@ export function applyMacros(basePatch, values = DEFAULT_MACROS, carrierMask = 0x
 
   // DIRT is deliberately a bounded feedback control in this first experiment.
   // Frequency ratios remain untouched until topology-aware ratio mapping exists.
-  bytes[GLOBAL.feedback] = adjusted(base[GLOBAL.feedback], delta.dirt * 0.08, 0, 7);
+  bytes[GLOBAL.feedback] = adjusted(base[GLOBAL.feedback], scaledDelta(delta.dirt, 8), 0, 7);
   return bytes;
 }
 
