@@ -97,7 +97,8 @@ export function setStep(sequence, trackIndex, stepIndex, changes = {}) {
   const step = next.tracks[trackIndex].steps[stepIndex];
   if ("active" in changes) step.active = Boolean(changes.active);
   if ("note" in changes) step.note = clamp(changes.note, 0, 127);
-  if ("velocity" in changes) step.velocity = clamp(changes.velocity, 0, 127);
+  if ("velocity" in changes) { step.velocity = clamp(changes.velocity, 0, 127); if (step.velocity === 0) step.active = false; }
+  if ("active" in changes && step.active && step.velocity === 0) step.velocity = 1;
   if ("gate" in changes) step.gate = clamp(changes.gate, 0, 15);
   if ("tie" in changes) step.tie = Boolean(changes.tie);
   if ("alt" in changes) step.alt = Boolean(changes.alt);
