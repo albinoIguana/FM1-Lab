@@ -94,6 +94,7 @@ int main(void)
     assert(fm1lab_sequencer_set_step(0, 7, &step) == 0);
     assert(steps[2][7].velocity == 0);
     assert(fm1lab_sequencer_select_lane(1) == 0);
+    assert(fm1lab_sequencer_read(&state) == 0 && state.selected_lane == 1);
     assert(fm1lab_sequencer_select_lane(2) == -1);
 
     /* Unbound project tracks remain byte-for-byte untouched. */
