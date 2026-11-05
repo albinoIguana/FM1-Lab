@@ -3,6 +3,7 @@
 #pragma once
 #include <stdint.h>
 
+#define FM6_SAMPLE_RATE_HZ 44100u /* fm1-base device/main_fm1.c: FS */
 #define FM1LAB_PATCH_COUNT 4u
 #define FM1LAB_MACRO_COUNT 4u
 #define FM1LAB_VOICE_LIMIT 8u /* voices per patch; four independent pools */
