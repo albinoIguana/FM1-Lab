@@ -737,15 +737,32 @@ static void draw(void)
     }
     cv_line(4, 54, 236, 54, C_LINE);
     cv_text(6, 58, &FONT_XS, "SEQUENCER", C_GRAY);
-    cv_text(86, 58, &FONT_XS, "2 LANES", C_HI);
-    cv_text(190, 58, &FONT_XS, "STOPPED", C_DIM);
+    cv_text(86, 58, &FONT_XS, ui.seq_edit ? "EDIT" : "2 LANES", C_HI);
+    int_text(seq_tempo(), t);
+    text_cat(t, " BPM");
+    cv_text(137, 58, &FONT_XS, t, C_GRAY);
+    cv_text(204, 58, &FONT_XS, seq_running() ? "PLAY" : "STOP", seq_running() ? C_HI : C_DIM);
     for (i = 0; i < 16; i++) {
+        uint32_t lane;
         int32_t x = 37 + (int32_t)i * 12;
-        cv_rect(x, 72, 8, 7, C_LINE);
-        cv_rect(x, 85, 8, 7, C_LINE);
+        for (lane = 0; lane < 2; lane++) {
+            int32_t y = lane ? 85 : 72;
+            uint8_t note = seq_step_note(lane, i);
+            uint16_t fill = note == 0xFFu ? C_LINE : lane ? C_WHITE : C_HI;
+            cv_rect(x, y, 8, 7, fill);
+            if (ui.seq_edit && ui.seq_lane == lane && ui.seq_step == i) {
+                cv_line(x - 1, y - 1, x + 8, y - 1, C_WHITE);
+                cv_line(x - 1, y + 7, x + 8, y + 7, C_WHITE);
+                cv_line(x - 1, y - 1, x - 1, y + 7, C_WHITE);
+                cv_line(x + 8, y - 1, x + 8, y + 7, C_WHITE);
+            } else if (seq_running() && seq_current_step() == i) {
+                cv_line(x - 1, y - 1, x + 8, y - 1, C_HI);
+                cv_line(x - 1, y + 7, x + 8, y + 7, C_HI);
+            }
+        }
     }
-    cv_text(6, 70, &FONT_XS, "A", C_HI);
-    cv_text(6, 83, &FONT_XS, "B", C_HI);
+    cv_text(6, 70, &FONT_XS, "A", ui.seq_lane == 0 ? C_WHITE : C_GRAY);
+    cv_text(6, 83, &FONT_XS, "B", ui.seq_lane == 1 ? C_WHITE : C_GRAY);
     cv_blit(0, 144);
 }
 
