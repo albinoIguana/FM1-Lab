@@ -1,0 +1,322 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * FM1-Lab FM6 voice layer.
+ *
+ * FM6 core: Felucca's integer-only MSFA/Dexed-derived core, Apache-2.0.
+ * The core is included in this translation unit because its compact API is
+ * intentionally static; this wrapper supplies the four-patch instrument and
+ * a single shared eight-voice allocator.
+ */
+#include <stdint.h>
+#include <string.h>
+#include "fm6.h"
+#include "felucca_tables.h"
+#include "felucca_fm6.h"
+
+/* FM6 core source: Apache-2.0, Copyright Google / Pascal Gauthier / Leo Kuroshita.
+ * Do not remove its SPDX header or attribution. */
+#include "../../upstream/felucca/firmware/src/fm6_core.c"
+
+#define PATCHES FM1LAB_PATCH_COUNT
+#define VOICES FM1LAB_VOICE_LIMIT
+#define Q24_ONE (1 << 24)
+#define Q24_DB6 (1 << 24)
+#define OUTPUT_LIMIT 8388607
+
+typedef struct {
+    uint8_t base[FP_SIZE + 1u];
+    uint8_t effective[FP_SIZE + 1u];
+    uint8_t macro[FM1LAB_MACRO_COUNT];
+    uint8_t enabled;
+    int32_t mod_level;
+    int32_t detune[6];
+    uint8_t feedback;
+    uint8_t ready;
+} fm1lab_patch_t;
+
+typedef struct {
+    fm6_note_t state;
+    uint32_t age;
+    uint8_t patch;
+    uint8_t note;
+    uint8_t used;
+    uint8_t fade_in;
+} fm1lab_voice_t;
+
+static fm1lab_patch_t instrument[PATCHES];
+static fm1lab_voice_t voices[VOICES];
+static fm6_lfo_t patch_lfo[PATCHES];
+static int32_t patch_lfo_value[PATCHES];
+static int32_t patch_lfo_delay[PATCHES];
+static uint32_t age_counter;
+static int32_t output_gain_q12;
+
+static int32_t clamp_i32(int32_t x, int32_t lo, int32_t hi)
+{
+    return x < lo ? lo : x > hi ? hi : x;
+}
+
+/* 128-byte Felucca bank record -> the 155-byte FM6 voice used by the core. */
+static void fm6_unpack(const uint8_t *b, uint8_t *v)
+{
+    uint32_t k, i;
+    for (k = 0; k < 6u; k++) {
+        const uint8_t *o = b + k * 17u;
+        uint8_t *d = v + k * FP_OP;
+        for (i = 0; i < 11u; i++)
+            d[i] = o[i] & 0x7Fu;
+        d[FP_LC] = o[11] & 3u;
+        d[FP_RC] = (o[11] >> 2) & 3u;
+        d[FP_RS] = o[12] & 7u;
+        d[FP_DET] = (o[12] >> 3) & 15u;
+        d[FP_AMS] = o[13] & 3u;
+        d[FP_KVS] = (o[13] >> 2) & 7u;
+        d[FP_OL] = o[14] & 0x7Fu;
+        d[FP_MODE] = o[15] & 1u;
+        d[FP_FC] = (o[15] >> 1) & 31u;
+        d[FP_FF] = o[16] & 0x7Fu;
+    }
+    for (i = 0; i < 9u; i++)
+        v[FP_PR1 + i] = b[102 + i] & 0x7Fu;
+    v[FP_ALG] &= 31u;
+    v[FP_FB] = b[111] & 7u;
+    v[FP_OKS] = (b[111] >> 3) & 1u;
+    for (i = 0; i < 4u; i++)
+        v[FP_LFS + i] = b[112 + i] & 0x7Fu;
+    v[FP_LKS] = b[116] & 1u;
+    v[FP_LFW] = (b[116] >> 1) & 7u;
+    v[FP_LPMS] = (b[116] >> 4) & 7u;
+    v[FP_TRNSP] = b[117] & 0x7Fu;
+    for (i = 0; i < 10u; i++)
+        v[FP_NAME + i] = b[118 + i] & 0x7Fu;
+    fm6_sanitize(v);
+}
+
+static void fm6_rebuild_patch(uint32_t index)
+{
+    fm1lab_patch_t *p = &instrument[index];
+    uint8_t *e = p->effective;
+    const uint8_t *b = p->base;
+    int32_t body = (int32_t)p->macro[FM1LAB_MACRO_BODY] - 50;
+    int32_t motion = p->macro[FM1LAB_MACRO_MOTION];
+    int32_t dirt = (int32_t)p->macro[FM1LAB_MACRO_DIRT] - 50;
+    int32_t ratio = body * 4 / 50;
+    int32_t meg = body * 40 / 50;
+    uint32_t carriers, k, j, carrier_n = 0;
+    static const int8_t spread[6] = {0, 1, -1, 2, -2, 3};
+    int32_t cents_step = dirt * 70908 / 50; /* 12 cents at either macro extreme; Q24 log2 */
+    memcpy(e, b, FP_SIZE + 1u);
+    carriers = fm6_carriers(e[FP_ALG]);
+
+    p->mod_level = ((int32_t)p->macro[FM1LAB_MACRO_BRIGHTNESS] - 50) * (6 << 24) / 50;
+    p->feedback = (uint8_t)clamp_i32((int32_t)b[FP_FB] + dirt * 3 / 50, 0, 7);
+
+    /* MOTION is a neutral-at-50 multiplier on the patch's LFO speed and depth. */
+    e[FP_LFS] = (uint8_t)clamp_i32((int32_t)b[FP_LFS] * motion / 50, 0, 99);
+    e[FP_LPMD] = (uint8_t)clamp_i32((int32_t)b[FP_LPMD] * motion / 50, 0, 99);
+    e[FP_LAMD] = (uint8_t)clamp_i32((int32_t)b[FP_LAMD] * motion / 50, 0, 99);
+
+    for (k = 0; k < 6u; k++) {
+        uint32_t ki = 5u - k; /* UI order OP1..OP6; core storage is OP6..OP1. */
+        uint8_t *op = e + ki * FP_OP;
+        p->detune[ki] = 0;
+        if ((carriers >> ki) & 1u) {
+            p->detune[ki] = spread[carrier_n++] * cents_step;
+            continue;
+        }
+        /* BODY is topology-aware: only modulators change ratio and envelope time. */
+        if (!op[FP_MODE])
+            op[FP_FC] = (uint8_t)clamp_i32((int32_t)op[FP_FC] + ratio, 0, 31);
+        for (j = 0; j < 4u; j++)
+            op[FP_R1 + j] = (uint8_t)clamp_i32((int32_t)op[FP_R1 + j] - meg, 0, 99);
+    }
+    fm6_lfo_reset(&patch_lfo[index], e);
+    p->ready = 1;
+}
+
+static int32_t fm6_soft_clip(int64_t x)
+{
+    uint64_t a = (uint64_t)(x < 0 ? -x : x);
+    uint32_t index = (uint32_t)(a >> 16);
+    int32_t y;
+    if (index > 256u)
+        index = 256u;
+    y = (int32_t)(((int64_t)TANH_Q15[index] * OUTPUT_LIMIT) >> 15);
+    return x < 0 ? -y : y;
+}
+
+static fm1lab_voice_t *fm6_allocate_voice(void)
+{
+    uint32_t i, oldest = 0;
+    for (i = 0; i < VOICES; i++)
+        if (!voices[i].used)
+            return &voices[i];
+    for (i = 1; i < VOICES; i++)
+        if ((int32_t)(voices[i].age - voices[oldest].age) < 0)
+            oldest = i;
+    return &voices[oldest];
+}
+
+void fm6_init(void)
+{
+    uint32_t i;
+    memset(instrument, 0, sizeof(instrument));
+    memset(voices, 0, sizeof(voices));
+    memset(patch_lfo, 0, sizeof(patch_lfo));
+    memset(patch_lfo_value, 0, sizeof(patch_lfo_value));
+    memset(patch_lfo_delay, 0, sizeof(patch_lfo_delay));
+    age_counter = 0;
+    output_gain_q12 = 0;
+    for (i = 0; i < PATCHES; i++) {
+        fm6_unpack(FM6_FACTORY[i], instrument[i].base);
+        instrument[i].macro[0] = 50;
+        instrument[i].macro[1] = 50;
+        instrument[i].macro[2] = 50;
+        instrument[i].macro[3] = 50;
+        instrument[i].enabled = (i == 0u); /* one layer by default; enable more as desired */
+        fm6_rebuild_patch(i);
+    }
+}
+
+void fm6_panic(void)
+{
+    memset(voices, 0, sizeof(voices));
+}
+
+void fm6_note_on(uint8_t note, uint8_t velocity)
+{
+    uint32_t i;
+    if (note > 127u || !velocity)
+        return;
+    for (i = 0; i < PATCHES; i++) {
+        fm1lab_patch_t *p = &instrument[i];
+        fm1lab_voice_t *v;
+        if (!p->enabled)
+            continue;
+        v = fm6_allocate_voice();
+        v->patch = (uint8_t)i;
+        v->note = note;
+        v->used = 1;
+        v->age = ++age_counter;
+        v->fade_in = 32;
+        fm6_note_init(&v->state, p->effective, (int32_t)note + p->effective[FP_TRNSP] - 24, velocity, 1);
+        fm6_lfo_key(&patch_lfo[i]);
+    }
+}
+
+void fm6_note_off(uint8_t note)
+{
+    uint32_t i;
+    for (i = 0; i < VOICES; i++) {
+        fm1lab_voice_t *v = &voices[i];
+        if (v->used && v->note == note) {
+            fm1lab_patch_t *p = &instrument[v->patch];
+            fm6_note_key(&v->state, p->effective, 0);
+        }
+    }
+}
+
+void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
+{
+    uint32_t base;
+    for (base = 0; base < frames; base += FM6_N) {
+        int32_t mix[FM6_N] = {0};
+        uint32_t p, v, i;
+        uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
+
+        for (p = 0; p < PATCHES; p++) {
+            patch_lfo_value[p] = fm6_lfo_sample(&patch_lfo[p]);
+            patch_lfo_delay[p] = fm6_lfo_delay(&patch_lfo[p]);
+        }
+
+        for (v = 0; v < VOICES; v++) {
+            fm1lab_voice_t *voice = &voices[v];
+            fm1lab_patch_t *patch;
+            int32_t bus[FM6_N];
+            int32_t pitch, fb;
+            if (!voice->used)
+                continue;
+            patch = &instrument[voice->patch];
+            pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16, 0);
+            fb = patch->feedback;
+            if (fm6_note_compute(&voice->state, patch->effective, bus,
+                                 patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
+                                 pitch, patch->effective[FP_ALG], fb, patch->detune, patch->mod_level)) {
+                int32_t dc = voice->state.dc;
+                for (i = 0; i < FM6_N; i++) {
+                    int32_t x = bus[i] - dc;
+                    dc += x >> 10; /* ~7 Hz high-pass; FM sidebands can otherwise leave DC. */
+                    if (voice->fade_in) {
+                        uint32_t gain = 32u - voice->fade_in;
+                        x = (int32_t)(((int64_t)x * gain) >> 5);
+                        voice->fade_in--;
+                    }
+                    mix[i] += x;
+                }
+                voice->state.dc = dc;
+            }
+            if (fm6_note_done(&voice->state, patch->effective, patch->effective[FP_ALG])) {
+                voice->state.live = 0;
+                voice->used = 0;
+            }
+        }
+
+        for (i = 0; i < count; i++) {
+            int32_t delta = (int32_t)master_q12 - output_gain_q12;
+            if (delta)
+                output_gain_q12 += delta / 64 + (delta > 0 ? 1 : -1);
+            stereo[(base + i) * 2u] = fm6_soft_clip(((int64_t)mix[i] * output_gain_q12) >> 15);
+            stereo[(base + i) * 2u + 1u] = stereo[(base + i) * 2u];
+        }
+    }
+}
+
+uint32_t fm6_patch_count(void) { return PATCHES; }
+const char *fm6_patch_name(uint32_t patch) { return patch < PATCHES ? (const char *)&instrument[patch].base[FP_NAME] : ""; }
+uint8_t fm6_patch_enabled(uint32_t patch) { return patch < PATCHES ? instrument[patch].enabled : 0; }
+void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled)
+{
+    uint32_t i;
+    if (patch >= PATCHES)
+        return;
+    instrument[patch].enabled = enabled != 0;
+    if (!enabled)
+        for (i = 0; i < VOICES; i++)
+            if (voices[i].used && voices[i].patch == patch)
+                fm6_note_key(&voices[i].state, instrument[patch].effective, 0);
+}
+uint8_t fm6_patch_algorithm(uint32_t patch) { return patch < PATCHES ? instrument[patch].effective[FP_ALG] : 0; }
+uint8_t fm6_operator_is_carrier(uint32_t patch, uint32_t op_1_to_6)
+{
+    uint32_t bit;
+    if (patch >= PATCHES || op_1_to_6 < 1u || op_1_to_6 > 6u)
+        return 0;
+    bit = 5u - (op_1_to_6 - 1u);
+    return (uint8_t)((fm6_carriers(instrument[patch].effective[FP_ALG]) >> bit) & 1u);
+}
+const uint8_t *fm6_patch_data(uint32_t patch) { return patch < PATCHES ? instrument[patch].base : 0; }
+void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
+{
+    if (patch >= PATCHES || byte_index >= FP_SIZE)
+        return;
+    instrument[patch].base[byte_index] = value;
+    fm6_sanitize(instrument[patch].base);
+    fm6_rebuild_patch(patch);
+}
+void fm6_macro_set(uint32_t patch, uint32_t macro, uint8_t value)
+{
+    if (patch >= PATCHES || macro >= FM1LAB_MACRO_COUNT)
+        return;
+    instrument[patch].macro[macro] = value > 100u ? 100u : value;
+    fm6_rebuild_patch(patch);
+}
+uint8_t fm6_macro_get(uint32_t patch, uint32_t macro)
+{
+    return patch < PATCHES && macro < FM1LAB_MACRO_COUNT ? instrument[patch].macro[macro] : 50u;
+}
+uint32_t fm6_active_voices(void)
+{
+    uint32_t i, n = 0;
+    for (i = 0; i < VOICES; i++)
+        n += voices[i].used != 0;
+    return n;
+}
