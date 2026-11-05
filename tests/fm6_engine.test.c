@@ -177,6 +177,71 @@ int main(void) {
     }
 
 
+    /* Combined worst-case functional stress: all 32 patch voices occupied,
+     * both sequencer lanes advancing, 16 held arp notes, and every FX bus
+     * enabled at maximum wet/send. Render one second of 44.1 kHz audio in
+     * device-sized 128-frame blocks. This checks integration and bounds, not
+     * the target's real-time CPU deadline. */
+    fm6_init();
+    memcpy(voice, fm6_patch_data(0), 155u);
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        if (patch) assert(fm6_patch_set_voice(patch, voice) == 0);
+        fm6_patch_set_enabled(patch, 1u);
+        fm6_patch_set_level(patch, 127u);
+        for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
+            fm6_note_on_mask((uint8_t)(36u + patch * 12u + n), 105u,
+                             (uint8_t)(1u << patch));
+        assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
+    }
+    for (unsigned effect = 0; effect < 3u; ++effect) {
+        fm6_fx_set_enabled((uint8_t)effect, 1u);
+        fm6_fx_set_mix((uint8_t)effect, 100u);
+        fm6_fx_set_time((uint8_t)effect, 100u);
+        fm6_fx_set_feedback((uint8_t)effect, (uint8_t)(effect == 0u ? 70u : 90u));
+        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+            fm6_fx_set_send((uint8_t)patch, (uint8_t)effect, 100u);
+    }
+    fm6_set_tempo(300u);
+    fm6_sequencer_set_length(64u);
+    fm6_sequencer_set_lane(0u, 0u);
+    fm6_sequencer_set_lane(1u, 1u);
+    for (unsigned lane = 0; lane < 2u; ++lane)
+        for (unsigned step = 0; step < 64u; ++step)
+            fm6_sequencer_set_step((uint8_t)lane, (uint8_t)step, 1u,
+                (uint8_t)(48u + lane * 12u + step % 12u), 110u, 90u);
+    fm6_arpeggiator_set_mode(1u);
+    for (unsigned n = 0; n < 16u; ++n)
+        fm6_note_on((uint8_t)(48u + n), (uint8_t)(80u + n * 3u));
+    fm6_sequencer_set_running(1u);
+
+    uint32_t stress_peak = 0u;
+    unsigned stereo_frames = 0u;
+    unsigned rendered_frames = 0u;
+    for (unsigned block = 0; block < 44100u / TEST_FRAMES; ++block) {
+        memset(output, 0, sizeof output);
+        fm6_render(output, TEST_FRAMES, 4096u);
+        for (unsigned sample = 0; sample < TEST_WORDS; ++sample) {
+            int64_t value = output[sample];
+            uint32_t magnitude = (uint32_t)(value < 0 ? -value : value);
+            assert(magnitude <= 8388607u);
+            if (magnitude > stress_peak) stress_peak = magnitude;
+        }
+        for (unsigned frame = 0; frame < TEST_FRAMES; ++frame)
+            if (output[frame * 2u] != output[frame * 2u + 1u]) ++stereo_frames;
+        rendered_frames += TEST_FRAMES;
+        assert(fm6_active_voices() <= FM1LAB_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
+        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+            assert(fm6_active_voices_patch(patch) <= FM1LAB_VOICE_LIMIT);
+    }
+    assert(rendered_frames >= 44000u);
+    assert(stress_peak > 0u);
+    assert(stereo_frames > 0u); /* chorus is actually contributing stereo output */
+    assert(fm6_sequencer_step() > 0u);
+    fm6_panic();
+    assert(fm6_active_voices() == 0u);
+    fm6_sequencer_set_running(0u);
+    fm6_arpeggiator_set_mode(0u);
+
     /* Performance state snapshot/restore covers every sequencer step, lane
      * assignment, tempo, arp mode, effect control and per-patch send. */
     fm6_performance_state_t saved, restored;
