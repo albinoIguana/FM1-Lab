@@ -53,7 +53,7 @@ The active FM6 renderer now owns the timing and note generation; these are not c
 - **FX routing:** each of the four FM6 patches has independent 0–100 sends to shared CHORUS, DELAY and REVERB buses. The three buses are processed in parallel after patch mixing. Chorus uses offset left/right taps for stereo width; delay and reverb are shared mono returns. Each has a wet-return control and time/feedback parameters; delay feedback and reverb/chorus regeneration are separate. The active UI exposes one effect per page, bypass, wet amount, time/feedback and the selected patch's send level.
 - **DSP buffers:** the effects use fixed-size integer ring/comb buffers and no allocation or flash I/O in the render path. The delay, chorus and three reverb comb buffers occupy 96 KiB in the platform `.pool` region.
 
-Sequencer patterns, arp mode, tempo and FX parameters currently initialize to defaults at boot; they are not yet saved as user data. The two-lane UI is an initial functional editor, not yet the final sequencing workflow (no swing, tie editing, MIDI clock sync or pattern persistence).
+Sequencer patterns, both lane assignments, tempo, arp mode, FX enable/mix/time/feedback and all per-patch FX sends are now included in the CRC-protected settings record. SAVE snapshots the live FM6 performance state; boot restores it stopped. Existing compact settings records have migration paths. Runtime transport phase, held notes and delay/reverb history are intentionally not persisted. The two-lane UI is an initial functional editor, not yet the final sequencing workflow (no swing, tie editing or MIDI clock sync).
 
 ## Remaining validation
 
@@ -63,4 +63,4 @@ Sequencer patterns, arp mode, tempo and FX parameters currently initialize to de
 
 ## Validation
 
-The FM6 host test compiles the same `app/dsp/fm6.c` and pinned Felucca core used by the active device build. The native device workflow runs that test, builds the firmware with fm1-base/Felucca-BSP and creates the package. A passing host test is not a substitute for physical hardware validation.
+The FM6 host test compiles the same `app/dsp/fm6.c` and pinned Felucca core used by the active device build. It now exercises a one-second combined stress run with all 32 voice slots occupied, both sequencer lanes active, 16 held arp notes and all three FX buses at maximum wet/send, checking voice bounds and Q23 output bounds. It also tests the platform overload callback: fm1-base calls `app_overload()` when a measured render block exceeds 90% of its 5.8 ms deadline; FM1-Lab then fades the globally oldest voice over 32 samples and frees that slot without changing another patch's allocator. This is a safety mechanism, not proof that the workload meets the deadline. The native device workflow runs the host tests and builds the firmware with fm1-base/Felucca-BSP. Host timing is not used as a device CPU estimate.
