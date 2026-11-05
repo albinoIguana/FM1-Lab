@@ -10,10 +10,16 @@
 static uint8_t saved_track_roles[GROOVE_TRACKS];
 static uint8_t roles_saved;
 
-static void fm1lab_native_transport(unsigned playing)
+static int fm1lab_native_transport(unsigned playing)
 {
-    /* Official screen MMC handler posts transport to the native sequencer. */
-    groove_screen_mmc(playing ? 2U : 1U);
+    if (!playing) {
+        groove_screen_mmc(1U); /* Official Stop + recording cleanup. */
+        return 0;
+    }
+    /* MMC command 2 is Continue (0xFB), not Start. The official screen's
+     * Start path posts 0xFA through this same local MIDI input queue. */
+    const uint8_t start = 0xfaU;
+    return fm1_midi_post(&start, 1U);
 }
 
 /* The alternate-tuning flag is part of the native step encoding. */
@@ -207,6 +213,5 @@ int fm1lab_sequencer_select_lane(unsigned lane)
 int fm1lab_sequencer_transport(unsigned playing)
 {
     if (playing > 1U || bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
-    fm1lab_native_transport(playing);
-    return 0;
+    return fm1lab_native_transport(playing) ? -2 : 0;
 }
