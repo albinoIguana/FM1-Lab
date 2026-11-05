@@ -7,7 +7,6 @@
  * a single shared eight-voice allocator.
  */
 #include <stdint.h>
-#include <string.h>
 #include "fm6.h"
 #include "felucca_tables.h"
 #include "felucca_fm6.h"
@@ -15,6 +14,20 @@
 /* FM6 core source: Apache-2.0, Copyright Google / Pascal Gauthier / Leo Kuroshita.
  * Do not remove its SPDX header or attribution. */
 #include "../../upstream/felucca/firmware/src/fm6_core.c"
+
+static void fm6_copy_bytes(void *dst, const void *src, uint32_t n)
+{
+    uint8_t *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+    while (n--)
+        *d++ = *s++;
+}
+static void fm6_zero_bytes(void *dst, uint32_t n)
+{
+    uint8_t *d = (uint8_t *)dst;
+    while (n--)
+        *d++ = 0;
+}
 
 #define PATCHES FM1LAB_PATCH_COUNT
 #define VOICES FM1LAB_VOICE_LIMIT
@@ -104,7 +117,7 @@ static void fm6_rebuild_patch(uint32_t index)
     uint32_t carriers, k, j, carrier_n = 0;
     static const int8_t spread[6] = {0, 1, -1, 2, -2, 3};
     int32_t cents_step = dirt * 70908 / 50; /* 12 cents at either macro extreme; Q24 log2 */
-    memcpy(e, b, FP_SIZE + 1u);
+    fm6_copy_bytes(e, b, FP_SIZE + 1u);
     carriers = fm6_carriers(e[FP_ALG]);
 
     p->mod_level = ((int32_t)p->macro[FM1LAB_MACRO_BRIGHTNESS] - 50) * (6 << 24) / 50;
@@ -159,11 +172,11 @@ static fm1lab_voice_t *fm6_allocate_voice(void)
 void fm6_init(void)
 {
     uint32_t i;
-    memset(instrument, 0, sizeof(instrument));
-    memset(voices, 0, sizeof(voices));
-    memset(patch_lfo, 0, sizeof(patch_lfo));
-    memset(patch_lfo_value, 0, sizeof(patch_lfo_value));
-    memset(patch_lfo_delay, 0, sizeof(patch_lfo_delay));
+    fm6_zero_bytes(instrument, sizeof(instrument));
+    fm6_zero_bytes(voices, sizeof(voices));
+    fm6_zero_bytes(patch_lfo, sizeof(patch_lfo));
+    fm6_zero_bytes(patch_lfo_value, sizeof(patch_lfo_value));
+    fm6_zero_bytes(patch_lfo_delay, sizeof(patch_lfo_delay));
     age_counter = 0;
     output_gain_q12 = 0;
     for (i = 0; i < PATCHES; i++) {
@@ -179,7 +192,7 @@ void fm6_init(void)
 
 void fm6_panic(void)
 {
-    memset(voices, 0, sizeof(voices));
+    fm6_zero_bytes(voices, sizeof(voices));
 }
 
 void fm6_note_on(uint8_t note, uint8_t velocity)
