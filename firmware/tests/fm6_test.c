@@ -4,6 +4,7 @@
 #include <string.h>
 #include "fm6.h"
 #include "seq.h"
+#include "storage_format.h"
 
 #define BLOCK 256u
 #define BLOCKS 24u
@@ -64,6 +65,9 @@ int main(void)
 {
     result_t base, repeat, neutral, bright, body, dirt;
     fm1lab_instrument_record_t record;
+    fm1lab_instrument_record_t chunk_in[6], chunk_out[6];
+    uint8_t chunk_bytes[FM1LAB_STORE_CHUNK_HEADER_BYTES + 6u * sizeof(fm1lab_instrument_record_t)];
+    uint32_t chunk_written = 0;
     uint32_t p, op, i, b;
     uint32_t active_peak = 0;
 
@@ -138,6 +142,26 @@ int main(void)
                 changed = 1;
         require(changed, "algorithm change updates operator routing topology");
     }
+
+    /* Chunk storage format checks header, version, length and CRC. */
+    memset(chunk_in, 0, sizeof(chunk_in));
+    for (i = 0; i < 6u; i++) {
+        chunk_in[i].valid = 1;
+        chunk_in[i].name[0] = (uint8_t)('A' + i);
+        chunk_in[i].seq_tempo = 120u;
+        chunk_in[i].seq_note[0][0] = (uint8_t)(60u + i);
+        chunk_in[i].seq_velocity[0][0] = 100u;
+    }
+    require(fm1lab_store_chunk_encode(0u, 6u, chunk_in, chunk_bytes,
+                sizeof(chunk_bytes), &chunk_written), "Instrument chunk encodes");
+    require(chunk_written == sizeof(chunk_bytes), "Instrument chunk fits its sector budget");
+    require(fm1lab_store_chunk_decode(0u, 6u, chunk_bytes, chunk_written, chunk_out),
+            "Instrument chunk decodes with valid CRC");
+    require(memcmp(chunk_in, chunk_out, sizeof(chunk_in)) == 0,
+            "Instrument chunk round-trips every patch and sequence byte");
+    chunk_bytes[FM1LAB_STORE_CHUNK_HEADER_BYTES + 10u] ^= 0x01u;
+    require(!fm1lab_store_chunk_decode(0u, 6u, chunk_bytes, chunk_written, chunk_out),
+            "Instrument chunk corruption is rejected by CRC");
 
     fm6_init();
     for (p = 0; p < 4u; p++)
