@@ -71,7 +71,7 @@ static int32_t output_gain_q12;
 static int16_t pitch_bend_16;
 
 
-#define FM6_SAMPLE_RATE 48000u
+#define FM6_SAMPLE_RATE FM6_SAMPLE_RATE_HZ
 #define FM6_SEQ_LANES 2u
 #define FM6_SEQ_STEPS 64u
 #define FM6_DELAY_SIZE 8192u
