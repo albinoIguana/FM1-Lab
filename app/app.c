@@ -375,7 +375,7 @@ void app_init(void)
     }
     instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-        fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
+        fm6_patch_set_enabled(p, 1u);
         fm6_patch_set_level(p, set.levels[p]);
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             fm6_macro_set(p, m, set.macros[p][m]);
