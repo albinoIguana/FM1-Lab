@@ -432,7 +432,19 @@ static void input(void)
             octave_step(1);
         else if (k == B_REC && FM1B_BLE)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
-        else if (k == B_SEL && ui.seq_edit) {
+        else if (k == B_SEL && ui.editor) {
+            if (ui.op_param == FM6_OP_RATIO || ui.op_param == FM6_OP_FIXED_MODE) {
+                uint8_t mode = (uint8_t)!fm6_operator_value(set.patch, ui.op_index + 1u, FM6_OP_FIXED_MODE);
+                ui_event_push3(EV_OPERATOR_SET,
+                               (uint8_t)(set.patch * FM6_OP_PARAM_COUNT + FM6_OP_FIXED_MODE),
+                               (uint8_t)(ui.op_index + 1u), mode);
+                app_say("FREQUENCY MODE", mode ? "FIXED" : "RATIO");
+            } else {
+                uint8_t enabled = (uint8_t)!fm6_patch_enabled(set.patch);
+                ui_event_push(EV_PATCH_ENABLE, set.patch, enabled);
+                app_say(fm6_patch_name(set.patch), enabled ? "ON" : "OFF");
+            }
+        } else if (k == B_SEL && ui.seq_edit) {
             uint8_t step_id = (uint8_t)((ui.seq_lane << 4) | ui.seq_step);
             if (seq_step_note(ui.seq_lane, ui.seq_step) == 0xFFu) {
                 uint8_t note = ui.last_key >= 0 ? (uint8_t)(53 + ui.last_key + 12 * set.octave) : 60u;
