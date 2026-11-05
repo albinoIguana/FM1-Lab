@@ -42,7 +42,7 @@ jobs:
         elf = Path("app/build/fm1lab.elf")
         image = Path("app/build/fm1lab.bin")
         data = elf.read_bytes()
-        if data[:4] != b"\\x7fELF" or data[4] != 1 or data[5] != 1:
+        if data[:4] != bytes([127]) + b"ELF" or data[4] != 1 or data[5] != 1:
             raise SystemExit("memory audit: expected a little-endian ELF32 image")
         shoff = struct.unpack_from("<I", data, 32)[0]
         shentsize, shnum, shstrndx = struct.unpack_from("<HHH", data, 46)
@@ -53,7 +53,7 @@ jobs:
         wanted = {".text", ".ram_text", ".data", ".bss", ".pool", ".noinit"}
         print("MEMORY AUDIT (linker ELF sections; bytes)")
         for section in sections:
-            end = names.find(b"\\0", section[0])
+            end = names.find(bytes([0]), section[0])
             name = names[section[0]:end].decode("ascii", "replace")
             if name in wanted:
                 print(f"  {name:10s} {section[5]:8d}")
