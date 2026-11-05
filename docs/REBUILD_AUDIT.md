@@ -22,7 +22,7 @@ From the last device link diagnostics:
 - Headroom against that XIP slot: **97,012 bytes**.
 - The stock M-VAVE packager rejected the image because its own reserved-space calculation allowed only 453,921 bytes; the image was 30,631 bytes above that policy ceiling.
 
-That rejection did **not** prove the image exceeded the FM1's physical application slot. The fix is not to blindly change a constant in the stock packager. Use a proven linker, flash map, update loader and package builder as one consistent system, then enforce the 581,564-byte XIP boundary in that system.
+That rejection did **not** prove the image exceeded the FM1's physical application slot. The M-VAVE package rejection is specific to that legacy firmware layout. The active build uses fm1-base and Felucca-BSP together: its linker, flash map, update loader and package builder enforce the 581,564-byte XIP slot as one consistent system. Do not transplant the M-VAVE packager limit or change either package's reserved-space constants.
 
 ## Verified Felucca-compatible storage map
 
@@ -53,7 +53,7 @@ The BSP's OTA implementation and flash-window definitions are the authority here
 | Hardware/BSP, linker, loader, packaging | [felucca-bsp](https://github.com/hugelton/felucca-bsp), pinned through [fm1-base](https://github.com/charlesvestal/fm1-base) | Known FM1 memory map, update path and packaging |
 | Platform/UI primitives, panel, audio, MIDI, storage, host simulator | [fm1-base](https://github.com/charlesvestal/fm1-base) | Small optional platform groups; native host simulator and common app interface |
 | Minimal hardware reference | [Dinghy](https://github.com/zvenson/dinghy) | Cross-check boot, USB rescue, MIDI, audio, storage and safety checks; do not carry its sine-only app |
-| Six-op FM engine | Pinned M-VAVE FM1 SDK `synth_dx7_*` API | Reuse the fixed-point six-operator engine already present in the device archive; do not package a second DSP core. Felucca remains a host/reference engine pending measured advantage. |
+| Six-op FM engine | Pinned Felucca `fm6_core.c` plus the FM1-Lab wrapper in `app/dsp/fm6.c` | Compile the requested Felucca FM6 core directly into the fm1-base app. The M-VAVE SDK's internal `synth_dx7_*` symbols are local/private in its prebuilt archive and cannot be linked by an application. |
 | Sequencer | Felucca timing/transport as a reference; implement only our two-lane feature set | Avoid bringing over unrelated four-track groovebox features |
 | Product UI | FM1-Lab Instrument/editor design, reimplemented against the platform graphics API | Four-patch Instrument, algorithm-aware editor, macros and two visible sequencer lanes |
 
@@ -61,7 +61,7 @@ The BSP's OTA implementation and flash-window definitions are the authority here
 
 1. Build the unmodified fm1-base template first, using its pinned BSP and documented JieLi toolchain.
 2. Start with the optional feature set actually required. Bluetooth MIDI, if enabled, uses fm1-base's own stack so the GPL FM6/sequencer sources do not link JieLi's closed Bluetooth libraries. No Wi-Fi, Bluetooth audio, sampler, or unused engines by default.
-3. Reuse the fixed-point six-operator M-VAVE synth API already linked in the device SDK. Do not package a second FM core; keep Felucca as a host/reference implementation unless measured tests justify switching.
+3. Compile the pinned Felucca FM6 core directly into the fm1-base app. The M-VAVE SDK archive's synth entry points are local/private and not linkable from app code; do not rely on guessed public headers for them.
 4. Implement four patch slots under one Instrument and a shared, measured voice budget. Do not instantiate four independent oversized synths.
 5. Implement only the agreed two-lane sequencer; share transport/clock and keep timing variations out of scope.
 6. Keep DSP in the audio render path and UI/storage work outside it. Test audio determinism, note-off safety, CPU budget, RAM and pool headroom.

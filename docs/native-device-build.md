@@ -1,20 +1,30 @@
 # Native FM1 device build
 
-The browser/WASI simulator build is not a device firmware build. The native entrypoint stages the FM1-Lab C modules into the pinned M-VAVE application tree, applies the storage and physical-control source patches, then invokes the matching SDK firmware-only build.
+## Active build path
 
-From Windows PowerShell at the repository root:
+The release-target build is **fm1-base + Felucca-BSP + the pinned Felucca FM6 core**. It is not the old M-VAVE SDK/Windows packager path.
 
-```powershell
-git submodule update --init --recursive
-.\scripts\build-device-firmware.ps1 -Toolchain 'C:\path\to\JieLi\pi32' 
+From the repository root, with recursive submodules initialized:
+
+```sh
+git submodule update --init --recursive base upstream/felucca
+bash tests/test-fm6-engine.sh
+sh build.sh
+python3 base/tools/build.py app --host
 ```
 
-The toolchain must be the exact JieLi Windows PI32v2 toolchain 2.5.3 required by the pinned SDK manifest. The script deliberately uses `-FirmwareOnly`: it does not create a distribution package or alter the live/main branch.
+The device package is produced at `app/build/fm1lab.fwsc`. The host build runs the same app code against fm1-base's host platform.
 
-The four-patch Instrument reuses the fixed-point six-operator DX7 synth API already linked in the M-VAVE SDK archive. The staging step copies the matching API header only; it removes stale generated `fm1lab_dx7` source files and does not compile a duplicate DSP core. Four Instrument instances are created before audio starts and use the same native engine implementation as the stock project engine.
+The GitHub Actions workflow **Native FM1 build** uses the pinned fm1-base builder and the matching JieLi toolchain. It runs the FM6 host test before building the device and host targets. The workflow artifact is the device package; the run log reports linker, RAM/pool, XIP-slot and package checks.
 
-The build must pass the official SDK linker and packager checks without changing reserved memory, persistent-data, Bluetooth or OTA boundaries. Physical audio, CPU headroom, heap use and flash/recovery behavior still require FM1 hardware validation.
+## Memory and update safety
 
-The script currently establishes the native compilation path for the Instrument data model, metadata codec, and named physical-control constants. It does **not** mean the new four-patch Instrument is already connected to note allocation, track mixing, or the device HOME screen. Those integrations and actual-hardware flash/recovery checks remain separate work.
+fm1-base uses Felucca-BSP's linker, loader, update path and package builder as one consistent system. Its app XIP slot is 581,564 bytes. The old M-VAVE SDK packager's 453,921-byte policy ceiling belongs to a different firmware layout and is not the active build limit. Do not change either packager's constants or repurpose another firmware family's flash map.
 
-The native SDK build may not run in GitHub's Linux browser-simulator workflow: it requires Windows and the exact external JieLi toolchain. A successful simulator build must never be reported as a successful device firmware build.
+The active app storage map is documented in `docs/REBUILD_AUDIT.md`. Preserve Felucca projects, samples, preset banks, autosave, voice bank, global settings and OTA staging. The app's own data objects remain in the explicitly reserved app/user windows.
+
+## Current scope
+
+The active app currently proves the Felucca FM6 audio path, panel input, MIDI note input, basic patch selection/enable and settings storage. The final four-patch HOME/macro/global pages, named Instrument bank, deep editor, two-lane sequencer, FX integration and physical-device validation remain in progress.
+
+The M-VAVE SDK build workflow is retained only as a manual reference; it is not the release device build.
