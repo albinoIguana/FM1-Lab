@@ -1,7 +1,6 @@
 #include "fm1lab_instrument.h"
 
 #include <stddef.h>
-#include <string.h>
 
 enum {
     OPERATOR_COUNT = 6,
@@ -11,6 +10,19 @@ enum {
     GLOBAL_LFO_AMP_DEPTH = 140,
     VOICE_ALGORITHM = 134
 };
+
+static void copy_bytes(void *destination, const void *source, unsigned count)
+{
+    uint8_t *d = (uint8_t *)destination;
+    const uint8_t *s = (const uint8_t *)source;
+    while (count--) *d++ = *s++;
+}
+
+static void zero_bytes(void *destination, unsigned count)
+{
+    uint8_t *d = (uint8_t *)destination;
+    while (count--) *d++ = 0;
+}
 
 /* Carrier masks are derived from the official M-VAVE dx7core.c algorithm
  * routing table. Bit zero denotes OP1; bit five denotes OP6. */
@@ -61,7 +73,7 @@ static void copy_name(char *destination, unsigned capacity, const char *source)
 void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
 {
     if (!instrument) return;
-    memset(instrument, 0, sizeof *instrument);
+    zero_bytes(instrument, sizeof *instrument);
     instrument->magic = FM1LAB_INSTRUMENT_MAGIC;
     instrument->version = FM1LAB_INSTRUMENT_VERSION;
     copy_name(instrument->name, sizeof instrument->name, name);
@@ -83,7 +95,7 @@ int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
     for (unsigned i = 0; i < FM1LAB_PATCH_BYTES; ++i)
         if (voice[i] > 127) return -1;
     if (voice[VOICE_ALGORITHM] > 31 || voice[GLOBAL_FEEDBACK] > 7) return -1;
-    memcpy(instrument->patches[patch].voice, voice, FM1LAB_PATCH_BYTES);
+    copy_bytes(instrument->patches[patch].voice, voice, FM1LAB_PATCH_BYTES);
     for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
         instrument->patches[patch].macros[m] = 50;
     instrument->patches[patch].enabled = 1;
@@ -171,7 +183,7 @@ int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch_in
 
     const fm1lab_patch_t *patch = &instrument->patches[patch_index];
     const uint8_t *base = patch->voice;
-    memcpy(output, base, FM1LAB_PATCH_BYTES);
+    copy_bytes(output, base, FM1LAB_PATCH_BYTES);
 
     const int brightness = (int)patch->macros[FM1LAB_BRIGHTNESS] - 50;
     const int body = (int)patch->macros[FM1LAB_BODY] - 50;
