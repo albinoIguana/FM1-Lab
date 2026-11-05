@@ -5,13 +5,15 @@
 
 #define FM1LAB_PATCH_COUNT 4u
 #define FM1LAB_MACRO_COUNT 4u
-#define FM1LAB_VOICE_LIMIT 8u
+#define FM1LAB_VOICE_LIMIT 8u /* voices per patch; four independent pools */
 
 enum {
     FM1LAB_MACRO_BRIGHTNESS = 0,
     FM1LAB_MACRO_BODY,
     FM1LAB_MACRO_MOTION,
-    FM1LAB_MACRO_DIRT
+    FM1LAB_MACRO_EDGE,
+    /* Source compatibility for older preset metadata. */
+    FM1LAB_MACRO_DIRT = FM1LAB_MACRO_EDGE
 };
 
 void fm6_init(void);

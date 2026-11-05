@@ -13,16 +13,16 @@ The device app compiles the pinned Felucca FM6 core directly through `app/dsp/fm
 3. Main-loop controls publish compact events; `app_render()` drains them in the audio interrupt before calling `fm6_render()`.
 4. `fm6_render()` produces stereo 24-bit audio at the platform-provided master gain.
 
-The FM6 wrapper contains four patch slots and one shared eight-voice allocator. Each note fans out to every enabled patch. The allocator is shared across all layers: with all four patches enabled, a chord consumes four voices per note, so the eight-voice pool provides at most two simultaneous layered notes before voice stealing. This is a real current limit, not a theoretical CPU estimate.
+The FM6 wrapper contains four patch slots and **four independent eight-voice allocators (32 total voice slots)**. Each patch has a fixed pool of eight voices; allocation and voice stealing are scoped to that patch, so a busy layer cannot steal another layer's notes. With all four patches enabled, each patch can sustain up to eight simultaneous notes before its own voice stealing. This is a structural polyphony guarantee, not a claim about available CPU headroom.
 
-The engine supports per-patch enable and level, non-destructive BRIGHTNESS/BODY/MOTION/DIRT macros, algorithm-aware carrier identification, note masks, pitch bend and tuned notes. The current fm1-base bring-up app loads the first four Felucca factory patches; the full named Instrument library and user-patch persistence are not yet wired into this app.
+The engine supports per-patch enable and level, non-destructive BRIGHTNESS/BODY/MOTION/EDGE macros, algorithm-aware carrier identification, note masks, pitch bend and tuned notes. The current fm1-base bring-up app loads the first four Felucca factory patches; the full named Instrument library and user-patch persistence are not yet wired into this app.
 
 ## What is not complete
 
 - The two-lane sequencer is not yet integrated into the fm1-base app. The older M-VAVE SDK sequencer adapter under `firmware/` is a separate prototype and is not part of the active device build.
-- The FM6 output currently reaches the platform render output directly. The final FX/send/return path has not yet been implemented or verified.
+- The FM6 output currently reaches the platform render output directly. Official-style per-track sends, shared FX routing, and effect DSP/pages have not yet been integrated or verified.
 - The current UI is a hardware bring-up screen, not the final HOME, macro, global-settings or deep-editor design.
-- No physical FM1 playback, CPU headroom, flash/recovery or long-duration MIDI test has been completed.
+- No physical FM1 playback, CPU headroom for 32 voices, flash/recovery or long-duration MIDI test has been completed.
 
 ## Validation
 

@@ -539,7 +539,7 @@ static void draw_home_panel(void)
 
 static void draw_macro_panel(void)
 {
-    static const char *const names[FM1LAB_MACRO_COUNT] = {"BRIGHTNESS", "BODY", "MOTION", "DIRT"};
+    static const char *const names[FM1LAB_MACRO_COUNT] = {"BRIGHTNESS", "BODY", "MOTION", "EDGE"};
     char t[24];
     cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(164, 2, &FONT_XS, "ALGO", C_GRAY);
@@ -555,7 +555,7 @@ static void draw_macro_panel(void)
         cv_rect(108, y + 2, (int32_t)value * 124 / 100, 8, C_HI);
         cv_rect(169, y, 2, 12, C_WHITE); /* neutral midpoint at 50 */
     }
-    cv_text(4, 138, &FONT_XS, "K1 BRIGHT  K2 BODY  K3 MOTION  K4 DIRT", C_GRAY);
+    cv_text(4, 138, &FONT_XS, "K1 BRIGHT  K2 BODY  K3 MOTION  K4 EDGE", C_GRAY);
 }
 
 static void draw_global_panel(uint32_t pct)
@@ -661,6 +661,13 @@ static void draw(void)
         cv_text(4, 48, &FONT_XS, "MIDI IN", C_GRAY);
         cv_text(52, 48, &FONT_XS, midi_last_port < NPORTS ? PORT[midi_last_port] : "", C_HI);
         cv_text(82, 48, &FONT_XS, h, C_WHITE);
+    }
+    /* Persistent, low-profile page index in the display's bottom-right corner. */
+    {
+        char page_text[8];
+        int_text((int32_t)page + 1, page_text);
+        text_cat(page_text, "/3");
+        cv_text(218, 52, &FONT_XS, page_text, C_GRAY);
     }
     cv_blit(0, 180);
 }

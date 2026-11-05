@@ -30,7 +30,7 @@ static void fm6_zero_bytes(void *dst, uint32_t n)
 }
 
 #define PATCHES FM1LAB_PATCH_COUNT
-#define VOICES FM1LAB_VOICE_LIMIT
+#define VOICES (PATCHES * FM1LAB_VOICE_LIMIT)
 #define Q24_ONE (1 << 24)
 #define Q24_DB6 (1 << 24)
 #define OUTPUT_LIMIT 8388607
@@ -183,13 +183,17 @@ static int32_t fm6_soft_clip(int64_t x)
     return x < 0 ? -y : y;
 }
 
-static fm1lab_voice_t *fm6_allocate_voice(void)
+/* Each patch owns a fixed, independent voice pool. Layering four patches can
+ * therefore never steal a voice from another patch. */
+static fm1lab_voice_t *fm6_allocate_voice(uint32_t patch)
 {
-    uint32_t i, oldest = 0;
-    for (i = 0; i < VOICES; i++)
+    uint32_t first = patch * FM1LAB_VOICE_LIMIT;
+    uint32_t end = first + FM1LAB_VOICE_LIMIT;
+    uint32_t i, oldest = first;
+    for (i = first; i < end; ++i)
         if (!voices[i].used)
             return &voices[i];
-    for (i = 1; i < VOICES; i++)
+    for (i = first + 1u; i < end; ++i)
         if ((int32_t)(voices[i].age - voices[oldest].age) < 0)
             oldest = i;
     return &voices[oldest];
@@ -237,7 +241,7 @@ void fm6_note_on_tuned_mask(uint8_t note, uint8_t velocity,
         fm1lab_voice_t *v;
         if (!(patch_mask & (1u << i)) || !p->enabled || !p->level)
             continue;
-        v = fm6_allocate_voice();
+        v = fm6_allocate_voice(i);
         v->patch = (uint8_t)i;
         v->note = note;
         v->used = 1;
