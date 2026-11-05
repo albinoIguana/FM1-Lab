@@ -1031,6 +1031,7 @@ static void draw_sequencer_panel(void)
 }
 static void draw_arp_panel(void)
 {
+    char t[16];
     const char *mode=arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN";
     rounded_panel(4,4,112,62,7,panel_fill(),RGB(36,215,232));
     cv_text(13,13,&FONT_XS,"ARPEGGIATOR",C_GRAY); cv_text(13,34,&FONT_B,mode,RGB(36,215,232));
