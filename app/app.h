@@ -16,19 +16,19 @@ int fm1lab_ble_off(void);
 
 /* the store: the app's objects, the panel calibration (the platform's) and Bluetooth's address and pairing among
  * them, and their flash offsets */
-enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_INSTRUMENTS0, OBJ_INSTRUMENTS1, OBJ_INSTRUMENTS2, OBJ_NOBJ };
+enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_INSTRUMENTS0, OBJ_INSTRUMENTS1, OBJ_INSTRUMENTS2, OBJ_INSTRUMENTS3, OBJ_NOBJ };
 /* Preserve Felucca's projects (0x97000..0x9EFFF), FM6 bank (0x9F000/0xFE000),
  * samples (0xA0000..0xDBFFF), user preset banks (0xDC000..0xDFFFF),
  * autosave (0xE5000..0xE6FFF), voice bank (0xE7000) and globals (0xFC000+).
  * App objects live in the otherwise unused user-reserved sectors EA000..EFFFF;
  * the 12-sector pool at F0000..FBFFF holds our Instrument bank. */
-#define APP_STORE_MAP {0xEA000u, 0xEC000u, 0xEE000u, 0xF0000u, 0xF0000u, 0xF0000u}
+#define APP_STORE_MAP {0xEA000u, 0xEC000u, 0xEE000u, 0xF0000u, 0xF0000u, 0xF0000u, 0xF0000u}
 #define APP_STORE_POOL
 #define APP_STORE_POOL_BASE 0xF0000u
 #define APP_STORE_POOL_N 12u
 #define APP_STORE_POOL_OLD 0u
 #define APP_STORE_POOL_OBJ0 OBJ_INSTRUMENTS0
-#define APP_STORE_POOL_OBJN 3u
+#define APP_STORE_POOL_OBJN 4u
 
 /* the contract: the platform calls these */
 void app_init(void);                     /* boot: the engine, then the saved settings (or defaults) */
