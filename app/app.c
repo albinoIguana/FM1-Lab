@@ -27,7 +27,7 @@ static uint8_t env_operator = 1u, env_levels;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
-static uint8_t arp_ui_mode, fx_ui_mix[3]={18u,24u,20u}, fx_ui_time[3]={48u,52u,45u}, fx_ui_feedback[3]={40u,42u,60u};
+static uint8_t arp_ui_mode;
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -333,9 +333,6 @@ void app_init(void)
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode = set.performance.arp_mode;
-        memcpy(fx_ui_mix, set.performance.fx_mix, sizeof fx_ui_mix);
-        memcpy(fx_ui_time, set.performance.fx_time, sizeof fx_ui_time);
-        memcpy(fx_ui_feedback, set.performance.fx_feedback, sizeof fx_ui_feedback);
         for (uint32_t lane = 0; lane < 2u; ++lane) {
             seq_ui_patch[lane] = set.performance.lane_patch[lane];
             for (uint32_t step = 0; step < 64u; ++step) {
@@ -1080,8 +1077,6 @@ static void draw_arp_panel(void)
 static void draw_fx_panel(uint8_t fx)
 {
     const char *names[3]={"CHORUS","DELAY","REVERB"};
-    const char *time_names[3]={"DEPTH","TIME","DECAY"};
-    const char *knob_names[4]={"WET","DEPTH","FEEDBACK","SEND"};
     uint8_t values[4]={fm6_fx_mix(fx),fm6_fx_time(fx),fm6_fx_feedback(fx),fm6_fx_get_send(set.patch,fx)};
     char t[16]; uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):RGB(242,212,59);
     cv_text(6,2,&FONT_XS,names[fx],C_WHITE);
@@ -1096,7 +1091,6 @@ static void draw_fx_panel(uint8_t fx)
         cv_rect(x+48,y+29,55,5,C_LINE);
         cv_rect(x+48,y+29,(int32_t)values[k]*55/100,5,accent);
     }
-    (void)time_names;
 }
 
 static void draw(void)
@@ -1153,7 +1147,7 @@ static void draw(void)
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 60, screen_bg());
-    if (page != PAGE_HOME && page != PAGE_ENV) for (uint32_t k = 0; k < 4u; ++k) {
+    if (page != PAGE_HOME && page != PAGE_ENV && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB)) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
         uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
@@ -1185,10 +1179,6 @@ static void draw(void)
                 cv_text(x+6,33,&FONT_XS,mode,ink);
             }
             if(k==0u) cv_text(x+6,33,&FONT_XS,t,ink);
-        } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
-            cv_text(x+6,23,&FONT_XS,k==0?"MIX":k==1?"TIME":k==2?"FDBK":"SEND",C_WHITE);
-            int_text(k==0?fx_ui_mix[page-PAGE_FX_CHORUS]:k==1?fx_ui_time[page-PAGE_FX_CHORUS]:k==2?fx_ui_feedback[page-PAGE_FX_CHORUS]:fm6_fx_get_send(set.patch,(uint8_t)(page-PAGE_FX_CHORUS)),t);
-            cv_text(x+6,33,&FONT_XS,t,ink);
         } else if (page == PAGE_LFO || page == PAGE_LFO_MOD) {
             static const char *const lfo_names[2][4] = {
                 {"WAVE", "SPEED", "PMD", "AMD"}, {"DELAY", "P SENS", "LFO SYNC", "OSC SYNC"}
