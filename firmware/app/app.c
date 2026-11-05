@@ -761,7 +761,7 @@ static void draw_editor(void)
     cv_begin(240, 96, C_BLACK);
     cv_text(6, 3, &FONT_XS, ui.alg_edit ? "ALGORITHM EDIT" : "OPERATOR PARAMETER", C_GRAY);
     int_text(selected_op, t);
-    text_cat(t, carrier ? " CARRIER" : " MODULATOR");
+    text_cat(t, fm6_operator_is_carrier(set.patch, selected_op) ? " CARRIER" : " MODULATOR");
     cv_text(6, 17, &FONT_B, t, C_WHITE);
     cv_text(116, 17, &FONT_XS, PARAM_NAME[ui.op_param], C_HI);
     int_text(value, t);
