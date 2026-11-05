@@ -123,7 +123,8 @@ static void fm6_fx_process(int32_t input,int32_t *left,int32_t *right)
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
     if(fx_enabled[0] && fx_mix[0]) {
         uint32_t tri=(fx_lfo_phase>>16)&1023u, depth=tri<512u?tri:1023u-tri;
-        uint32_t d=360u+depth*360u/511u, read=(cp-d)&(FM6_CHORUS_SIZE-1u);
+        uint32_t d=120u+(uint32_t)fx_time[0]*3u+depth*(120u+(uint32_t)fx_time[0]*3u)/511u;
+        uint32_t read=(cp-d)&(FM6_CHORUS_SIZE-1u);
         chorus=fx_chorus[read];
     }
     fx_chorus[cp]=fm6_sat_q23((int64_t)input+(int64_t)chorus*2/5);
@@ -137,9 +138,10 @@ static void fm6_fx_process(int32_t input,int32_t *left,int32_t *right)
     if(fx_enabled[2] && fx_mix[2]) {
         int32_t a=fx_comb_a[fx_comb_pos_a],b=fx_comb_b[fx_comb_pos_b],c=fx_comb_c[fx_comb_pos_c];
         reverb=(a+b+c)/3;
-        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)input+(int64_t)a*68/100);
-        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)input+(int64_t)b*72/100);
-        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)input+(int64_t)c*76/100);
+        uint32_t decay=55u+(uint32_t)fx_time[2]*25u/100u;
+        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)input+(int64_t)a*decay/100);
+        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)input+(int64_t)b*(decay+3u)/100);
+        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)input+(int64_t)c*(decay+6u)/100);
     } else { fx_comb_a[fx_comb_pos_a]=fx_comb_b[fx_comb_pos_b]=fx_comb_c[fx_comb_pos_c]=0; }
     fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&255u);
     fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&511u);
@@ -323,6 +325,8 @@ void fm6_panic(void)
 {
     fm6_zero_bytes(voices, sizeof(voices));
     pitch_bend_16 = 0;
+    seq_running=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
+    arp_count=0u; arp_live=0u; arp_index=0u;
 }
 
 void fm6_note_on_tuned_mask(uint8_t note, uint8_t velocity,
