@@ -6,6 +6,7 @@
  * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
+#include "seq.h"
 
 #define SET_MAGIC 0x4C314D46u            /* "FM1L": native Instrument settings */
 #define INST_STORE_MAGIC 0x31494D46u      /* "FM1I" */
@@ -61,8 +62,10 @@ static void instrument_store_load(void)
             app_copy_bytes(&instrument_cache[slot],
                            buf + INST_HEADER_BYTES + i * sizeof(fm1lab_instrument_record_t),
                            sizeof(fm1lab_instrument_record_t));
-            if (instrument_cache[slot].valid)
+            if (instrument_cache[slot].valid) {
                 fm6_instrument_load(slot, &instrument_cache[slot]);
+                seq_instrument_load(slot, &instrument_cache[slot]);
+            }
         }
     }
 }
@@ -104,15 +107,16 @@ static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the 
 enum {
     EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE,
     EV_SELECT_INSTRUMENT, EV_MACRO, EV_ALGORITHM, EV_NAME_CHAR,
-    EV_SNAPSHOT, EV_MARK_SAVED
+    EV_SNAPSHOT, EV_MARK_SAVED, EV_SEQ_SET, EV_SEQ_CLEAR,
+    EV_SEQ_START, EV_SEQ_STOP, EV_SEQ_TEMPO
 };
-typedef struct { volatile uint8_t type, a, b; } ui_event_t;
+typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
 
 /* Main-loop controls never write FM voice state directly. They publish compact events;
  * the audio interrupt is the sole runtime writer of the synthesizer state. */
-static void ui_event_push(uint8_t type, uint8_t a, uint8_t b)
+static void ui_event_push3(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 {
     uint8_t head = ui_event_head, next = (uint8_t)((head + 1u) & 63u);
     if (next == ui_event_tail) {
@@ -122,7 +126,12 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b)
     ui_events[head].type = type;
     ui_events[head].a = a;
     ui_events[head].b = b;
+    ui_events[head].c = c;
     ui_event_head = next;
+}
+static void ui_event_push(uint8_t type, uint8_t a, uint8_t b)
+{
+    ui_event_push3(type, a, b, 0);
 }
 
 static void ui_events_drain(void)
@@ -135,7 +144,7 @@ static void ui_events_drain(void)
         return;
     }
     while ((tail = ui_event_tail) != ui_event_head) {
-        uint8_t type = ui_events[tail].type, a = ui_events[tail].a, b = ui_events[tail].b;
+        uint8_t type = ui_events[tail].type, a = ui_events[tail].a, b = ui_events[tail].b, c = ui_events[tail].c;
         ui_event_tail = (uint8_t)((tail + 1u) & 63u);
         if (type == EV_NOTE_ON)
             fm6_note_on(a, b);
@@ -145,8 +154,10 @@ static void ui_events_drain(void)
             fm6_panic();
         else if (type == EV_PATCH_ENABLE)
             fm6_patch_set_enabled(a, b);
-        else if (type == EV_SELECT_INSTRUMENT)
+        else if (type == EV_SELECT_INSTRUMENT) {
             fm6_select_instrument(a);
+            seq_select_instrument(a);
+        }
         else if (type == EV_MACRO)
             fm6_macro_set(a >> 2, a & 3u, b);
         else if (type == EV_ALGORITHM)
@@ -156,11 +167,22 @@ static void ui_events_drain(void)
         else if (type == EV_SNAPSHOT) {
             if (!snapshot_ready) {
                 fm6_instrument_export_current(&save_snapshot);
+                seq_instrument_export_current(&save_snapshot);
                 snapshot_slot = (uint8_t)fm6_current_instrument();
                 snapshot_ready = 1;
             }
         } else if (type == EV_MARK_SAVED)
             fm6_instrument_mark_saved(a);
+        else if (type == EV_SEQ_SET)
+            seq_set_step(a >> 4, a & 15u, b, c);
+        else if (type == EV_SEQ_CLEAR)
+            seq_clear_step(a >> 4, a & 15u);
+        else if (type == EV_SEQ_START)
+            seq_start();
+        else if (type == EV_SEQ_STOP)
+            seq_stop();
+        else if (type == EV_SEQ_TEMPO)
+            seq_set_tempo(a);
     }
 }
 
@@ -201,9 +223,14 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
+    uint32_t offset;
     midi_in();
     ui_events_drain();
-    fm6_render(lr, n, master_q12);
+    for (offset = 0; offset < n; offset += 32u) {
+        uint32_t count = n - offset < 32u ? n - offset : 32u;
+        seq_process(count);
+        fm6_render(lr + offset * 2u, count, master_q12);
+    }
 }
 
 void app_panic(void)
@@ -228,12 +255,14 @@ static void settings_defaults(void)
 void app_init(void)
 {
     fm6_init();
+    seq_init();
     instrument_store_load();
     if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
         || set.octave < -2 || set.octave > 2 || set.instrument >= FM1LAB_INSTRUMENT_COUNT
         || set.patch >= FM1LAB_PATCH_COUNT || set.ble_off > 1u)
         settings_defaults();
     fm6_select_instrument(set.instrument);
+    seq_select_instrument(set.instrument);
 }
 
 /* --------------------------------------------------------------------- UI --- */
