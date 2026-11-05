@@ -76,17 +76,18 @@ jobs:
           # the extraction root. Use that explicit path rather than a regex
           # search whose separator assumptions can silently reject valid output.
           $pi32Root = Join-Path $extract 'C$\\JL\\pi32'
-          $clang = Join-Path $pi32Root 'bin\\clang.exe'
-          if (!(Test-Path -LiteralPath $clang -PathType Leaf)) {
+          $extractedClang = Join-Path $pi32Root 'bin\\clang.exe'
+          if (!(Test-Path -LiteralPath $extractedClang -PathType Leaf)) {
             Write-Host 'Extracted installer directory tree:'
             Get-ChildItem -LiteralPath $extract -Force -Recurse |
               Select-Object -ExpandProperty FullName
-            throw "Expected JieLi compiler was not found at $clang."
+            throw "Expected JieLi compiler was not found at $extractedClang."
           }
 
           New-Item -ItemType Directory -Path 'C:\\JL' -Force | Out-Null
           Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
           Copy-Item -LiteralPath $pi32Root -Destination $target -Recurse -Force
+          $clang = Join-Path $target 'bin\\clang.exe'
           if (!(Test-Path -LiteralPath $clang -PathType Leaf)) { throw "Extracted toolchain did not produce $clang" }
 
           & $clang --version
