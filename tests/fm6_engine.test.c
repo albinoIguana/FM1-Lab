@@ -55,6 +55,14 @@ int main(void) {
     assert(peak(output, TEST_WORDS) > 0);
     fm6_patch_set_level(1, 0u);
     assert(fm6_active_voices() == 8u);
+    /* Zero volume is a true layer-off state: no existing or new voices. */
+    fm6_note_on_mask(73u, 100u, 0x02u);
+    assert(fm6_active_voices() == 8u);
+    fm6_patch_set_level(1, 127u);
+    fm6_note_on_mask(73u, 100u, 0x02u);
+    assert(fm6_active_voices() == 9u);
+    fm6_patch_set_level(1, 0u);
+    assert(fm6_active_voices() == 8u);
     fm6_patch_set_enabled(0, 0u);
     assert(fm6_active_voices() == 0u);
     fm6_panic();
