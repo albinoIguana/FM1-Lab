@@ -217,21 +217,21 @@ static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
     set.octave = 0;
+    set.instrument = 0;
     set.patch = 0;
-    set.enabled_mask = 1u;
     set.ble_off = 0;
+    set.rsv[0] = set.rsv[1] = set.rsv[2] = 0;
 }
 
 void app_init(void)
 {
-    uint32_t i;
     fm6_init();
+    instrument_store_load();
     if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
-        || set.octave < -2 || set.octave > 2 || set.patch >= FM1LAB_PATCH_COUNT
-        || (set.enabled_mask & 0xF0u) || set.ble_off > 1u)
+        || set.octave < -2 || set.octave > 2 || set.instrument >= FM1LAB_INSTRUMENT_COUNT
+        || set.patch >= FM1LAB_PATCH_COUNT || set.ble_off > 1u)
         settings_defaults();
-    for (i = 0; i < FM1LAB_PATCH_COUNT; i++)
-        fm6_patch_set_enabled(i, (set.enabled_mask >> i) & 1u);
+    fm6_select_instrument(set.instrument);
 }
 
 /* --------------------------------------------------------------------- UI --- */
@@ -429,17 +429,13 @@ static void input(void)
         else if (k == B_REC && FM1B_BLE)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
         else if (k == B_SEL) {
-            set.enabled_mask ^= (uint8_t)(1u << set.patch);
-            ui_event_push(EV_PATCH_ENABLE, set.patch, (set.enabled_mask >> set.patch) & 1u);
-            set_dirty = 1;
-            app_say(fm6_patch_name(set.patch), fm6_patch_enabled(set.patch) ? "ON" : "OFF");
+            uint8_t enabled = (uint8_t)!fm6_patch_enabled(set.patch);
+            ui_event_push(EV_PATCH_ENABLE, set.patch, enabled);
+            app_say(fm6_patch_name(set.patch), enabled ? "ON" : "OFF");
         } else if (k == B_SAVE) {
-            if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
-                set_dirty = 0;
-                app_say("SAVED", "");
-            } else {
-                app_say("SAVE", "FAILED");
-            }
+            if (!snapshot_ready)
+                ui_event_push(EV_SNAPSHOT, 0, 0);
+            app_say("INSTRUMENT", "SAVE QUEUED");
         } else {
             app_say("BUTTON", BTN_NAME[k]);
         }
