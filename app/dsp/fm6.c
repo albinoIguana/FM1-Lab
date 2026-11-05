@@ -7,22 +7,37 @@
  * a single shared eight-voice allocator.
  */
 #include <stdint.h>
+#include "fm1.h"
 #include "fm6.h"
+#if defined(__clang__) && !defined(FM1_HOST_TEST)
+#pragma clang attribute push(__attribute__((section(".volatile_ram.fm1"), aligned(4))), apply_to = variable)
+#endif
 #include "felucca_tables.h"
+#if defined(__clang__) && !defined(FM1_HOST_TEST)
+#pragma clang attribute pop
+#endif
 #include "felucca_fm6.h"
 
 /* FM6 core source: Apache-2.0, Copyright Google / Pascal Gauthier / Leo Kuroshita.
  * Do not remove its SPDX header or attribution. */
+#if defined(__clang__) && !defined(FM1_HOST_TEST)
+#pragma clang attribute push(__attribute__((section(".volatile_ram.fm1"), aligned(4))), apply_to = variable)
+#pragma clang attribute push(__attribute__((section(".volatile_ram_code"))), apply_to = function)
+#endif
 #include "../../upstream/felucca/firmware/src/fm6_core.c"
+#if defined(__clang__) && !defined(FM1_HOST_TEST)
+#pragma clang attribute pop
+#pragma clang attribute pop
+#endif
 
-static void fm6_copy_bytes(void *dst, const void *src, uint32_t n)
+static FM1_AUDIO_CODE void fm6_copy_bytes(void *dst, const void *src, uint32_t n)
 {
     uint8_t *d = (uint8_t *)dst;
     const uint8_t *s = (const uint8_t *)src;
     while (n--)
         *d++ = *s++;
 }
-static void fm6_zero_bytes(void *dst, uint32_t n)
+static FM1_AUDIO_CODE void fm6_zero_bytes(void *dst, uint32_t n)
 {
     uint8_t *d = (uint8_t *)dst;
     while (n--)
@@ -40,6 +55,7 @@ typedef struct {
     uint8_t effective[FP_SIZE + 1u];
     uint8_t macro[FM1LAB_MACRO_COUNT];
     uint8_t enabled;
+    uint8_t level;
     int32_t mod_level;
     int32_t detune[6];
     uint8_t feedback;
@@ -53,6 +69,7 @@ typedef struct {
     uint8_t note;
     uint8_t used;
     uint8_t fade_in;
+    int16_t tune16;
 } fm1lab_voice_t;
 
 static fm1lab_patch_t instrument[PATCHES];
@@ -62,24 +79,25 @@ static int32_t patch_lfo_value[PATCHES];
 static int32_t patch_lfo_delay[PATCHES];
 static uint32_t age_counter;
 static int32_t output_gain_q12;
+static int16_t pitch_bend_16;
 
-static int32_t clamp_i32(int32_t x, int32_t lo, int32_t hi)
+static FM1_AUDIO_CODE int32_t clamp_i32(int32_t x, int32_t lo, int32_t hi)
 {
     return x < lo ? lo : x > hi ? hi : x;
 }
 
 /* Felucca FM6 patch range validation, retained from its GPL engine wrapper. */
-static uint32_t fm6_max(uint32_t i)
+static FM1_AUDIO_CODE uint32_t fm6_max(uint32_t i)
 {
-    static const uint8_t OPMAX[21] = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 3, 3, 7, 3, 7, 99, 1, 31, 99, 14};
-    static const uint8_t VMAX[19] = {99, 99, 99, 99, 99, 99, 99, 99, 31, 7, 1, 99, 99, 99, 99, 1, 5, 7, 48};
+    static const uint8_t OPMAX[21] FM1_AUDIO_DATA = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 3, 3, 7, 3, 7, 99, 1, 31, 99, 14};
+    static const uint8_t VMAX[19] FM1_AUDIO_DATA = {99, 99, 99, 99, 99, 99, 99, 99, 31, 7, 1, 99, 99, 99, 99, 1, 5, 7, 48};
     if (i < 126u)
         return OPMAX[i % 21u];
     if (i < FP_NAME)
         return VMAX[i - 126u];
     return 126u;
 }
-static void fm6_sanitize(uint8_t *v)
+static FM1_AUDIO_CODE void fm6_sanitize(uint8_t *v)
 {
     uint32_t i;
     for (i = 0; i < FP_SIZE; i++) {
@@ -127,7 +145,7 @@ static void fm6_unpack(const uint8_t *b, uint8_t *v)
     fm6_sanitize(v);
 }
 
-static void fm6_rebuild_patch(uint32_t index)
+static FM1_AUDIO_CODE void fm6_rebuild_patch(uint32_t index)
 {
     fm1lab_patch_t *p = &instrument[index];
     uint8_t *e = p->effective;
@@ -138,7 +156,7 @@ static void fm6_rebuild_patch(uint32_t index)
     int32_t ratio = body * 4 / 50;
     int32_t meg = body * 40 / 50;
     uint32_t carriers, k, j, carrier_n = 0;
-    static const int8_t spread[6] = {0, 1, -1, 2, -2, 3};
+    static const int8_t spread[6] FM1_AUDIO_DATA = {0, 1, -1, 2, -2, 3};
     int32_t cents_step = dirt * 70908 / 50; /* 12 cents at either macro extreme; Q24 log2 */
     fm6_copy_bytes(e, b, FP_SIZE + 1u);
     carriers = fm6_carriers(e[FP_ALG]);
@@ -169,9 +187,9 @@ static void fm6_rebuild_patch(uint32_t index)
     p->ready = 1;
 }
 
-static int32_t fm6_soft_clip(int64_t x)
+static FM1_AUDIO_CODE int32_t fm6_soft_clip(int64_t x)
 {
-    uint64_t a = (uint64_t)(x < 0 ? -x : x);
+    uint64_t a = x < 0 ? (uint64_t)(-(x + 1)) + 1u : (uint64_t)x;
     uint32_t index = (uint32_t)(a >> 16);
     int32_t y;
     if (index > 256u)
@@ -180,7 +198,7 @@ static int32_t fm6_soft_clip(int64_t x)
     return x < 0 ? -y : y;
 }
 
-static fm1lab_voice_t *fm6_allocate_voice(void)
+static FM1_AUDIO_CODE fm1lab_voice_t *fm6_allocate_voice(void)
 {
     uint32_t i, oldest = 0;
     for (i = 0; i < VOICES; i++)
@@ -202,6 +220,7 @@ void fm6_init(void)
     fm6_zero_bytes(patch_lfo_delay, sizeof(patch_lfo_delay));
     age_counter = 0;
     output_gain_q12 = 0;
+    pitch_bend_16 = 0;
     for (i = 0; i < PATCHES; i++) {
         fm6_unpack(FM6_FACTORY[i], instrument[i].base);
         instrument[i].macro[0] = 50;
@@ -209,16 +228,19 @@ void fm6_init(void)
         instrument[i].macro[2] = 50;
         instrument[i].macro[3] = 50;
         instrument[i].enabled = (i == 0u); /* one layer by default; enable more as desired */
+        instrument[i].level = 127u;
         fm6_rebuild_patch(i);
     }
 }
 
-void fm6_panic(void)
+FM1_AUDIO_CODE void fm6_panic(void)
 {
     fm6_zero_bytes(voices, sizeof(voices));
+    pitch_bend_16 = 0;
 }
 
-void fm6_note_on(uint8_t note, uint8_t velocity)
+FM1_AUDIO_CODE void fm6_note_on_tuned_mask(uint8_t note, uint8_t velocity,
+                                           uint8_t patch_mask, int16_t tune16)
 {
     uint32_t i;
     if (note > 127u || !velocity)
@@ -226,7 +248,7 @@ void fm6_note_on(uint8_t note, uint8_t velocity)
     for (i = 0; i < PATCHES; i++) {
         fm1lab_patch_t *p = &instrument[i];
         fm1lab_voice_t *v;
-        if (!p->enabled)
+        if (!(patch_mask & (1u << i)) || !p->enabled || !p->level)
             continue;
         v = fm6_allocate_voice();
         v->patch = (uint8_t)i;
@@ -234,31 +256,63 @@ void fm6_note_on(uint8_t note, uint8_t velocity)
         v->used = 1;
         v->age = ++age_counter;
         v->fade_in = 32;
+        v->tune16 = tune16;
         fm6_note_init(&v->state, p->effective, (int32_t)note + p->effective[FP_TRNSP] - 24, velocity, 1);
         fm6_lfo_key(&patch_lfo[i]);
     }
 }
 
-void fm6_note_off(uint8_t note)
+FM1_AUDIO_CODE void fm6_note_on_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask)
+{
+    fm6_note_on_tuned_mask(note, velocity, patch_mask, 0);
+}
+
+FM1_AUDIO_CODE void fm6_note_on(uint8_t note, uint8_t velocity)
+{
+    fm6_note_on_mask(note, velocity, (uint8_t)((1u << PATCHES) - 1u));
+}
+
+FM1_AUDIO_CODE void fm6_note_off_mask(uint8_t note, uint8_t patch_mask)
 {
     uint32_t i;
     for (i = 0; i < VOICES; i++) {
         fm1lab_voice_t *v = &voices[i];
-        if (v->used && v->note == note) {
+        if (v->used && v->note == note && (patch_mask & (1u << v->patch))) {
             fm1lab_patch_t *p = &instrument[v->patch];
             fm6_note_key(&v->state, p->effective, 0);
         }
     }
 }
 
-void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
+FM1_AUDIO_CODE void fm6_note_off(uint8_t note)
+{
+    fm6_note_off_mask(note, (uint8_t)((1u << PATCHES) - 1u));
+}
+
+FM1_AUDIO_CODE void fm6_pitch_bend(uint16_t value)
+{
+    if (value > 16383u) value = 16383u;
+    pitch_bend_16 = (int16_t)(((int32_t)value - 8192) * 32 / 8192);
+}
+
+FM1_AUDIO_CODE void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
 {
     uint32_t base;
     for (base = 0; base < frames; base += FM6_N) {
-        int32_t mix[FM6_N] = {0};
+        int64_t mix[FM6_N] = {0};
+        int32_t patch_gain_q15[PATCHES] = {0};
+        uint32_t active_layers = 0;
         uint32_t p, v, i;
         uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
 
+        for (p = 0; p < PATCHES; p++)
+            active_layers += instrument[p].enabled && instrument[p].level != 0u;
+        if (active_layers) {
+            for (p = 0; p < PATCHES; p++)
+                if (instrument[p].enabled && instrument[p].level)
+                    patch_gain_q15[p] = (int32_t)((uint32_t)instrument[p].level * 32768u /
+                                                  (127u * active_layers));
+        }
         for (p = 0; p < PATCHES; p++) {
             patch_lfo_value[p] = fm6_lfo_sample(&patch_lfo[p]);
             patch_lfo_delay[p] = fm6_lfo_delay(&patch_lfo[p]);
@@ -272,7 +326,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
             if (!voice->used)
                 continue;
             patch = &instrument[voice->patch];
-            pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16, 0);
+            pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16 + voice->tune16 + pitch_bend_16, 0);
             fb = patch->feedback;
             if (fm6_note_compute(&voice->state, patch->effective, bus,
                                  patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
@@ -286,7 +340,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
                         x = (int32_t)(((int64_t)x * gain) >> 5);
                         voice->fade_in--;
                     }
-                    mix[i] += x;
+                    mix[i] += ((int64_t)x * patch_gain_q15[voice->patch]) >> 15;
                 }
                 voice->state.dc = dc;
             }
@@ -300,7 +354,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
             int32_t delta = (int32_t)master_q12 - output_gain_q12;
             if (delta)
                 output_gain_q12 += delta / 64 + (delta > 0 ? 1 : -1);
-            stereo[(base + i) * 2u] = fm6_soft_clip(((int64_t)mix[i] * output_gain_q12) >> 15);
+            stereo[(base + i) * 2u] = fm6_soft_clip((mix[i] * output_gain_q12) >> 15);
             stereo[(base + i) * 2u + 1u] = stereo[(base + i) * 2u];
         }
     }
@@ -309,7 +363,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
 uint32_t fm6_patch_count(void) { return PATCHES; }
 const char *fm6_patch_name(uint32_t patch) { return patch < PATCHES ? (const char *)&instrument[patch].base[FP_NAME] : ""; }
 uint8_t fm6_patch_enabled(uint32_t patch) { return patch < PATCHES ? instrument[patch].enabled : 0; }
-void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled)
+FM1_AUDIO_CODE void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled)
 {
     uint32_t i;
     if (patch >= PATCHES)
@@ -318,7 +372,7 @@ void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled)
     if (!enabled)
         for (i = 0; i < VOICES; i++)
             if (voices[i].used && voices[i].patch == patch)
-                fm6_note_key(&voices[i].state, instrument[patch].effective, 0);
+                voices[i].used = 0;
 }
 uint8_t fm6_patch_algorithm(uint32_t patch) { return patch < PATCHES ? instrument[patch].effective[FP_ALG] : 0; }
 uint8_t fm6_operator_is_carrier(uint32_t patch, uint32_t op_1_to_6)
@@ -330,7 +384,31 @@ uint8_t fm6_operator_is_carrier(uint32_t patch, uint32_t op_1_to_6)
     return (uint8_t)((fm6_carriers(instrument[patch].effective[FP_ALG]) >> bit) & 1u);
 }
 const uint8_t *fm6_patch_data(uint32_t patch) { return patch < PATCHES ? instrument[patch].base : 0; }
-void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
+
+FM1_AUDIO_CODE int fm6_patch_set_voice(uint32_t patch, const uint8_t *voice)
+{
+    if (patch >= PATCHES || !voice) return -1;
+    for (uint32_t i = 0; i < FP_SIZE; ++i)
+        if (voice[i] > 127u) return -1;
+    fm6_copy_bytes(instrument[patch].base, voice, FP_SIZE);
+    fm6_sanitize(instrument[patch].base);
+    for (uint32_t i = 0; i < VOICES; ++i)
+        if (voices[i].used && voices[i].patch == patch)
+            voices[i].used = 0;
+    fm6_rebuild_patch(patch);
+    return 0;
+}
+
+FM1_AUDIO_CODE void fm6_patch_set_level(uint32_t patch, uint8_t level)
+{
+    if (patch >= PATCHES) return;
+    instrument[patch].level = level;
+    if (!level)
+        for (uint32_t i = 0; i < VOICES; ++i)
+            if (voices[i].used && voices[i].patch == patch)
+                voices[i].used = 0;
+}
+FM1_AUDIO_CODE void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
 {
     if (patch >= PATCHES || byte_index >= FP_SIZE)
         return;
@@ -338,7 +416,7 @@ void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
     fm6_sanitize(instrument[patch].base);
     fm6_rebuild_patch(patch);
 }
-void fm6_macro_set(uint32_t patch, uint32_t macro, uint8_t value)
+FM1_AUDIO_CODE void fm6_macro_set(uint32_t patch, uint32_t macro, uint8_t value)
 {
     if (patch >= PATCHES || macro >= FM1LAB_MACRO_COUNT)
         return;
@@ -349,7 +427,7 @@ uint8_t fm6_macro_get(uint32_t patch, uint32_t macro)
 {
     return patch < PATCHES && macro < FM1LAB_MACRO_COUNT ? instrument[patch].macro[macro] : 50u;
 }
-uint32_t fm6_active_voices(void)
+FM1_AUDIO_CODE uint32_t fm6_active_voices(void)
 {
     uint32_t i, n = 0;
     for (i = 0; i < VOICES; i++)
