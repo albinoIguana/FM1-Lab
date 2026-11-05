@@ -3,8 +3,18 @@
 #include "fm1lab_instrument.h"
 #include <string.h>
 
-extern int groove_sequence_track_enable(unsigned track, unsigned enabled);
-extern void groove_sequence_transport(uint8_t status);
+/* Use the native FM1 application API only. The similarly named functions in
+ * web/engine/sequencer.c are browser-simulator internals and are not linked
+ * into the device firmware. Preserve every project's track role while this
+ * two-lane view temporarily isolates its selected tracks. */
+static uint8_t saved_track_roles[GROOVE_TRACKS];
+static uint8_t roles_saved;
+
+static void fm1lab_native_transport(unsigned playing)
+{
+    /* Official screen MMC handler posts transport to the native sequencer. */
+    groove_screen_mmc(playing ? 2U : 1U);
+}
 
 /* The alternate-tuning flag is part of the native step encoding. */
 static unsigned bound_tracks[FM1LAB_SEQUENCE_LANES] = {255U, 255U};
@@ -30,9 +40,22 @@ int fm1lab_sequencer_bind(unsigned a, unsigned b)
         groove_track_role(b) != GROOVE_TRACK_NORMAL ||
         groove_source_type(a) != GROOVE_DX7 || groove_source_type(b) != GROOVE_DX7)
         return -2;
-    groove_sequence_transport(0xfcU);
-    for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
-        if (groove_sequence_track_enable(track, track == a || track == b)) return -3;
+    fm1lab_native_transport(0);
+    if (!roles_saved) {
+        for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
+            saved_track_roles[track] = (uint8_t)groove_track_role(track);
+        roles_saved = 1;
+    }
+    for (unsigned track = 0; track < GROOVE_TRACKS; ++track) {
+        unsigned role = (track == a || track == b)
+            ? GROOVE_TRACK_NORMAL : GROOVE_TRACK_OFF;
+        if (groove_track_role_set(track, role)) {
+            for (unsigned restore = 0; restore < GROOVE_TRACKS; ++restore)
+                (void)groove_track_role_set(restore, saved_track_roles[restore]);
+            roles_saved = 0;
+            return -3;
+        }
+    }
     bound_tracks[0] = a;
     bound_tracks[1] = b;
     selected_lane = 0;
@@ -43,9 +66,12 @@ int fm1lab_sequencer_bind(unsigned a, unsigned b)
 
 int fm1lab_sequencer_unbind(void)
 {
-    groove_sequence_transport(0xfcU);
-    for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
-        if (groove_sequence_track_enable(track, 1U)) return -1;
+    fm1lab_native_transport(0);
+    if (roles_saved) {
+        for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
+            if (groove_track_role_set(track, saved_track_roles[track])) return -1;
+        roles_saved = 0;
+    }
     bound_tracks[0] = bound_tracks[1] = 255U;
     selected_lane = 0;
     return 0;
@@ -181,6 +207,6 @@ int fm1lab_sequencer_select_lane(unsigned lane)
 int fm1lab_sequencer_transport(unsigned playing)
 {
     if (playing > 1U || bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
-    groove_sequence_transport(playing ? 0xfaU : 0xfcU);
+    fm1lab_native_transport(playing);
     return 0;
 }
