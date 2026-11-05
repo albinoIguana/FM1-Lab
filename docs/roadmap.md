@@ -45,8 +45,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Add the first native six-operator patch-editor screen, editing the selected Instrument patch directly; expose algorithm-aware carrier/modulator roles and depth, envelope rates/levels, oscillator output/ratio/detune, global feedback/LFO, patch selection and Instrument save.
 - [ ] Add a true operator connection graph, undo/compare, and patch audition/voice-engine integration; the current topology strip reports roles/depth but does not yet draw every routing edge.
 - [x] Save the four voice records and metadata together through one version-2 bank transaction, preserving the other seven Instruments in that bank.
-- [ ] Integrate the native model with the FM1 device app and actual voice engine.
-- [ ] Connect patch enable and level state to the device mixer / voice routing
+- [x] Integrate the Felucca FM6 core with the fm1-base device app's live key/MIDI audio path.
+- [x] Connect patch enable and level state to the shared FM6 voice allocator / layer gain
 - [ ] Route the four-patch FM1-Lab audio through the FX processing controlled by the native FX page; verify reverb/delay sends and shared returns affect the custom instrument.
 
 ## Device storage and controls
@@ -66,8 +66,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 
 - [x] Add a reproducible Windows entrypoint that stages the FM1-Lab C modules and patches into the pinned native app tree before invoking the SDK firmware-only build.
 - [ ] Integrate the Instrument model with device note allocation, mixer routing and HOME UI in the native device build.
-- [ ] Build with the matching JieLi Windows toolchain 2.5.3.
-- [ ] Produce and inspect a device firmware image without touching the live/main branch.
+- [ ] Build with the pinned fm1-base/Felucca-BSP JieLi toolchain through the Native FM1 build workflow.
+- [ ] Produce and inspect the fm1-base device package without touching the live/main branch.
 - [ ] Test patch isolation, macro limits, mute/level, save/load integrity, MIDI and rollback on actual FM1 hardware.
 - [ ] Only call the firmware flashable after the device build and hardware checks pass.
 
