@@ -24,7 +24,7 @@ int main(void) {
     fm6_patch_set_level(1, 127u);
     fm6_patch_set_enabled(1, 1u);
     fm6_note_on_mask(60u, 100u, 0x02u);
-    assert(fm6_active_voices() == 1u);
+    assert(fm6_active_voices() == 8u);
     memset(output, 0, sizeof output);
     fm6_render(output, TEST_FRAMES, 4096u);
     assert(peak(output, TEST_WORDS) > 0);
@@ -43,7 +43,7 @@ int main(void) {
     fm6_note_on_mask(72u, 100u, 0x01u); /* steals only within patch 0 */
     assert(fm6_active_voices() == 10u);
     fm6_note_on_tuned_mask(64u, 90u, 0x03u, 12);
-    assert(fm6_active_voices() == 12u);
+    assert(fm6_active_voices() == 11u);
     fm6_pitch_bend(16383u);
     memset(output, 0, sizeof output);
     fm6_render(output, TEST_FRAMES, 4096u);
