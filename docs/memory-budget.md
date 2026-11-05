@@ -43,6 +43,21 @@ The linker file is the authority for addresses. The builder separately checks th
 
 The FM6 note state is instead in the regular `.bss` region: the core's `fm6_note_t` is 244 bytes, so 32 live note records account for **7,808 bytes**, before the FM1-Lab voice wrapper, four patch records, LFO state and other engine/platform globals. The 43,752-byte total includes all linked app and platform globals; it is not an FM6-only figure.
 
+### Exact ELF section sizes from the new build report
+
+The 2026-11-05 device build emitted the following section sizes directly from `app/build/fm1lab.elf`:
+
+| ELF section | Used | Region capacity |
+|---|---:|---:|
+| `.text` (XIP code + const data) | 146,888 B | Included in the 581,564 B XIP image slot |
+| `.ram_text` | 3,556 B | 32,768 B |
+| `.data` | 2,936 B | Part of 98,304 B |
+| `.bss` | 40,808 B | Part of 98,304 B |
+| `.pool` | 69,384 B | 344,064 B |
+| `.noinit` | 1,836 B | 15,696 B |
+
+The builder's address-based `.data + .bss` check reports 43,752 B; the raw ELF section sizes sum to 43,744 B. The 8-byte difference is retained in the conservative budget rather than silently discarded. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The application image size is exactly 153,380 B (146,888 + 3,556 + 2,936), before package wrapping.
+
 The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. Generated lookup tables are `const` data and are placed with XIP `.text/.rodata`, not copied into the 96 KiB RAM region. Only one FM6 core is linked; the four patches are data/voice pools, not four copies of the engine.
 
 ## 4. What this means for the next features
