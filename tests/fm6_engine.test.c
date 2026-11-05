@@ -139,7 +139,7 @@ int main(void) {
     fm6_note_on(60u,110u);
     for(unsigned block=0;block<64u;block++)
         fm6_render(wet+block*TEST_WORDS,128u,4096u);
-    fm6_init(); fm6_fx_set_enabled(0u,1u); fm6_fx_set_mix(0u,100u);
+    fm6_init();
     fm6_note_on(60u,110u);
     for(unsigned block=0;block<64u;block++)
         fm6_render(dry+block*TEST_WORDS,128u,4096u);
