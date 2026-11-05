@@ -49,6 +49,19 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Connect patch enable and level state to the shared FM6 voice allocator / layer gain
 - [ ] Route the four-patch FM1-Lab audio through the FX processing controlled by the native FX page; verify reverb/delay sends and shared returns affect the custom instrument.
 
+## Audio Engine 2.0 — active priority
+
+- [ ] Freeze named effect/parameter enums, signal-flow topology and settings migration contract (see [audio-engine-2.0-plan.md](audio-engine-2.0-plan.md)).
+- [ ] Add four shared send buses: Chorus, Phaser, Delay and Reverb; retain independent per-patch sends.
+- [ ] Add per-patch Amp/Drive and 3-band EQ inserts with independent bypass and state.
+- [ ] Add master compressor and independent peak-safety limiter.
+- [ ] Replace generic effect time controls with real processor-specific rate/depth/decay/damping/pre-delay parameters.
+- [ ] Add per-patch pan and headroom-aware mixer routing.
+- [ ] Version and migrate persistent performance state; preserve all existing settings and patterns.
+- [ ] Add processor isolation, bypass, bounds, tail, DC, clipping and combined-stress tests.
+- [ ] Re-audit .pool/.bss/stack and validate actual device CPU/xruns before release.
+- [ ] Add swing/ties and external MIDI clock after the audio routing contract stabilizes.
+
 ## Device storage and controls
 
 - [x] Add a version-2 bank format and metadata read/write API to the existing four-bank DX7 voice library; preserve version-1 bank reads and stage/recovery flow.
