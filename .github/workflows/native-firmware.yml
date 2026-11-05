@@ -1,0 +1,35 @@
+name: Native FM1 firmware
+
+on:
+  push:
+    branches: [rewrite/fm1-native-instrument]
+    paths:
+      - "firmware/**"
+      - ".gitmodules"
+      - ".github/workflows/native-firmware.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "firmware/**"
+      - ".gitmodules"
+      - ".github/workflows/native-firmware.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      sdk: true
+      build: |
+        set -euo pipefail
+        git submodule update --init --recursive firmware/base firmware/upstream/felucca
+        cd firmware
+        sh build.sh
+        python3 base/tools/build.py app --host
+      packages: firmware/app/build/fm1lab.fwsc
