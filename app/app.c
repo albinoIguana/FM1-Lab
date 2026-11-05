@@ -287,7 +287,7 @@ static void settings_defaults(void)
     set.magic = SET_MAGIC;
     set.octave = 0;
     set.patch = 0;
-    set.enabled_mask = 1u;
+    set.enabled_mask = 0x0fu; /* all four factory layers active */
     set.ble_off = 0;
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         set.levels[p] = 127u;
@@ -601,6 +601,17 @@ static void input(void)
             fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
             set_dirty = 1u;
             app_say("FX",fm6_fx_enabled(fx)?"ON":"BYPASS");
+        } else if (k == B_EDIT && page == PAGE_HOME) {
+            /* HOME / EDIT toggles the selected layer without changing its voice.
+             * Publish to the audio thread; instrument save persists the choice. */
+            uint8_t enabled = (uint8_t)!current_instrument.patches[set.patch].enabled;
+            current_instrument.patches[set.patch].enabled = enabled;
+            if (enabled) set.enabled_mask |= (uint8_t)(1u << set.patch);
+            else set.enabled_mask &= (uint8_t)~(1u << set.patch);
+            ui_event_push(EV_PATCH_ENABLE, set.patch, enabled, 0u);
+            instrument_dirty = 1u;
+            set_dirty = 1u;
+            app_say("LAYER", enabled ? "ON" : "OFF");
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", fm6_patch_name(set.patch));
@@ -891,7 +902,7 @@ static void draw_home_panel(void)
         cv_rect(x + 59, y + 45, 43, 5, C_LINE);
         cv_rect(x + 59, y + 45, (int32_t)set.levels[p] * 43 / 127, 5, accent);
     }
-    cv_text(5, 138, &FONT_XS, "SELECT PATCH   PRESS SEL TO SHAPE", C_GRAY);
+    cv_text(5, 138, &FONT_XS, "EDIT: LAYER ON/OFF   SEL: SHAPE", C_GRAY);
 }
 
 static void draw_macro_panel(void)
