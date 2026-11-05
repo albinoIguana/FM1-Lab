@@ -89,7 +89,9 @@ int main(void) {
     fm6_init();
     fm6_set_tempo(120u);
     fm6_sequencer_set_lane(0u,0u);
+    fm6_sequencer_set_lane(1u,0u);
     fm6_sequencer_set_step(0u,0u,1u,60u,110u,75u);
+    fm6_sequencer_set_step(1u,0u,1u,67u,100u,75u);
     fm6_sequencer_set_running(1u);
     int32_t seq_peak=0;
     for(unsigned block=0;block<48u;block++) {
@@ -99,6 +101,7 @@ int main(void) {
     }
     assert(fm6_sequencer_running()==1u);
     assert(fm6_sequencer_step()==1u); /* one 16th-note at 120 BPM */
+    assert(fm6_active_voices_patch(0u)>=2u); /* both independent lanes reached the same FM6 patch */
     assert(seq_peak>0);
     fm6_sequencer_set_running(0u);
     assert(fm6_sequencer_running()==0u);
@@ -145,6 +148,6 @@ int main(void) {
         fm6_render(dry+block*TEST_WORDS,128u,4096u);
     for(unsigned i=0;i<64u*TEST_WORDS;i++) assert(wet[i]==dry[i]);
 
-    puts("Felucca FM6 engine: 4 x 8 independent voices, per-patch stealing, patch loading, macros, tuning, bend and render passed");
+    puts("Felucca FM6 engine: voice pools, dual-lane sequencing, arp scheduling, FX buses/sends and render passed");
     return 0;
 }
