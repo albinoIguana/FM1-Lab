@@ -445,7 +445,6 @@ static void input(void)
             if (ui.seq_edit) {
                 ui_event_push3(EV_SEQ_SET, (uint8_t)((ui.seq_lane << 4) | ui.seq_step),
                                (uint8_t)note, (uint8_t)v);
-                ui.seq_step = (uint8_t)((ui.seq_step + 1u) & 15u);
             }
             plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
         } else if (!(keys & bit) && (ui.keys & bit)) {
