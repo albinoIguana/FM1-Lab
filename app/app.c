@@ -624,8 +624,7 @@ static void input(void)
                 if (next < 0) next += USER_INSTRUMENT_COUNT;
                 if ((uint32_t)next != instrument_index) {
                     instrument_load((uint32_t)next, 1);
-                    app_say("INSTRUMENT", next == 0 ? "FACTORY / USER 1" :
-                        next == 1 ? "USER 2" : "USER 3");
+                    app_say("INSTRUMENT", "SELECTED");
                 }
             }
         } else if (k >= EN_K1 && k <= EN_K4) {
@@ -912,6 +911,7 @@ static void draw_lfo_panel(uint32_t modulation)
 static void draw(void)
 {
     char t[24];
+    char bank_label[] = "BANK 1 / INST 01";
     int32_t note = voice_note;
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
     uint16_t accent = patch_color(set.patch);
@@ -928,7 +928,10 @@ static void draw(void)
             page == PAGE_LFO ? "LFO" :
             page == PAGE_LFO_MOD ? "LFO MODULATION" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
-        cv_text(10, 18, &FONT_XS, instrument_index == 0u ? "FACTORY / USER 1" : instrument_index == 1u ? "USER 2" : "USER 3", accent);
+        bank_label[5] = (char)('1' + instrument_index / 8u);
+        bank_label[14] = (char)('0' + ((instrument_index % 8u + 1u) / 10u));
+        bank_label[15] = (char)('0' + ((instrument_index % 8u + 1u) % 10u));
+        cv_text(10, 18, &FONT_XS, bank_label, accent);
         if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
         if (note >= 0) {
             note_name(note, t);
