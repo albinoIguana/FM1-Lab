@@ -38,6 +38,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-2.5.3.exe'
           $extract = Join-Path $env:RUNNER_TEMP 'jieli-toolchain-extracted'
+          $installRoot = Join-Path $extract 'C$\JL'
           $target = 'C:\JL\pi32'
           $clang = Join-Path $target 'bin\clang.exe'
 
@@ -71,22 +72,31 @@ jobs:
             throw "innoextract could not unpack the JieLi 2.5.3 Inno Setup payload (exit $LASTEXITCODE)."
           }
 
-          # Innoextract preserves the installer's absolute Windows drive layout.
-          # The verified 2.5.3 payload is therefore under C$/JL/pi32, not at
-          # the extraction root. Use that explicit path rather than a regex
-          # search whose separator assumptions can silently reject valid output.
-          $pi32Root = Join-Path $extract 'C$\JL\pi32'
+          # Preserve the installer's complete C:\JL layout. Innoextract
+          # places q32s-include and q32s-lib beside pi32, not inside it.
+          # Copying pi32 alone silently drops the system headers (including
+          # ctype.h) that the official compiler expects from its install.
+          $pi32Root = Join-Path $installRoot 'pi32'
           $extractedClang = Join-Path $pi32Root 'bin\clang.exe'
-          if (!(Test-Path -LiteralPath $extractedClang -PathType Leaf)) {
+          $systemHeaders = Join-Path $installRoot 'q32s-include'
+          $systemCtype = Join-Path $systemHeaders 'ctype.h'
+          if (!(Test-Path -LiteralPath $extractedClang -PathType Leaf) -or
+              !(Test-Path -LiteralPath $systemCtype -PathType Leaf)) {
             Write-Host 'Extracted installer directory tree:'
             Get-ChildItem -LiteralPath $extract -Force -Recurse |
               Select-Object -ExpandProperty FullName
-            throw "Expected JieLi compiler was not found at $extractedClang."
+            throw "Incomplete JieLi installation payload. Expected $extractedClang and $systemCtype."
           }
 
+          # Recreate the installer's directory tree rather than hand-picking
+          # subdirectories. Keep the original C:\JL paths used by clang.
+          Remove-Item -LiteralPath 'C:\JL' -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path 'C:\JL' -Force | Out-Null
-          Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
-          Copy-Item -LiteralPath $pi32Root -Destination $target -Recurse -Force
+          Copy-Item -Path (Join-Path $installRoot '*') -Destination 'C:\JL' -Recurse -Force
+          $stagedCtype = Join-Path 'C:\JL\q32s-include' 'ctype.h'
+          if (!(Test-Path -LiteralPath $stagedCtype -PathType Leaf)) {
+            throw "JieLi system header staging failed: $stagedCtype"
+          }
           $clang = Join-Path $target 'bin\clang.exe'
           if (!(Test-Path -LiteralPath $clang -PathType Leaf)) { throw "Extracted toolchain did not produce $clang" }
 
