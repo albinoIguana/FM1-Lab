@@ -68,6 +68,29 @@ static int32_t clamp_i32(int32_t x, int32_t lo, int32_t hi)
     return x < lo ? lo : x > hi ? hi : x;
 }
 
+/* Felucca FM6 patch range validation, retained from its GPL engine wrapper. */
+static uint32_t fm6_max(uint32_t i)
+{
+    static const uint8_t OPMAX[21] = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 3, 3, 7, 3, 7, 99, 1, 31, 99, 14};
+    static const uint8_t VMAX[19] = {99, 99, 99, 99, 99, 99, 99, 99, 31, 7, 1, 99, 99, 99, 99, 1, 5, 7, 48};
+    if (i < 126u)
+        return OPMAX[i % 21u];
+    if (i < FP_NAME)
+        return VMAX[i - 126u];
+    return 126u;
+}
+static void fm6_sanitize(uint8_t *v)
+{
+    uint32_t i;
+    for (i = 0; i < FP_SIZE; i++) {
+        if (i >= FP_NAME)
+            v[i] = v[i] < 32u || v[i] > 126u ? ' ' : v[i];
+        else if (v[i] > fm6_max(i))
+            v[i] = (uint8_t)fm6_max(i);
+    }
+    v[FP_SIZE] = 0;
+}
+
 /* 128-byte Felucca bank record -> the 155-byte FM6 voice used by the core. */
 static void fm6_unpack(const uint8_t *b, uint8_t *v)
 {
