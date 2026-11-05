@@ -46,6 +46,14 @@ The fm1-base template's default map (`0xFC000`, `0xDC000`, `0xDE000`) would coll
 
 The BSP's OTA implementation and flash-window definitions are the authority here: `chip/ota.c` defines five staging sectors at `0xE0000`, and `chip/fm1_flash.h` defines XDATA1 as `0xE7000..0xFC000`. The broader staging comment in fm1-base's storage source is stale and is not used as the flash map.
 
+## Instrument storage sizing
+
+The persisted record is 607 bytes: four 128-byte FM6 voice records, four macro values per patch, Instrument name/enable mask, and the two 16-step note/velocity lanes plus tempo. Six records plus an 8-byte chunk header use 3,650 bytes, below the 3,840-byte payload limit per storage sector. Sixteen Instruments are split 6/5/5 across three pooled objects. The 12-sector pool provides two-copy atomic storage for the three objects with six spare sectors for rotation/garbage collection.
+
+The three platform objects use six sectors (`EA000..EFFFF`); the instrument chunks use the remaining twelve sectors (`F0000..FBFFF`). This consumes the full 18-sector USER window. Felucca project/sample/preset/voice-bank/global sectors remain outside this allocation. Stock-firmware USER patches in `EA000..FBFFF` are not preserved; Felucca's projects and user preset banks are.
+
+The first native build produced a 151,428-byte app image. After adding the 16-slot Instrument bank, the app image measured 155,172 bytes and RAM `.data+.bss` measured 54,168 of 98,304 bytes. Those numbers predate the two-lane sequencer and current UI work; the latest build must remeasure them and run the host audio regression suite.
+
 ## Component selection
 
 | Layer | Selected source | Use |
