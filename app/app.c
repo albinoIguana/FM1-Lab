@@ -282,6 +282,12 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
     }
 }
 
+/* Read-only diagnostics from fm1-base's measured audio ISR counters. These
+ * deliberately do not add UI work or logging to the real-time render path. */
+uint32_t app_audio_cpu_pct(void) { return plat_cpu_pct(); }
+uint32_t app_audio_xruns(void) { return plat_xruns(); }
+uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count(); }
+
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     ui_events_drain();
@@ -1355,6 +1361,12 @@ int app_expect(const char *what, int *got)
         *got = set_dirty;
     else if (!strcmp(what, "page"))
         *got = page;
+    else if (!strcmp(what, "cpu"))
+        *got = (int)app_audio_cpu_pct();
+    else if (!strcmp(what, "xruns"))
+        *got = (int)app_audio_xruns();
+    else if (!strcmp(what, "shed"))
+        *got = (int)app_audio_overload_shed_count();
     else if (!strcmp(what, "vel"))           /* the last key's velocity and pressure */
         *got = ui.vel[ui.last_key];
     else if (!strcmp(what, "prs"))
