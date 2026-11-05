@@ -732,6 +732,7 @@ static void input(void)
                 if(index==0u) fx_ui_mix[fx]=(uint8_t)clamp((int32_t)fx_ui_mix[fx]+e,0,100);
                 else if(index==1u) fx_ui_time[fx]=(uint8_t)clamp((int32_t)fx_ui_time[fx]+e,0,100);
                 else if(index==2u) fx_ui_feedback=(uint8_t)clamp((int32_t)fx_ui_feedback+e,0,90);
+                else fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
                 fm6_fx_set_mix(fx,fx_ui_mix[fx]); fm6_fx_set_time(fx,fx_ui_time[fx]); fm6_fx_set_feedback(fx_ui_feedback);
                 app_say("EFFECT PARAMETER", "UPDATED");
             } else if (page == PAGE_ENV) {
@@ -1051,8 +1052,9 @@ static void draw_fx_panel(uint8_t fx)
     rounded_panel(122,4,112,62,7,panel_fill(),accent);
     cv_text(131,13,&FONT_XS,"WET MIX",C_GRAY); int_text(fx_ui_mix[fx],t); cv_text(131,34,&FONT_B,t,accent);
     cv_rect(12,84,216,8,C_LINE); cv_rect(12,84,(int32_t)fx_ui_mix[fx]*216/100,8,accent);
-    cv_text(6,106,&FONT_XS,fx==1u?"TIME / FEEDBACK":fx==0u?"RATE / DEPTH":"DECAY / DAMPING",C_GRAY);
+    cv_text(6,106,&FONT_XS,fx==1u?"DELAY TIME / FEEDBACK":fx==0u?"RATE / DEPTH":"DECAY / TONE",C_GRAY);
     int_text(fx_ui_time[fx],t); cv_text(6,124,&FONT_B,t,accent);
+    cv_text(122,106,&FONT_XS,"PATCH SEND",C_GRAY); int_text(fm6_fx_get_send(set.patch,fx),t); cv_text(122,124,&FONT_B,t,accent);
 }
 
 static void draw(void)
@@ -1136,8 +1138,8 @@ static void draw(void)
             cv_text(x+6,23,&FONT_XS,k==0?"TEMPO":"-",C_WHITE);
             int_text(transport_ui_bpm,t); cv_text(x+6,33,&FONT_XS,t,ink);
         } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
-            cv_text(x+6,23,&FONT_XS,k==0?"MIX":k==1?"TIME":k==2?"FDBK":"-",C_WHITE);
-            int_text(k==0?fx_ui_mix[page-PAGE_FX_CHORUS]:k==1?fx_ui_time[page-PAGE_FX_CHORUS]:fx_ui_feedback,t);
+            cv_text(x+6,23,&FONT_XS,k==0?"MIX":k==1?"TIME":k==2?"FDBK":"SEND",C_WHITE);
+            int_text(k==0?fx_ui_mix[page-PAGE_FX_CHORUS]:k==1?fx_ui_time[page-PAGE_FX_CHORUS]:k==2?fx_ui_feedback:fm6_fx_get_send(set.patch,(uint8_t)(page-PAGE_FX_CHORUS)),t);
             cv_text(x+6,33,&FONT_XS,t,ink);
         } else if (page == PAGE_LFO || page == PAGE_LFO_MOD) {
             static const char *const lfo_names[2][4] = {
