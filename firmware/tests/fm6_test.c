@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "fm6.h"
+#include "seq.h"
 
 #define BLOCK 256u
 #define BLOCKS 24u
@@ -141,6 +142,32 @@ int main(void)
         fm6_render(audio, BLOCK, 4096);
     require(fm6_active_voices() == 0u, "note-off releases every voice without hanging");
 
-    printf("FM6 host tests passed: 4 patches, 8 shared voices, deterministic audio, neutral macros, 24-bit limiter.\n");
+    /* The sequencer is two lanes, saved per Instrument, with source-safe note-offs. */
+    fm6_init();
+    seq_init();
+    seq_set_step(0u, 0u, 60u, 100u);
+    seq_set_step(1u, 0u, 64u, 90u);
+    seq_start();
+    seq_process(32u);
+    require(seq_running(), "sequencer transport starts");
+    require(seq_current_step() == 0u, "sequencer starts on step zero");
+    require(fm6_active_voices() == 2u, "two sequencer lanes create independent notes");
+    seq_instrument_export_current(&record);
+    require(record.seq_note[0][0] == 60u && record.seq_note[1][0] == 64u,
+            "both lanes are included in Instrument save data");
+    require(record.seq_tempo == 120u, "default sequence tempo is 120 BPM");
+    seq_stop();
+    seq_instrument_load(3u, &record);
+    seq_select_instrument(3u);
+    require(seq_step_note(0u, 0u) == 60u && seq_step_note(1u, 0u) == 64u,
+            "two-lane sequence survives Instrument export/import");
+    seq_set_tempo(250u);
+    require(seq_tempo() == 240u, "tempo is clamped to supported maximum");
+    seq_set_tempo(30u);
+    require(seq_tempo() == 60u, "tempo is clamped to supported minimum");
+    seq_select_instrument(4u);
+    require(seq_step_note(0u, 0u) == 0xFFu, "each Instrument has its own sequence");
+
+    printf("FM6 host tests passed: 4 patches, 8 shared voices, deterministic audio, neutral macros, 24-bit limiter, saveable Instruments, two sequencer lanes.\n");
     return 0;
 }
