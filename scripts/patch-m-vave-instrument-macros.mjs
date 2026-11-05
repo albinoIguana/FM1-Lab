@@ -15,9 +15,6 @@ if (!source.includes('#include "fm1lab_runtime.h"'))
 if (!source.includes("FM1LAB_MACRO_PAGE"))
   replaceOnce("FM1LAB_HOME, FM1LAB_SEQ, FM1LAB_PATCH };",
     "FM1LAB_HOME, FM1LAB_SEQ, FM1LAB_PATCH, FM1LAB_MACRO_PAGE };", "macro page enum");
-if (!source.includes("static unsigned fm1lab_macro_return_page"))
-  replaceOnce("static unsigned fm1lab_patch_env_levels;",
-    "static unsigned fm1lab_patch_env_levels;\nstatic unsigned fm1lab_macro_return_page = FM1LAB_HOME;", "macro page state");
 if (!source.includes("static void fm1lab_macro_draw(void)")) {
 const draw = String.raw`
 static void fm1lab_macro_draw(void)
