@@ -277,6 +277,7 @@ static struct {
     uint32_t save_t;                      /* SAVE press duration: short = save, long = rename */
     uint8_t save_long, rename, rename_pos;
     char rename_backup[FM1LAB_INSTRUMENT_NAME_LEN];
+    uint8_t seq_edit, seq_lane, seq_step, seq_tempo_mode;
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint8_t redraw;
@@ -441,6 +442,11 @@ static void input(void)
             ui.prs[k] = 0;
             ui.last_key = (int32_t)k;
             note_on(note, v);
+            if (ui.seq_edit) {
+                ui_event_push3(EV_SEQ_SET, (uint8_t)((ui.seq_lane << 4) | ui.seq_step),
+                               (uint8_t)note, (uint8_t)v);
+                ui.seq_step = (uint8_t)((ui.seq_step + 1u) & 15u);
+            }
             plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
         } else if (!(keys & bit) && (ui.keys & bit)) {
             ui.prs[k] = 0;
@@ -462,10 +468,29 @@ static void input(void)
             octave_step(1);
         else if (k == B_REC && FM1B_BLE)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
-        else if (k == B_SEL) {
+        else if (k == B_SEL && ui.seq_edit) {
+            uint8_t step_id = (uint8_t)((ui.seq_lane << 4) | ui.seq_step);
+            if (seq_step_note(ui.seq_lane, ui.seq_step) == 0xFFu) {
+                uint8_t note = ui.last_key >= 0 ? (uint8_t)(53 + ui.last_key + 12 * set.octave) : 60u;
+                ui_event_push3(EV_SEQ_SET, step_id, note, 100u);
+                app_say("STEP", "NOTE ADDED");
+            } else {
+                ui_event_push(EV_SEQ_CLEAR, step_id, 0);
+                app_say("STEP", "CLEARED");
+            }
+        } else if (k == B_SEL) {
             uint8_t enabled = (uint8_t)!fm6_patch_enabled(set.patch);
             ui_event_push(EV_PATCH_ENABLE, set.patch, enabled);
             app_say(fm6_patch_name(set.patch), enabled ? "ON" : "OFF");
+        } else if (k == B_SEQ) {
+            ui.seq_edit ^= 1u;
+            app_say("SEQUENCER", ui.seq_edit ? "EDIT MODE" : "HOME");
+        } else if (k == B_PLAY) {
+            ui_event_push(seq_running() ? EV_SEQ_STOP : EV_SEQ_START, 0, 0);
+            app_say("SEQUENCER", seq_running() ? "STOPPING" : "PLAYING");
+        } else if (k == B_GLO && ui.seq_edit) {
+            ui.seq_tempo_mode ^= 1u;
+            app_say("TEMPO MODE", ui.seq_tempo_mode ? "ENCODER" : "LANE SELECT");
         } else if (k == B_SAVE) {
             ui.save_t = plat_ms() | 1u;
             ui.save_long = 0;
@@ -475,6 +500,10 @@ static void input(void)
                 ui_event_push(EV_NAME_CHAR, (uint8_t)pos, (uint8_t)ui.rename_backup[pos]);
             ui.rename = 0;
             app_say("RENAME", "CANCELLED");
+        } else if (k == B_HOME && ui.seq_edit) {
+            ui.seq_edit = 0;
+            ui.seq_tempo_mode = 0;
+            app_say("SEQUENCER", "HOME");
         } else {
             app_say("BUTTON", BTN_NAME[k]);
         }
@@ -557,6 +586,12 @@ static void input(void)
             ui_event_push(EV_SELECT_INSTRUMENT, set.instrument, 0);
             set_dirty = 1;
             app_say("INSTRUMENT", fm6_instrument_name(set.instrument));
+        } else if (k == EN_SELECT && ui.seq_edit) {
+            int32_t next = ((int32_t)ui.seq_step + e) % (int32_t)FM1LAB_SEQ_STEPS;
+            if (next < 0)
+                next += (int32_t)FM1LAB_SEQ_STEPS;
+            ui.seq_step = (uint8_t)next;
+            app_say("SEQUENCE STEP", "");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0)
@@ -564,6 +599,20 @@ static void input(void)
             set.patch = (uint8_t)next;
             set_dirty = 1;
             app_say("PATCH", fm6_patch_name(set.patch));
+        } else if (k == EN_ALGO && ui.seq_edit) {
+            if (ui.seq_tempo_mode) {
+                int32_t bpm = (int32_t)seq_tempo() + e;
+                bpm = bpm < 60 ? 60 : bpm > 240 ? 240 : bpm;
+                ui_event_push(EV_SEQ_TEMPO, (uint8_t)bpm, 0);
+                int_text(bpm, t);
+                app_say("TEMPO", t);
+            } else {
+                int32_t lane = ((int32_t)ui.seq_lane + e) % 2;
+                if (lane < 0)
+                    lane += 2;
+                ui.seq_lane = (uint8_t)lane;
+                app_say("SEQUENCE LANE", lane ? "B" : "A");
+            }
         } else if (k == EN_ALGO) {
             int32_t next = ((int32_t)fm6_patch_algorithm(set.patch) + e) % 32;
             if (next < 0)
