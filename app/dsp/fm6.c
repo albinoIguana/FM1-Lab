@@ -53,6 +53,7 @@ typedef struct {
     uint8_t patch;
     uint8_t note;
     uint8_t used;
+    uint8_t source;
     uint8_t fade_in;
     int16_t tune16;
 } fm1lab_voice_t;
@@ -90,16 +91,17 @@ static volatile uint8_t fx_send[PATCHES][3];
 static uint32_t fx_lfo_phase;
 static int32_t fm6_sat_q23(int64_t x) { return x>OUTPUT_LIMIT?OUTPUT_LIMIT:x< -OUTPUT_LIMIT?-OUTPUT_LIMIT:(int32_t)x; }
 static uint32_t fm6_step_period(void) { return (FM6_SAMPLE_RATE*60u)/((uint32_t)transport_bpm*4u); }
-static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16);
+static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint8_t source);
+static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint8_t source);
 static void fm6_transport_step(void)
 {
     for(uint32_t lane=0;lane<2u;lane++) {
-        if(seq_gate_left[lane]) { fm6_note_off_mask(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane])); seq_gate_left[lane]=0u; }
+        if(seq_gate_left[lane]) { fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u)); seq_gate_left[lane]=0u; }
         if(seq_running) {
             volatile fm6_step_t *s=&seq_pattern[lane][seq_position];
             if(s->enabled && s->velocity) {
                 uint8_t patch=seq_lane_patch[lane];
-                fm6_note_start_tuned_mask(s->note,s->velocity,(uint8_t)(1u<<patch),0);
+                fm6_note_start_tuned_mask(s->note,s->velocity,(uint8_t)(1u<<patch),0,(uint8_t)(lane+1u));
                 seq_live_note[lane]=s->note; seq_live_patch[lane]=patch;
                 seq_gate_left[lane]=fm6_step_period()*(s->gate?s->gate:50u)/100u;
                 if(!seq_gate_left[lane]) seq_gate_left[lane]=1u;
@@ -108,14 +110,14 @@ static void fm6_transport_step(void)
     }
     if(seq_running) seq_position=(uint8_t)((seq_position+1u)%seq_length);
     if(arp_mode && arp_count) {
-        if(arp_live) fm6_note_off(arp_live_note);
+        if(arp_live) fm6_note_off_source(arp_live_note,0x0fu,3u);
         if(arp_mode==1u) arp_index=(uint8_t)(arp_index%arp_count);
         else if(arp_mode==2u) arp_index=(uint8_t)(arp_count-1u-(arp_index%arp_count));
         else {
             if(arp_index>=arp_count) { arp_index=arp_count>1u?(uint8_t)(arp_count-2u):0u; arp_direction=0u; }
             else if(!arp_direction && arp_index==0u) arp_direction=1u;
         }
-        arp_live_note=arp_notes[arp_index]; fm6_note_start_tuned_mask(arp_live_note,100u,0x0fu,0); arp_live=1u;
+        arp_live_note=arp_notes[arp_index]; fm6_note_start_tuned_mask(arp_live_note,100u,0x0fu,0,3u); arp_live=1u;
         if(arp_mode==3u) { if(arp_direction) ++arp_index; else if(arp_index) --arp_index; }
         else ++arp_index;
     } else if(arp_live) { fm6_note_off(arp_live_note); arp_live=0u; }
@@ -333,7 +335,7 @@ void fm6_panic(void)
     arp_count=0u; arp_live=0u; arp_index=0u;
 }
 
-static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16)
+static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint8_t source)
 {
     uint32_t i;
     if (note > 127u || !velocity)
@@ -349,6 +351,7 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
         v->patch = (uint8_t)i;
         v->note = note;
         v->used = 1;
+        v->source = source;
         v->age = ++age_counter;
         v->fade_in = 32;
         v->tune16 = tune16;
@@ -365,7 +368,7 @@ void fm6_note_on_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int
         if(arp_count<16u) arp_notes[arp_count++]=note;
         return;
     }
-    fm6_note_start_tuned_mask(note,velocity,patch_mask,tune16);
+    fm6_note_start_tuned_mask(note,velocity,patch_mask,tune16,0u);
 }
 
 void fm6_note_on_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask)
@@ -378,14 +381,23 @@ void fm6_note_on(uint8_t note, uint8_t velocity)
     fm6_note_on_mask(note, velocity, (uint8_t)((1u << PATCHES) - 1u));
 }
 
-void fm6_note_off_mask(uint8_t note, uint8_t patch_mask)
+static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint8_t source)
 {
-    uint32_t i;
-    for (i = 0; i < VOICES; i++) {
-        fm1lab_voice_t *v = &voices[i];
-        if (v->used && v->note == note && (patch_mask & (1u << v->patch))) {
-            fm1lab_patch_t *p = &instrument[v->patch];
-            fm6_note_key(&v->state, p->effective, 0);
+    for(uint32_t i=0;i<VOICES;i++) {
+        fm1lab_voice_t *v=&voices[i];
+        if(v->used && v->note==note && v->source==source && (patch_mask&(1u<<v->patch))) {
+            fm1lab_patch_t *p=&instrument[v->patch];
+            fm6_note_key(&v->state,p->effective,0);
+        }
+    }
+}
+void fm6_note_off_mask(uint8_t note,uint8_t patch_mask)
+{
+    for(uint32_t i=0;i<VOICES;i++) {
+        fm1lab_voice_t *v=&voices[i];
+        if(v->used && v->note==note && (patch_mask&(1u<<v->patch))) {
+            fm1lab_patch_t *p=&instrument[v->patch];
+            fm6_note_key(&v->state,p->effective,0);
         }
     }
 }
@@ -397,10 +409,10 @@ void fm6_note_off(uint8_t note)
             for(uint32_t j=k+1u;j<arp_count;j++) arp_notes[j-1u]=arp_notes[j];
             --arp_count; if(arp_index>k && arp_index) --arp_index; break;
         }
-        if(!arp_count && arp_live) { fm6_note_off_mask(arp_live_note,0x0fu); arp_live=0u; }
+        if(!arp_count && arp_live) { fm6_note_off_source(arp_live_note,0x0fu,3u); arp_live=0u; }
         return;
     }
-    fm6_note_off_mask(note,(uint8_t)((1u<<PATCHES)-1u));
+    fm6_note_off_source(note,(uint8_t)((1u<<PATCHES)-1u),0u);
 }
 
 void fm6_pitch_bend(uint16_t value)
@@ -476,7 +488,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
             if(seq_start_pending) { seq_position=0u; seq_gate_left[0]=seq_gate_left[1]=0u; seq_start_pending=0u; }
             if(seq_stop_pending) {
                 for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane]) {
-                    fm6_note_off_mask(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]));
+                    fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
                     seq_gate_left[lane]=0u;
                 }
                 seq_stop_pending=0u;
