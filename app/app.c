@@ -754,14 +754,16 @@ static void input(void)
                     app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN");
                 }
             } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
+                /* The four hardware knobs always map left-to-right to the
+                 * four primary controls for the effect on this page:
+                 * K1 wet, K2 rate/time/decay, K3 feedback, K4 patch send. */
                 uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
-                if(index==0u) fx_ui_mix[fx]=(uint8_t)clamp((int32_t)fx_ui_mix[fx]+e,0,100);
-                else if(index==1u) fx_ui_time[fx]=(uint8_t)clamp((int32_t)fx_ui_time[fx]+e,0,100);
-                else if(index==2u) fx_ui_feedback[fx]=(uint8_t)clamp((int32_t)fx_ui_feedback[fx]+e,0,fx==0u?70:90);
+                if(index==0u) fm6_fx_set_mix(fx,(uint8_t)clamp((int32_t)fm6_fx_mix(fx)+e,0,100));
+                else if(index==1u) fm6_fx_set_time(fx,(uint8_t)clamp((int32_t)fm6_fx_time(fx)+e,0,100));
+                else if(index==2u) fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,fx==0u?70:90));
                 else fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
-                fm6_fx_set_mix(fx,fx_ui_mix[fx]); fm6_fx_set_time(fx,fx_ui_time[fx]); fm6_fx_set_feedback(fx,fx_ui_feedback[fx]);
                 set_dirty = 1u;
-                app_say("EFFECT PARAMETER", "UPDATED");
+                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":"REVERB DECAY"):index==2u?"FX FEEDBACK":"PATCH SEND", "UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
                 app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
@@ -1078,16 +1080,23 @@ static void draw_arp_panel(void)
 static void draw_fx_panel(uint8_t fx)
 {
     const char *names[3]={"CHORUS","DELAY","REVERB"};
+    const char *time_names[3]={"DEPTH","TIME","DECAY"};
+    const char *knob_names[4]={"WET","DEPTH","FEEDBACK","SEND"};
+    uint8_t values[4]={fm6_fx_mix(fx),fm6_fx_time(fx),fm6_fx_feedback(fx),fm6_fx_get_send(set.patch,fx)};
     char t[16]; uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):RGB(242,212,59);
-    rounded_panel(4,4,112,62,7,panel_fill(),accent);
-    cv_text(13,13,&FONT_XS,names[fx],C_WHITE);
-    cv_text(13,34,&FONT_B,fm6_fx_enabled(fx)?"ACTIVE":"BYPASS",fm6_fx_enabled(fx)?RGB(75,235,135):RGB(255,82,101));
-    rounded_panel(122,4,112,62,7,panel_fill(),accent);
-    cv_text(131,13,&FONT_XS,"WET MIX",C_GRAY); int_text(fx_ui_mix[fx],t); cv_text(131,34,&FONT_B,t,accent);
-    cv_rect(12,84,216,8,C_LINE); cv_rect(12,84,(int32_t)fx_ui_mix[fx]*216/100,8,accent);
-    cv_text(6,106,&FONT_XS,fx==1u?"DELAY TIME / FEEDBACK":fx==0u?"RATE / DEPTH":"DECAY / TONE",C_GRAY);
-    int_text(fx_ui_time[fx],t); cv_text(6,124,&FONT_B,t,accent);
-    cv_text(122,106,&FONT_XS,"PATCH SEND",C_GRAY); int_text(fm6_fx_get_send(set.patch,fx),t); cv_text(122,124,&FONT_B,t,accent);
+    cv_text(6,2,&FONT_XS,names[fx],C_WHITE);
+    cv_text(154,2,&FONT_XS,fm6_fx_enabled(fx)?"ACTIVE":"BYPASS",fm6_fx_enabled(fx)?RGB(75,235,135):RGB(255,82,101));
+    for(uint32_t k=0;k<4u;++k) {
+        int32_t x=4+(int32_t)(k&1u)*118;
+        int32_t y=18+(int32_t)(k>>1u)*54;
+        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?"K3 FEEDBACK":"K4 PATCH SEND",C_GRAY);
+        int_text(values[k],t);
+        cv_text(x+7,y+23,&FONT_B,t,accent);
+        cv_rect(x+48,y+29,55,5,C_LINE);
+        cv_rect(x+48,y+29,(int32_t)values[k]*55/100,5,accent);
+    }
+    (void)time_names;
 }
 
 static void draw(void)
