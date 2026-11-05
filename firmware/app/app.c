@@ -47,7 +47,6 @@ static void instrument_store_load(void)
     static const uint8_t count[INST_CHUNKS] = {6u, 5u, 5u};
     uint8_t buf[INST_HEADER_BYTES + INST_CHUNK_MAX_RECORDS * sizeof(fm1lab_instrument_record_t)];
     uint32_t chunk, i;
-    app_copy_bytes(instrument_cache, instrument_cache, 0u);
     for (chunk = 0; chunk < INST_CHUNKS; chunk++) {
         int n = plat_store_load(OBJ_INSTRUMENTS0 + chunk, buf, sizeof(buf));
         instrument_chunk_header_t h;
