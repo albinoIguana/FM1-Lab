@@ -2,10 +2,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "fm1.h"
 #include "fm6.h"
 
-static int32_t output[FM1_BLOCK_WORDS];
+enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
+static int32_t output[TEST_WORDS];
 
 static int32_t peak(const int32_t *samples, unsigned count)
 {
@@ -38,8 +38,8 @@ int main(void)
     fm6_note_on_mask(60u, 100u, 0x02u);
     assert(fm6_active_voices() == 1u);
     memset(output, 0, sizeof output);
-    fm6_render(output, FM1_BLOCK_FRAMES, 4096u);
-    assert(peak(output, FM1_BLOCK_WORDS) > 0);
+    fm6_render(output, TEST_FRAMES, 4096u);
+    assert(peak(output, TEST_WORDS) > 0);
 
     uint8_t invalid[156];
     memcpy(invalid, voice, sizeof invalid);
