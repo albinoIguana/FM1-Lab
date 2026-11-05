@@ -10,6 +10,6 @@ cc -std=c99 -O2 -Wall -Wextra \
   -Ifirmware/app/dsp \
   -I"$GEN" \
   -Ifirmware/upstream/felucca/firmware/engines/src \
-  firmware/tests/fm6_test.c firmware/app/dsp/fm6.c firmware/app/dsp/seq.c \
+  firmware/tests/fm6_test.c firmware/app/dsp/fm6.c firmware/app/dsp/seq.c firmware/app/storage_format.c \
   -o firmware/app/build/fm6_host_test
 firmware/app/build/fm6_host_test
