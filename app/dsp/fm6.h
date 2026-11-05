@@ -24,6 +24,23 @@ void fm6_note_on_tuned_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask, 
 void fm6_note_off(uint8_t note);
 void fm6_note_off_mask(uint8_t note, uint8_t patch_mask);
 void fm6_pitch_bend(uint16_t value);
+void fm6_set_tempo(uint16_t bpm);
+void fm6_sequencer_set_running(uint8_t running);
+void fm6_sequencer_set_length(uint8_t steps);
+void fm6_sequencer_set_lane(uint8_t lane, uint8_t patch);
+void fm6_sequencer_set_step(uint8_t lane, uint8_t step, uint8_t enabled, uint8_t note, uint8_t velocity, uint8_t gate);
+uint8_t fm6_sequencer_step(void);
+uint8_t fm6_sequencer_running(void);
+void fm6_arpeggiator_set_mode(uint8_t mode);
+uint8_t fm6_arpeggiator_mode(void);
+void fm6_fx_set_enabled(uint8_t effect, uint8_t enabled);
+void fm6_fx_set_mix(uint8_t effect, uint8_t mix);
+void fm6_fx_set_time(uint8_t effect, uint8_t value);
+void fm6_fx_set_feedback(uint8_t value);
+uint8_t fm6_fx_enabled(uint8_t effect);
+uint8_t fm6_fx_mix(uint8_t effect);
+uint8_t fm6_fx_time(uint8_t effect);
+uint8_t fm6_fx_feedback(void);
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12);
 
 uint32_t fm6_patch_count(void);
