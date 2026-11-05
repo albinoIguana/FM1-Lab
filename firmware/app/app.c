@@ -569,7 +569,7 @@ static void input(void)
             ui.redraw = 1;
         } else if (ui.rename) {
             app_say("RENAME", "SELECT / ALGO");
-        } else if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
+        } else if (k == EN_ALGO && !ui.editor && !ui.seq_edit && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
         } else if (k == EN_PRESET) {
