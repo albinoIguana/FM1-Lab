@@ -28,6 +28,6 @@ jobs:
       build: |
         set -euo pipefail
         git submodule update --init --recursive base
-        ./build.sh
+        sh build.sh
         python3 base/tools/build.py app --host
       packages: app/build/fm1lab.fwsc
