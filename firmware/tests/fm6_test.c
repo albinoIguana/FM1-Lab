@@ -213,6 +213,22 @@ int main(void)
     seq_select_instrument(4u);
     require(seq_step_note(0u, 0u) == 0xFFu, "each Instrument has its own sequence");
 
+    /* Sequencer lane note-offs must not cut a same-pitch live keyboard note. */
+    fm6_init();
+    for (op = 1; op <= 6u; op++)
+        fm6_operator_set_value(0u, op, FM6_OP_RELEASE, 99u);
+    fm6_note_on_source(60u, 100u, 0u);
+    fm6_note_on_source(60u, 100u, 1u);
+    require(fm6_active_voices() == 2u, "same pitch can exist on two note sources");
+    fm6_note_off_source(60u, 1u);
+    for (b = 0; b < 64u; b++)
+        fm6_render(audio, BLOCK, 4096);
+    require(fm6_active_voices() == 1u, "lane A note-off leaves keyboard source held");
+    fm6_note_off_source(60u, 0u);
+    for (b = 0; b < 64u; b++)
+        fm6_render(audio, BLOCK, 4096);
+    require(fm6_active_voices() == 0u, "keyboard source releases independently");
+
     printf("FM6 host tests passed: 4 patches, 8 shared voices, deterministic audio, neutral macros, 24-bit limiter, saveable Instruments, two sequencer lanes.\n");
     return 0;
 }
