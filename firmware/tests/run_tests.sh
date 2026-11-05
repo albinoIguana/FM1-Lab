@@ -7,6 +7,7 @@ test -s "$GEN/felucca_tables.h"
 test -s "$GEN/felucca_fm6.h"
 mkdir -p firmware/app/build
 cc -std=c99 -O2 -Wall -Wextra \
+  -Ifirmware/app \
   -Ifirmware/app/dsp \
   -I"$GEN" \
   -Ifirmware/upstream/felucca/firmware/engines/src \
