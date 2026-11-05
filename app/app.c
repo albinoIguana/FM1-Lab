@@ -526,6 +526,8 @@ static void draw_home_panel(void)
         int enabled = (set.enabled_mask >> p) & 1u;
         cv_rect(x, y, 112, 62, C_BLACK);
         outline(x, y, 112, 62, accent);
+        if (p == set.patch)
+            cv_rect(x + 3, y + 6, 2, 10, C_HI);
         cv_text(x + 6, y + 6, &FONT_XS, fm6_patch_name(p), C_WHITE);
         cv_text(x + 6, y + 24, &FONT_XS, enabled ? "ACTIVE" : "MUTED", enabled ? C_HI : C_DIM);
         cv_text(x + 58, y + 24, &FONT_XS, "ALG", C_GRAY);
@@ -544,6 +546,7 @@ static void draw_macro_panel(void)
 {
     static const char *const names[FM1LAB_MACRO_COUNT] = {"BRIGHTNESS", "BODY", "MOTION", "EDGE"};
     char t[24];
+    uint32_t now = plat_ms();
     cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(164, 2, &FONT_XS, "ALGO", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
@@ -551,14 +554,19 @@ static void draw_macro_panel(void)
     for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m) {
         int32_t y = 28 + (int32_t)m * 27;
         uint32_t value = set.macros[set.patch][m];
+        uint16_t ink = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u
+                           ? C_HI : C_LINE;
+        if (ink == C_HI)
+            outline(2, y - 4, 232, 20, C_HI);
         cv_text(6, y, &FONT_XS, names[m], C_WHITE);
         int_text((int32_t)value, t);
         cv_text(78, y, &FONT_XS, t, C_HI);
         cv_rect(108, y + 2, 124, 8, C_LINE);
         cv_rect(108, y + 2, (int32_t)value * 124 / 100, 8, C_HI);
         cv_rect(169, y, 2, 12, C_WHITE); /* neutral midpoint at 50 */
+        cv_rect(107 + (int32_t)value * 124 / 100, y, 3, 12, C_WHITE);
     }
-    cv_text(4, 138, &FONT_XS, "K1 BRIGHT  K2 BODY  K3 MOTION  K4 EDGE", C_GRAY);
+    cv_text(4, 138, &FONT_XS, "50 = NEUTRAL   K1 BRIGHT  K2 BODY  K3 MOTION  K4 EDGE", C_GRAY);
 }
 
 /* Read-only role map: reflects the selected algorithm's carrier assignment
