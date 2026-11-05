@@ -494,13 +494,13 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
                 seq_stop_pending=0u;
             }
             if(arp_clear_pending) {
-                if(arp_live) fm6_note_off_mask(arp_live_note,0x0fu);
+                if(arp_live) fm6_note_off_source(arp_live_note,0x0fu,3u);
                 arp_live=0u; arp_count=0u; arp_index=0u; arp_clear_pending=0u;
             }
             transport_phase+=(uint32_t)transport_bpm*4u;
             if(transport_phase>=FM6_SAMPLE_RATE*60u) { transport_phase-=FM6_SAMPLE_RATE*60u; fm6_transport_step(); }
             for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane] && --seq_gate_left[lane]==0u)
-                fm6_note_off_mask(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]));
+                fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
             int64_t dry=0, send_accum[3]={0,0,0};
             for(uint32_t p=0;p<PATCHES;p++) {
                 int64_t sample=patch_mix[p][i]; dry+=sample;
