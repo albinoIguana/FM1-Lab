@@ -1,0 +1,84 @@
+diff --git a/web/engine/Simulator.c b/web/engine/Simulator.c
+--- a/web/engine/Simulator.c
++++ b/web/engine/Simulator.c
+@@ -462,4 +462,12 @@
+ EXPORT("sim_midi") int sim_midi(unsigned bytes) { return sim_midi_from(FM1_MIDI_USB, bytes); }
+ 
++/* FM1-Lab reads official M-VAVE DX7 factory voices through the same
++ * expanded 156-byte patch representation used by the device firmware. */
++EXPORT("sim_fm_factory") int sim_fm_factory(unsigned program)
++{
++    groove_fm_factory(file_buffer, program % FM1_FM_PROGRAMS);
++    return 0;
++}
++
+ int fm1_usb_audio_read(int32_t *pcm, unsigned frames, uint16_t gains[2])
+ {
+diff --git a/sdk/Simulator.js b/sdk/Simulator.js
+--- a/sdk/Simulator.js
++++ b/sdk/Simulator.js
+@@ -202,5 +202,5 @@
+   globalThis.FM1SimulatorCore=coreRuntime();
+   globalThis.FM1SimulatorAudioSource='('+coreRuntime.toString()+')('+audioThread.toString()+');';
+ 
+-  if (typeof document === 'undefined') return;
++  if (typeof document === 'undefined' || globalThis.FM1_LAB_MODE) return;
+   const $ = id=>document.getElementById(id), sources=['DX7','303','808','PSG','PLUCK','SAMPLER'];
+diff --git a/web/synth/dx7core.c b/web/synth/dx7core.c
+--- a/web/synth/dx7core.c
++++ b/web/synth/dx7core.c
+@@ -67,5 +67,54 @@
+     { 0xc1, 0x14, 0x04, 0x04, 0x04, 0x04 }, // 31
+     { 0xc4, 0x04, 0x04, 0x04, 0x04, 0x04 }, // 32
+ };
+ 
++/* The low two bits select the destination bus. Bus zero is final audio output. */
++#ifdef __wasm__
++__attribute__((export_name("sim_fm_carriers")))
++#endif
++unsigned sim_fm_carriers(unsigned algorithm)
++{
++    const u8 *flags = algorithms[algorithm & 31U];
++    unsigned mask = 0;
++    for (unsigned op = 0; op < FM_OP_CNT; ++op)
++        if ((flags[op] & 3U) == 0) mask |= 1U << (5U - op);
++    return mask;
++}
++
++/* Return modulation stages between an operator and a carrier.
++ * Operator numbers use the printed DX7 labels OP1..OP6. */
++#ifdef __wasm__
++__attribute__((export_name("sim_fm_operator_depth")))
++#endif
++unsigned sim_fm_operator_depth(unsigned algorithm, unsigned operator_number)
++{
++    if (operator_number < 1U || operator_number > FM_OP_CNT) return 0U;
++    const u8 *flags = algorithms[algorithm & 31U];
++    u8 producers[3][FM_OP_CNT] = {{0}};
++    u8 counts[3] = {0};
++    u8 edges[FM_OP_CNT][FM_OP_CNT] = {{0}};
++    u8 carrier[FM_OP_CNT] = {0};
++    u8 depth[FM_OP_CNT] = {0};
++    for (unsigned op = 0; op < FM_OP_CNT; ++op) {
++        unsigned inbus = (flags[op] >> 4) & 3U;
++        unsigned outbus = flags[op] & 3U;
++        unsigned add = (flags[op] & 4U) != 0U;
++        if (inbus)
++            for (unsigned n = 0; n < counts[inbus]; ++n)
++                edges[producers[inbus][n]][op] = 1U;
++        if (!outbus) carrier[op] = 1U;
++        else {
++            if (!add) counts[outbus] = 0U;
++            producers[outbus][counts[outbus]++] = (u8)op;
++        }
++    }
++    for (unsigned op = 0; op < FM_OP_CNT; ++op)
++        depth[op] = carrier[op] ? 0U : 1U;
++    for (unsigned pass = 0; pass < FM_OP_CNT; ++pass)
++        for (unsigned op = 0; op < FM_OP_CNT; ++op)
++            for (unsigned next = 0; next < FM_OP_CNT; ++next)
++                if (edges[op][next] && depth[next] + 1U > depth[op])
++                    depth[op] = (u8)(depth[next] + 1U);
++    return depth[FM_OP_CNT - operator_number];
++}
+ FM1_DSP_CODE static void compute_fb4(int *output,t_dx7op_params *params,int gaincur, int gaindst,int *fb_buf, int feedback_shift)

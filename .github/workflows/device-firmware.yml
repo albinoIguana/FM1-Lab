@@ -1,0 +1,19 @@
+name: Legacy M-VAVE SDK reference build (not release)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Explain the legacy target
+        shell: pwsh
+        run: |
+          Write-Host 'This workflow builds the old M-VAVE SDK application path for reference only.'
+          Write-Host 'The active FM1 device target is fm1-base + Felucca-BSP via Native FM1 build.'
+          Write-Host 'Do not treat this workflow or its package limit as the release firmware path.'

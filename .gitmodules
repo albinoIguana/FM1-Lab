@@ -1,0 +1,9 @@
+[submodule "vendor/m-vave-fm1"]
+	path = vendor/m-vave-fm1
+	url = https://github.com/m-vave/fm1_open.git
+[submodule "base"]
+	path = base
+	url = https://github.com/charlesvestal/fm1-base.git
+[submodule "upstream/felucca"]
+	path = upstream/felucca
+	url = https://github.com/hugelton/Felucca.git

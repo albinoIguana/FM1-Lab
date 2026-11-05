@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090d14">
+<title>FM1-Lab · Instrument Workshop</title>
+<link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+<div id="boot" class="boot">
+  <div class="boot-mark">FM<span>1</span></div>
+  <p class="eyebrow">M-VAVE FM1 · CUSTOM INSTRUMENT FIRMWARE WORKSHOP</p>
+  <h1>FOUR PATCHES.<br><em>ONE INSTRUMENT.</em></h1>
+  <p class="boot-copy">A purpose-built FM sound design environment running on M-VAVE's official FM1 engine.</p>
+  <button id="enter" class="primary">INITIALIZE WORKSHOP</button>
+  <p id="boot-status" class="status">WAITING TO INITIALIZE</p>
+</div>
+<main id="app" hidden>
+  <header class="topbar">
+    <a class="brand" href="#" id="brand-home">FM1<span>·</span>LAB</a>
+    <div class="engine-state"><i></i><span id="engine-status">M-VAVE ENGINE STARTING</span></div>
+    <div class="top-actions">
+      <button id="open-sequencer" class="quiet">SEQ · 2 TRACK</button>
+      <button id="audio-start" class="primary small">START AUDIO</button>
+      <button id="export-instrument" class="quiet">EXPORT</button>
+      <button id="import-instrument" class="quiet">IMPORT</button>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+    </div>
+  </header>
+  <section id="home-screen">
+    <div class="hero">
+      <div><p class="eyebrow">01 / INSTRUMENT SELECT</p><h2>Instrument <em>library</em></h2><p class="muted">An Instrument is four independent six-operator FM patches, saved and recalled as one unit.</p></div>
+      <div class="instrument-picker">
+        <button id="instrument-prev" aria-label="Previous Instrument">−</button>
+        <div><small>ACTIVE INSTRUMENT</small><strong id="instrument-index">01 / 02</strong><input id="instrument-name" maxlength="24" value="GLASS CURRENT" aria-label="Instrument name"></div>
+        <button id="instrument-next" aria-label="Next Instrument">+</button>
+      </div>
+    </div>
+    <div class="section-head"><div><p class="eyebrow">PATCH SELECT / 1–4</p><h3>Four sound sources</h3></div><span class="muted">ONE PATCH PER FM PART</span></div>
+    <section id="patch-grid" class="patch-grid"></section>
+    <p class="footnote">Select a patch to open its six-operator editor. Macro changes are derived from the saved patch, so turning a macro never destroys the underlying voice.</p>
+  </section>
+  <section id="editor-screen" hidden>
+    <div class="editor-head">
+      <button id="back-home" class="quiet">← INSTRUMENT</button>
+      <div><p class="eyebrow">02 / PATCH DESIGN</p><h2 id="editor-title">PATCH 01</h2></div>
+      <button id="play-note" class="primary">▶ PLAY C4</button>
+    </div>
+    <div class="patch-global panel">
+      <label>PATCH NAME<input id="patch-name" maxlength="10"></label>
+      <label>ALGORITHM<select id="algorithm"></select></label>
+      <label>FEEDBACK<output id="feedback-value">0</output><input id="feedback" type="range" min="0" max="7" step="1"></label>
+    </div>
+    <div class="work-grid">
+      <section class="panel macro-panel">
+        <div class="panel-title"><div><p class="eyebrow">03 / PERFORMANCE CONTROLS</p><h3>Instrument macros</h3></div><span>LIVE · ROLE AWARE</span></div>
+        <div id="macros" class="macro-list"></div>
+      </section>
+      <section class="panel operator-panel">
+        <div class="panel-title"><div><p class="eyebrow">04 / FM6 VOICE</p><h3>Operator architecture</h3></div><span>6 OPERATORS</span></div>
+        <div id="operator-tabs" class="operator-tabs"></div>
+        <div id="operator-editor" class="operator-editor"></div>
+      </section>
+    </div>
+    <p class="footnote">Engine: M-VAVE FM1 official DX7 implementation · 156-byte native voice data · six-operator algorithms.</p>
+  </section>
+  <section id="sequencer-screen" hidden>
+    <div class="editor-head">
+      <button id="seq-back" class="quiet">← INSTRUMENT</button>
+      <div><p class="eyebrow">02 / TWO-TRACK SEQUENCER</p><h2>SEQ <em>COMPOSE</em></h2></div>
+    </div>
+    <p class="muted">Both tracks stay visible. Select a lane, set its timing, then enter notes. The timeline remains 64 steps wide while each track's active length is independently adjustable.</p>
+    <div id="sequencer-view" class="sequencer-workspace"></div>
+    <p class="footnote">The sequencer data model and editing surface are in place. Native transport, clock synchronization and device control mapping remain integration work.</p>
+  </section>
+  <footer class="app-footer">FM1-LAB / INDEPENDENT INSTRUMENT DESIGN <span>BUILT ON M-VAVE OPEN FM1 SOURCE + SDK</span></footer>
+</main>
+<script type="module" src="./src/main-native.js"></script>
+</body>
+</html>
