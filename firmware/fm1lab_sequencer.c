@@ -28,6 +28,24 @@ static unsigned bound_tracks[FM1LAB_SEQUENCE_LANES] = {255U, 255U};
 static unsigned selected_lane;
 static uint8_t bound_patch[FM1LAB_SEQUENCE_LANES] = {0, 1};
 
+static int restore_changed_roles(void)
+{
+    int failed = 0;
+    for (int track = GROOVE_TRACKS - 1; track >= 0; --track) {
+        uint8_t bit = (uint8_t)(1U << track);
+        if (!(changed_roles & bit)) continue;
+        if (groove_track_role_set((unsigned)track, saved_track_roles[track]))
+            failed = 1;
+        else
+            changed_roles &= (uint8_t)~bit;
+    }
+    if (!changed_roles) {
+        binding_active = 0;
+        restore_pending = 0;
+    }
+    return failed ? -1 : 0;
+}
+
 static int lane_track(unsigned lane, unsigned *track)
 {
     if (lane >= FM1LAB_SEQUENCE_LANES || bound_tracks[lane] >= GROOVE_TRACKS)
