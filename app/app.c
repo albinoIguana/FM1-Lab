@@ -6,6 +6,7 @@
  * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
+#include "fm1lab_instrument.h"
 
 #define SET_MAGIC_V1 0x4C314D46u
 #define SET_MAGIC    0x4C314D47u
@@ -23,6 +24,10 @@ typedef struct {
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;
+static fm1lab_instrument_t current_instrument;
+static uint8_t instrument_index, instrument_dirty, instrument_loaded;
+static volatile uint8_t instrument_apply_pending;
+enum { USER_INSTRUMENT_COUNT = 3 };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 
@@ -34,7 +39,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE, EV_MACRO_SET, EV_PATCH_LEVEL };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD };
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -55,6 +60,75 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
     ui_event_head = next;
 }
 
+static void instrument_apply_engine(void)
+{
+    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        const fm1lab_patch_t *part = &current_instrument.patches[p];
+        (void)fm6_patch_set_voice(p, part->voice);
+        fm6_patch_set_enabled(p, part->enabled);
+        fm6_patch_set_level(p, part->level);
+        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
+            fm6_macro_set(p, m, part->macros[m]);
+    }
+}
+
+static void instrument_factory_defaults(void)
+{
+    fm1lab_instrument_init(&current_instrument, "FACTORY");
+    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        const uint8_t *voice = fm6_patch_data(p);
+        if (voice) (void)fm1lab_patch_set_voice(&current_instrument, p, voice);
+        current_instrument.patches[p].enabled = (set.enabled_mask >> p) & 1u;
+        current_instrument.patches[p].level = set.levels[p];
+        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
+            current_instrument.patches[p].macros[m] = set.macros[p][m];
+    }
+}
+
+static void instrument_sync_settings(void)
+{
+    set.enabled_mask = 0;
+    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        const fm1lab_patch_t *part = &current_instrument.patches[p];
+        if (part->enabled) set.enabled_mask |= (uint8_t)(1u << p);
+        set.levels[p] = part->level;
+        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
+            set.macros[p][m] = part->macros[m];
+    }
+}
+
+static void instrument_load(uint32_t index, int from_audio)
+{
+    fm1lab_instrument_t candidate;
+    int bytes = plat_store_load(OBJ_INSTRUMENTS0 + index, &candidate, sizeof candidate);
+    if (bytes == (int)sizeof candidate && fm1lab_instrument_valid(&candidate)) {
+        current_instrument = candidate;
+    } else {
+        instrument_factory_defaults();
+    }
+    instrument_index = (uint8_t)index;
+    instrument_loaded = 1u;
+    instrument_dirty = 0u;
+    instrument_sync_settings();
+    if (from_audio) {
+        instrument_apply_pending = 1u;
+        ui_event_push(EV_INSTRUMENT_LOAD, 0, 0, 0);
+    } else {
+        instrument_apply_engine();
+    }
+}
+
+static int instrument_save(void)
+{
+    if (!instrument_loaded || !fm1lab_instrument_valid(&current_instrument))
+        return -1;
+    if (plat_store_save(OBJ_INSTRUMENTS0 + instrument_index,
+                        &current_instrument, sizeof current_instrument))
+        return -1;
+    instrument_dirty = 0u;
+    return 0;
+}
+
 static void ui_events_drain(void)
 {
     uint8_t tail;
@@ -62,12 +136,14 @@ static void ui_events_drain(void)
         ui_event_tail = ui_event_head;
         ui_event_overflow = 0;
         fm6_panic();
-        for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        if (instrument_loaded) instrument_apply_engine();
+        else for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
             fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
             fm6_patch_set_level(p, set.levels[p]);
             for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
                 fm6_macro_set(p, m, set.macros[p][m]);
         }
+        instrument_apply_pending = 0u;
         return;
     }
     while ((tail = ui_event_tail) != ui_event_head) {
@@ -86,6 +162,11 @@ static void ui_events_drain(void)
             fm6_macro_set(a, b, c);
         else if (type == EV_PATCH_LEVEL)
             fm6_patch_set_level(a, b);
+        else if (type == EV_INSTRUMENT_LOAD) {
+            fm6_panic();
+            instrument_apply_engine();
+            instrument_apply_pending = 0u;
+        }
     }
 }
 
@@ -193,6 +274,7 @@ void app_init(void)
         }
     }
     page = PAGE_HOME;
+    instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
         fm6_patch_set_level(p, set.levels[p]);
@@ -410,9 +492,11 @@ static void input(void)
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", fm6_patch_name(set.patch));
         } else if (k == B_SAVE) {
-            if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
+            int instrument_result = instrument_save();
+            int settings_result = plat_store_save(OBJ_SETTINGS, &set, sizeof set);
+            if (instrument_result == 0 && settings_result == 0) {
                 set_dirty = 0;
-                app_say("SAVED", "");
+                app_say("INSTRUMENT", "SAVED");
             } else {
                 app_say("SAVE", "FAILED");
             }
@@ -451,7 +535,17 @@ static void input(void)
             set_dirty = 1;
             app_say("PATCH", fm6_patch_name(set.patch));
         } else if (k == EN_PRESET) {
-            app_say("INSTRUMENT", "LIBRARY NOT READY");
+            if (instrument_dirty) {
+                app_say("SAVE INSTRUMENT", "BEFORE CHANGING");
+            } else {
+                int32_t next = ((int32_t)instrument_index + e) % USER_INSTRUMENT_COUNT;
+                if (next < 0) next += USER_INSTRUMENT_COUNT;
+                if ((uint32_t)next != instrument_index) {
+                    instrument_load((uint32_t)next, 1);
+                    app_say("INSTRUMENT", next == 0 ? "FACTORY / USER 1" :
+                        next == 1 ? "USER 2" : "USER 3");
+                }
+            }
         } else if (k >= EN_K1 && k <= EN_K4) {
             uint32_t index = (uint32_t)k - EN_K1;
             if (page == PAGE_MACRO) {
@@ -459,6 +553,8 @@ static void input(void)
                 if (value < 0) value = 0;
                 if (value > 100) value = 100;
                 set.macros[set.patch][index] = (uint8_t)value;
+                current_instrument.patches[set.patch].macros[index] = (uint8_t)value;
+                instrument_dirty = 1u;
                 ui_event_push(EV_MACRO_SET, set.patch, (uint8_t)index, (uint8_t)value);
                 set_dirty = 1;
                 app_say("MACRO", "UPDATED");
@@ -467,6 +563,8 @@ static void input(void)
                 if (value < 0) value = 0;
                 if (value > 127) value = 127;
                 set.levels[index] = (uint8_t)value;
+                current_instrument.patches[index].level = (uint8_t)value;
+                instrument_dirty = 1u;
                 ui_event_push(EV_PATCH_LEVEL, (uint8_t)index, (uint8_t)value, 0);
                 set_dirty = 1;
                 app_say("PATCH LEVEL", "UPDATED");
