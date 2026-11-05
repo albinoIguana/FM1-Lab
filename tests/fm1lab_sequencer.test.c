@@ -3,7 +3,10 @@
 #include <assert.h>
 #include <string.h>
 
-static unsigned roles[8], sources[8], lengths[8], tempo = 120, swing, enabled_mask = 0xffU, playing;
+static unsigned roles[8], sources[8], lengths[8], tempo = 120, swing, playing;
+static unsigned start_posts, stop_posts;
+static int fail_role_track = -1;
+static unsigned fail_role_count;
 static unsigned track_volumes[8], muted[8];
 static uint8_t imported_voices[8][FM1LAB_PATCH_BYTES];
 static struct groove_step steps[8][64];
@@ -11,8 +14,25 @@ static unsigned settings[8][64][7];
 
 unsigned groove_track_role(unsigned t) { return t < 8 ? roles[t] : GROOVE_TRACK_OFF; }
 unsigned groove_source_type(unsigned t) { return t < 8 ? sources[t] : GROOVE_SOURCES; }
-int groove_sequence_track_enable(unsigned t, unsigned on) { if (t >= 8) return -1; if (on) enabled_mask |= 1U << t; else enabled_mask &= ~(1U << t); return 0; }
-void groove_sequence_transport(uint8_t status) { playing = status == 0xfaU; }
+int groove_track_role_set(unsigned t, unsigned role)
+{
+    if (t >= 8 || role > GROOVE_TRACK_OFF) return -1;
+    if ((int)t == fail_role_track && fail_role_count) { --fail_role_count; return -1; }
+    roles[t] = role;
+    return 0;
+}
+void groove_screen_mmc(unsigned command)
+{
+    if (command == 1 || command == 9) { ++stop_posts; playing = 0; }
+    else if (command == 2 || command == 3 || command == 6) playing = 1;
+}
+int fm1_midi_post(const uint8_t *message, size_t bytes)
+{
+    if (!message || bytes != 1) return -1;
+    if (message[0] == 0xfaU) { ++start_posts; playing = 1; return 0; }
+    if (message[0] == 0xfcU) { ++stop_posts; playing = 0; return 0; }
+    return -1;
+}
 void groove_sequence_view(unsigned t, unsigned s, struct groove_view *v) { (void)t; (void)s; memset(v, 0, sizeof *v); v->playing = (uint8_t)playing; }
 int fm1lab_instrument_valid(const fm1lab_instrument_t *i) { return i && i->magic == FM1LAB_INSTRUMENT_MAGIC && i->version == FM1LAB_INSTRUMENT_VERSION; }
 int fm1lab_render_patch(const fm1lab_instrument_t *i, unsigned p, uint8_t out[FM1LAB_PATCH_BYTES]) { if (!fm1lab_instrument_valid(i) || p >= FM1LAB_PATCH_COUNT) return -1; memcpy(out, i->patches[p].voice, FM1LAB_PATCH_BYTES); return 0; }
