@@ -39,7 +39,7 @@ static uint8_t env_operator = 1u, env_levels;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
-static uint8_t arp_ui_mode, fx_ui_mix[3]={18u,24u,20u}, fx_ui_time[3]={48u,52u,45u}, fx_ui_feedback=42u;
+static uint8_t arp_ui_mode, fx_ui_mix[3]={18u,24u,20u}, fx_ui_time[3]={48u,52u,45u}, fx_ui_feedback[3]={40u,42u,60u};
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -731,9 +731,9 @@ static void input(void)
                 uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
                 if(index==0u) fx_ui_mix[fx]=(uint8_t)clamp((int32_t)fx_ui_mix[fx]+e,0,100);
                 else if(index==1u) fx_ui_time[fx]=(uint8_t)clamp((int32_t)fx_ui_time[fx]+e,0,100);
-                else if(index==2u) fx_ui_feedback=(uint8_t)clamp((int32_t)fx_ui_feedback+e,0,90);
+                else if(index==2u) fx_ui_feedback[fx]=(uint8_t)clamp((int32_t)fx_ui_feedback[fx]+e,0,fx==0u?70:90);
                 else fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
-                fm6_fx_set_mix(fx,fx_ui_mix[fx]); fm6_fx_set_time(fx,fx_ui_time[fx]); fm6_fx_set_feedback(fx_ui_feedback);
+                fm6_fx_set_mix(fx,fx_ui_mix[fx]); fm6_fx_set_time(fx,fx_ui_time[fx]); fm6_fx_set_feedback(fx,fx_ui_feedback[fx]);
                 app_say("EFFECT PARAMETER", "UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
@@ -1139,7 +1139,7 @@ static void draw(void)
             int_text(transport_ui_bpm,t); cv_text(x+6,33,&FONT_XS,t,ink);
         } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
             cv_text(x+6,23,&FONT_XS,k==0?"MIX":k==1?"TIME":k==2?"FDBK":"SEND",C_WHITE);
-            int_text(k==0?fx_ui_mix[page-PAGE_FX_CHORUS]:k==1?fx_ui_time[page-PAGE_FX_CHORUS]:k==2?fx_ui_feedback:fm6_fx_get_send(set.patch,(uint8_t)(page-PAGE_FX_CHORUS)),t);
+            int_text(k==0?fx_ui_mix[page-PAGE_FX_CHORUS]:k==1?fx_ui_time[page-PAGE_FX_CHORUS]:k==2?fx_ui_feedback[page-PAGE_FX_CHORUS]:fm6_fx_get_send(set.patch,(uint8_t)(page-PAGE_FX_CHORUS)),t);
             cv_text(x+6,33,&FONT_XS,t,ink);
         } else if (page == PAGE_LFO || page == PAGE_LFO_MOD) {
             static const char *const lfo_names[2][4] = {
