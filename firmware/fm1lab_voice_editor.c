@@ -1,12 +1,28 @@
 #include "fm1lab_voice_editor.h"
 
-#include <ctype.h>
-#include <string.h>
 
 enum { OPERATOR_STRIDE = 21, GLOBAL_ALGORITHM = 134, GLOBAL_FEEDBACK = 135,
        GLOBAL_LFO_SPEED = 137, GLOBAL_LFO_DELAY = 138,
        GLOBAL_LFO_PITCH_DEPTH = 139, GLOBAL_LFO_AMP_DEPTH = 140,
        VOICE_NAME_OFFSET = 145, VOICE_NAME_BYTES = 10 };
+
+static void copy_bytes(void *destination, const void *source, unsigned count)
+{
+    uint8_t *d = (uint8_t *)destination;
+    const uint8_t *s = (const uint8_t *)source;
+    while (count--) *d++ = *s++;
+}
+
+static void fill_bytes(void *destination, uint8_t value, unsigned count)
+{
+    uint8_t *d = (uint8_t *)destination;
+    while (count--) *d++ = value;
+}
+
+static unsigned char upper_ascii(unsigned char value)
+{
+    return value >= 'a' && value <= 'z' ? (unsigned char)(value - 'a' + 'A') : value;
+}
 
 static int operator_field_offset(fm1lab_operator_field_t field, unsigned *offset,
                                  unsigned *maximum)
@@ -42,6 +58,10 @@ static int global_field_offset(fm1lab_global_field_t field, unsigned *offset,
     case FM1LAB_GLOBAL_LFO_DELAY:       *offset = GLOBAL_LFO_DELAY; *maximum = 99; break;
     case FM1LAB_GLOBAL_LFO_PITCH_DEPTH: *offset = GLOBAL_LFO_PITCH_DEPTH; *maximum = 99; break;
     case FM1LAB_GLOBAL_LFO_AMP_DEPTH:   *offset = GLOBAL_LFO_AMP_DEPTH; *maximum = 99; break;
+    case FM1LAB_GLOBAL_LFO_WAVE:        *offset = 142; *maximum = 5; break;
+    case FM1LAB_GLOBAL_LFO_SYNC:        *offset = 141; *maximum = 1; break;
+    case FM1LAB_GLOBAL_OSC_SYNC:        *offset = 136; *maximum = 1; break;
+    case FM1LAB_GLOBAL_PITCH_SENS:      *offset = 143; *maximum = 7; break;
     default: return -1;
     }
     return 0;
@@ -117,7 +137,7 @@ int fm1lab_voice_operator_modulates(const uint8_t voice[FM1LAB_PATCH_BYTES],
 int fm1lab_voice_name_get(const uint8_t voice[FM1LAB_PATCH_BYTES], char name[11])
 {
     if (!voice || !name) return -1;
-    memcpy(name, voice + VOICE_NAME_OFFSET, VOICE_NAME_BYTES);
+    copy_bytes(name, voice + VOICE_NAME_OFFSET, VOICE_NAME_BYTES);
     name[VOICE_NAME_BYTES] = '\0';
     for (int i = VOICE_NAME_BYTES - 1; i >= 0 && name[i] == ' '; --i) name[i] = '\0';
     return 0;
@@ -130,8 +150,8 @@ int fm1lab_voice_name_set(uint8_t voice[FM1LAB_PATCH_BYTES], const char *name)
         unsigned char ch = (unsigned char)name[i];
         if (ch < 32 || ch > 126) return -1;
     }
-    memset(voice + VOICE_NAME_OFFSET, ' ', VOICE_NAME_BYTES);
+    fill_bytes(voice + VOICE_NAME_OFFSET, ' ', VOICE_NAME_BYTES);
     for (unsigned i = 0; i < VOICE_NAME_BYTES && name[i]; ++i)
-        voice[VOICE_NAME_OFFSET + i] = (uint8_t)toupper((unsigned char)name[i]);
+        voice[VOICE_NAME_OFFSET + i] = (uint8_t)upper_ascii((unsigned char)name[i]);
     return 0;
 }
