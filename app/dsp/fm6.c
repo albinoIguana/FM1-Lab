@@ -91,7 +91,7 @@ static uint8_t arp_live_note, arp_live;
 static int32_t fx_delay[FM6_DELAY_SIZE], fx_chorus[FM6_CHORUS_SIZE];
 static int32_t fx_comb_a[256], fx_comb_b[512], fx_comb_c[1024];
 static uint16_t fx_delay_pos, fx_chorus_pos, fx_comb_pos_a, fx_comb_pos_b, fx_comb_pos_c;
-static volatile uint8_t fx_enabled[3], fx_mix[3]={18u,24u,20u}, fx_time[3]={48u,52u,45u}, fx_feedback=42u;
+static volatile uint8_t fx_enabled[3], fx_mix[3]={18u,24u,20u}, fx_time[3]={48u,52u,45u}, fx_feedback[3]={40u,42u,60u};
 static volatile uint8_t fx_send[PATCHES][3];
 static uint32_t fx_lfo_phase;
 static int32_t fm6_sat_q23(int64_t x) { return x>OUTPUT_LIMIT?OUTPUT_LIMIT:x< -OUTPUT_LIMIT?-OUTPUT_LIMIT:(int32_t)x; }
@@ -137,18 +137,18 @@ static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,in
         uint32_t read=(cp-d)&(FM6_CHORUS_SIZE-1u);
         chorus=fx_chorus[read];
     }
-    fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0]+(int64_t)chorus*2/5);
+    fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0]+(int64_t)chorus*fx_feedback[0]/100u);
     fx_chorus_pos=(uint16_t)((cp+1u)&(FM6_CHORUS_SIZE-1u));
     if(fx_enabled[1] && fx_mix[1]) {
         uint32_t d=256u+(uint32_t)fx_time[1]*78u, read=(dp-d)&(FM6_DELAY_SIZE-1u);
         delay=fx_delay[read];
     }
-    fx_delay[dp]=fm6_sat_q23((int64_t)sends[1]+(int64_t)delay*fx_feedback/100u);
+    fx_delay[dp]=fm6_sat_q23((int64_t)sends[1]+(int64_t)delay*fx_feedback[1]/100u);
     fx_delay_pos=(uint16_t)((dp+1u)&(FM6_DELAY_SIZE-1u));
     if(fx_enabled[2] && fx_mix[2]) {
         int32_t a=fx_comb_a[fx_comb_pos_a],b=fx_comb_b[fx_comb_pos_b],c=fx_comb_c[fx_comb_pos_c];
         reverb=(a+b+c)/3;
-        uint32_t decay=55u+(uint32_t)fx_time[2]*25u/100u;
+        uint32_t decay=40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
         fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2]+(int64_t)a*decay/100);
         fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2]+(int64_t)b*(decay+3u)/100);
         fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2]+(int64_t)c*(decay+6u)/100);
@@ -315,7 +315,7 @@ void fm6_init(void)
     fm6_zero_bytes(fx_comb_b,sizeof(fx_comb_b)); fm6_zero_bytes(fx_comb_c,sizeof(fx_comb_c));
     fm6_zero_volatile_bytes(fx_enabled,sizeof(fx_enabled)); fm6_zero_volatile_bytes(fx_send,sizeof(fx_send));
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=100u;
-    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback=42u;
+    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u;
     seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
     arp_mode=0u; arp_count=0u; arp_index=0u; arp_direction=1u; arp_live=0u;
     transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
@@ -550,11 +550,11 @@ uint8_t fm6_arpeggiator_mode(void) { return arp_mode; }
 void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled) { if(effect<3u) fx_enabled[effect]=enabled!=0u; }
 void fm6_fx_set_mix(uint8_t effect,uint8_t mix) { if(effect<3u) fx_mix[effect]=mix>100u?100u:mix; }
 void fm6_fx_set_time(uint8_t effect,uint8_t value) { if(effect<3u) fx_time[effect]=value>100u?100u:value; }
-void fm6_fx_set_feedback(uint8_t value) { fx_feedback=value>90u?90u:value; }
+void fm6_fx_set_feedback(uint8_t effect,uint8_t value) { if(effect<3u) fx_feedback[effect]=value>(effect==0u?70u:90u)?(effect==0u?70u:90u):value; }
 uint8_t fm6_fx_enabled(uint8_t effect) { return effect<3u?fx_enabled[effect]:0u; }
 uint8_t fm6_fx_mix(uint8_t effect) { return effect<3u?fx_mix[effect]:0u; }
 uint8_t fm6_fx_time(uint8_t effect) { return effect<3u?fx_time[effect]:0u; }
-uint8_t fm6_fx_feedback(void) { return fx_feedback; }
+uint8_t fm6_fx_feedback(uint8_t effect) { return effect<3u?fx_feedback[effect]:0u; }
 void fm6_fx_set_send(uint8_t patch,uint8_t effect,uint8_t send) { if(patch<PATCHES&&effect<3u) fx_send[patch][effect]=send>100u?100u:send; }
 uint8_t fm6_fx_get_send(uint8_t patch,uint8_t effect) { return patch<PATCHES&&effect<3u?fx_send[patch][effect]:0u; }
 
