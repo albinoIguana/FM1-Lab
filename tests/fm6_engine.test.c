@@ -54,6 +54,36 @@ int main(void) {
     assert(fm6_active_voices() == 0u);
     fm6_panic();
     assert(fm6_active_voices() == 0u);
-    puts("Felucca FM6 engine: independent patch voice pools, patch loading, macros, layer masks, tuning, bend and render passed");
+
+    /* Full four-layer stress: all four independent pools reach their
+     * documented per-patch limit simultaneously (32 live FM voices). */
+    fm6_init();
+    memcpy(voice, fm6_patch_data(0), 155u);
+    for (unsigned patch = 1; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        assert(fm6_patch_set_voice(patch, voice) == 0);
+        fm6_patch_set_level(patch, 127u);
+        fm6_patch_set_enabled(patch, 1u);
+    }
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
+            fm6_note_on_mask((uint8_t)(40u + patch * 12u + n), 100u,
+                             (uint8_t)(1u << patch));
+        assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
+    }
+    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
+
+    /* Overfilling one layer may steal only inside that layer's own pool. */
+    fm6_note_on_mask(100u, 100u, 0x04u);
+    fm6_note_on_mask(101u, 100u, 0x04u);
+    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
+
+    memset(output, 0, sizeof output);
+    fm6_render(output, TEST_FRAMES, 4096u);
+    assert(peak(output, TEST_WORDS) > 0);
+    fm6_panic();
+    assert(fm6_active_voices() == 0u);
+    puts("Felucca FM6 engine: 4 x 8 independent voices, per-patch stealing, patch loading, macros, tuning, bend and render passed");
     return 0;
 }

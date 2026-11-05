@@ -39,3 +39,4 @@ void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value);
 void fm6_macro_set(uint32_t patch, uint32_t macro, uint8_t value);
 uint8_t fm6_macro_get(uint32_t patch, uint32_t macro);
 uint32_t fm6_active_voices(void);
+uint32_t fm6_active_voices_patch(uint32_t patch);

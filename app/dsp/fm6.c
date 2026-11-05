@@ -432,3 +432,15 @@ uint32_t fm6_active_voices(void)
         n += voices[i].used != 0;
     return n;
 }
+
+/* Diagnostic/test accessor: count only one patch's fixed voice pool. */
+uint32_t fm6_active_voices_patch(uint32_t patch)
+{
+    uint32_t i, n = 0;
+    if (patch >= PATCHES)
+        return 0;
+    for (i = patch * FM1LAB_VOICE_LIMIT;
+         i < (patch + 1u) * FM1LAB_VOICE_LIMIT; ++i)
+        n += voices[i].used != 0;
+    return n;
+}
