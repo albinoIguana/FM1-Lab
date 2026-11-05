@@ -37,6 +37,7 @@ jobs:
           node --check scripts/patch-m-vave-native-patch-editor.mjs
           node scripts/patch-m-vave-instrument-macros.mjs
           node --check scripts/patch-m-vave-instrument-macros.mjs
+          node scripts/patch-m-vave-instrument-macros.mjs
           node scripts/patch-m-vave-audio-mixer.mjs
           node --check scripts/patch-m-vave-audio-mixer.mjs
       - name: Check application modules

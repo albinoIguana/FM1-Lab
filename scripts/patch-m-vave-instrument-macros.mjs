@@ -36,9 +36,21 @@ static void fm1lab_macro_draw(void)
     text(184, 8, "PATCH", 1, DIM, BACK);
     number(218, 8, (int)fm1lab_home_runtime.selected_patch + 1, 1, 1, TEXT, BACK);
     if (fm1lab_home_runtime.dirty) text(8, 37, "UNSAVED", 1, AMBER, BACK);
+    uint8_t algorithm = 0;
+    (void)fm1lab_voice_global_get(patch->voice, FM1LAB_GLOBAL_ALGORITHM, &algorithm);
+    text(8, 37, "ALG", 1, DIM, BACK);
+    number(32, 36, algorithm, 2, 1, TEXT, BACK);
+    text(58, 37, "ROLES", 1, DIM, BACK);
+    for (unsigned op = 1; op <= 6; ++op) {
+        int carrier = fm1lab_voice_operator_is_carrier(patch->voice, op);
+        unsigned x = 101U + (op - 1U) * 21U;
+        char role[3] = {(char)('0' + op), carrier ? 'C' : 'M', 0};
+        frame(x, 34, 19, 14, carrier ? GREEN : AMBER);
+        text(x + 4U, 37, role, 1, carrier ? GREEN : AMBER, BACK);
+    }
     static const char *const names[FM1LAB_MACRO_COUNT] = {"BRIGHTNESS", "BODY", "MOTION", "DIRT"};
     static const char *const descriptions[FM1LAB_MACRO_COUNT] = {
-        "MODULATOR ENERGY", "MOD RATIO + ENVELOPE", "LFO SPEED + DEPTH", "FEEDBACK + DETUNE"
+        "DEPTH-SCALED MOD OUTPUT", "CARRIER SUSTAIN LEVEL", "MODULATOR EG SHAPE", "GLOBAL FEEDBACK"
     };
     for (unsigned i = 0; i < FM1LAB_MACRO_COUNT; ++i) {
         unsigned y = 49U + i * 43U, value = patch->macros[i];
@@ -63,12 +75,16 @@ replaceOnce("    if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return; }",
 if (!source.includes("FM1-LAB performance macro controls")) {
 const controls = String.raw`
     if ((page == FM1LAB_HOME || page == FM1LAB_PATCH) && (pressed & BUTTON(GLO)) && !(pressed & BUTTON(HOME))) {
+        glo_down = 0;
+        glo_used = 1;
         fm1lab_macro_return_page = (unsigned)page;
         page = FM1LAB_MACRO_PAGE;
         goto controls_done;
     }
     if (page == FM1LAB_MACRO_PAGE) {
         if (pressed & (BUTTON(HOME) | BUTTON(GLO))) {
+            glo_down = 0;
+            glo_used = 1;
             page = fm1lab_macro_return_page == FM1LAB_PATCH ? FM1LAB_PATCH : FM1LAB_HOME;
             goto controls_done;
         }

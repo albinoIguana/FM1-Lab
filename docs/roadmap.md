@@ -57,7 +57,7 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [x] Replace numeric native screen encoder references with named physical-control constants in the simulator source build.
 - [ ] Map PRESETS to the new four-patch Instrument selector and KNOB 1–4 to patch slots in the redesigned HOME screen.
 - [ ] Implement the HOME Instrument screen with four patch tiles, names, active state and selection.
-- [ ] Add four macro controls with algorithm-aware carrier/modulator behavior.
+- [x] Add a dedicated four-macro performance page; show the selected patch algorithm and live carrier/modulator roles, with four physical macro knobs and a visible neutral midpoint. Macro rendering is topology-aware in the native voice model.
 - [ ] Complete the deep six-operator editor and immediate FX controls on-device.
 - [ ] Add Instrument rename, duplicate, save/load and import/export behavior.
 
