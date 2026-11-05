@@ -18,4 +18,6 @@ uint8_t seq_step_velocity(uint32_t lane, uint32_t step);
 void seq_set_step(uint32_t lane, uint32_t step, uint8_t note, uint8_t velocity);
 void seq_clear_step(uint32_t lane, uint32_t step);
 uint8_t seq_tempo(void);
+uint8_t seq_instrument_dirty(uint32_t slot);
+void seq_instrument_mark_saved(uint32_t slot);
 void seq_set_tempo(uint8_t bpm);
