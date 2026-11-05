@@ -25,6 +25,7 @@ typedef struct {
 static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
+static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
 static volatile uint8_t instrument_apply_pending;
 enum { USER_INSTRUMENT_COUNT = 3 };
@@ -72,17 +73,20 @@ static void instrument_apply_engine(void)
     }
 }
 
-static void instrument_factory_defaults(void)
+static void instrument_factory_capture(void)
 {
-    fm1lab_instrument_init(&current_instrument, "FACTORY");
+    fm1lab_instrument_init(&factory_instrument, "FACTORY");
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const uint8_t *voice = fm6_patch_data(p);
-        if (voice) (void)fm1lab_patch_set_voice(&current_instrument, p, voice);
-        current_instrument.patches[p].enabled = (set.enabled_mask >> p) & 1u;
-        current_instrument.patches[p].level = set.levels[p];
-        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
-            current_instrument.patches[p].macros[m] = set.macros[p][m];
+        if (voice) (void)fm1lab_patch_set_voice(&factory_instrument, p, voice);
+        factory_instrument.patches[p].enabled = fm6_patch_enabled(p);
+        factory_instrument.patches[p].level = 127u;
     }
+}
+
+static void instrument_factory_defaults(void)
+{
+    current_instrument = factory_instrument;
 }
 
 static void instrument_sync_settings(void)
@@ -274,6 +278,7 @@ void app_init(void)
         }
     }
     page = PAGE_HOME;
+    instrument_factory_capture();
     instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
@@ -763,7 +768,7 @@ static void draw(void)
             page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
             page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
-        cv_text(10, 18, &FONT_XS, current_instrument.name, accent);
+        cv_text(10, 18, &FONT_XS, instrument_index == 0u ? "FACTORY / USER 1" : instrument_index == 1u ? "USER 2" : "USER 3", accent);
         if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
         if (note >= 0) {
             note_name(note, t);
