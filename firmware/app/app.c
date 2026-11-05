@@ -8,14 +8,89 @@
 #include "fm6.h"
 
 #define SET_MAGIC 0x4C314D46u            /* "FM1L": native Instrument settings */
+#define INST_STORE_MAGIC 0x31494D46u      /* "FM1I" */
+#define INST_STORE_VERSION 1u
+#define INST_CHUNKS 3u
+#define INST_HEADER_BYTES 8u
+#define INST_CHUNK_MAX_RECORDS 6u
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t patch;                       /* selected patch in the four-patch Instrument */
-    uint8_t enabled_mask;                /* one bit per patch */
+    uint8_t instrument;                  /* selected user Instrument, 0..15 */
+    uint8_t patch;                       /* selected patch inside the Instrument, 0..3 */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
-    uint8_t rsv[1];
+    uint8_t rsv[3];
 } settings_t;
+
+typedef struct {
+    uint32_t magic;
+    uint16_t version;
+    uint8_t first;
+    uint8_t count;
+} instrument_chunk_header_t;
+
+static fm1lab_instrument_record_t instrument_cache[FM1LAB_INSTRUMENT_COUNT];
+static fm1lab_instrument_record_t save_snapshot;
+static volatile uint8_t snapshot_ready;
+
+static void app_copy_bytes(void *dst, const void *src, uint32_t n)
+{
+    uint8_t *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+    while (n--)
+        *d++ = *s++;
+}
+
+static void instrument_store_load(void)
+{
+    static const uint8_t first[INST_CHUNKS] = {0u, 6u, 11u};
+    static const uint8_t count[INST_CHUNKS] = {6u, 5u, 5u};
+    uint8_t buf[INST_HEADER_BYTES + INST_CHUNK_MAX_RECORDS * sizeof(fm1lab_instrument_record_t)];
+    uint32_t chunk, i;
+    app_copy_bytes(instrument_cache, instrument_cache, 0u);
+    for (chunk = 0; chunk < INST_CHUNKS; chunk++) {
+        int n = plat_store_load(OBJ_INSTRUMENTS0 + chunk, buf, sizeof(buf));
+        instrument_chunk_header_t h;
+        if (n != (int)(INST_HEADER_BYTES + count[chunk] * sizeof(fm1lab_instrument_record_t)))
+            continue;
+        app_copy_bytes(&h, buf, sizeof(h));
+        if (h.magic != INST_STORE_MAGIC || h.version != INST_STORE_VERSION
+            || h.first != first[chunk] || h.count != count[chunk])
+            continue;
+        for (i = 0; i < count[chunk]; i++) {
+            uint32_t slot = first[chunk] + i;
+            app_copy_bytes(&instrument_cache[slot],
+                           buf + INST_HEADER_BYTES + i * sizeof(fm1lab_instrument_record_t),
+                           sizeof(fm1lab_instrument_record_t));
+            if (instrument_cache[slot].valid)
+                fm6_instrument_load(slot, &instrument_cache[slot]);
+        }
+    }
+}
+
+static int instrument_store_save(uint32_t slot, const fm1lab_instrument_record_t *record)
+{
+    static const uint8_t first[INST_CHUNKS] = {0u, 6u, 11u};
+    static const uint8_t count[INST_CHUNKS] = {6u, 5u, 5u};
+    uint8_t buf[INST_HEADER_BYTES + INST_CHUNK_MAX_RECORDS * sizeof(fm1lab_instrument_record_t)];
+    instrument_chunk_header_t h;
+    uint32_t chunk, i;
+    if (slot >= FM1LAB_INSTRUMENT_COUNT || !record)
+        return 0;
+    chunk = slot < 6u ? 0u : slot < 11u ? 1u : 2u;
+    app_copy_bytes(&instrument_cache[slot], record, sizeof(*record));
+    instrument_cache[slot].valid = 1;
+    h.magic = INST_STORE_MAGIC;
+    h.version = INST_STORE_VERSION;
+    h.first = first[chunk];
+    h.count = count[chunk];
+    app_copy_bytes(buf, &h, sizeof(h));
+    for (i = 0; i < count[chunk]; i++)
+        app_copy_bytes(buf + INST_HEADER_BYTES + i * sizeof(fm1lab_instrument_record_t),
+                       &instrument_cache[first[chunk] + i], sizeof(fm1lab_instrument_record_t));
+    return plat_store_save(OBJ_INSTRUMENTS0 + chunk, buf,
+                           INST_HEADER_BYTES + count[chunk] * sizeof(fm1lab_instrument_record_t)) == 0;
+}
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
