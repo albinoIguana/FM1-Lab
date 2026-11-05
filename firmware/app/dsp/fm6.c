@@ -420,6 +420,57 @@ uint8_t fm6_operator_is_carrier(uint32_t patch, uint32_t op_1_to_6)
     bit = 5u - (op_1_to_6 - 1u);
     return (uint8_t)((fm6_carriers(instrument[patch].effective[FP_ALG]) >> bit) & 1u);
 }
+
+uint8_t fm6_operator_route(uint32_t patch, uint32_t op_1_to_6)
+{
+    uint32_t alg, bit;
+    if (patch >= PATCHES || op_1_to_6 < 1u || op_1_to_6 > 6u)
+        return 0;
+    alg = instrument[patch].effective[FP_ALG] & 31u;
+    bit = 5u - (op_1_to_6 - 1u);
+    return FM6_ALG[alg][bit];
+}
+
+static uint8_t *fm6_operator_field(uint32_t patch, uint32_t op_1_to_6, uint32_t parameter)
+{
+    uint8_t *op;
+    if (patch >= PATCHES || op_1_to_6 < 1u || op_1_to_6 > 6u || parameter >= FM6_OP_PARAM_COUNT)
+        return 0;
+    op = instrument[patch].base + (6u - op_1_to_6) * FP_OP;
+    switch (parameter) {
+    case FM6_OP_LEVEL: return &op[FP_OL];
+    case FM6_OP_RATIO: return &op[FP_FC];
+    case FM6_OP_FINE: return &op[FP_FF];
+    case FM6_OP_ATTACK: return &op[FP_R1];
+    case FM6_OP_DECAY: return &op[FP_R1 + 1u];
+    case FM6_OP_SUSTAIN: return &op[FP_L1 + 2u];
+    case FM6_OP_RELEASE: return &op[FP_R1 + 3u];
+    case FM6_OP_FIXED_MODE: return &op[FP_MODE];
+    default: return 0;
+    }
+}
+
+uint8_t fm6_operator_value(uint32_t patch, uint32_t op_1_to_6, uint32_t parameter)
+{
+    uint8_t *field = fm6_operator_field(patch, op_1_to_6, parameter);
+    return field ? *field : 0u;
+}
+
+uint8_t fm6_operator_set_value(uint32_t patch, uint32_t op_1_to_6, uint32_t parameter, uint8_t value)
+{
+    uint8_t *field = fm6_operator_field(patch, op_1_to_6, parameter);
+    uint8_t max;
+    if (!field)
+        return 0;
+    max = parameter == FM6_OP_FIXED_MODE ? 1u :
+          parameter == FM6_OP_RATIO ? 31u : 99u;
+    *field = value > max ? max : value;
+    fm6_sanitize(instrument[patch].base);
+    fm6_rebuild_patch(patch);
+    bank[current_instrument].record.valid = 1;
+    bank[current_instrument].dirty = 1;
+    return 1;
+}
 const uint8_t *fm6_patch_data(uint32_t patch) { return patch < PATCHES ? instrument[patch].base : 0; }
 void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
 {
