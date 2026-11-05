@@ -27,9 +27,9 @@ The browser workshop is a development and audition surface. The corresponding cu
 
 ## Native firmware core
 
-The `firmware/fm1lab_instrument.c` module is the first device-side implementation: a fixed four-patch Instrument contract, per-patch macro/mute/level state, M-VAVE algorithm carrier masks, and non-destructive macro rendering. It is compiled with the official application sources and has host-side C tests. It is not yet connected to device storage, the screen, physical controls, or the hardware voice/mixer path.
+The active `app/app.c` build now compiles the same four-patch Instrument model used by the host-side C tests and connects it to the Felucca FM6 voice engine. The PRESET encoder selects among three native Instrument storage slots; each slot holds four expanded DX7 voices plus macro, mute, and level state. SEL/SELECT still select and edit patches independently of the Instrument selector. SAVE persists the active Instrument and the global settings, and changing Instrument is blocked while its edits are unsaved. Loading is handed to the audio task through the app's event queue so the UI thread does not write live FM voice state.
 
-A separate tested metadata codec now defines eight named four-patch Instruments per existing 32-voice bank. Its 400-byte block fits after the current 3,604-byte v1 bank data inside the 4 KiB sector and has its own CRC. This is a layout/codec milestone only: the bank read/write/recovery path has not yet been upgraded to read or persist that block, so no device save/load behavior is claimed yet.
+This is the first working native storage bridge, not yet the full 32-Instrument / four-bank library. The existing 400-byte metadata codec and the upstream M-VAVE bank journal remain separate work; the active app currently uses three platform storage objects rather than claiming that the full bank format is connected. Sequencer, arpeggiator, ENV/LFO editing, and FX audio routing are also not yet connected in this native app.
 
 ## Build and validation
 
