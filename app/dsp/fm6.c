@@ -136,22 +136,23 @@ static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,in
         uint32_t read_r=(cp-(d+160u))&(FM6_CHORUS_SIZE-1u);
         chorus=fx_chorus[read_l]; chorus_r=fx_chorus[read_r];
     }
-    fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0]+(int64_t)chorus*fx_feedback[0]/100u);
+    fx_chorus[cp]=fm6_sat_q23((int64_t)(fx_enabled[0]?sends[0]:0)+(int64_t)chorus*fx_feedback[0]/100u);
     fx_chorus_pos=(uint16_t)((cp+1u)&(FM6_CHORUS_SIZE-1u));
     if(fx_enabled[1] && fx_mix[1]) {
         uint32_t d=256u+(uint32_t)fx_time[1]*78u, read=(dp-d)&(FM6_DELAY_SIZE-1u);
         delay=fx_delay[read];
     }
-    fx_delay[dp]=fm6_sat_q23((int64_t)sends[1]+(int64_t)delay*fx_feedback[1]/100u);
+    fx_delay[dp]=fm6_sat_q23((int64_t)(fx_enabled[1]?sends[1]:0)+(int64_t)delay*fx_feedback[1]/100u);
     fx_delay_pos=(uint16_t)((dp+1u)&(FM6_DELAY_SIZE-1u));
     if(fx_enabled[2] && fx_mix[2]) {
         int32_t a=fx_comb_a[fx_comb_pos_a],b=fx_comb_b[fx_comb_pos_b],c=fx_comb_c[fx_comb_pos_c];
         reverb=(a+b+c)/3;
         uint32_t decay=40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
-        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2]+(int64_t)a*decay/100);
-        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2]+(int64_t)b*(decay+3u)/100);
-        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2]+(int64_t)c*(decay+6u)/100);
-    } else { fx_comb_a[fx_comb_pos_a]=fx_comb_b[fx_comb_pos_b]=fx_comb_c[fx_comb_pos_c]=0; }
+        int32_t reverb_input=fx_enabled[2]?sends[2]:0;
+        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)reverb_input+(int64_t)a*decay/100);
+        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)reverb_input+(int64_t)b*(decay+3u)/100);
+        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)reverb_input+(int64_t)c*(decay+6u)/100);
+    }
     fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&2047u);
     fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&4095u);
     fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&8191u);
@@ -324,6 +325,7 @@ void fm6_init(void)
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=100u;
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u;
     seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
+    seq_start_pending=seq_stop_pending=arp_clear_pending=0u;
     arp_mode=0u; arp_count=0u; arp_index=0u; arp_direction=1u; arp_live=0u;
     transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
     fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=0u;
@@ -510,7 +512,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
         for (i = 0; i < count; i++) {
             int32_t delta=(int32_t)master_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
-            if(seq_start_pending) { seq_position=0u; seq_gate_left[0]=seq_gate_left[1]=0u; seq_start_pending=0u; }
+            if(seq_start_pending) { seq_position=0u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u; seq_start_pending=0u; }
             if(seq_stop_pending) {
                 for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane]) {
                     fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
@@ -548,7 +550,7 @@ void fm6_sequencer_set_running(uint8_t running) {
     if(!next&&seq_running) seq_stop_pending=1u;
     seq_running=next;
 }
-void fm6_sequencer_set_length(uint8_t steps) { seq_length=steps<1u?1u:steps>64u?64u:steps; }
+void fm6_sequencer_set_length(uint8_t steps) { seq_length=steps<1u?1u:steps>64u?64u:steps; if(seq_position>=seq_length) seq_position=0u; }
 void fm6_sequencer_set_lane(uint8_t lane,uint8_t patch) { if(lane<2u&&patch<4u) seq_lane_patch[lane]=patch; }
 void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t note,uint8_t velocity,uint8_t gate) {
     if(lane>=2u||step>=64u||note>127u||velocity>127u) return;
