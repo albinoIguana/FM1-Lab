@@ -75,8 +75,8 @@ jobs:
           # The verified 2.5.3 payload is therefore under C$/JL/pi32, not at
           # the extraction root. Use that explicit path rather than a regex
           # search whose separator assumptions can silently reject valid output.
-          $pi32Root = Join-Path $extract 'C$\\JL\\pi32'
-          $extractedClang = Join-Path $pi32Root 'bin\\clang.exe'
+          $pi32Root = Join-Path $extract 'C$\JL\pi32'
+          $extractedClang = Join-Path $pi32Root 'bin\clang.exe'
           if (!(Test-Path -LiteralPath $extractedClang -PathType Leaf)) {
             Write-Host 'Extracted installer directory tree:'
             Get-ChildItem -LiteralPath $extract -Force -Recurse |
@@ -84,10 +84,10 @@ jobs:
             throw "Expected JieLi compiler was not found at $extractedClang."
           }
 
-          New-Item -ItemType Directory -Path 'C:\\JL' -Force | Out-Null
+          New-Item -ItemType Directory -Path 'C:\JL' -Force | Out-Null
           Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
           Copy-Item -LiteralPath $pi32Root -Destination $target -Recurse -Force
-          $clang = Join-Path $target 'bin\\clang.exe'
+          $clang = Join-Path $target 'bin\clang.exe'
           if (!(Test-Path -LiteralPath $clang -PathType Leaf)) { throw "Extracted toolchain did not produce $clang" }
 
           & $clang --version
