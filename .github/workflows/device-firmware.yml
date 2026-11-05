@@ -1,147 +1,19 @@
-name: Native FM1 device firmware
+name: Legacy M-VAVE SDK reference build (not release)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feat/m-vave-native-instrument
-      - feature/native-instrument-macro-workflow
-    paths:
-      - 'firmware/**'
-      - 'scripts/build-device-firmware.ps1'
-      - 'app/dsp/**'
-      - 'upstream/felucca'
-      - 'scripts/patch-m-vave-audio-mixer.mjs'
-      - 'scripts/patch-m-vave-instrument-home.mjs'
-      - 'scripts/patch-m-vave-instrument-sequencer-screen.mjs'
-      - 'scripts/patch-m-vave-native-patch-editor.mjs'
-      - 'scripts/patch-m-vave-instrument-macros.mjs'
-      - 'scripts/patch-m-vave-instrument-storage.mjs'
-      - 'scripts/patch-m-vave-two-track-sequencer.mjs'
-      - 'scripts/patch-m-vave-physical-controls.mjs'
-      - '.github/workflows/device-firmware.yml'
 
 permissions:
   contents: read
 
 jobs:
-  build-device-firmware:
+  reference-build:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - name: Check out FM1-Lab and pinned M-VAVE source
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Set up Python for pinned Felucca table generation
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Set up Node.js for source staging
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Extract the pinned JieLi toolchain without running its GUI installer
-        shell: pwsh
-        timeout-minutes: 15
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $installer = Join-Path $env:RUNNER_TEMP 'jieli-windows-toolchains-2.5.3.exe'
-          $extract = Join-Path $env:RUNNER_TEMP 'jieli-toolchain-extracted'
-          $installRoot = Join-Path $extract 'C$\JL'
-          $target = 'C:\JL\pi32'
-          $clang = Join-Path $target 'bin\clang.exe'
-
-          # The SDK build consumes the compiler, system headers and libraries
-          # from the single C:\JL\pi32 tree. Code::Blocks is only an IDE
-          # prerequisite in JieLi's interactive installer.
-          Invoke-WebRequest -Uri 'https://jl-update.oss-cn-shenzhen.aliyuncs.com/2.5.3.exe' -OutFile $installer
-          $item = Get-Item -LiteralPath $installer
-          if ($item.Length -lt 1MB) {
-            throw "JieLi installer download is unexpectedly small ($($item.Length) bytes)."
-          }
-          Write-Host "Downloaded JieLi 2.5.3 installer: $($item.Length) bytes"
-          Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
-
-          $extractorZip = Join-Path $env:RUNNER_TEMP 'innoextract-1.9-windows.zip'
-          $extractorDir = Join-Path $env:RUNNER_TEMP 'innoextract'
-          Invoke-WebRequest -Uri 'https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip' -OutFile $extractorZip
-          Remove-Item -LiteralPath $extractorDir -Recurse -Force -ErrorAction SilentlyContinue
-          Expand-Archive -LiteralPath $extractorZip -DestinationPath $extractorDir -Force
-          $innoextract = Get-ChildItem -LiteralPath $extractorDir -Filter 'innoextract.exe' -File -Recurse | Select-Object -First 1
-          if (!$innoextract) { throw 'The pinned innoextract release did not contain innoextract.exe.' }
-
-          Remove-Item -LiteralPath $extract -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path $extract -Force | Out-Null
-          & $innoextract.FullName '-d' $extract $installer
-          if ($LASTEXITCODE -ne 0) {
-            throw "innoextract could not unpack the JieLi 2.5.3 Inno Setup payload (exit $LASTEXITCODE)."
-          }
-
-          # The actual installer log shows q32s-include and q32s-lib under
-          # C:\JL\pi32, alongside bin\clang.exe. Validate and stage that
-          # complete pi32 directory; do not invent sibling paths under C:\JL.
-          $pi32Root = Join-Path $installRoot 'pi32'
-          $extractedClang = Join-Path $pi32Root 'bin\clang.exe'
-          $systemCtype = Join-Path $pi32Root 'q32s-include\ctype.h'
-          $systemLib = Join-Path $pi32Root 'q32s-lib\libc.a'
-          if (!(Test-Path -LiteralPath $extractedClang -PathType Leaf) -or
-              !(Test-Path -LiteralPath $systemCtype -PathType Leaf) -or
-              !(Test-Path -LiteralPath $systemLib -PathType Leaf)) {
-            Write-Host 'Extracted installer directory tree:'
-            Get-ChildItem -LiteralPath $extract -Force -Recurse |
-              Select-Object -ExpandProperty FullName
-            throw "Incomplete JieLi PI32 installation. Expected clang, q32s-include\ctype.h and q32s-lib\libc.a under $pi32Root."
-          }
-
-          Remove-Item -LiteralPath 'C:\JL' -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path $target -Force | Out-Null
-          Copy-Item -Path (Join-Path $pi32Root '*') -Destination $target -Recurse -Force
-          $stagedCtype = Join-Path $target 'q32s-include\ctype.h'
-          $stagedLib = Join-Path $target 'q32s-lib\libc.a'
-          if (!(Test-Path -LiteralPath $stagedCtype -PathType Leaf) -or
-              !(Test-Path -LiteralPath $stagedLib -PathType Leaf)) {
-            throw "JieLi system files were not staged under $target."
-          }
-          $clang = Join-Path $target 'bin\clang.exe'
-          if (!(Test-Path -LiteralPath $clang -PathType Leaf)) { throw "Extracted toolchain did not produce $clang" }
-
-          & $clang --version
-          if ($LASTEXITCODE -ne 0) { throw 'Extracted JieLi clang.exe failed to execute.' }
-          $clangHash = (Get-FileHash $clang -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($clangHash -ne 'd4bc97cf421c1ccc373dd8924ce88720ff7457b3f1478d15df4aeda6ae923bce') {
-            throw "Wrong JieLi compiler build: $clangHash. FM1 SDK requires toolchain 2.5.3 / PI32v2 clang 4.0.1."
-          }
-          Write-Host "Verified extracted JieLi PI32v2 clang 4.0.1 SHA-256: $clangHash"
-
-      - name: Build the actual FM1 device firmware
+      - name: Explain the legacy target
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          ./scripts/build-device-firmware.ps1 -Toolchain 'C:\JL\pi32'
-
-      - name: Upload flashable firmware image
-        uses: actions/upload-artifact@v4
-        with:
-          name: fm1lab-native-device-firmware
-          path: vendor/m-vave-fm1/build/dx7/generated/FM1_OFFICIAL_OPEN.fwsc
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload device build diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fm1lab-device-build-diagnostics
-          path: |
-            vendor/m-vave-fm1/build/dx7/sdk.elf
-            vendor/m-vave-fm1/build/dx7/sdk.map
-            vendor/m-vave-fm1/build/dx7/generated/firmware-report.json
-            vendor/m-vave-fm1/build/dx7/generated/package-report.json
-            ${{ runner.temp }}/jieli-installer.log
-          if-no-files-found: warn
-          retention-days: 14
+          Write-Host 'This workflow builds the old M-VAVE SDK application path for reference only.'
+          Write-Host 'The active FM1 device target is fm1-base + Felucca-BSP via Native FM1 build.'
+          Write-Host 'Do not treat this workflow or its package limit as the release firmware path.'

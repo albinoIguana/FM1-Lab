@@ -31,6 +31,7 @@ jobs:
       build: |
         set -euo pipefail
         git submodule update --init --recursive base upstream/felucca
+        bash tests/test-fm6-engine.sh
         sh build.sh
         python3 base/tools/build.py app --host
       packages: app/build/fm1lab.fwsc
