@@ -539,7 +539,7 @@ static void draw_home_panel(void)
         cv_rect(x + 54, y + 45, 50, 6, C_LINE);
         cv_rect(x + 54, y + 45, (int32_t)set.levels[p] * 50 / 127, 6, C_HI);
     }
-    cv_text(4, 138, &FONT_XS, "SELECT: PATCH   SEL: MACROS   GLO: GLOBAL", C_GRAY);
+    cv_text(4, 138, &FONT_XS, "SELECT PATCH  SEL MACROS  GLO SET", C_GRAY);
 }
 
 static void draw_macro_panel(void)
@@ -566,7 +566,8 @@ static void draw_macro_panel(void)
         cv_rect(169, y, 2, 12, C_WHITE); /* neutral midpoint at 50 */
         cv_rect(107 + (int32_t)value * 124 / 100, y, 3, 12, C_WHITE);
     }
-    cv_text(4, 138, &FONT_XS, "50 = NEUTRAL   K1 BRIGHT  K2 BODY  K3 MOTION  K4 EDGE", C_GRAY);
+    cv_text(4, 128, &FONT_XS, "50 = NEUTRAL", C_GRAY);
+    cv_text(4, 138, &FONT_XS, "K1 BRIGHT  K2 BODY  K3 MOVE  K4 EDGE", C_GRAY);
 }
 
 /* Read-only role map: reflects the selected algorithm's carrier assignment
