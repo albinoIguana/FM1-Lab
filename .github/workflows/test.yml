@@ -2,7 +2,7 @@ name: FM1-Lab native engine checks
 
 on:
   push:
-    branches: ["feat/m-vave-native-instrument"]
+    branches: ["feat/m-vave-native-instrument", "rewrite/native-fm1-foundation"]
   pull_request:
     branches: ["main"]
 
