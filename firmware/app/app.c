@@ -417,86 +417,92 @@ static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uin
         cv_rect(x + 2, y + h - p, w - 4, p, C_WHITE);
 }
 
+static void draw_patch_card(uint32_t patch, int32_t x, int32_t y)
+{
+    uint32_t op;
+    int selected = patch == set.patch;
+    int enabled = fm6_patch_enabled(patch);
+    uint16_t edge = selected ? C_HI : C_LINE;
+    char alg[12] = "ALG ";
+    int_text(fm6_patch_algorithm(patch), alg + 4);
+
+    cv_rect(x, y, 112, 52, selected ? C_LINE : C_BLACK);
+    cv_line(x, y, x + 111, y, edge);
+    cv_line(x, y + 51, x + 111, y + 51, edge);
+    cv_line(x, y, x, y + 51, edge);
+    cv_line(x + 111, y, x + 111, y + 51, edge);
+    if (selected)
+        cv_rect(x + 3, y + 4, 2, 43, C_HI);
+
+    cv_text(x + 8, y + 5, &FONT_B, fm6_patch_name(patch), enabled ? C_WHITE : C_DIM);
+    cv_text(x + 8, y + 23, &FONT_XS, alg, C_GRAY);
+    cv_rect(x + 82, y + 5, 24, 13, enabled ? C_HI : C_DIM);
+    cv_text(x + 86, y + 6, &FONT_XS, enabled ? "ON" : "OFF", C_BLACK);
+
+    /* Six small operator tiles: bright = carrier, muted = modulator. */
+    for (op = 1; op <= 6; op++) {
+        uint16_t col = fm6_operator_is_carrier(patch, op) ? C_HI : C_DIM;
+        cv_rect(x + 8 + (int32_t)(op - 1u) * 15, y + 39, 9, 7, col);
+    }
+}
+
 static void draw(void)
 {
     char t[24];
     int32_t note = voice_note;
-    uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
-    static const uint8_t WK[16] = PLAT_WHITE_KEYS, BK[11] = PLAT_BLACK_KEYS;
-    /* the header: the name and the note, or a message for a moment */
-    cv_begin(240, 32, C_BLACK);
-    if (now < ui.msg_until) {
-        int32_t x = cv_text(10, 6, &FONT_B, ui.msg[0], C_WHITE);
-        cv_text(x + 8, 6, &FONT_B, ui.msg[1], C_HI);
-    } else {
-        int32_t x = cv_text(10, 6, &FONT_B, APP_NAME, C_WHITE);
-        if (FM1B_BLE)                        /* Bluetooth: grey while it waits, lit while a computer is connected */
-            x = cv_text(x + 8, 10, &FONT_XS, "BLE", plat_ble_connected() ? C_HI : C_DIM);
-        if (FM1B_BLE_CENTRAL)                /* a Bluetooth MIDI device: lit while connected */
-            cv_text(x + 6, 10, &FONT_XS, "DEV", plat_ble_device() == BLE_DEV_READY ? C_HI : C_DIM);
-        if (note >= 0) {                     /* the note, and the last key's velocity and pressure */
-            int32_t x;
-            note_name(note, t);
-            x = 230 - text_w(&FONT_B, t);
-            cv_text(x, 6, &FONT_B, t, C_HI);
-            if (ui.keys >> ui.last_key & 1u) {
-                char n[24] = "V ";
-                int_text(ui.vel[ui.last_key], t);
-                text_cat(n, t);
-                text_cat(n, "  P ");
-                int_text(ui.prs[ui.last_key], t);
-                text_cat(n, t);
-                cv_text(x - 12 - text_w(&FONT_XS, n), 10, &FONT_XS, n, C_GRAY);
-            }
-        }
-    }
-    cv_blit(0, 0);
-    /* the buttons, 4 to a row, lit while held; the encoders and their counts, lit for a moment after a turn */
+    uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u, i;
+    static const char *const MACRO_NAME[4] = {"BRIGHT", "BODY", "MOTION", "DIRT"};
+
+    /* Header and the 2x2 patch matrix. */
     cv_begin(240, 144, C_BLACK);
-    for (i = 0; i < NB; i++)
-        cell(4 + (int32_t)(i % 4u) * 58, (int32_t)(i / 4u) * 21, 56, BTN_NAME[i], (ui.btn >> i) & 1u);
-    for (i = 0; i < NE; i++) {
-        int32_t x = 4 + (int32_t)(i % 4u) * 58, y = 88 + (int32_t)(i / 4u) * 28;
-        int lit = ui.turned_at[i] && now - ui.turned_at[i] < 300u;
-        cv_text(x, y, &FONT_XS, ENC_NAME[i], lit ? C_HI : C_GRAY);
-        int_text(ui.turns[i], t);
-        cv_text(x, y + 13, &FONT_XS, t, lit ? C_WHITE : C_DIM);
-    }
-    cv_blit(0, 36);
-    /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
-    cv_begin(240, 60, C_BLACK);
-    for (i = 0; i < 16u; i++)
-        key_cell(4 + (int32_t)i * 14, 14, 13, 14, WK[i], C_DIM);
-    for (i = 0; i < 11u; i++) {
-        static const uint8_t AT[11] = {0, 1, 2, 4, 5, 7, 8, 9, 11, 12, 14};   /* the white key each one follows */
-        key_cell(4 + (int32_t)AT[i] * 14 + 8, 0, 11, 12, BK[i], C_LINE);
-    }
-    octave_text(t);
-    cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
-    cv_text(30, 36, &FONT_XS, t, C_HI);
-    cv_text(64, 36, &FONT_XS, "PATCH", C_GRAY);
-    cv_text(112, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
-    cv_text(202, 36, &FONT_XS, fm6_patch_enabled(set.patch) ? "ON" : "OFF", fm6_patch_enabled(set.patch) ? C_HI : C_DIM);
-    if (midi_count) {                        /* the last MIDI message in, and where from */
-        static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
-        static const char HEX[] = "0123456789ABCDEF";
-        uint32_t m = midi_last, b;
-        char h[12];
-        for (b = 0; b < 3u; b++) {
-            uint32_t v = (m >> (8u + 8u * b)) & 0xFFu;
-            h[3 * b] = HEX[v >> 4];
-            h[3 * b + 1] = HEX[v & 15u];
-            h[3 * b + 2] = b < 2u ? ' ' : 0;
+    cv_text(7, 5, &FONT_B, APP_NAME, C_WHITE);
+    cv_text(104, 8, &FONT_XS, "FOUR-PATCH FM", C_HI);
+    if (FM1B_BLE)
+        cv_text(194, 8, &FONT_XS, "BLE", plat_ble_connected() ? C_HI : C_DIM);
+    if (now < ui.msg_until) {
+        cv_rect(4, 23, 232, 17, C_LINE);
+        cv_text(9, 24, &FONT_XS, ui.msg[0], C_WHITE);
+        cv_text(120, 24, &FONT_XS, ui.msg[1], C_HI);
+    } else {
+        cv_line(4, 22, 236, 22, C_LINE);
+        if (note >= 0) {
+            note_name(note, t);
+            cv_text(196, 5, &FONT_XS, t, C_HI);
         }
-        cv_text(4, 48, &FONT_XS, "MIDI IN", C_GRAY);
-        cv_text(52, 48, &FONT_XS, midi_last_port < NPORTS ? PORT[midi_last_port] : "", C_HI);
-        cv_text(82, 48, &FONT_XS, h, C_WHITE);
     }
-    cv_text(178, 36, &FONT_XS, "VOL", C_GRAY);
+    draw_patch_card(0, 6, 29);
+    draw_patch_card(1, 122, 29);
+    draw_patch_card(2, 6, 86);
+    draw_patch_card(3, 122, 86);
+    cv_blit(0, 0);
+
+    /* Four topology-aware macros and the two-lane step display. */
+    cv_begin(240, 96, C_BLACK);
+    cv_text(6, 3, &FONT_XS, "MACROS", C_GRAY);
     int_text((int32_t)pct, t);
     text_cat(t, "%");
-    cv_text(204, 36, &FONT_XS, t, C_HI);
-    cv_blit(0, 180);
+    cv_text(204, 3, &FONT_XS, t, C_HI);
+    for (i = 0; i < 4; i++) {
+        int32_t x = 6 + (int32_t)i * 59;
+        uint32_t value = fm6_macro_get(set.patch, i);
+        cv_text(x, 17, &FONT_XS, MACRO_NAME[i], C_GRAY);
+        int_text((int32_t)value, t);
+        cv_text(x, 30, &FONT_B, t, C_WHITE);
+        cv_rect(x, 43, 48, 4, C_LINE);
+        cv_rect(x, 43, (int32_t)value * 48 / 100, 4, C_HI);
+    }
+    cv_line(4, 54, 236, 54, C_LINE);
+    cv_text(6, 58, &FONT_XS, "SEQUENCER", C_GRAY);
+    cv_text(86, 58, &FONT_XS, "2 LANES", C_HI);
+    cv_text(190, 58, &FONT_XS, "STOPPED", C_DIM);
+    for (i = 0; i < 16; i++) {
+        int32_t x = 37 + (int32_t)i * 12;
+        cv_rect(x, 72, 8, 7, C_LINE);
+        cv_rect(x, 85, 8, 7, C_LINE);
+    }
+    cv_text(6, 70, &FONT_XS, "A", C_HI);
+    cv_text(6, 83, &FONT_XS, "B", C_HI);
+    cv_blit(0, 144);
 }
 
 void app_ui_init(void)
