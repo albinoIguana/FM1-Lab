@@ -10,7 +10,7 @@ The device boots to the four-patch Instrument page. The four tiles show patch na
 - PRESETS encoder: choose one of the 32 named Instruments in the four-bank library.
 - ALGORITHM encoder: change the selected patch algorithm.
 - KNOB 1–4: set the four patch levels.
-- SEL button: toggle the selected patch active/muted.
+- SEL button: open the selected patch's performance macro page.
 - SAVE: store the complete four-patch Instrument as one bank transaction.
 - EDIT or SCL: open the focused patch editor.
 - GLO: open the native global mixer/settings page.

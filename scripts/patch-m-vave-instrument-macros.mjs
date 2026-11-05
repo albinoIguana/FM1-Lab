@@ -70,6 +70,10 @@ replaceOnce("    if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return; }",
 "    if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return; }\n    if (visible == FM1LAB_MACRO_PAGE) { fm1lab_macro_draw(); return; }","macro page render dispatch");
 if (!source.includes("FM1-LAB performance macro controls")) {
 const controls = String.raw`
+    if (page == FM1LAB_HOME && (pressed & BUTTON(SEL))) {
+        page = FM1LAB_MACRO_PAGE;
+        goto controls_done;
+    }
     if (page == FM1LAB_MACRO_PAGE) {
         if (pressed & BUTTON(HOME)) {
             page = FM1LAB_HOME;
