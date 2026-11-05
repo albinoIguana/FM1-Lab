@@ -586,10 +586,9 @@ static void input(void)
                 page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
             app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
-            if (page == PAGE_HOME) {
-                page = PAGE_MACRO;
-                app_say("MACROS", fm6_patch_name(set.patch));
-            }
+            /* SEL is a global return to the selected patch's options. */
+            page = PAGE_MACRO;
+            app_say("MACROS", fm6_patch_name(set.patch));
         } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
             uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
             fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
@@ -685,14 +684,12 @@ static void input(void)
             seq_ui_patch[seq_ui_lane] = (uint8_t)patch;
             fm6_sequencer_set_lane(seq_ui_lane, (uint8_t)patch);
             app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
-        } else if (k == EN_SELECT && page == PAGE_ARP) {
-            int32_t mode = ((int32_t)arp_ui_mode + e) % 4;
-            if (mode < 0) mode += 4;
-            arp_ui_mode = (uint8_t)mode;
-            fm6_arpeggiator_set_mode(arp_ui_mode);
-            app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
         } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
-            app_say("FX PAGE", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : "REVERB");
+            int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
+            next %= 3;
+            if (next < 0) next += 3;
+            page = (uint8_t)(PAGE_FX_CHORUS + next);
+            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : "REVERB");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
@@ -702,9 +699,13 @@ static void input(void)
         } else if (k == EN_PRESET) {
             if (instrument_apply_pending) {
                 app_say("INSTRUMENT", "LOADING");
-            } else if (instrument_dirty) {
-                app_say("SAVE INSTRUMENT", "BEFORE CHANGING");
             } else {
+                /* PRESET must never appear inert: preserve edits before
+                 * moving to another Instrument slot. */
+                if (instrument_dirty && instrument_save() != 0) {
+                    app_say("SAVE FAILED", "PRESET NOT CHANGED");
+                    continue;
+                }
                 int32_t slot = ((int32_t)(instrument_index % 8u) + e) % 8;
                 if (slot < 0) slot += 8;
                 uint32_t next = (instrument_index / 8u) * 8u + (uint32_t)slot;
@@ -724,9 +725,17 @@ static void input(void)
                 fm6_sequencer_set_step(lane,step,seq_ui_enabled[lane][step],seq_ui_note[lane][step],seq_ui_velocity[lane][step],seq_ui_gate[lane][step]);
                 app_say("SEQUENCER STEP", "UPDATED");
             } else if (page == PAGE_ARP) {
-                if(index==0u) transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
-                fm6_set_tempo(transport_ui_bpm);
-                app_say("TEMPO", "UPDATED");
+                if(index==0u) {
+                    transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
+                    fm6_set_tempo(transport_ui_bpm);
+                    app_say("TEMPO", "UPDATED");
+                } else if(index==1u) {
+                    int32_t mode=((int32_t)arp_ui_mode+e)%4;
+                    if(mode<0) mode+=4;
+                    arp_ui_mode=(uint8_t)mode;
+                    fm6_arpeggiator_set_mode(arp_ui_mode);
+                    app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN");
+                }
             } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
                 uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
                 if(index==0u) fx_ui_mix[fx]=(uint8_t)clamp((int32_t)fx_ui_mix[fx]+e,0,100);
@@ -763,6 +772,12 @@ static void input(void)
                 set_dirty = 1;
                 app_say("MACRO", "UPDATED");
             } else if (page == PAGE_HOME) {
+                /* Each patch strip is also a direct patch select; the same
+                 * encoder continues to trim that patch's level. */
+                if (set.patch != index) {
+                    set.patch = (uint8_t)index;
+                    set_dirty = 1u;
+                }
                 int32_t value = (int32_t)set.levels[index] + e;
                 if (value < 0) value = 0;
                 if (value > 127) value = 127;
@@ -1039,8 +1054,8 @@ static void draw_arp_panel(void)
     rounded_panel(122,4,112,62,7,panel_fill(),RGB(227,75,210));
     cv_text(131,13,&FONT_XS,"CLOCK",C_GRAY); int_text(transport_ui_bpm,t); cv_text(131,34,&FONT_B,t,RGB(227,75,210));
     cv_text(6,82,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_WHITE);
-    cv_text(6,101,&FONT_XS,"SELECT CHANGES DIRECTION",C_GRAY);
-    cv_text(6,120,&FONT_XS,"B ARP CYCLES THE MODE",C_GRAY);
+    cv_text(6,101,&FONT_XS,"K1 TEMPO   K2 MODE",C_GRAY);
+    cv_text(6,120,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_GRAY);
 }
 static void draw_fx_panel(uint8_t fx)
 {
@@ -1108,9 +1123,10 @@ static void draw(void)
     else draw_global_panel(pct);
     cv_blit(0, 36);
 
-    /* Real control legend replaces the old piano-key graphic. */
+    /* Compact control strip. HOME and ENV already show these values in
+     * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 60, screen_bg());
-    for (uint32_t k = 0; k < 4u; ++k) {
+    if (page != PAGE_HOME && page != PAGE_ENV) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
         uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
@@ -1135,8 +1151,13 @@ static void draw(void)
             int_text(k==0?seq_ui_enabled[seq_ui_lane][seq_ui_step]:k==1?seq_ui_note[seq_ui_lane][seq_ui_step]:k==2?seq_ui_velocity[seq_ui_lane][seq_ui_step]:seq_ui_gate[seq_ui_lane][seq_ui_step],t);
             cv_text(x+6,33,&FONT_XS,t,ink);
         } else if (page == PAGE_ARP) {
-            cv_text(x+6,23,&FONT_XS,k==0?"TEMPO":"-",C_WHITE);
-            int_text(transport_ui_bpm,t); cv_text(x+6,33,&FONT_XS,t,ink);
+            cv_text(x+6,23,&FONT_XS,k==0?"TEMPO":k==1?"MODE":"-",C_WHITE);
+            if(k==0u) int_text(transport_ui_bpm,t);
+            else if(k==1u) {
+                const char *mode=arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP/DN";
+                cv_text(x+6,33,&FONT_XS,mode,ink);
+            }
+            if(k==0u) cv_text(x+6,33,&FONT_XS,t,ink);
         } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
             cv_text(x+6,23,&FONT_XS,k==0?"MIX":k==1?"TIME":k==2?"FDBK":"SEND",C_WHITE);
             int_text(k==0?fx_ui_mix[page-PAGE_FX_CHORUS]:k==1?fx_ui_time[page-PAGE_FX_CHORUS]:k==2?fx_ui_feedback[page-PAGE_FX_CHORUS]:fm6_fx_get_send(set.patch,(uint8_t)(page-PAGE_FX_CHORUS)),t);
@@ -1149,22 +1170,22 @@ static void draw(void)
             cv_text(x + 6, 33, &FONT_XS, "K1-K4 EDIT", ink);
         } else cv_text(x + 6, 27, &FONT_XS, "-", C_GRAY);
     }
-    if (page == PAGE_HOME) cv_text(4, 53, &FONT_XS, "SELECT PATCH   SEL OPEN", C_GRAY);
-    else if (page == PAGE_MACRO) cv_text(4, 53, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
-    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 53, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
-    else if (page == PAGE_ENV) cv_text(4, 53, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
-    else if (page == PAGE_LFO) cv_text(4, 53, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
-    else if (page == PAGE_LFO_MOD) cv_text(4, 53, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
-    else if (page == PAGE_SEQ) cv_text(4,53,&FONT_XS,"K1 ENABLE  K2 NOTE  K3 VELOCITY  K4 GATE",C_GRAY);
-    else if (page == PAGE_ARP) cv_text(4,53,&FONT_XS,"HOLD KEYS  SELECT DIRECTION  K1 TEMPO",C_GRAY);
-    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) cv_text(4,53,&FONT_XS,"EDIT BYPASS  FX CYCLES EFFECT PAGES",C_GRAY);
-    else cv_text(4, 53, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
+    if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-K4 SELECT + LEVEL   SELECT KNOB CYCLES PATCH", C_GRAY);
+    else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
+    else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
+    else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
+    else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
+    else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"K1 ENABLE  K2 NOTE  K3 VELOCITY  K4 GATE",C_GRAY);
+    else if (page == PAGE_ARP) cv_text(4,43,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
+    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
+    else cv_text(4, 43, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     int_text((int32_t)page + 1, t);
     {
         char page_text[8] = "";
         text_cat(page_text, t); text_cat(page_text, "/");
         int_text((int32_t)PAGE_COUNT, t); text_cat(page_text, t);
-        cv_text(218, 51, &FONT_XS, page_text, C_GRAY);
+        cv_text(218, 43, &FONT_XS, page_text, C_GRAY);
     }
     cv_blit(0, 180);
 }
