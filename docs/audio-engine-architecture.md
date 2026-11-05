@@ -15,7 +15,7 @@ The device app compiles the pinned Felucca FM6 core directly through `app/dsp/fm
 
 The FM6 wrapper contains four patch slots and **four independent eight-voice allocators (32 total voice slots)**. Each patch has a fixed pool of eight voices; allocation and voice stealing are scoped to that patch, so a busy layer cannot steal another layer's notes. With all four patches enabled, each patch can sustain up to eight simultaneous notes before its own voice stealing. This is a structural polyphony guarantee, not a claim about available CPU headroom.
 
-The engine supports per-patch enable and level, non-destructive BRIGHTNESS/BODY/MOTION/EDGE macros, algorithm-aware carrier identification, note masks, pitch bend and tuned notes. The current fm1-base bring-up app loads the first four Felucca factory patches; the full named Instrument library and user-patch persistence are not yet wired into this app.
+The engine supports per-patch enable and level, non-destructive BRIGHTNESS/BODY/MOTION/EDGE macros, algorithm-aware carrier identification, note masks, pitch bend and tuned notes. The active app now loads the 32-Instrument / four-bank store described in the README, with audio-owner Instrument swaps.
 
 ## FM1 headroom research and what it proves
 
@@ -41,14 +41,25 @@ The exact pinned fm1-base platform revision used by this branch (`2d8ed748cdade5
 - `plat_xruns()`: audio deadline misses since boot.
 - `plat_ticks24()`: a 24 MHz free-running timer for measuring short render spans.
 
-The GLOBAL page now displays the device-reported CPU percentage and xrun count. This is the first direct way to evaluate the actual FM1 build under layered playing without pretending a host benchmark is a hardware measurement. For a useful test, enable all four patches, sustain/sequence dense chords, enable effects when integrated, and record the highest CPU percentage and whether the xrun counter increments. The reference firmware's 2.9 ms audio block profiling is a useful comparator; the fm1-base CPU percentage is the device's authoritative render-budget signal for this build.
+The platform exposes device-reported CPU percentage and xrun counters through `plat_cpu_pct()` and `plat_xruns()`. The current native UI does not yet surface both diagnostics. For hardware validation, enable all four patches, run dense two-lane sequences with the arpeggiator and effects enabled, and record peak CPU percentage and xrun changes. The reference firmware's 2.9 ms audio-block profiling is a useful comparator; host timing is not a device render-budget measurement.
 
-## What is not complete
+## Active sequencer, arpeggiator and FX path
 
-- The two-lane sequencer is not yet integrated into the fm1-base app. The older M-VAVE SDK sequencer adapter under `firmware/` is a separate prototype and is not part of the active device build.
-- The FM6 output currently reaches the platform render output directly. Official-style per-track sends, shared FX routing, and effect DSP/pages have not yet been integrated or verified.
-- The current UI is a hardware bring-up screen, not the final HOME, macro, global-settings or deep-editor design.
-- No physical FM1 playback, CPU headroom for 32 voices, flash/recovery or long-duration MIDI test has been completed.
+The active FM6 renderer now owns the timing and note generation; these are not calls into the older SDK adapter in `firmware/fm1lab_sequencer.c`.
+
+- **Two-lane sequencer:** two independent 64-step lanes, each with patch assignment, note, velocity, enable and gate. The native UI starts with a 16-step pattern and the SELECT encoder navigates the 64-step address space. Both lanes dispatch into the same FM6 allocator used by keyboard and MIDI notes. Lane-specific source tags prevent a lane's note-off from releasing a same-pitch note played by the other lane or by the arpeggiator.
+- **Arpeggiator:** captures up to 16 held keyboard/MIDI notes and generates UP, DOWN or UP/DOWN note events on the transport clock. Generated notes enter the FM6 allocator through an internal path so they are not re-captured as new key input.
+- **Clock:** the transport phase accumulator generates 16th-note events at 30–300 BPM using a 48 kHz sample-rate assumption. Sequencer gates and arp notes are advanced inside `fm6_render()`, not by the main UI loop. Confirm the actual device audio rate and adjust the constant if the platform build is configured differently.
+- **FX routing:** each of the four FM6 patches has independent 0–100 sends to shared CHORUS, DELAY and REVERB buses. The three buses are processed in parallel after patch mixing. Each has a wet-return control and time/feedback parameters; delay feedback and reverb/chorus regeneration are separate. The active UI exposes one effect per page, bypass, wet amount, time/feedback and the selected patch's send level.
+- **DSP buffers:** the effects use fixed-size integer ring/comb buffers and no allocation or flash I/O in the render path. The implementation adds roughly 47 KiB of effect delay memory before compiler alignment and other state.
+
+Sequencer patterns, arp mode, tempo and FX parameters currently initialize to defaults at boot; they are not yet saved as user data. The two-lane UI is an initial functional editor, not yet the final sequencing workflow (no swing, tie editing, MIDI clock sync or pattern persistence).
+
+## Remaining validation
+
+- Host tests exercise sequencer note dispatch, arp scheduling, each FX processor and per-patch send isolation; the native build and emulator must pass on the same final commit before calling this integration build-verified.
+- No physical FM1 playback, actual device sample-rate confirmation, 32-voice-plus-FX CPU headroom, xrun profiling, flash/recovery or long-duration MIDI test has been completed.
+- The final visual design remains a work in progress; these pages are functional controls, not the completed global design system.
 
 ## Validation
 
