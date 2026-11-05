@@ -85,7 +85,7 @@ jobs:
           }
 
           Remove-Item -LiteralPath 'C:\JL' -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path 'C:\JL' -Force | Out-Null
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
           Copy-Item -Path (Join-Path $pi32Root '*') -Destination $target -Recurse -Force
           $stagedCtype = Join-Path $target 'q32s-include\ctype.h'
           $stagedLib = Join-Path $target 'q32s-lib\libc.a'
