@@ -29,6 +29,8 @@ The browser workshop is a development and audition surface. The corresponding cu
 
 The active `app/app.c` build now compiles the same four-patch Instrument model used by the host-side C tests and connects it to the Felucca FM6 voice engine. The PRESET encoder selects among three native Instrument storage slots; each slot holds four expanded DX7 voices plus macro, mute, and level state. SEL/SELECT still select and edit patches independently of the Instrument selector. SAVE persists the active Instrument and the global settings, and changing Instrument is blocked while its edits are unsaved. Loading is handed to the audio task through the app's event queue so the UI thread does not write live FM voice state.
 
+The active app also has dedicated operator-envelope and two-page LFO editors. The envelope page edits each DX7 operator's four rates and four levels; the LFO pages follow the official FM1 voice map for waveform, speed, pitch/amp depth, delay, pitch sensitivity, LFO key sync, and oscillator sync. These edits are queued to the audio task as voice snapshots rather than writing DSP state from the UI thread.
+
 This is the first working native storage bridge, not yet the full 32-Instrument / four-bank library. The existing 400-byte metadata codec and the upstream M-VAVE bank journal remain separate work; the active app currently uses three platform storage objects rather than claiming that the full bank format is connected. Sequencer, arpeggiator, ENV/LFO editing, and FX audio routing are also not yet connected in this native app.
 
 ## Build and validation
