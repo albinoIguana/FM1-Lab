@@ -26,16 +26,58 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
-static volatile int32_t voice_note = -1;     /* MIDI note, -1 = released */
+static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE };
+typedef struct { volatile uint8_t type, a, b; } ui_event_t;
+static volatile ui_event_t ui_events[64];
+static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
+
+/* Main-loop controls never write FM voice state directly. They publish compact events;
+ * the audio interrupt is the sole runtime writer of the synthesizer state. */
+static void ui_event_push(uint8_t type, uint8_t a, uint8_t b)
+{
+    uint8_t head = ui_event_head, next = (uint8_t)((head + 1u) & 63u);
+    if (next == ui_event_tail) {
+        ui_event_overflow = 1;
+        return;
+    }
+    ui_events[head].type = type;
+    ui_events[head].a = a;
+    ui_events[head].b = b;
+    ui_event_head = next;
+}
+
+static void ui_events_drain(void)
+{
+    uint8_t tail;
+    if (ui_event_overflow) {
+        ui_event_tail = ui_event_head;
+        ui_event_overflow = 0;
+        fm6_panic();
+        return;
+    }
+    while ((tail = ui_event_tail) != ui_event_head) {
+        uint8_t type = ui_events[tail].type, a = ui_events[tail].a, b = ui_events[tail].b;
+        ui_event_tail = (uint8_t)((tail + 1u) & 63u);
+        if (type == EV_NOTE_ON)
+            fm6_note_on(a, b);
+        else if (type == EV_NOTE_OFF)
+            fm6_note_off(a);
+        else if (type == EV_PANIC)
+            fm6_panic();
+        else if (type == EV_PATCH_ENABLE)
+            fm6_patch_set_enabled(a, b);
+    }
+}
 
 static void note_on(int32_t note, uint32_t vel)
 {
     voice_note = note;
-    fm6_note_on((uint8_t)note, (uint8_t)vel);
+    ui_event_push(EV_NOTE_ON, (uint8_t)note, (uint8_t)vel);
 }
 static void note_off(int32_t note)
 {
-    fm6_note_off((uint8_t)note);
+    ui_event_push(EV_NOTE_OFF, (uint8_t)note, 0);
     if (voice_note == note)
         voice_note = -1;
 }
@@ -52,16 +94,21 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
             midi_last_port = (uint32_t)port;
             midi_count++;
         }
-        if ((st & 0xF0u) == 0x90u && d2)
-            note_on((int32_t)d1, d2);
-        else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u)
-            note_off((int32_t)d1);
+        if ((st & 0xF0u) == 0x90u && d2) {
+            voice_note = (int32_t)d1;
+            fm6_note_on((uint8_t)d1, (uint8_t)d2); /* MIDI is already in the audio interrupt. */
+        } else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
+            fm6_note_off((uint8_t)d1);
+            if (voice_note == (int32_t)d1)
+                voice_note = -1;
+        }
     }
 }
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     midi_in();
+    ui_events_drain();
     fm6_render(lr, n, master_q12);
 }
 
@@ -69,6 +116,8 @@ void app_panic(void)
 {
     voice_note = -1;
     fm6_panic();
+    ui_event_tail = ui_event_head;
+    ui_event_overflow = 0;
 }
 
 /* --------------------------------------------------------------- settings --- */
@@ -210,7 +259,7 @@ static void octave_step(int32_t d)
     if (o == set.octave)
         return;
     voice_note = -1;                         /* a key held across the change would not find its note off */
-    fm6_panic();
+    ui_event_push(EV_PANIC, 0, 0);
     set.octave = (int8_t)o;
     set_dirty = 1;
     octave_text(t);
@@ -289,7 +338,7 @@ static void input(void)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
         else if (k == B_SEL) {
             set.enabled_mask ^= (uint8_t)(1u << set.patch);
-            fm6_patch_set_enabled(set.patch, (set.enabled_mask >> set.patch) & 1u);
+            ui_event_push(EV_PATCH_ENABLE, set.patch, (set.enabled_mask >> set.patch) & 1u);
             set_dirty = 1;
             app_say(fm6_patch_name(set.patch), fm6_patch_enabled(set.patch) ? "ON" : "OFF");
         } else if (k == B_SAVE) {
