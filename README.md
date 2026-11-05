@@ -33,7 +33,7 @@ The bank format uses 11-character persisted Instrument names to fit all 32 voice
 
 The active app also has dedicated operator-envelope and two-page LFO editors. The envelope page edits each DX7 operator's four rates and four levels; the LFO pages follow the official FM1 voice map for waveform, speed, pitch/amp depth, delay, pitch sensitivity, LFO key sync, and oscillator sync. These edits are queued to the audio task as voice snapshots rather than writing DSP state from the UI thread.
 
-The active FM6 audio path now includes a sample-clocked two-lane sequencer, held-note arpeggiator (UP / DOWN / UP-DOWN), and parallel CHORUS / DELAY / REVERB send buses with per-patch send levels. These are implemented in `app/dsp/fm6.c`, not the older SDK adapter. Sequencer patterns and performance settings are currently volatile and reset to defaults at boot. CI host tests are being expanded to exercise generated note dispatch and effect send isolation; physical FM1 playback and device CPU/xrun validation are still required.
+The active FM6 audio path now includes a sample-clocked two-lane sequencer, held-note arpeggiator (UP / DOWN / UP-DOWN), and parallel CHORUS / DELAY / REVERB send buses with per-patch send levels. These are implemented in `app/dsp/fm6.c`, not the older SDK adapter. Sequencer patterns and performance settings are currently volatile and reset to defaults at boot. The native host tests cover both sequencer lanes, generated arp output, all three effect processors, and per-patch send isolation. Physical FM1 playback and device CPU/xrun validation are still required.
 
 ## Build and validation
 
