@@ -37,7 +37,7 @@ enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE
 static uint8_t page = PAGE_HOME;
 static uint8_t env_operator = 1u, env_levels;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
-               seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,1u};
+               seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_mode, fx_ui_mix[3]={18u,24u,20u}, fx_ui_time[3]={48u,52u,45u}, fx_ui_feedback=42u;
 
@@ -342,7 +342,7 @@ void app_init(void)
     page = PAGE_HOME;
     instrument_factory_capture();
     for(uint32_t lane=0;lane<2u;lane++) {
-        seq_ui_patch[lane]=(uint8_t)lane;
+        seq_ui_patch[lane]=0u;
         for(uint32_t step=0;step<64u;step++) {
             seq_ui_note[lane][step]=(uint8_t)(lane?67u:48u);
             seq_ui_velocity[lane][step]=100u; seq_ui_gate[lane][step]=50u;
