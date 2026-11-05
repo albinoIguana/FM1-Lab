@@ -108,7 +108,7 @@ enum {
     EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE,
     EV_SELECT_INSTRUMENT, EV_MACRO, EV_ALGORITHM, EV_NAME_CHAR,
     EV_SNAPSHOT, EV_MARK_SAVED, EV_SEQ_SET, EV_SEQ_CLEAR,
-    EV_SEQ_START, EV_SEQ_STOP, EV_SEQ_TEMPO
+    EV_SEQ_START, EV_SEQ_STOP, EV_SEQ_TEMPO, EV_OPERATOR_SET
 };
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
@@ -183,6 +183,8 @@ static void ui_events_drain(void)
             seq_stop();
         else if (type == EV_SEQ_TEMPO)
             seq_set_tempo(a);
+        else if (type == EV_OPERATOR_SET)
+            fm6_operator_set_value(a / FM6_OP_PARAM_COUNT, b, a % FM6_OP_PARAM_COUNT, c);
     }
 }
 
@@ -278,6 +280,7 @@ static struct {
     uint8_t save_long, rename, rename_pos;
     char rename_backup[FM1LAB_INSTRUMENT_NAME_LEN];
     uint8_t seq_edit, seq_lane, seq_step, seq_tempo_mode;
+    uint8_t editor, alg_edit, op_index, op_param;
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint8_t redraw;
