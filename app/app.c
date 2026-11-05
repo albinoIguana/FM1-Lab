@@ -7,6 +7,7 @@
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
 #include "fm1lab_instrument.h"
+#include "fm1lab_voice_editor.h"
 
 #define SET_MAGIC_V1 0x4C314D46u
 #define SET_MAGIC    0x4C314D47u
@@ -28,9 +29,12 @@ static fm1lab_instrument_t current_instrument;
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
 static volatile uint8_t instrument_apply_pending;
+static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
+static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = 3 };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
+static uint8_t env_operator = 1u, env_levels;
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -40,7 +44,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE };
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -148,6 +152,8 @@ static void ui_events_drain(void)
                 fm6_macro_set(p, m, set.macros[p][m]);
         }
         instrument_apply_pending = 0u;
+        voice_update_pending = 0u;
+        voice_dirty = 0u;
         return;
     }
     while ((tail = ui_event_tail) != ui_event_head) {
@@ -170,8 +176,61 @@ static void ui_events_drain(void)
             fm6_panic();
             instrument_apply_engine();
             instrument_apply_pending = 0u;
+            voice_dirty = 0u;
+        } else if (type == EV_PATCH_VOICE) {
+            (void)fm6_patch_set_voice(a, voice_update_snapshot);
+            voice_update_pending = 0u;
         }
     }
+}
+
+static void voice_update_publish(void)
+{
+    if (!voice_dirty || voice_update_pending || !instrument_loaded) return;
+    const uint8_t *voice = current_instrument.patches[set.patch].voice;
+    for (uint32_t i = 0; i < FM1LAB_PATCH_BYTES; ++i)
+        voice_update_snapshot[i] = voice[i];
+    voice_update_patch = set.patch;
+    voice_dirty = 0u;
+    voice_update_pending = 1u;
+    ui_event_push(EV_PATCH_VOICE, voice_update_patch, 0, 0);
+}
+
+static void voice_edit_changed(void)
+{
+    instrument_dirty = 1u;
+    set_dirty = 1u;
+    voice_dirty = 1u;
+    ui.redraw = 1u;
+}
+
+static void voice_edit_global(fm1lab_global_field_t field, int delta)
+{
+    uint8_t *voice = current_instrument.patches[set.patch].voice;
+    uint8_t value;
+    unsigned maximum = field == FM1LAB_GLOBAL_LFO_WAVE ? 5u :
+        field == FM1LAB_GLOBAL_PITCH_SENS ? 7u :
+        (field == FM1LAB_GLOBAL_LFO_SYNC || field == FM1LAB_GLOBAL_OSC_SYNC) ? 1u : 99u;
+    if (!delta || fm1lab_voice_global_get(voice, field, &value)) return;
+    int next = (int)value + delta;
+    if (next < 0) next = 0;
+    if ((unsigned)next > maximum) next = (int)maximum;
+    if ((uint8_t)next != value &&
+        !fm1lab_voice_global_set(voice, field, (unsigned)next))
+        voice_edit_changed();
+}
+
+static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
+{
+    uint8_t *voice = current_instrument.patches[set.patch].voice;
+    uint8_t value;
+    if (!delta || fm1lab_voice_operator_get(voice, env_operator, field, &value)) return;
+    int next = (int)value + delta;
+    if (next < 0) next = 0;
+    if (next > 99) next = 99;
+    if ((uint8_t)next != value &&
+        !fm1lab_voice_operator_set(voice, env_operator, field, (unsigned)next))
+        voice_edit_changed();
 }
 
 static void note_on(int32_t note, uint32_t vel)
@@ -211,8 +270,8 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
-    midi_in();
     ui_events_drain();
+    midi_in();
     fm6_render(lr, n, master_q12);
 }
 
@@ -488,6 +547,14 @@ static void input(void)
         } else if (k == B_GLO) {
             page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
             app_say("GLOBAL", page == PAGE_GLOBAL ? "SETTINGS" : "HOME");
+        } else if (k == B_ENV) {
+            if (page == PAGE_ENV) env_levels ^= 1u;
+            else page = PAGE_ENV;
+            app_say("ENVELOPE", env_levels ? "LEVELS" : "RATES");
+        } else if (k == B_LFO) {
+            page = page == PAGE_LFO ? PAGE_LFO_MOD :
+                page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
+            app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
             if (page == PAGE_HOME) {
                 page = PAGE_MACRO;
@@ -533,6 +600,12 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
+        } else if (k == EN_ALGO && page == PAGE_ENV) {
+            int32_t next = ((int32_t)env_operator - 1 + e) % 6;
+            if (next < 0) next += 6;
+            env_operator = (uint8_t)(next + 1);
+            app_say("ENVELOPE OPERATOR", fm1lab_voice_operator_is_carrier(
+                current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
@@ -555,7 +628,24 @@ static void input(void)
             }
         } else if (k >= EN_K1 && k <= EN_K4) {
             uint32_t index = (uint32_t)k - EN_K1;
-            if (page == PAGE_MACRO) {
+            if (page == PAGE_ENV) {
+                voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
+                app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
+            } else if (page == PAGE_LFO) {
+                static const fm1lab_global_field_t fields[4] = {
+                    FM1LAB_GLOBAL_LFO_WAVE, FM1LAB_GLOBAL_LFO_SPEED,
+                    FM1LAB_GLOBAL_LFO_PITCH_DEPTH, FM1LAB_GLOBAL_LFO_AMP_DEPTH
+                };
+                voice_edit_global(fields[index], e);
+                app_say("LFO", "UPDATED");
+            } else if (page == PAGE_LFO_MOD) {
+                static const fm1lab_global_field_t fields[4] = {
+                    FM1LAB_GLOBAL_LFO_DELAY, FM1LAB_GLOBAL_PITCH_SENS,
+                    FM1LAB_GLOBAL_LFO_SYNC, FM1LAB_GLOBAL_OSC_SYNC
+                };
+                voice_edit_global(fields[index], e);
+                app_say("LFO MODULATION", "UPDATED");
+            } else if (page == PAGE_MACRO) {
                 int32_t value = (int32_t)set.macros[set.patch][index] + e;
                 if (value < 0) value = 0;
                 if (value > 100) value = 100;
@@ -584,6 +674,7 @@ static void input(void)
             app_say(ENC_NAME[k], t);
         }
     }
+    voice_update_publish();
     if (keys != ui.keys || btn != ui.btn)
         ui.redraw = 1;
     ui.keys = keys;
@@ -752,6 +843,70 @@ static void draw_global_panel(uint32_t pct)
     }
 }
 
+static void draw_envelope_panel(void)
+{
+    static const char *const rates[4] = {"RATE 1", "RATE 2", "RATE 3", "RATE 4"};
+    static const char *const levels[4] = {"LEVEL 1", "LEVEL 2", "LEVEL 3", "LEVEL 4"};
+    char t[16];
+    const uint8_t *voice = current_instrument.patches[set.patch].voice;
+    int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
+    uint16_t accent = patch_color(set.patch);
+    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
+    cv_text(140, 2, &FONT_XS, "OPERATOR", C_GRAY);
+    int_text(env_operator, t); cv_text(204, 2, &FONT_XS, t, accent);
+    cv_text(6, 19, &FONT_XS, carrier ? "CARRIER ENVELOPE" : "MODULATOR ENVELOPE", carrier ? accent : C_GRAY);
+    for (uint32_t i = 0; i < 4u; ++i) {
+        int32_t x = 4 + (int32_t)(i & 1u) * 118;
+        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        uint8_t value = 0;
+        (void)fm1lab_voice_operator_get(voice, env_operator,
+            (fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + i), &value);
+        rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
+        cv_text(x + 9, y + 8, &FONT_XS, env_levels ? levels[i] : rates[i], C_WHITE);
+        int_text(value, t); cv_text(x + 88, y + 8, &FONT_XS, t, accent);
+        cv_rect(x + 9, y + 32, 94, 7, C_LINE);
+        cv_rect(x + 9, y + 32, (int32_t)value * 94 / 99, 7, accent);
+        cv_text(x + 9, y + 48, &FONT_XS, env_levels ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
+    }
+}
+
+static void draw_lfo_panel(uint32_t modulation)
+{
+    static const char *const labels[2][4] = {
+        {"WAVEFORM", "SPEED", "PITCH DEPTH", "AMP DEPTH"},
+        {"DELAY", "PITCH SENS", "LFO KEY SYNC", "OSC KEY SYNC"}
+    };
+    static const char *const waves[6] = {"TRIANGLE", "SAW DOWN", "SAW UP", "SQUARE", "SINE", "S/HOLD"};
+    static const fm1lab_global_field_t fields[2][4] = {
+        {FM1LAB_GLOBAL_LFO_WAVE, FM1LAB_GLOBAL_LFO_SPEED, FM1LAB_GLOBAL_LFO_PITCH_DEPTH, FM1LAB_GLOBAL_LFO_AMP_DEPTH},
+        {FM1LAB_GLOBAL_LFO_DELAY, FM1LAB_GLOBAL_PITCH_SENS, FM1LAB_GLOBAL_LFO_SYNC, FM1LAB_GLOBAL_OSC_SYNC}
+    };
+    static const uint8_t maxima[2][4] = {{5,99,99,99},{99,7,1,1}};
+    char t[20];
+    const uint8_t *voice = current_instrument.patches[set.patch].voice;
+    uint16_t accent = patch_color(set.patch);
+    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
+    cv_text(172, 2, &FONT_XS, modulation ? "PAGE 2/2" : "PAGE 1/2", accent);
+    for (uint32_t i = 0; i < 4u; ++i) {
+        int32_t x = 4 + (int32_t)(i & 1u) * 118;
+        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        uint8_t value = 0;
+        (void)fm1lab_voice_global_get(voice, fields[modulation][i], &value);
+        rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
+        cv_text(x + 9, y + 8, &FONT_XS, labels[modulation][i], C_WHITE);
+        if (!modulation && i == 0u) {
+            cv_text(x + 9, y + 26, &FONT_B, waves[value % 6u], accent);
+        } else {
+            if (modulation && i >= 2u) cv_text(x + 9, y + 26, &FONT_B, value ? "ON" : "OFF", accent);
+            else {
+                int_text(value, t); cv_text(x + 9, y + 26, &FONT_B, t, accent);
+                cv_rect(x + 9, y + 46, 94, 5, C_LINE);
+                cv_rect(x + 9, y + 46, (int32_t)value * 94 / maxima[modulation][i], 5, accent);
+            }
+        }
+    }
+}
+
 static void draw(void)
 {
     char t[24];
@@ -766,7 +921,10 @@ static void draw(void)
     } else {
         const char *title = page == PAGE_MACRO ? "PATCH MACROS" :
             page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
-            page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" : "INSTRUMENT";
+            page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" :
+            page == PAGE_ENV ? "OPERATOR ENVELOPE" :
+            page == PAGE_LFO ? "LFO" :
+            page == PAGE_LFO_MOD ? "LFO MODULATION" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
         cv_text(10, 18, &FONT_XS, instrument_index == 0u ? "FACTORY / USER 1" : instrument_index == 1u ? "USER 2" : "USER 3", accent);
         if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
@@ -780,6 +938,9 @@ static void draw(void)
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
     else if (page == PAGE_OPERATOR_MAP) draw_operator_map();
+    else if (page == PAGE_ENV) draw_envelope_panel();
+    else if (page == PAGE_LFO) draw_lfo_panel(0);
+    else if (page == PAGE_LFO_MOD) draw_lfo_panel(1);
     else draw_global_panel(pct);
     cv_blit(0, 36);
 
@@ -798,11 +959,26 @@ static void draw(void)
             static const char *const short_names[4] = {"BRIGHT", "BODY", "MOTION", "EDGE"};
             cv_text(x + 6, 23, &FONT_XS, short_names[k], C_WHITE);
             int_text(set.macros[set.patch][k], t); cv_text(x + 6, 33, &FONT_XS, t, ink);
+        } else if (page == PAGE_ENV) {
+            cv_text(x + 6, 23, &FONT_XS, env_levels ? "LEVEL" : "RATE", C_WHITE);
+            uint8_t value = 0;
+            (void)fm1lab_voice_operator_get(current_instrument.patches[set.patch].voice,
+                env_operator, (fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + k), &value);
+            int_text(value, t); cv_text(x + 6, 33, &FONT_XS, t, ink);
+        } else if (page == PAGE_LFO || page == PAGE_LFO_MOD) {
+            static const char *const lfo_names[2][4] = {
+                {"WAVE", "SPEED", "PMD", "AMD"}, {"DELAY", "P SENS", "LFO SYNC", "OSC SYNC"}
+            };
+            cv_text(x + 6, 23, &FONT_XS, lfo_names[page == PAGE_LFO_MOD][k], C_WHITE);
+            cv_text(x + 6, 33, &FONT_XS, "K1-K4 EDIT", ink);
         } else cv_text(x + 6, 27, &FONT_XS, "-", C_GRAY);
     }
     if (page == PAGE_HOME) cv_text(4, 53, &FONT_XS, "SELECT PATCH   SEL OPEN", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 53, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
     else if (page == PAGE_OPERATOR_MAP) cv_text(4, 53, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
+    else if (page == PAGE_ENV) cv_text(4, 53, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
+    else if (page == PAGE_LFO) cv_text(4, 53, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
+    else if (page == PAGE_LFO_MOD) cv_text(4, 53, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
     else cv_text(4, 53, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     int_text((int32_t)page + 1, t);
     {
