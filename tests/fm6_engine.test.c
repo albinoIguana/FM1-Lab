@@ -84,6 +84,53 @@ int main(void) {
     assert(peak(output, TEST_WORDS) > 0);
     fm6_panic();
     assert(fm6_active_voices() == 0u);
+
+    /* Sample-clocked two-lane sequencer drives the same FM6 note allocator. */
+    fm6_init();
+    fm6_set_tempo(120u);
+    fm6_sequencer_set_lane(0u,0u);
+    fm6_sequencer_set_step(0u,0u,1u,60u,110u,75u);
+    fm6_sequencer_set_running(1u);
+    int32_t seq_peak=0;
+    for(unsigned block=0;block<48u;block++) {
+        memset(output,0,sizeof output);
+        fm6_render(output,128u,4096u);
+        int32_t p=peak(output,TEST_WORDS); if(p>seq_peak) seq_peak=p;
+    }
+    assert(fm6_sequencer_running()==1u);
+    assert(fm6_sequencer_step()==1u); /* one 16th-note at 120 BPM */
+    assert(seq_peak>0);
+    fm6_sequencer_set_running(0u);
+    assert(fm6_sequencer_running()==0u);
+
+    /* Arpeggiator captures held key input, then emits timed FM6 note events. */
+    fm6_init();
+    fm6_arpeggiator_set_mode(1u);
+    fm6_note_on(60u,100u); fm6_note_on(64u,100u); fm6_note_on(67u,100u);
+    assert(fm6_active_voices()==0u);
+    for(unsigned block=0;block<48u;block++) {
+        memset(output,0,sizeof output); fm6_render(output,128u,4096u);
+    }
+    assert(fm6_active_voices()>0u);
+    fm6_note_off(60u); fm6_note_off(64u); fm6_note_off(67u);
+    fm6_arpeggiator_set_mode(0u);
+
+    /* Every effect changes the active FM6 output, not just a UI parameter. */
+    int32_t dry[64u*128u*2u], wet[64u*128u*2u];
+    fm6_init(); fm6_note_on(60u,110u);
+    for(unsigned block=0;block<64u;block++)
+        fm6_render(dry+block*TEST_WORDS,128u,4096u);
+    for(unsigned effect=0;effect<3u;effect++) {
+        fm6_init(); fm6_fx_set_enabled((uint8_t)effect,1u);
+        fm6_fx_set_mix((uint8_t)effect,100u);
+        fm6_note_on(60u,110u);
+        for(unsigned block=0;block<64u;block++)
+            fm6_render(wet+block*TEST_WORDS,128u,4096u);
+        int changed=0;
+        for(unsigned i=0;i<64u*TEST_WORDS;i++) if(wet[i]!=dry[i]) { changed=1; break; }
+        assert(changed);
+    }
+
     puts("Felucca FM6 engine: 4 x 8 independent voices, per-patch stealing, patch loading, macros, tuning, bend and render passed");
     return 0;
 }
