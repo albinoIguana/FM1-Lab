@@ -823,6 +823,11 @@ void app_frame(void)
     }
     if (fm6_current_instrument() != set.instrument)
         ui.redraw = 1;
+    if (last_seq_step != seq_current_step() || last_seq_running != seq_running()) {
+        last_seq_step = seq_current_step();
+        last_seq_running = seq_running();
+        ui.redraw = 1;
+    }
     if (ui.redraw) {
         ui.redraw = 0;
         draw();
@@ -840,6 +845,12 @@ int app_expect(const char *what, int *got)
         *got = set.instrument;
     else if (!strcmp(what, "instrument_dirty"))
         *got = fm6_instrument_dirty(set.instrument);
+    else if (!strcmp(what, "seq_running"))
+        *got = seq_running();
+    else if (!strcmp(what, "seq_tempo"))
+        *got = seq_tempo();
+    else if (!strcmp(what, "seq_step"))
+        *got = seq_current_step();
     else if (!strcmp(what, "note"))
         *got = voice_note;
     else if (!strcmp(what, "dirty"))
