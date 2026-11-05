@@ -48,7 +48,7 @@ The BSP's OTA implementation and flash-window definitions are the authority here
 
 ## Instrument storage sizing
 
-The persisted record is 607 bytes: four 128-byte FM6 voice records, four macro values per patch, Instrument name/enable mask, and the two 16-step note/velocity lanes plus tempo. Six records plus an 8-byte chunk header use 3,650 bytes, below the 3,840-byte payload limit per storage sector. Sixteen Instruments are split 6/5/5 across three pooled objects. The 12-sector pool provides two-copy atomic storage for the three objects with six spare sectors for rotation/garbage collection.
+The persisted record is 607 bytes: four 128-byte FM6 voice records, four macro values per patch, Instrument name/enable mask, and the two 16-step note/velocity lanes plus tempo. Six records plus a 12-byte chunk header use 3,654 bytes, below the 3,840-byte payload limit per storage sector. Sixteen Instruments are split 6/5/5 across three pooled objects. The 12-sector pool provides two-copy atomic storage for the three objects with six spare sectors for rotation/garbage collection.
 
 The three platform objects use six sectors (`EA000..EFFFF`); the instrument chunks use the remaining twelve sectors (`F0000..FBFFF`). This consumes the full 18-sector USER window. Felucca project/sample/preset/voice-bank/global sectors remain outside this allocation. Stock-firmware USER patches in `EA000..FBFFF` are not preserved; Felucca's projects and user preset banks are.
 
@@ -62,8 +62,22 @@ The first native build produced a 151,428-byte app image. After adding the 16-sl
 | Platform/UI primitives, panel, audio, MIDI, storage, host simulator | [fm1-base](https://github.com/charlesvestal/fm1-base) | Small optional platform groups; native host simulator and common app interface |
 | Minimal hardware reference | [Dinghy](https://github.com/zvenson/dinghy) | Cross-check boot, USB rescue, MIDI, audio, storage and safety checks; do not carry its sine-only app |
 | Six-op FM reference | [Felucca](https://github.com/hugelton/Felucca) | Integer-only MSFA/Dexed-derived FM6 core and patch semantics; use its core and required generated tables, not the browser DX7 simulator |
-| Sequencer | Felucca timing/transport as a reference; implement only our two-lane feature set | Avoid bringing over unrelated four-track groovebox features |
+| Sequencer | FM1-Lab native 2-lane/16-step scheduler; patterns stored per Instrument | Minimal scheduler and shared clock/gate; no Felucca or Baud Girl sequencer code copied |
 | Product UI | FM1-Lab Instrument/editor design, reimplemented against the platform graphics API | Four-patch Instrument, algorithm-aware editor, macros and two visible sequencer lanes |
+
+## Open-source project comparison
+
+| Project | What it offers | Decision for this build |
+|---|---|---|
+| [fm1-base](https://github.com/charlesvestal/fm1-base) + [felucca-bsp](https://github.com/hugelton/felucca-bsp) | Reusable AC79 hardware/BSP, linker, loader, package builder, audio/MIDI/storage/UI primitives and host simulator; configurable optional features. The documented app slot is 581,564 bytes, with 96 KiB app RAM and 336 KiB memory pool. | **Platform selected.** Smaller and cleaner than importing a complete groovebox; own BLE stack avoids linking the closed JieLi Bluetooth libraries. |
+| [Felucca](https://github.com/hugelton/Felucca) | Complete four-track, multi-engine firmware with 13 engines and a 64-step piano-roll/song sequencer. FM6 is its six-operator integer FM engine. | **FM6 core + required patch conversion/table generator only.** Do not import its other 12 engines, song system, sampler, or full UI. The released full app binary is about 513 KB; our first native image was about 151 KB before the current Instrument/sequencer work. |
+| [Dinghy](https://github.com/zvenson/dinghy) | Minimal documented firmware with a four-voice sine synth; useful for understanding boot, USB rescue, MIDI, audio and storage plumbing. | Reference only. A sine engine is not the six-operator instrument we want, and fm1-base gives us a more complete platform layer. |
+| [SLOOP](https://github.com/3dSam/SLOOP) | Felucca-derived four-track groovebox with three synth parts plus drums and live-performance features. | Not imported. It carries more engine, sequencing and performance functionality than this single-Instrument design needs. |
+| [M-VAVE FM1 Open](https://github.com/m-vave/fm1_open) | Official eight-track app with sample slots and effects; its app is open, but its device-engine SDK is a binary SDK with a linking exception. | Reference only. A binary engine is not a suitable source base for our custom FM6 algorithm editor and topology-aware macros. |
+| Baud Girl FM-1+VA | Closed-source firmware with the stock FM engine, VA/chiptune additions and a 64-step sequencer. | Not copyable as source. We implement only the agreed two-lane/16-step sequencer ourselves; this is not a port of Baud Girl. |
+| fm1-nes / foma | Alternative SDK/minimal-app experiments. | Not selected: they do not offer a better combination of native FM6 source, platform services and verified packaging than fm1-base + Felucca FM6. |
+
+This is a component-level selection, not a wholesale fork: fm1-base owns the hardware boundary, Felucca supplies the FM6 DSP, and FM1-Lab owns the Instrument model, macro system, two-lane sequencer, storage format and UI.
 
 ## Build and runtime principles
 
@@ -79,10 +93,10 @@ The first native build produced a 151,428-byte app image. After adding the 16-sl
 ## Licensing / provenance
 
 - fm1-base and felucca-bsp: MPL-2.0.
-- Felucca application/engine wrapper and sequencer: GPL-3.0-only.
+- Felucca FM6 engine wrapper and patch/table generator: GPL-3.0-only. The Felucca sequencer and other engines are not copied.
 - Felucca `fm6_core.c`: Apache-2.0; retain its header and Apache license notice.
 - Dinghy: GPL-3.0-only; reference only unless source is copied, in which case retain its notices.
-- This project will retain per-file notices and an explicit third-party license/credits inventory. The own-stack Bluetooth choice avoids linking JieLi's closed Bluetooth libraries into a GPL application.
+- The firmware retains per-file notices and an explicit third-party license/credits inventory. The FM1-Lab sequencer and Instrument storage codec are original project code. The own-stack Bluetooth choice avoids linking JieLi's closed Bluetooth libraries into the GPL application.
 
 ## Preserved work
 
