@@ -7,6 +7,7 @@
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
 #include "seq.h"
+#include "storage_format.h"
 
 #define SET_MAGIC 0x4C314D46u            /* "FM1L": native Instrument settings */
 #define INST_STORE_MAGIC 0x31494D46u      /* "FM1I" */
@@ -37,25 +38,6 @@ static fm1lab_instrument_record_t instrument_cache[FM1LAB_INSTRUMENT_COUNT];
 static fm1lab_instrument_record_t save_snapshot;
 static volatile uint8_t snapshot_ready, snapshot_slot;
 
-static void app_copy_bytes(void *dst, const void *src, uint32_t n)
-{
-    uint8_t *d = (uint8_t *)dst;
-    const uint8_t *s = (const uint8_t *)src;
-    while (n--)
-        *d++ = *s++;
-}
-
-static uint32_t app_crc32(const uint8_t *data, uint32_t n)
-{
-    uint32_t crc = 0xFFFFFFFFu, i, bit;
-    for (i = 0; i < n; i++) {
-        crc ^= data[i];
-        for (bit = 0; bit < 8u; bit++)
-            crc = (crc >> 1) ^ (0xEDB88320u & (uint32_t)-(int32_t)(crc & 1u));
-    }
-    return ~crc;
-}
-
 static void instrument_store_load(void)
 {
     static const uint8_t first[INST_CHUNKS] = {0u, 6u, 11u};
@@ -64,20 +46,11 @@ static void instrument_store_load(void)
     uint32_t chunk, i;
     for (chunk = 0; chunk < INST_CHUNKS; chunk++) {
         int n = plat_store_load(OBJ_INSTRUMENTS0 + chunk, buf, sizeof(buf));
-        instrument_chunk_header_t h;
-        if (n != (int)(INST_HEADER_BYTES + count[chunk] * sizeof(fm1lab_instrument_record_t)))
-            continue;
-        app_copy_bytes(&h, buf, sizeof(h));
-        if (h.magic != INST_STORE_MAGIC || h.version != INST_STORE_VERSION
-            || h.first != first[chunk] || h.count != count[chunk]
-            || h.crc != app_crc32(buf + INST_HEADER_BYTES,
-                                  count[chunk] * sizeof(fm1lab_instrument_record_t)))
+        if (n < 0 || !fm1lab_store_chunk_decode(first[chunk], count[chunk],
+                buf, (uint32_t)n, &instrument_cache[first[chunk]]))
             continue;
         for (i = 0; i < count[chunk]; i++) {
             uint32_t slot = first[chunk] + i;
-            app_copy_bytes(&instrument_cache[slot],
-                           buf + INST_HEADER_BYTES + i * sizeof(fm1lab_instrument_record_t),
-                           sizeof(fm1lab_instrument_record_t));
             if (instrument_cache[slot].valid) {
                 fm6_instrument_load(slot, &instrument_cache[slot]);
                 seq_instrument_load(slot, &instrument_cache[slot]);
@@ -91,48 +64,18 @@ static int instrument_store_save(uint32_t slot, const fm1lab_instrument_record_t
     static const uint8_t first[INST_CHUNKS] = {0u, 6u, 11u};
     static const uint8_t count[INST_CHUNKS] = {6u, 5u, 5u};
     uint8_t buf[INST_HEADER_BYTES + INST_CHUNK_MAX_RECORDS * sizeof(fm1lab_instrument_record_t)];
-    instrument_chunk_header_t h;
-    uint32_t chunk, i;
+    uint32_t chunk, written = 0;
     if (slot >= FM1LAB_INSTRUMENT_COUNT || !record)
         return 0;
     chunk = slot < 6u ? 0u : slot < 11u ? 1u : 2u;
-    app_copy_bytes(&instrument_cache[slot], record, sizeof(*record));
+    instrument_cache[slot] = *record;
     instrument_cache[slot].valid = 1;
-    h.magic = INST_STORE_MAGIC;
-    h.version = INST_STORE_VERSION;
-    h.first = first[chunk];
-    h.count = count[chunk];
-    for (i = 0; i < count[chunk]; i++)
-        app_copy_bytes(buf + INST_HEADER_BYTES + i * sizeof(fm1lab_instrument_record_t),
-                       &instrument_cache[first[chunk] + i], sizeof(fm1lab_instrument_record_t));
-    h.crc = app_crc32(buf + INST_HEADER_BYTES, count[chunk] * sizeof(fm1lab_instrument_record_t));
-    app_copy_bytes(buf, &h, sizeof(h));
-    return plat_store_save(OBJ_INSTRUMENTS0 + chunk, buf,
-                           INST_HEADER_BYTES + count[chunk] * sizeof(fm1lab_instrument_record_t)) == 0;
+    if (!fm1lab_store_chunk_encode(first[chunk], count[chunk],
+            &instrument_cache[first[chunk]], buf, sizeof(buf), &written))
+        return 0;
+    return plat_store_save(OBJ_INSTRUMENTS0 + chunk, buf, written) == 0;
 }
-static settings_t set;
-static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-/* the controls by their names in plat.h, in its order */
-static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
-                                         "PLAY", "REC", "OCT-", "OCT+"};
-static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2", "K3", "K4"};
-
-/* ------------------------------------------------------------------ voice --- */
-/* MIDI runs in the audio interrupt; UI changes are serialized through the event queue. */
-static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum {
-    EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE,
-    EV_SELECT_INSTRUMENT, EV_MACRO, EV_ALGORITHM, EV_NAME_CHAR,
-    EV_SNAPSHOT, EV_MARK_SAVED, EV_SEQ_SET, EV_SEQ_CLEAR,
-    EV_SEQ_START, EV_SEQ_STOP, EV_SEQ_TEMPO, EV_OPERATOR_SET
-};
-typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
-static volatile ui_event_t ui_events[64];
-static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
-
-/* Main-loop controls never write FM voice state directly. They publish compact events;
- * the audio interrupt is the sole runtime writer of the synthesizer state. */
 static void ui_event_push3(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 {
     uint8_t head = ui_event_head, next = (uint8_t)((head + 1u) & 63u);
