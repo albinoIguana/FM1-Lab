@@ -12,7 +12,7 @@ typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t crc; } settings_t;
 static inline uint16_t settings_crc16(const void *data, size_t length) {
     const uint8_t *bytes=(const uint8_t *)data; uint16_t crc=0xFFFFu;
-    while(length--) { crc^=(uint16_t)*bytes++<<8; for(uint32_t bit=0;bit<8u;++bit) crc=(uint16_t)((crc&0x8000u)?(crc<<1)^0x1021u:crc<<1); }
+    while(length--) { crc^=(uint16_t)*bytes++<<8; for(uint32_t bit=0;bit<8u;++bit) crc=(uint16_t)((crc&0x8000u)?(((uint32_t)crc<<1)^0x1021u):((uint32_t)crc<<1)); }
     return crc;
 }
 static inline void settings_seal(settings_t *v) { v->magic=SET_MAGIC; v->crc=settings_crc16(v,offsetof(settings_t,crc)); }
