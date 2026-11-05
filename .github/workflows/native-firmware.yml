@@ -32,9 +32,9 @@ jobs:
         cd firmware
         sh build.sh
         python3 base/tools/build.py app --host
-        mkdir -p firmware/build/release-assets
-        cp firmware/app/build/fm1lab.fwsc firmware/build/release-assets/
-        cp firmware/app/build/fm1lab.bin firmware/build/release-assets/
+        mkdir -p build/release-assets
+        cp app/build/fm1lab.fwsc build/release-assets/
+        cp app/build/fm1lab.bin build/release-assets/
       tests-block: true
       test: |
         set -euo pipefail
