@@ -3,8 +3,8 @@
  *
  * FM6 core: Felucca's integer-only MSFA/Dexed-derived core, Apache-2.0.
  * The core is included in this translation unit because its compact API is
- * intentionally static; this wrapper supplies the four-patch instrument and
- * a single shared eight-voice allocator.
+ * intentionally static; this wrapper supplies the four-patch instrument, four independent eight-voice
+ * pools, and per-patch note allocation.
  */
 #include <stdint.h>
 #include "fm6.h"
@@ -137,7 +137,7 @@ static void fm6_rebuild_patch(uint32_t index)
     const uint8_t *b = p->base;
     int32_t body = (int32_t)p->macro[FM1LAB_MACRO_BODY] - 50;
     int32_t motion = p->macro[FM1LAB_MACRO_MOTION];
-    int32_t dirt = (int32_t)p->macro[FM1LAB_MACRO_DIRT] - 50;
+    int32_t dirt = (int32_t)p->macro[FM1LAB_MACRO_EDGE] - 50;
     int32_t ratio = body * 4 / 50;
     int32_t meg = body * 40 / 50;
     uint32_t carriers, k, j, carrier_n = 0;
