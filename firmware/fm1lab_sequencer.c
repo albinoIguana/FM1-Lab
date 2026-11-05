@@ -133,7 +133,7 @@ int fm1lab_sequencer_read(fm1lab_sequence_state_t *state)
 
 int fm1lab_sequencer_set_tempo(int bpm)
 {
-    if (bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
+    if (!binding_active || restore_pending || bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
     if (bpm < 30 || bpm > 300) return -1;
     int delta = bpm - (int)groove_tempo_saved();
     groove_tempo_edit(delta);
