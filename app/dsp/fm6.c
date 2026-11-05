@@ -129,30 +129,26 @@ static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,in
 {
     int32_t chorus=0,chorus_r=0,delay=0,reverb=0;
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
-    if(fx_enabled[0] && fx_mix[0]) {
-        uint32_t tri=(fx_lfo_phase>>16)&1023u, depth=tri<512u?tri:1023u-tri;
-        uint32_t d=120u+(uint32_t)fx_time[0]*3u+depth*(120u+(uint32_t)fx_time[0]*3u)/511u;
-        uint32_t read_l=(cp-d)&(FM6_CHORUS_SIZE-1u);
-        uint32_t read_r=(cp-(d+160u))&(FM6_CHORUS_SIZE-1u);
-        chorus=fx_chorus[read_l]; chorus_r=fx_chorus[read_r];
-    }
-    fx_chorus[cp]=fm6_sat_q23((int64_t)(fx_enabled[0]?sends[0]:0)+(int64_t)chorus*fx_feedback[0]/100u);
+    uint32_t tri=(fx_lfo_phase>>16)&1023u, depth=tri<512u?tri:1023u-tri;
+    uint32_t chorus_delay=120u+(uint32_t)fx_time[0]*3u+depth*(120u+(uint32_t)fx_time[0]*3u)/511u;
+    uint32_t chorus_l_index=(cp-chorus_delay)&(FM6_CHORUS_SIZE-1u);
+    uint32_t chorus_r_index=(cp-(chorus_delay+160u))&(FM6_CHORUS_SIZE-1u);
+    int32_t chorus_l_feedback=fx_chorus[chorus_l_index], chorus_r_feedback=fx_chorus[chorus_r_index];
+    if(fx_enabled[0] && fx_mix[0]) { chorus=chorus_l_feedback; chorus_r=chorus_r_feedback; }
+    fx_chorus[cp]=fm6_sat_q23((int64_t)(fx_enabled[0]?sends[0]:0)+(int64_t)chorus_l_feedback*fx_feedback[0]/100u);
     fx_chorus_pos=(uint16_t)((cp+1u)&(FM6_CHORUS_SIZE-1u));
-    if(fx_enabled[1] && fx_mix[1]) {
-        uint32_t d=256u+(uint32_t)fx_time[1]*78u, read=(dp-d)&(FM6_DELAY_SIZE-1u);
-        delay=fx_delay[read];
-    }
-    fx_delay[dp]=fm6_sat_q23((int64_t)(fx_enabled[1]?sends[1]:0)+(int64_t)delay*fx_feedback[1]/100u);
+    uint32_t delay_length=256u+(uint32_t)fx_time[1]*78u;
+    int32_t delay_feedback=fx_delay[(dp-delay_length)&(FM6_DELAY_SIZE-1u)];
+    if(fx_enabled[1] && fx_mix[1]) delay=delay_feedback;
+    fx_delay[dp]=fm6_sat_q23((int64_t)(fx_enabled[1]?sends[1]:0)+(int64_t)delay_feedback*fx_feedback[1]/100u);
     fx_delay_pos=(uint16_t)((dp+1u)&(FM6_DELAY_SIZE-1u));
-    if(fx_enabled[2] && fx_mix[2]) {
-        int32_t a=fx_comb_a[fx_comb_pos_a],b=fx_comb_b[fx_comb_pos_b],c=fx_comb_c[fx_comb_pos_c];
-        reverb=(a+b+c)/3;
-        uint32_t decay=40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
-        int32_t reverb_input=fx_enabled[2]?sends[2]:0;
-        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)reverb_input+(int64_t)a*decay/100);
-        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)reverb_input+(int64_t)b*(decay+3u)/100);
-        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)reverb_input+(int64_t)c*(decay+6u)/100);
-    }
+    int32_t a=fx_comb_a[fx_comb_pos_a],b=fx_comb_b[fx_comb_pos_b],c=fx_comb_c[fx_comb_pos_c];
+    if(fx_enabled[2] && fx_mix[2]) reverb=(a+b+c)/3;
+    uint32_t decay=40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
+    int32_t reverb_input=fx_enabled[2]?sends[2]:0;
+    fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)reverb_input+(int64_t)a*decay/100);
+    fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)reverb_input+(int64_t)b*(decay+3u)/100);
+    fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)reverb_input+(int64_t)c*(decay+6u)/100);
     fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&2047u);
     fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&4095u);
     fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&8191u);
