@@ -28,6 +28,11 @@ static void fm6_zero_bytes(void *dst, uint32_t n)
     while (n--)
         *d++ = 0;
 }
+static void fm6_zero_volatile_bytes(volatile void *dst,uint32_t n)
+{
+    volatile uint8_t *d=(volatile uint8_t *)dst;
+    while(n--) *d++=0u;
+}
 
 #define PATCHES FM1LAB_PATCH_COUNT
 #define VOICES (PATCHES * FM1LAB_VOICE_LIMIT)
@@ -303,12 +308,12 @@ void fm6_init(void)
     age_counter = 0;
     output_gain_q12 = 0;
     pitch_bend_16 = 0;
-    fm6_zero_bytes(seq_pattern,sizeof(seq_pattern)); fm6_zero_bytes(seq_gate_left,sizeof(seq_gate_left));
+    fm6_zero_volatile_bytes(seq_pattern,sizeof(seq_pattern)); fm6_zero_bytes(seq_gate_left,sizeof(seq_gate_left));
     fm6_zero_bytes(seq_live_note,sizeof(seq_live_note)); fm6_zero_bytes(seq_live_patch,sizeof(seq_live_patch));
-    fm6_zero_bytes(arp_notes,sizeof(arp_notes)); fm6_zero_bytes(fx_delay,sizeof(fx_delay));
+    fm6_zero_volatile_bytes(arp_notes,sizeof(arp_notes)); fm6_zero_bytes(fx_delay,sizeof(fx_delay));
     fm6_zero_bytes(fx_chorus,sizeof(fx_chorus)); fm6_zero_bytes(fx_comb_a,sizeof(fx_comb_a));
     fm6_zero_bytes(fx_comb_b,sizeof(fx_comb_b)); fm6_zero_bytes(fx_comb_c,sizeof(fx_comb_c));
-    fm6_zero_bytes(fx_enabled,sizeof(fx_enabled)); fm6_zero_bytes(fx_send,sizeof(fx_send));
+    fm6_zero_volatile_bytes(fx_enabled,sizeof(fx_enabled)); fm6_zero_volatile_bytes(fx_send,sizeof(fx_send));
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=100u;
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback=42u;
     seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
