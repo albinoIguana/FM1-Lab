@@ -23,7 +23,7 @@ typedef struct {
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 
 /* the controls by their names in plat.h, in its order */
@@ -406,6 +406,9 @@ static void input(void)
                 page = PAGE_MACRO;
                 app_say("MACROS", fm6_patch_name(set.patch));
             }
+        } else if (k == B_EDIT) {
+            page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
+            app_say("OPERATOR ROLES", fm6_patch_name(set.patch));
         } else if (k == B_SAVE) {
             if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
                 set_dirty = 0;
@@ -558,6 +561,32 @@ static void draw_macro_panel(void)
     cv_text(4, 138, &FONT_XS, "K1 BRIGHT  K2 BODY  K3 MOTION  K4 EDGE", C_GRAY);
 }
 
+/* Read-only role map: reflects the selected algorithm's carrier assignment
+ * without pretending to expose operator routing or editable values. */
+static void draw_operator_map(void)
+{
+    char t[24];
+    cv_text(6, 2, &FONT_XS, "OPERATOR ROLES", C_WHITE);
+    cv_text(154, 2, &FONT_XS, "ALGO", C_GRAY);
+    int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
+    cv_text(204, 2, &FONT_XS, t, C_HI);
+    for (uint32_t op = 1; op <= 6u; ++op) {
+        int32_t x = 6 + (int32_t)((op - 1u) % 3u) * 78;
+        int32_t y = 24 + (int32_t)((op - 1u) / 3u) * 49;
+        int carrier = fm6_operator_is_carrier(set.patch, op);
+        uint16_t accent = carrier ? C_HI : C_LINE;
+        cv_rect(x, y, 70, 42, C_BLACK);
+        outline(x, y, 70, 42, accent);
+        cv_text(x + 5, y + 5, &FONT_XS, "OP", C_GRAY);
+        int_text((int32_t)op, t);
+        cv_text(x + 23, y + 5, &FONT_XS, t, C_WHITE);
+        cv_rect(x + 5, y + 23, 60, 12, carrier ? C_HI : C_LINE);
+        cv_text(x + 8, y + 24, &FONT_XS, carrier ? "CARRIER" : "MODULATOR",
+                carrier ? C_BLACK : C_WHITE);
+    }
+    cv_text(6, 128, &FONT_XS, "CARRIERS: AUDIO OUT   MODULATORS: FM", C_GRAY);
+}
+
 static void draw_global_panel(uint32_t pct)
 {
     char t[24];
@@ -596,7 +625,8 @@ static void draw(void)
         cv_text(x + 8, 6, &FONT_B, ui.msg[1], C_HI);
     } else {
         const char *title = page == PAGE_MACRO ? "PATCH MACROS" :
-            page == PAGE_GLOBAL ? "GLOBAL SETTINGS" : APP_NAME;
+            page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
+            page == PAGE_OPERATOR_MAP ? "OPERATOR ROLES" : APP_NAME;
         int32_t x = cv_text(10, 6, &FONT_B, title, C_WHITE);
         if (FM1B_BLE)                        /* Bluetooth: grey while it waits, lit while a computer is connected */
             x = cv_text(x + 8, 10, &FONT_XS, "BLE", plat_ble_connected() ? C_HI : C_DIM);
@@ -623,6 +653,7 @@ static void draw(void)
     cv_begin(240, 144, C_BLACK);
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
+    else if (page == PAGE_OPERATOR_MAP) draw_operator_map();
     else draw_global_panel(pct);
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
@@ -646,6 +677,12 @@ static void draw(void)
         cv_text(64, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
         cv_text(178, 36, &FONT_XS, "NEUTRAL", C_GRAY);
         cv_text(218, 36, &FONT_XS, "50", C_HI);
+    } else if (page == PAGE_OPERATOR_MAP) {
+        cv_text(4, 36, &FONT_XS, "ROLES", C_GRAY);
+        cv_text(64, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
+        cv_text(178, 36, &FONT_XS, "ALGO", C_GRAY);
+        int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
+        cv_text(218 - text_w(&FONT_XS, t), 36, &FONT_XS, t, C_HI);
     } else {
         cv_text(4, 36, &FONT_XS, "GLOBAL", C_GRAY);
         cv_text(64, 36, &FONT_XS, "SETTINGS", C_HI);
@@ -672,7 +709,9 @@ static void draw(void)
     {
         char page_text[8];
         int_text((int32_t)page + 1, page_text);
-        text_cat(page_text, "/3");
+        int_text((int32_t)PAGE_COUNT, t);
+        text_cat(page_text, "/");
+        text_cat(page_text, t);
         cv_text(218, 52, &FONT_XS, page_text, C_GRAY);
     }
     cv_blit(0, 180);
