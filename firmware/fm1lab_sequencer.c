@@ -8,7 +8,8 @@
  * into the device firmware. Preserve every project's track role while this
  * two-lane view temporarily isolates its selected tracks. */
 static uint8_t saved_track_roles[GROOVE_TRACKS];
-static uint8_t roles_saved;
+static uint8_t changed_roles;
+static uint8_t binding_active, restore_pending;
 
 static int fm1lab_native_transport(unsigned playing)
 {
