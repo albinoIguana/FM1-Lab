@@ -8,6 +8,7 @@
 #include "fm6.h"
 #include "fm1lab_instrument.h"
 #include "fm1lab_voice_editor.h"
+#include "fm1lab_store_library.h"
 
 #define SET_MAGIC_V1 0x4C314D46u
 #define SET_MAGIC    0x4C314D47u
@@ -31,7 +32,7 @@ static uint8_t instrument_index, instrument_dirty, instrument_loaded;
 static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
-enum { USER_INSTRUMENT_COUNT = 3 };
+enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 static uint8_t env_operator = 1u, env_levels;
@@ -108,8 +109,8 @@ static void instrument_sync_settings(void)
 static void instrument_load(uint32_t index, int from_audio)
 {
     fm1lab_instrument_t candidate;
-    int bytes = plat_store_load(OBJ_INSTRUMENTS0 + index, &candidate, sizeof candidate);
-    if (bytes == (int)sizeof candidate && fm1lab_instrument_valid(&candidate)) {
+    int loaded = fm1lab_store_library_load(index, &candidate);
+    if (!loaded && fm1lab_instrument_valid(&candidate)) {
         current_instrument = candidate;
     } else {
         instrument_factory_defaults();
@@ -130,8 +131,7 @@ static int instrument_save(void)
 {
     if (!instrument_loaded || !fm1lab_instrument_valid(&current_instrument))
         return -1;
-    if (plat_store_save(OBJ_INSTRUMENTS0 + instrument_index,
-                        &current_instrument, sizeof current_instrument))
+    if (fm1lab_store_library_save(instrument_index, &current_instrument))
         return -1;
     instrument_dirty = 0u;
     return 0;
@@ -337,6 +337,9 @@ void app_init(void)
     }
     page = PAGE_HOME;
     instrument_factory_capture();
+    if (plat_store_size(OBJ_INSTRUMENTS0) < 0) {
+        (void)fm1lab_store_library_format(&factory_instrument);
+    }
     instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
