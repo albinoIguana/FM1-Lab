@@ -187,6 +187,9 @@ int main(void) {
         for(unsigned block=0;block<64u;block++)
             fm6_render(wet+block*TEST_WORDS,128u,4096u);
         fm6_init();
+        /* Match the wet render's one-layer fixture; only the send differs. */
+        for (unsigned patch = 1u; patch < FM1LAB_PATCH_COUNT; ++patch)
+            fm6_patch_set_enabled((uint8_t)patch, 0u);
         fm6_note_on(60u,110u);
         for(unsigned block=0;block<64u;block++)
             fm6_render(dry+block*TEST_WORDS,128u,4096u);
