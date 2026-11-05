@@ -192,6 +192,7 @@ int main(void)
     seq_init();
     seq_set_step(0u, 0u, 60u, 100u);
     seq_set_step(1u, 0u, 64u, 90u);
+    require(seq_instrument_dirty(0u), "sequence edits mark Instrument dirty");
     seq_start();
     seq_process(32u);
     require(seq_running(), "sequencer transport starts");
@@ -203,13 +204,17 @@ int main(void)
     require(record.seq_tempo == 120u, "default sequence tempo is 120 BPM");
     seq_stop();
     seq_instrument_load(3u, &record);
+    require(!seq_instrument_dirty(3u), "loaded sequence starts clean");
     seq_select_instrument(3u);
     require(seq_step_note(0u, 0u) == 60u && seq_step_note(1u, 0u) == 64u,
             "two-lane sequence survives Instrument export/import");
     seq_set_tempo(250u);
     require(seq_tempo() == 240u, "tempo is clamped to supported maximum");
+    require(seq_instrument_dirty(3u), "tempo edits mark sequence dirty");
     seq_set_tempo(30u);
     require(seq_tempo() == 60u, "tempo is clamped to supported minimum");
+    seq_instrument_mark_saved(3u);
+    require(!seq_instrument_dirty(3u), "sequence save clears dirty state");
     seq_select_instrument(4u);
     require(seq_step_note(0u, 0u) == 0xFFu, "each Instrument has its own sequence");
 
