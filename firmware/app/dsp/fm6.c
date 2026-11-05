@@ -280,14 +280,16 @@ void fm6_init(void)
             for (m = 0; m < FM1LAB_MACRO_COUNT; m++)
                 bank[i].record.macros[p][m] = 50u;
     }
-    bank[0].record.valid = 1;
+    bank[0].record.valid = 0;
     bank[0].record.name[0] = 'I';
     bank[0].record.name[1] = 'N';
     bank[0].record.name[2] = 'I';
     bank[0].record.name[3] = 'T';
     bank[0].record.name[4] = 0;
-    fm6_activate_instrument(0);
+    fm6_activate_instrument(0); /* Invalid slot loads the factory four-patch template. */
     fm6_save_active_to_bank(0);
+    bank[0].record.valid = 1;
+    bank[0].dirty = 0;
 }
 
 void fm6_panic(void)
