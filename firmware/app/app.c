@@ -14,6 +14,8 @@
 #define INST_CHUNKS 3u
 #define INST_HEADER_BYTES 8u
 #define INST_CHUNK_MAX_RECORDS 6u
+typedef char fm1lab_record_size_check[(sizeof(fm1lab_instrument_record_t) == 607u) ? 1 : -1];
+typedef char fm1lab_chunk_size_check[(INST_HEADER_BYTES + INST_CHUNK_MAX_RECORDS * sizeof(fm1lab_instrument_record_t) <= 3840u) ? 1 : -1];
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
