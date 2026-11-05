@@ -3,17 +3,37 @@
 #include <limits.h>
 #include <string.h>
 #include "fm1.h"
-#include "fm1lab_audio_engine.h"
+#include "dsp/fm6.h"
 #include "fm1lab_instrument.h"
 #include "fm1lab_runtime.h"
 
-enum { FM1LAB_AUDIO_VOICES_PER_PATCH = 4 };
+enum {
+    CMD_PATCH_CONFIG = 1,
+    CMD_NOTE_ON,
+    CMD_NOTE_OFF,
+    CMD_ALL_NOTES_OFF,
+    CMD_PITCH_BEND,
+    FM1LAB_AUDIO_QUEUE_CAPACITY = 32
+};
 
-static fm1lab_audio_engine_t audio_engine;
+typedef struct {
+    uint8_t type;
+    uint8_t patch;
+    uint8_t note;
+    uint8_t velocity;
+    uint8_t patch_mask;
+    uint8_t enabled;
+    uint8_t level;
+    uint8_t macros[FM1LAB_MACRO_COUNT];
+    uint16_t bend;
+    uint8_t voice[FM1LAB_PATCH_BYTES];
+} fm1lab_audio_command_t;
+
+static fm1lab_audio_command_t command_queue[FM1LAB_AUDIO_QUEUE_CAPACITY];
 static fm1lab_instrument_t audio_shadow;
-static uint8_t live_voice[FM1LAB_AUDIO_PATCHES][FM1LAB_PATCH_BYTES];
-static volatile uint32_t audio_ready;
-static volatile uint32_t keyboard_mode;
+static volatile uint32_t queue_head, queue_tail;
+static volatile uint32_t panic_pending, audio_ready, keyboard_mode;
+static int32_t fm6_output[FM1_BLOCK_WORDS] __attribute__((aligned(32)));
 
 static inline __attribute__((always_inline)) void audio_barrier(void)
 {
@@ -27,6 +47,42 @@ static inline __attribute__((always_inline)) int32_t add_sat32(int32_t a, int32_
     return a + b;
 }
 
+static int enqueue(const fm1lab_audio_command_t *command)
+{
+    uint32_t head = queue_head;
+    audio_barrier();
+    uint32_t next = (head + 1u) & (FM1LAB_AUDIO_QUEUE_CAPACITY - 1u);
+    uint32_t tail = queue_tail;
+    if (next == tail) return -2;
+    command_queue[head] = *command;
+    audio_barrier();
+    queue_head = next;
+    return 0;
+}
+
+static FM1_AUDIO_CODE int dequeue(fm1lab_audio_command_t *command)
+{
+    uint32_t tail = queue_tail;
+    audio_barrier();
+    uint32_t head = queue_head;
+    if (tail == head) return 0;
+    *command = command_queue[tail];
+    audio_barrier();
+    queue_tail = (tail + 1u) & (FM1LAB_AUDIO_QUEUE_CAPACITY - 1u);
+    return 1;
+}
+
+static FM1_AUDIO_CODE void apply_patch_config(const fm1lab_audio_command_t *command)
+{
+    unsigned patch = command->patch;
+    if (patch >= FM1LAB_PATCH_COUNT) return;
+    if (fm6_patch_set_voice(patch, command->voice)) return;
+    for (unsigned macro = 0; macro < FM1LAB_MACRO_COUNT; ++macro)
+        fm6_macro_set(patch, macro, command->macros[macro]);
+    fm6_patch_set_enabled(patch, command->enabled);
+    fm6_patch_set_level(patch, command->level);
+}
+
 int fm1lab_audio_init(void)
 {
     if (fm1lab_audio_is_ready()) return 0;
@@ -35,23 +91,17 @@ int fm1lab_audio_init(void)
     memset(&runtime, 0, sizeof runtime);
     if (fm1lab_runtime_load(&runtime, 0u) != 0) return -1;
 
-    uint8_t voices[FM1LAB_AUDIO_PATCHES][FM1LAB_PATCH_BYTES];
-    uint8_t enabled[FM1LAB_AUDIO_PATCHES];
-    uint8_t levels[FM1LAB_AUDIO_PATCHES];
-    for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p) {
-        if (fm1lab_render_patch(&runtime.instrument, p, voices[p]) != 0)
-            return -1;
-        enabled[p] = runtime.instrument.patches[p].enabled;
-        levels[p] = runtime.instrument.patches[p].level;
+    fm6_init();
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        const fm1lab_patch_t *part = &runtime.instrument.patches[patch];
+        if (fm6_patch_set_voice(patch, part->voice) != 0) return -1;
+        for (unsigned macro = 0; macro < FM1LAB_MACRO_COUNT; ++macro)
+            fm6_macro_set(patch, macro, part->macros[macro]);
+        fm6_patch_set_enabled(patch, part->enabled);
+        fm6_patch_set_level(patch, part->level);
     }
 
-    if (fm1lab_audio_engine_init(&audio_engine, voices, enabled, levels,
-                                 FM1LAB_AUDIO_VOICES_PER_PATCH,
-                                 FM1_SAMPLE_RATE) != 0)
-        return -1;
-
     audio_shadow = runtime.instrument;
-    memcpy(live_voice, voices, sizeof live_voice);
     audio_barrier();
     audio_ready = 1u;
     return 0;
@@ -70,27 +120,24 @@ int fm1lab_audio_sync_instrument(const fm1lab_instrument_t *instrument)
         !fm1lab_instrument_valid(instrument)) return -1;
 
     int result = 0;
-    for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p) {
-        uint8_t rendered[FM1LAB_PATCH_BYTES];
-        if (fm1lab_render_patch(instrument, p, rendered) != 0) return -1;
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        const fm1lab_patch_t *next = &instrument->patches[patch];
+        fm1lab_patch_t *previous = &audio_shadow.patches[patch];
+        if (memcmp(previous, next, sizeof *next) == 0) continue;
 
-        if (memcmp(rendered, live_voice[p], FM1LAB_PATCH_BYTES) != 0) {
-            int r = fm1lab_audio_engine_set_patch(&audio_engine, p, rendered);
-            if (r) result = r;
-            else memcpy(live_voice[p], rendered, FM1LAB_PATCH_BYTES);
+        fm1lab_audio_command_t command;
+        memset(&command, 0, sizeof command);
+        command.type = CMD_PATCH_CONFIG;
+        command.patch = (uint8_t)patch;
+        command.enabled = next->enabled;
+        command.level = next->level;
+        memcpy(command.macros, next->macros, sizeof command.macros);
+        memcpy(command.voice, next->voice, sizeof command.voice);
+        if (enqueue(&command) != 0) {
+            result = -2;
+            continue;
         }
-        if (instrument->patches[p].enabled != audio_shadow.patches[p].enabled) {
-            int r = fm1lab_audio_engine_set_enabled(
-                &audio_engine, p, instrument->patches[p].enabled);
-            if (r) result = r;
-            else audio_shadow.patches[p].enabled = instrument->patches[p].enabled;
-        }
-        if (instrument->patches[p].level != audio_shadow.patches[p].level) {
-            int r = fm1lab_audio_engine_set_level(
-                &audio_engine, p, instrument->patches[p].level);
-            if (r) result = r;
-            else audio_shadow.patches[p].level = instrument->patches[p].level;
-        }
+        *previous = *next;
     }
     memcpy(audio_shadow.name, instrument->name, sizeof audio_shadow.name);
     return result;
@@ -102,39 +149,120 @@ void fm1lab_audio_set_keyboard_mode(int enabled)
     keyboard_mode = enabled ? 1u : 0u;
 }
 
+static int queue_note(uint8_t type, uint8_t note, uint8_t velocity)
+{
+    fm1lab_audio_command_t command;
+    memset(&command, 0, sizeof command);
+    command.type = type;
+    command.note = note;
+    command.velocity = velocity;
+    command.patch_mask = (uint8_t)((1u << FM1LAB_PATCH_COUNT) - 1u);
+    int result = enqueue(&command);
+    if (result && type == CMD_NOTE_OFF) {
+        audio_barrier();
+        panic_pending = 1u;
+    }
+    return result;
+}
+
 int fm1lab_audio_route_midi(const uint8_t *message, size_t bytes)
 {
     if (!message || !bytes || !fm1lab_audio_is_ready()) return 0;
     uint32_t mode = keyboard_mode;
     audio_barrier();
     if (!mode) return 0;
-    if (message[0] == 0xffu) {
-        (void)fm1lab_audio_engine_all_notes_off(&audio_engine);
-        return 0;
+
+    uint8_t status = message[0] & 0xf0u;
+    if (status == 0x80u || status == 0x90u) {
+        if (bytes != 3u || message[1] > 127u || message[2] > 127u) return -1;
+        if (status == 0x80u || message[2] == 0u)
+            return queue_note(CMD_NOTE_OFF, message[1], 0u) == 0 ? 1 : -1;
+        return queue_note(CMD_NOTE_ON, message[1], message[2]) == 0 ? 1 : -1;
     }
-    if (message[0] >= 0xf0u) return 0;
-    size_t expected = (message[0] & 0xe0u) == 0xc0u ? 2u : 3u;
-    if (bytes != expected || message[1] > 127u ||
-        (expected == 3u && message[2] > 127u)) return -1;
-    return fm1lab_audio_engine_midi(&audio_engine, message, bytes, 0x0fu) == 0 ? 1 : -1;
+    if (status == 0xe0u) {
+        if (bytes != 3u || message[1] > 127u || message[2] > 127u) return -1;
+        fm1lab_audio_command_t command;
+        memset(&command, 0, sizeof command);
+        command.type = CMD_PITCH_BEND;
+        command.bend = (uint16_t)((uint16_t)message[1] | ((uint16_t)message[2] << 7));
+        return enqueue(&command) == 0 ? 1 : -1;
+    }
+    if (status == 0xb0u && bytes == 3u && (message[1] == 120u || message[1] == 123u)) {
+        fm1lab_audio_command_t command;
+        memset(&command, 0, sizeof command);
+        command.type = CMD_ALL_NOTES_OFF;
+        return enqueue(&command) == 0 ? 1 : -1;
+    }
+    if (message[0] == 0xffu) {
+        fm1lab_audio_command_t command;
+        memset(&command, 0, sizeof command);
+        command.type = CMD_ALL_NOTES_OFF;
+        (void)enqueue(&command);
+    }
+    return 0;
 }
 
-/* DMA callback contract: stereo is interleaved Q23. This runs after the
- * stock synth render and before fm1_output_mix applies master gain, USB/BT
- * inputs and final 24-bit clipping. Keep this call chain allocation/Flash-free. */
+/* Called only from the audio owner (DMA callback or a sequencer engine hook). */
+FM1_AUDIO_CODE void fm1lab_audio_sequence_note(unsigned patch, unsigned note,
+                                                unsigned velocity, int cents)
+{
+    if (!fm1lab_audio_is_ready() || patch >= FM1LAB_PATCH_COUNT ||
+        note > 127u || velocity > 127u) return;
+    if (velocity) {
+        int tune16 = cents * 16 / 100;
+        if (tune16 > 32) tune16 = 32;
+        if (tune16 < -32) tune16 = -32;
+        fm6_note_on_tuned_mask((uint8_t)note, (uint8_t)velocity,
+                               (uint8_t)(1u << patch), (int16_t)tune16);
+    } else {
+        fm6_note_off_mask((uint8_t)note, (uint8_t)(1u << patch));
+    }
+}
+
+/* The FM6 render is mixed after the stock engine render and before APP master
+ * gain/USB/BT mixing. The FM6 core and its lookup tables are staged in the
+ * SDK's volatile-RAM code/data sections for flash-safe audio execution. */
 FM1_AUDIO_CODE void fm1lab_audio_mix(int32_t *stereo_q23)
 {
     if (!fm1lab_audio_is_ready() || !stereo_q23) return;
 
-    int32_t mono_q24[FM1_BLOCK_FRAMES];
-    if (fm1lab_audio_engine_render(&audio_engine, mono_q24,
-                                   FM1_BLOCK_FRAMES) != 0)
-        return;
+    uint32_t panic = panic_pending;
+    if (panic) {
+        panic_pending = 0u;
+        audio_barrier();
+        fm6_panic();
+    }
 
+    fm1lab_audio_command_t command;
+    while (dequeue(&command)) {
+        if (panic && (command.type == CMD_NOTE_ON || command.type == CMD_NOTE_OFF))
+            continue;
+        switch (command.type) {
+        case CMD_PATCH_CONFIG:
+            apply_patch_config(&command);
+            break;
+        case CMD_NOTE_ON:
+            fm6_note_on_mask(command.note, command.velocity, command.patch_mask);
+            break;
+        case CMD_NOTE_OFF:
+            fm6_note_off_mask(command.note, command.patch_mask);
+            break;
+        case CMD_ALL_NOTES_OFF:
+            fm6_panic();
+            break;
+        case CMD_PITCH_BEND:
+            fm6_pitch_bend(command.bend);
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (!fm6_active_voices()) return;
+    fm6_render(fm6_output, FM1_BLOCK_FRAMES, 4096u);
     for (unsigned frame = 0; frame < FM1_BLOCK_FRAMES; ++frame) {
-        int32_t sample = mono_q24[frame] >> 1;
-        stereo_q23[frame * 2u] = add_sat32(stereo_q23[frame * 2u], sample);
+        stereo_q23[frame * 2u] = add_sat32(stereo_q23[frame * 2u], fm6_output[frame * 2u]);
         stereo_q23[frame * 2u + 1u] =
-            add_sat32(stereo_q23[frame * 2u + 1u], sample);
+            add_sat32(stereo_q23[frame * 2u + 1u], fm6_output[frame * 2u + 1u]);
     }
 }
