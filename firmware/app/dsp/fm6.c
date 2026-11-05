@@ -53,6 +53,7 @@ typedef struct {
     uint8_t note;
     uint8_t used;
     uint8_t fade_in;
+    uint8_t source;
 } fm1lab_voice_t;
 
 static fm1lab_patch_t instrument[PATCHES];
@@ -297,7 +298,7 @@ void fm6_panic(void)
     fm6_zero_bytes(voices, sizeof(voices));
 }
 
-void fm6_note_on(uint8_t note, uint8_t velocity)
+void fm6_note_on_source(uint8_t note, uint8_t velocity, uint8_t source)
 {
     uint32_t i;
     if (note > 127u || !velocity)
@@ -310,6 +311,7 @@ void fm6_note_on(uint8_t note, uint8_t velocity)
         v = fm6_allocate_voice();
         v->patch = (uint8_t)i;
         v->note = note;
+        v->source = source;
         v->used = 1;
         v->age = ++age_counter;
         v->fade_in = 32;
@@ -317,17 +319,25 @@ void fm6_note_on(uint8_t note, uint8_t velocity)
         fm6_lfo_key(&patch_lfo[i]);
     }
 }
+void fm6_note_on(uint8_t note, uint8_t velocity)
+{
+    fm6_note_on_source(note, velocity, 0u);
+}
 
-void fm6_note_off(uint8_t note)
+void fm6_note_off_source(uint8_t note, uint8_t source)
 {
     uint32_t i;
     for (i = 0; i < VOICES; i++) {
         fm1lab_voice_t *v = &voices[i];
-        if (v->used && v->note == note) {
+        if (v->used && v->note == note && v->source == source) {
             fm1lab_patch_t *p = &instrument[v->patch];
             fm6_note_key(&v->state, p->effective, 0);
         }
     }
+}
+void fm6_note_off(uint8_t note)
+{
+    fm6_note_off_source(note, 0u);
 }
 
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
