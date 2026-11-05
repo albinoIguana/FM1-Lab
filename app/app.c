@@ -6,35 +6,12 @@
  * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
+#include "fm1lab_settings_record.h"
 #include "fm1lab_instrument.h"
 #include "fm1lab_voice_editor.h"
 #include "fm1lab_store_library.h"
 #include <stddef.h>
 
-#define SET_MAGIC_V1 0x4C314D46u
-#define SET_MAGIC_V2 0x4C314D47u
-#define SET_MAGIC    0x4C314D48u
-typedef struct {
-    uint32_t magic;
-    int8_t octave;
-    uint8_t patch, enabled_mask, ble_off, rsv[1];
-} settings_v1_t;
-typedef struct {
-    uint32_t magic;
-    int8_t octave;
-    uint8_t patch, enabled_mask, ble_off;
-    uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT];
-    uint8_t levels[FM1LAB_PATCH_COUNT];
-} settings_v2_t;
-typedef struct {
-    uint32_t magic;
-    int8_t octave;
-    uint8_t patch, enabled_mask, ble_off;
-    uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT];
-    uint8_t levels[FM1LAB_PATCH_COUNT];
-    fm6_performance_state_t performance;
-    uint16_t crc;
-} settings_t;
 static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
@@ -304,58 +281,6 @@ void app_panic(void)
 }
 
 /* --------------------------------------------------------------- settings --- */
-static uint16_t settings_crc16(const void *data, size_t length)
-{
-    const uint8_t *bytes = (const uint8_t *)data;
-    uint16_t crc = 0xFFFFu;
-    while (length--) {
-        crc ^= (uint16_t)*bytes++ << 8;
-        for (uint32_t bit = 0; bit < 8u; ++bit)
-            crc = (uint16_t)((crc & 0x8000u) ? (crc << 1) ^ 0x1021u : crc << 1);
-    }
-    return crc;
-}
-
-static void settings_seal(settings_t *v)
-{
-    v->magic = SET_MAGIC;
-    v->crc = settings_crc16(v, offsetof(settings_t, crc));
-}
-
-static int settings_v1_valid(const settings_v1_t *v)
-{
-    return v->magic == SET_MAGIC_V1 && v->octave >= -2 && v->octave <= 2 &&
-        v->patch < FM1LAB_PATCH_COUNT && !(v->enabled_mask & 0xF0u) && v->ble_off <= 1u;
-}
-
-static int settings_v2_valid(const settings_v2_t *v)
-{
-    if (v->magic != SET_MAGIC_V2 || v->octave < -2 || v->octave > 2 ||
-        v->patch >= FM1LAB_PATCH_COUNT || (v->enabled_mask & 0xF0u) || v->ble_off > 1u)
-        return 0;
-    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-        if (v->levels[p] > 127u) return 0;
-        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
-            if (v->macros[p][m] > 100u) return 0;
-    }
-    return 1;
-}
-
-static int settings_valid(const settings_t *v)
-{
-    if (v->magic != SET_MAGIC || v->octave < -2 || v->octave > 2 ||
-        v->patch >= FM1LAB_PATCH_COUNT || (v->enabled_mask & 0xF0u) || v->ble_off > 1u ||
-        !fm6_performance_state_valid(&v->performance) ||
-        v->crc != settings_crc16(v, offsetof(settings_t, crc)))
-        return 0;
-    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-        if (v->levels[p] > 127u) return 0;
-        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
-            if (v->macros[p][m] > 100u) return 0;
-    }
-    return 1;
-}
-
 static void settings_defaults(void)
 {
     memset(&set, 0, sizeof set);
@@ -395,20 +320,10 @@ void app_init(void)
     } else {
         settings_defaults();
         if (plat_store_load(OBJ_SETTINGS, &old_v2, sizeof old_v2) == (int)sizeof old_v2 &&
-            settings_v2_valid(&old_v2)) {
-            set.octave = old_v2.octave;
-            set.patch = old_v2.patch;
-            set.enabled_mask = old_v2.enabled_mask;
-            set.ble_off = old_v2.ble_off;
-            memcpy(set.macros, old_v2.macros, sizeof set.macros);
-            memcpy(set.levels, old_v2.levels, sizeof set.levels);
+            settings_import_v2(&set, &old_v2) == 0) {
             set_dirty = 1u; /* migrate v2 settings into the CRC-protected performance record */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v1, sizeof old_v1) == (int)sizeof old_v1 &&
-                   settings_v1_valid(&old_v1)) {
-            set.octave = old_v1.octave;
-            set.patch = old_v1.patch;
-            set.enabled_mask = old_v1.enabled_mask;
-            set.ble_off = old_v1.ble_off;
+                   settings_import_v1(&set, &old_v1) == 0) {
             set_dirty = 1u; /* migrate the original compact settings record */
         }
         settings_seal(&set);
