@@ -112,7 +112,7 @@ static void fm6_transport_step(void)
             if(arp_index>=arp_count) { arp_index=arp_count>1u?(uint8_t)(arp_count-2u):0u; arp_direction=0u; }
             else if(!arp_direction && arp_index==0u) arp_direction=1u;
         }
-        arp_live_note=arp_notes[arp_index]; fm6_note_on(arp_live_note,100u); arp_live=1u;
+        arp_live_note=arp_notes[arp_index]; fm6_note_on_mask(arp_live_note,100u,0x0fu); arp_live=1u;
         if(arp_mode==3u) { if(arp_direction) ++arp_index; else if(arp_index) --arp_index; }
         else ++arp_index;
     } else if(arp_live) { fm6_note_off(arp_live_note); arp_live=0u; }
