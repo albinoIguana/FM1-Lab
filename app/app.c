@@ -574,7 +574,13 @@ static void draw_global_panel(uint32_t pct)
     cv_text(8, 112, &FONT_XS, "MIDI IN", C_GRAY);
     int_text((int32_t)midi_count, t);
     cv_text(90, 112, &FONT_XS, t, C_WHITE);
-    cv_text(4, 138, &FONT_XS, "REC HOLD: BLUETOOTH   SAVE: STORE SETTINGS", C_GRAY);
+    /* Device-side render-budget telemetry from the pinned fm1-base ISR. */
+    cv_text(8, 136, &FONT_XS, "CPU", C_GRAY);
+    int_text((int32_t)plat_cpu_pct(), t); text_cat(t, "%");
+    cv_text(40, 136, &FONT_XS, t, C_HI);
+    cv_text(122, 136, &FONT_XS, "XRUNS", C_GRAY);
+    int_text((int32_t)plat_xruns(), t);
+    cv_text(168, 136, &FONT_XS, t, C_HI);
 }
 
 static void draw(void)

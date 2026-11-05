@@ -34,6 +34,15 @@ References:
 - [Official M-VAVE FM1 open-source app](https://github.com/m-vave/fm1_open)
 - [FM-Stud1o firmware and profiling documentation](https://github.com/MPASTEAU/FM-Stud1o-FM-1-Firmware)
 
+## Device-side headroom telemetry
+
+The exact pinned fm1-base platform revision used by this branch (`2d8ed748cdade582c65d9fc8d8cf17da4ddadec8`) exposes:
+- `plat_cpu_pct()`: audio load as a percentage of the render budget, measured by the device audio ISR.
+- `plat_xruns()`: audio deadline misses since boot.
+- `plat_ticks24()`: a 24 MHz free-running timer for measuring short render spans.
+
+The GLOBAL page now displays the device-reported CPU percentage and xrun count. This is the first direct way to evaluate the actual FM1 build under layered playing without pretending a host benchmark is a hardware measurement. For a useful test, enable all four patches, sustain/sequence dense chords, enable effects when integrated, and record the highest CPU percentage and whether the xrun counter increments. The reference firmware's 2.9 ms audio block profiling is a useful comparator; the fm1-base CPU percentage is the device's authoritative render-budget signal for this build.
+
 ## What is not complete
 
 - The two-lane sequencer is not yet integrated into the fm1-base app. The older M-VAVE SDK sequencer adapter under `firmware/` is a separate prototype and is not part of the active device build.
