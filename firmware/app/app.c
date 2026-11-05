@@ -245,6 +245,9 @@ static struct {
     int32_t last_key;                    /* the key pressed last: its numbers in the header */
     uint8_t looking;                     /* Bluetooth MIDI devices: REC pressed, the scan's list up (lib/btdev) */
     uint32_t rec_t;                      /* REC went down (0: not held, or its hold already acted) */
+    uint32_t save_t;                      /* SAVE press duration: short = save, long = rename */
+    uint8_t save_long, rename, rename_pos;
+    char rename_backup[FM1LAB_INSTRUMENT_NAME_LEN];
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint8_t redraw;
@@ -435,11 +438,42 @@ static void input(void)
             ui_event_push(EV_PATCH_ENABLE, set.patch, enabled);
             app_say(fm6_patch_name(set.patch), enabled ? "ON" : "OFF");
         } else if (k == B_SAVE) {
-            if (!snapshot_ready)
-                ui_event_push(EV_SNAPSHOT, 0, 0);
-            app_say("INSTRUMENT", "SAVE QUEUED");
+            ui.save_t = plat_ms() | 1u;
+            ui.save_long = 0;
+        } else if (k == B_HOME && ui.rename) {
+            uint32_t pos;
+            for (pos = 0; pos < FM1LAB_INSTRUMENT_NAME_LEN - 1u; pos++)
+                ui_event_push(EV_NAME_CHAR, (uint8_t)pos, (uint8_t)ui.rename_backup[pos]);
+            ui.rename = 0;
+            app_say("RENAME", "CANCELLED");
         } else {
             app_say("BUTTON", BTN_NAME[k]);
+        }
+    }
+    if (ui.save_t) {
+        if (btn & (1u << B_SAVE)) {
+            if (!ui.save_long && plat_ms() - ui.save_t >= 800u) {
+                uint32_t pos;
+                ui.save_long = 1;
+                ui.rename = 1;
+                ui.rename_pos = 0;
+                for (pos = 0; pos < FM1LAB_INSTRUMENT_NAME_LEN; pos++)
+                    ui.rename_backup[pos] = fm6_instrument_name(set.instrument)[pos];
+                app_say("RENAME", "SELECT / ALGO");
+            }
+        } else {
+            if (ui.rename) {
+                ui.rename = 0;
+                if (!snapshot_ready)
+                    ui_event_push(EV_SNAPSHOT, 0, 0);
+                app_say("INSTRUMENT", "SAVE QUEUED");
+            } else if (!ui.save_long) {
+                if (!snapshot_ready)
+                    ui_event_push(EV_SNAPSHOT, 0, 0);
+                app_say("INSTRUMENT", "SAVE QUEUED");
+            }
+            ui.save_t = 0;
+            ui.save_long = 0;
         }
     }
     if (FM1B_BLE && ui.rec_t) {             /* REC: held a second, Bluetooth on / off; a press, a device */
@@ -463,7 +497,27 @@ static void input(void)
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
         ui.redraw = 1;
-        if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
+        if (ui.rename && k == EN_SELECT) {
+            int32_t next = ((int32_t)ui.rename_pos + e) % (int32_t)(FM1LAB_INSTRUMENT_NAME_LEN - 1u);
+            if (next < 0)
+                next += (int32_t)(FM1LAB_INSTRUMENT_NAME_LEN - 1u);
+            ui.rename_pos = (uint8_t)next;
+            app_say("RENAME POSITION", "");
+        } else if (ui.rename && k == EN_ALGO) {
+            static const char charset[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
+            uint32_t nchar = sizeof(charset) - 1u, index = 0;
+            uint8_t current = (uint8_t)fm6_instrument_name(set.instrument)[ui.rename_pos];
+            int32_t next;
+            while (index < nchar && (uint8_t)charset[index] != current)
+                index++;
+            next = ((int32_t)index + e) % (int32_t)nchar;
+            if (next < 0)
+                next += (int32_t)nchar;
+            ui_event_push(EV_NAME_CHAR, ui.rename_pos, (uint8_t)charset[next]);
+            ui.redraw = 1;
+        } else if (ui.rename) {
+            app_say("RENAME", "SELECT / ALGO");
+        } else if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
         } else if (k == EN_PRESET) {
