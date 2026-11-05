@@ -62,6 +62,7 @@ static void require(int ok, const char *message)
 int main(void)
 {
     result_t base, repeat, neutral, bright, body, dirt;
+    fm1lab_instrument_record_t record;
     uint32_t p, op, i, b;
     uint32_t active_peak = 0;
 
@@ -92,6 +93,29 @@ int main(void)
     require(base.hash != bright.hash, "BRIGHTNESS changes the spectrum");
     require(base.hash != body.hash, "BODY changes modulator ratio/envelopes");
     require(base.hash != dirt.hash, "DIRT changes feedback/detune");
+
+    /* Instrument slots preserve all four patches, macros, enable state and name. */
+    fm6_init();
+    require(fm6_current_instrument() == 0u, "default Instrument slot is zero");
+    fm6_select_instrument(1u);
+    require(fm6_current_instrument() == 1u, "preset selection changes Instrument");
+    require(!fm6_instrument_valid(1u), "unused Instrument slot starts empty");
+    fm6_patch_set_algorithm(0u, 7u);
+    fm6_macro_set(0u, FM1LAB_MACRO_BODY, 73u);
+    fm6_instrument_set_name_char(0u, 'T');
+    require(fm6_instrument_dirty(1u), "editing an Instrument marks it dirty");
+    fm6_instrument_export_current(&record);
+    require(record.valid && record.name[0] == 'T', "snapshot includes valid user name");
+    require(record.macros[0][FM1LAB_MACRO_BODY] == 73u, "snapshot includes macro state");
+    fm6_instrument_mark_saved(1u);
+    require(!fm6_instrument_dirty(1u), "successful save clears dirty state");
+    fm6_instrument_load(2u, &record);
+    fm6_select_instrument(2u);
+    require(fm6_instrument_valid(2u), "stored Instrument loads into another slot");
+    require(fm6_instrument_name(2u)[0] == 'T', "Instrument name survives export/import");
+    require(fm6_patch_algorithm(0u) == 7u, "patch algorithm survives export/import");
+    require(fm6_macro_get(0u, FM1LAB_MACRO_BODY) == 73u, "macro value survives export/import");
+    require(!fm6_instrument_dirty(2u), "loaded Instrument starts clean");
 
     fm6_init();
     for (p = 0; p < 4u; p++)
