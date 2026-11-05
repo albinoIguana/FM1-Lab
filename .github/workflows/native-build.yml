@@ -2,7 +2,7 @@ name: Native FM1 build
 
 on:
   push:
-    branches: [rewrite/native-fm1-foundation]
+    branches: [rewrite/native-fm1-foundation, feature/native-instrument-macro-workflow]
     paths:
       - "app/**"
       - "firmware/**"

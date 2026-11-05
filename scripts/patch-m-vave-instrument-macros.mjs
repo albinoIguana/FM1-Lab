@@ -62,7 +62,7 @@ replaceOnce("    if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return; }",
 "    if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return; }\n    if (visible == FM1LAB_MACRO_PAGE) { fm1lab_macro_draw(); return; }","macro page render dispatch");
 if (!source.includes("FM1-LAB performance macro controls")) {
 const controls = String.raw`
-    if ((page == FM1LAB_HOME || page == FM1LAB_PATCH) && (pressed & BUTTON(GLO))) {
+    if ((page == FM1LAB_HOME || page == FM1LAB_PATCH) && (pressed & BUTTON(GLO)) && !(pressed & BUTTON(HOME))) {
         fm1lab_macro_return_page = (unsigned)page;
         page = FM1LAB_MACRO_PAGE;
         goto controls_done;
@@ -99,7 +99,7 @@ const controls = String.raw`
         if (encoder_active(controls->encoders)) goto controls_done;
     }
 `;
-replaceOnce("    /* FM1-LAB native patch editor controls */",
+replaceOnce("    /* Panel shortcuts precede modal editors.",
 "    /* FM1-LAB performance macro controls */\n"+controls+"\n    /* FM1-LAB native patch editor controls */","macro page controls");
 }
 fs.writeFileSync(screenPath, source);
