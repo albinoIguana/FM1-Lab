@@ -587,6 +587,96 @@ uint8_t fm6_fx_feedback(uint8_t effect) { return effect<3u?fx_feedback[effect]:0
 void fm6_fx_set_send(uint8_t patch,uint8_t effect,uint8_t send) { if(patch<PATCHES&&effect<3u) fx_send[patch][effect]=send>100u?100u:send; }
 uint8_t fm6_fx_get_send(uint8_t patch,uint8_t effect) { return patch<PATCHES&&effect<3u?fx_send[patch][effect]:0u; }
 
+int fm6_performance_state_valid(const fm6_performance_state_t *s)
+{
+    if (!s || s->tempo_bpm < 30u || s->tempo_bpm > 300u ||
+        s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 3u)
+        return 0;
+    for (uint32_t lane = 0; lane < 2u; ++lane) {
+        if (s->lane_patch[lane] >= PATCHES) return 0;
+        for (uint32_t step = 0; step < 64u; ++step) {
+            if (s->seq_enabled[lane][step] > 1u ||
+                s->seq_note[lane][step] > 127u ||
+                s->seq_velocity[lane][step] > 127u ||
+                s->seq_gate[lane][step] > 100u)
+                return 0;
+        }
+    }
+    for (uint32_t fx = 0; fx < 3u; ++fx) {
+        if (s->fx_enabled[fx] > 1u || s->fx_mix[fx] > 100u ||
+            s->fx_time[fx] > 100u ||
+            s->fx_feedback[fx] > (fx == 0u ? 70u : 90u))
+            return 0;
+        for (uint32_t patch = 0; patch < PATCHES; ++patch)
+            if (s->fx_send[patch][fx] > 100u) return 0;
+    }
+    return 1;
+}
+
+void fm6_performance_state_get(fm6_performance_state_t *s)
+{
+    if (!s) return;
+    s->tempo_bpm = (uint16_t)transport_bpm;
+    s->seq_length = seq_length;
+    for (uint32_t lane = 0; lane < 2u; ++lane) {
+        s->lane_patch[lane] = seq_lane_patch[lane];
+        for (uint32_t step = 0; step < 64u; ++step) {
+            s->seq_enabled[lane][step] = seq_pattern[lane][step].enabled;
+            s->seq_note[lane][step] = seq_pattern[lane][step].note;
+            s->seq_velocity[lane][step] = seq_pattern[lane][step].velocity;
+            s->seq_gate[lane][step] = seq_pattern[lane][step].gate;
+        }
+    }
+    s->arp_mode = arp_mode;
+    for (uint32_t fx = 0; fx < 3u; ++fx) {
+        s->fx_enabled[fx] = fx_enabled[fx];
+        s->fx_mix[fx] = fx_mix[fx];
+        s->fx_time[fx] = fx_time[fx];
+        s->fx_feedback[fx] = fx_feedback[fx];
+        for (uint32_t patch = 0; patch < PATCHES; ++patch)
+            s->fx_send[patch][fx] = fx_send[patch][fx];
+    }
+}
+
+/* Call during initialization, before audio rendering starts. Runtime transport
+ * phase, held keys, live notes, and delay/reverb history are never restored. */
+int fm6_performance_state_set(const fm6_performance_state_t *s)
+{
+    if (!fm6_performance_state_valid(s)) return -1;
+    transport_bpm = s->tempo_bpm;
+    seq_length = s->seq_length;
+    seq_position = 0u;
+    seq_running = 0u;
+    seq_start_pending = seq_stop_pending = 0u;
+    transport_phase = 0u;
+    seq_gate_left[0] = seq_gate_left[1] = 0u;
+    seq_live_note[0] = seq_live_note[1] = 0u;
+    seq_live_patch[0] = seq_live_patch[1] = 0u;
+    for (uint32_t lane = 0; lane < 2u; ++lane) {
+        seq_lane_patch[lane] = s->lane_patch[lane];
+        for (uint32_t step = 0; step < 64u; ++step) {
+            seq_pattern[lane][step].enabled = 0u;
+            seq_pattern[lane][step].note = s->seq_note[lane][step];
+            seq_pattern[lane][step].velocity = s->seq_velocity[lane][step];
+            seq_pattern[lane][step].gate = s->seq_gate[lane][step];
+            seq_pattern[lane][step].enabled = s->seq_enabled[lane][step];
+        }
+    }
+    arp_mode = s->arp_mode;
+    arp_count = arp_index = arp_live = 0u;
+    arp_direction = 1u;
+    arp_clear_pending = 0u;
+    for (uint32_t fx = 0; fx < 3u; ++fx) {
+        fx_enabled[fx] = s->fx_enabled[fx];
+        fx_mix[fx] = s->fx_mix[fx];
+        fx_time[fx] = s->fx_time[fx];
+        fx_feedback[fx] = s->fx_feedback[fx];
+        for (uint32_t patch = 0; patch < PATCHES; ++patch)
+            fx_send[patch][fx] = s->fx_send[patch][fx];
+    }
+    return 0;
+}
+
 uint32_t fm6_patch_count(void) { return PATCHES; }
 const char *fm6_patch_name(uint32_t patch) { return patch < PATCHES ? (const char *)&instrument[patch].base[FP_NAME] : ""; }
 uint8_t fm6_patch_enabled(uint32_t patch) { return patch < PATCHES ? instrument[patch].enabled : 0; }
