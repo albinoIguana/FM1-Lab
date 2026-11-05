@@ -176,6 +176,47 @@ int main(void) {
         for(unsigned i=0;i<64u*TEST_WORDS;i++) assert(wet[i]==dry[i]);
     }
 
+
+    /* Performance state snapshot/restore covers every sequencer step, lane
+     * assignment, tempo, arp mode, effect control and per-patch send. */
+    fm6_performance_state_t saved, restored;
+    memset(&saved, 0, sizeof saved);
+    memset(&restored, 0, sizeof restored);
+    saved.tempo_bpm = 137u;
+    saved.seq_length = 48u;
+    saved.lane_patch[0] = 2u;
+    saved.lane_patch[1] = 3u;
+    for (unsigned lane = 0; lane < 2u; ++lane)
+        for (unsigned step = 0; step < 64u; ++step) {
+            saved.seq_enabled[lane][step] = (uint8_t)((step % 3u) == lane);
+            saved.seq_note[lane][step] = (uint8_t)(36u + lane * 12u + step % 48u);
+            saved.seq_velocity[lane][step] = (uint8_t)(70u + step % 58u);
+            saved.seq_gate[lane][step] = (uint8_t)(10u + step % 91u);
+        }
+    saved.arp_mode = 3u;
+    for (unsigned fx = 0; fx < 3u; ++fx) {
+        saved.fx_enabled[fx] = 1u;
+        saved.fx_mix[fx] = (uint8_t)(30u + fx * 20u);
+        saved.fx_time[fx] = (uint8_t)(40u + fx * 15u);
+        saved.fx_feedback[fx] = (uint8_t)(fx == 0u ? 60u : 70u + fx * 5u);
+        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+            saved.fx_send[patch][fx] = (uint8_t)(patch * 20u + fx * 5u);
+    }
+    assert(fm6_performance_state_valid(&saved));
+    fm6_init();
+    assert(fm6_performance_state_set(&saved) == 0);
+    assert(fm6_sequencer_running() == 0u);
+    fm6_performance_state_get(&restored);
+    assert(memcmp(&saved, &restored, sizeof saved) == 0);
+    restored.tempo_bpm = 29u;
+    assert(!fm6_performance_state_valid(&restored));
+    assert(fm6_performance_state_set(&restored) == -1);
+    fm6_performance_state_get(&restored);
+    assert(memcmp(&saved, &restored, sizeof saved) == 0);
+    fm6_sequencer_set_running(1u);
+    assert(fm6_sequencer_running() == 1u);
+    fm6_sequencer_set_running(0u);
+
     puts("Felucca FM6 engine: voice pools, dual-lane sequencing, arp scheduling, FX buses/sends and render passed");
     return 0;
 }
