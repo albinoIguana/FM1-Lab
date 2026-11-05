@@ -334,7 +334,7 @@ void fm6_init(void)
         instrument[i].macro[1] = 50;
         instrument[i].macro[2] = 50;
         instrument[i].macro[3] = 50;
-        instrument[i].enabled = (i == 0u); /* one layer by default; enable more as desired */
+        instrument[i].enabled = 1u; /* factory instrument starts as a four-layer stack */
         instrument[i].level = 127u;
         fm6_rebuild_patch(i);
     }
