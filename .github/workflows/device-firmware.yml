@@ -42,11 +42,9 @@ jobs:
           $target = 'C:\JL\pi32'
           $clang = Join-Path $target 'bin\clang.exe'
 
-          # The SDK build consumes the compiler and libraries from C:\JL\pi32.
-          # Code::Blocks is only an IDE prerequisite in JieLi's interactive
-          # installer; it is not used by the SDK's Build.ps1 command-line build.
-          # Extract the signed 2.5.3 Inno Setup payload directly so CI does not
-          # need a desktop session to answer Code::Blocks' first-run dialogs.
+          # The SDK build consumes the compiler, system headers and libraries
+          # from the single C:\JL\pi32 tree. Code::Blocks is only an IDE
+          # prerequisite in JieLi's interactive installer.
           Invoke-WebRequest -Uri 'https://jl-update.oss-cn-shenzhen.aliyuncs.com/2.5.3.exe' -OutFile $installer
           $item = Get-Item -LiteralPath $installer
           if ($item.Length -lt 1MB) {
@@ -55,8 +53,6 @@ jobs:
           Write-Host "Downloaded JieLi 2.5.3 installer: $($item.Length) bytes"
           Get-AuthenticodeSignature -FilePath $installer | Format-List Status,StatusMessage,SignerCertificate
 
-          # 7-Zip recognizes the PE wrapper but does not unpack the Inno Setup payload.
-          # Use the upstream innoextract Windows release to extract the actual files.
           $extractorZip = Join-Path $env:RUNNER_TEMP 'innoextract-1.9-windows.zip'
           $extractorDir = Join-Path $env:RUNNER_TEMP 'innoextract'
           Invoke-WebRequest -Uri 'https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip' -OutFile $extractorZip
@@ -72,30 +68,30 @@ jobs:
             throw "innoextract could not unpack the JieLi 2.5.3 Inno Setup payload (exit $LASTEXITCODE)."
           }
 
-          # Preserve the installer's complete C:\JL layout. Innoextract
-          # places q32s-include and q32s-lib beside pi32, not inside it.
-          # Copying pi32 alone silently drops the system headers (including
-          # ctype.h) that the official compiler expects from its install.
+          # The actual installer log shows q32s-include and q32s-lib under
+          # C:\JL\pi32, alongside bin\clang.exe. Validate and stage that
+          # complete pi32 directory; do not invent sibling paths under C:\JL.
           $pi32Root = Join-Path $installRoot 'pi32'
           $extractedClang = Join-Path $pi32Root 'bin\clang.exe'
-          $systemHeaders = Join-Path $installRoot 'q32s-include'
-          $systemCtype = Join-Path $systemHeaders 'ctype.h'
+          $systemCtype = Join-Path $pi32Root 'q32s-include\ctype.h'
+          $systemLib = Join-Path $pi32Root 'q32s-lib\libc.a'
           if (!(Test-Path -LiteralPath $extractedClang -PathType Leaf) -or
-              !(Test-Path -LiteralPath $systemCtype -PathType Leaf)) {
+              !(Test-Path -LiteralPath $systemCtype -PathType Leaf) -or
+              !(Test-Path -LiteralPath $systemLib -PathType Leaf)) {
             Write-Host 'Extracted installer directory tree:'
             Get-ChildItem -LiteralPath $extract -Force -Recurse |
               Select-Object -ExpandProperty FullName
-            throw "Incomplete JieLi installation payload. Expected $extractedClang and $systemCtype."
+            throw "Incomplete JieLi PI32 installation. Expected clang, q32s-include\ctype.h and q32s-lib\libc.a under $pi32Root."
           }
 
-          # Recreate the installer's directory tree rather than hand-picking
-          # subdirectories. Keep the original C:\JL paths used by clang.
           Remove-Item -LiteralPath 'C:\JL' -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path 'C:\JL' -Force | Out-Null
-          Copy-Item -Path (Join-Path $installRoot '*') -Destination 'C:\JL' -Recurse -Force
-          $stagedCtype = Join-Path 'C:\JL\q32s-include' 'ctype.h'
-          if (!(Test-Path -LiteralPath $stagedCtype -PathType Leaf)) {
-            throw "JieLi system header staging failed: $stagedCtype"
+          Copy-Item -Path (Join-Path $pi32Root '*') -Destination $target -Recurse -Force
+          $stagedCtype = Join-Path $target 'q32s-include\ctype.h'
+          $stagedLib = Join-Path $target 'q32s-lib\libc.a'
+          if (!(Test-Path -LiteralPath $stagedCtype -PathType Leaf) -or
+              !(Test-Path -LiteralPath $stagedLib -PathType Leaf)) {
+            throw "JieLi system files were not staged under $target."
           }
           $clang = Join-Path $target 'bin\clang.exe'
           if (!(Test-Path -LiteralPath $clang -PathType Leaf)) { throw "Extracted toolchain did not produce $clang" }
