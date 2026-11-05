@@ -542,8 +542,11 @@ uint8_t fm6_sequencer_step(void) { return seq_position; }
 uint8_t fm6_sequencer_running(void) { return seq_running; }
 void fm6_arpeggiator_set_mode(uint8_t mode) {
     if(mode>3u) mode=3u;
-    if((arp_mode==0u && mode!=0u) || (arp_mode!=0u && mode==0u)) arp_clear_pending=1u;
-    if(arp_mode==0u && mode!=0u) arp_direction=1u;
+    /* Enabling starts with an empty held-note set naturally (keys played
+     * while bypassed are not captured). Only disabling needs an audio-owner
+     * release/clear event for the currently generated arp note. */
+    if(arp_mode!=0u && mode==0u) arp_clear_pending=1u;
+    if(arp_mode==0u && mode!=0u) { arp_index=0u; arp_direction=1u; }
     arp_mode=mode;
 }
 uint8_t fm6_arpeggiator_mode(void) { return arp_mode; }
