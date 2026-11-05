@@ -318,7 +318,13 @@ int main(void) {
             offset += count;
         }
     }
-    for (unsigned sample = 0; sample < 4096u * 2u; ++sample) {\n        if (chunk_a[sample] != chunk_b[sample]) {\n            fprintf(stderr, "render chunk mismatch at sample %u: %ld vs %ld\\n", sample, (long)chunk_a[sample], (long)chunk_b[sample]);\n            assert(chunk_a[sample] == chunk_b[sample]);\n        }\n    }
+    for (unsigned sample = 0; sample < 4096u * 2u; ++sample) {
+        if (chunk_a[sample] != chunk_b[sample]) {
+            fprintf(stderr, "render chunk mismatch at sample %u: %ld vs %ld\n",
+                    sample, (long)chunk_a[sample], (long)chunk_b[sample]);
+            assert(chunk_a[sample] == chunk_b[sample]);
+        }
+    }
     fm6_panic();
 
     /* Performance state snapshot/restore covers every sequencer step, lane
