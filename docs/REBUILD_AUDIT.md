@@ -53,7 +53,7 @@ The BSP's OTA implementation and flash-window definitions are the authority here
 | Hardware/BSP, linker, loader, packaging | [felucca-bsp](https://github.com/hugelton/felucca-bsp), pinned through [fm1-base](https://github.com/charlesvestal/fm1-base) | Known FM1 memory map, update path and packaging |
 | Platform/UI primitives, panel, audio, MIDI, storage, host simulator | [fm1-base](https://github.com/charlesvestal/fm1-base) | Small optional platform groups; native host simulator and common app interface |
 | Minimal hardware reference | [Dinghy](https://github.com/zvenson/dinghy) | Cross-check boot, USB rescue, MIDI, audio, storage and safety checks; do not carry its sine-only app |
-| Six-op FM reference | [Felucca](https://github.com/hugelton/Felucca) | Integer-only MSFA/Dexed-derived FM6 core and patch semantics; use its core and required generated tables, not the browser DX7 simulator |
+| Six-op FM engine | Pinned M-VAVE FM1 SDK `synth_dx7_*` API | Reuse the fixed-point six-operator engine already present in the device archive; do not package a second DSP core. Felucca remains a host/reference engine pending measured advantage. |
 | Sequencer | Felucca timing/transport as a reference; implement only our two-lane feature set | Avoid bringing over unrelated four-track groovebox features |
 | Product UI | FM1-Lab Instrument/editor design, reimplemented against the platform graphics API | Four-patch Instrument, algorithm-aware editor, macros and two visible sequencer lanes |
 
@@ -61,7 +61,7 @@ The BSP's OTA implementation and flash-window definitions are the authority here
 
 1. Build the unmodified fm1-base template first, using its pinned BSP and documented JieLi toolchain.
 2. Start with the optional feature set actually required. Bluetooth MIDI, if enabled, uses fm1-base's own stack so the GPL FM6/sequencer sources do not link JieLi's closed Bluetooth libraries. No Wi-Fi, Bluetooth audio, sampler, or unused engines by default.
-3. Use the integer-only FM6 core. Do not use the browser simulator's floating-point DX7 engine in the device build.
+3. Reuse the fixed-point six-operator M-VAVE synth API already linked in the device SDK. Do not package a second FM core; keep Felucca as a host/reference implementation unless measured tests justify switching.
 4. Implement four patch slots under one Instrument and a shared, measured voice budget. Do not instantiate four independent oversized synths.
 5. Implement only the agreed two-lane sequencer; share transport/clock and keep timing variations out of scope.
 6. Keep DSP in the audio render path and UI/storage work outside it. Test audio determinism, note-off safety, CPU budget, RAM and pool headroom.
