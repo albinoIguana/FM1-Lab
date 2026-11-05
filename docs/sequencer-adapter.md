@@ -2,7 +2,7 @@
 
 ## Scope
 
-FM1-Lab exposes two sequencer lanes while the M-VAVE project format retains eight tracks. The adapter binds two explicitly selected tracks; it does not move, clear, or rewrite the other six project rows.
+FM1-Lab exposes two sequencer lanes while the M-VAVE project format retains eight tracks. The adapter binds two explicitly selected tracks. Playback isolation uses the pinned official track-role API; see the side effects and undo-history caveat below.
 
 Only tracks whose role is `GROOVE_TRACK_NORMAL` and source type is `GROOVE_DX7` can be bound. This keeps the four-patch FM Instrument workflow from accidentally attaching to a drum, sampler, or other synth track.
 
