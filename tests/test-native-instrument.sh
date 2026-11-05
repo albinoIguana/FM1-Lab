@@ -7,7 +7,8 @@ CONTROLS_BIN="$(mktemp)"
 LIBRARY_BIN="$(mktemp)"
 RUNTIME_BIN="$(mktemp)"
 SEQUENCER_BIN="$(mktemp)"
-trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN"' EXIT
+SETTINGS_BIN="$(mktemp)"
+trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN"' EXIT
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/tests/fm1lab_instrument.test.c" -o "$INSTRUMENT_BIN"
@@ -42,6 +43,10 @@ cc -std=c11 -Wall -Wextra -Werror \
   "$ROOT/firmware/fm1lab_sequencer.c" "$ROOT/tests/fm1lab_sequencer.test.c" -o "$SEQUENCER_BIN"
 "$SEQUENCER_BIN"
 echo "FM1-Lab native sequencer adapter tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app/dsp" \
+  "$ROOT/tests/settings_record.test.c" -o "$SETTINGS_BIN"
+"$SETTINGS_BIN"
 
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/firmware/fm1lab_instrument.c" "$ROOT/firmware/fm1lab_voice_editor.c" \
