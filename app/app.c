@@ -673,6 +673,7 @@ static void input(void)
         } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
             uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
             fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
+            set_dirty = 1u;
             app_say("FX",fm6_fx_enabled(fx)?"ON":"BYPASS");
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
@@ -684,6 +685,7 @@ static void input(void)
             page = PAGE_ARP;
             arp_ui_mode = (uint8_t)((arp_ui_mode + 1u) % 4u);
             fm6_arpeggiator_set_mode(arp_ui_mode);
+            set_dirty = 1u;
             app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
         } else if (k == B_FX) {
             if (page < PAGE_FX_CHORUS || page > PAGE_FX_REVERB) page = PAGE_FX_CHORUS;
@@ -765,6 +767,7 @@ static void input(void)
             if (patch < 0) patch += 4;
             seq_ui_patch[seq_ui_lane] = (uint8_t)patch;
             fm6_sequencer_set_lane(seq_ui_lane, (uint8_t)patch);
+            set_dirty = 1u;
             app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
         } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
             int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
@@ -805,17 +808,20 @@ static void input(void)
                 else if(index==2u) seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
                 else seq_ui_gate[lane][step]=(uint8_t)clamp((int32_t)seq_ui_gate[lane][step]+e,10,100);
                 fm6_sequencer_set_step(lane,step,seq_ui_enabled[lane][step],seq_ui_note[lane][step],seq_ui_velocity[lane][step],seq_ui_gate[lane][step]);
+                set_dirty = 1u;
                 app_say("SEQUENCER STEP", "UPDATED");
             } else if (page == PAGE_ARP) {
                 if(index==0u) {
                     transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
                     fm6_set_tempo(transport_ui_bpm);
+                    set_dirty = 1u;
                     app_say("TEMPO", "UPDATED");
                 } else if(index==1u) {
                     int32_t mode=((int32_t)arp_ui_mode+e)%4;
                     if(mode<0) mode+=4;
                     arp_ui_mode=(uint8_t)mode;
                     fm6_arpeggiator_set_mode(arp_ui_mode);
+                    set_dirty = 1u;
                     app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN");
                 }
             } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
@@ -825,6 +831,7 @@ static void input(void)
                 else if(index==2u) fx_ui_feedback[fx]=(uint8_t)clamp((int32_t)fx_ui_feedback[fx]+e,0,fx==0u?70:90);
                 else fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
                 fm6_fx_set_mix(fx,fx_ui_mix[fx]); fm6_fx_set_time(fx,fx_ui_time[fx]); fm6_fx_set_feedback(fx,fx_ui_feedback[fx]);
+                set_dirty = 1u;
                 app_say("EFFECT PARAMETER", "UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
