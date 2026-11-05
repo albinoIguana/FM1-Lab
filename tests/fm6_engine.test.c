@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "fm1.h"
 #include "fm6.h"
 
 static int32_t output[FM1_BLOCK_WORDS];
