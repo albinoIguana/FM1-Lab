@@ -131,9 +131,12 @@ int main(void) {
         fm6_note_on(60u,110u);
         for(unsigned block=0;block<64u;block++)
             fm6_render(wet+block*TEST_WORDS,128u,4096u);
-        int changed=0;
+        int changed=0,stereo_spread=0;
         for(unsigned i=0;i<64u*TEST_WORDS;i++) if(wet[i]!=dry[i]) { changed=1; break; }
+        for(unsigned frame=0;frame<64u*128u;frame++)
+            if(wet[frame*2u]!=wet[frame*2u+1u]) { stereo_spread=1; break; }
         assert(changed);
+        if(effect==0u) assert(stereo_spread);
     }
 
 
