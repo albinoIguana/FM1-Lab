@@ -125,7 +125,7 @@ static void fm6_transport_step(void)
         arp_live_note=arp_notes[arp_index]; fm6_note_start_tuned_mask(arp_live_note,100u,0x0fu,0,3u); arp_live=1u;
         if(arp_mode==3u) { if(arp_direction) ++arp_index; else if(arp_index) --arp_index; }
         else ++arp_index;
-    } else if(arp_live) { fm6_note_off(arp_live_note); arp_live=0u; }
+    } else if(arp_live) { fm6_note_off_source(arp_live_note,0x0fu,3u); arp_live=0u; }
 }
 static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,int64_t *right)
 {
