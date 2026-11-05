@@ -103,9 +103,17 @@ function drawKeys(){
  rect(0,180,240,60,C.black);
  for(let i=0;i<16;i++){const x=4+i*14;rect(x,194,13,14,C.dim)}
  for(const i of [0,1,2,4,5,7,8,9,11,12,14])rect(4+i*14+8,180,11,12,C.line);
- text('OCT',4,216,C.gray,7);text((state.octave<0?'-':'+')+Math.abs(state.octave),30,216,C.hi,7);
- const labels=['PATCH','MACROS','GLOBAL','ROLES'];text(labels[state.page],64,216,C.gray,7);text(patchNames[state.patch],112,216,C.hi,7);
- text(state.enabled[state.patch]?'ON':'OFF',202,216,state.enabled[state.patch]?C.hi:C.dim,7);
+ if(state.page===0){
+  text('OCT',4,216,C.gray,7);text((state.octave<0?'-':'+')+Math.abs(state.octave),30,216,C.hi,7);
+  text('PATCH',64,216,C.gray,7);text(patchNames[state.patch],112,216,C.hi,7);
+  text(state.enabled[state.patch]?'ON':'OFF',202,216,state.enabled[state.patch]?C.hi:C.dim,7);
+ }else if(state.page===1){
+  text('MACROS',4,216,C.gray,7);text(patchNames[state.patch],64,216,C.hi,7);text('NEUTRAL',178,216,C.gray,7);text('50',218,216,C.hi,7);
+ }else if(state.page===2){
+  text('GLOBAL',4,216,C.gray,7);text('SETTINGS',64,216,C.hi,7);text('VOL',178,216,C.gray,7);text(state.master+'%',204,216,C.hi,7);
+ }else{
+  text('ROLES',4,216,C.gray,7);text(patchNames[state.patch],64,216,C.hi,7);text('ALGO',178,216,C.gray,7);text('5',218,216,C.hi,7);
+ }
  // Page indicator occupies the same lower-right screen corner as the firmware.
  text((state.page+1)+'/4',218,232,C.gray,7,'right');
 }
