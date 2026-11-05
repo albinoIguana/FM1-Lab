@@ -159,16 +159,20 @@ int fm1lab_store_library_save(unsigned index, const fm1lab_instrument_t *in)
     return plat_store_save(OBJ_INSTRUMENTS0+b,bank,BANK_BYTES);
 }
 
+int fm1lab_store_library_format_bank(unsigned b, const fm1lab_instrument_t *factory)
+{
+    if(b>=FM1LAB_STORE_BANK_COUNT || !fm1lab_instrument_valid(factory)) return -1;
+    uint8_t bank[BANK_BYTES];
+    bank_init(bank,b);
+    for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)
+        instrument_encode(record_at(bank,slot),factory);
+    write16(bank+6,crc16(bank+BANK_HEADER,BANK_BYTES-BANK_HEADER));
+    return plat_store_save(OBJ_INSTRUMENTS0+b,bank,BANK_BYTES);
+}
 int fm1lab_store_library_format(const fm1lab_instrument_t *factory)
 {
     if(!fm1lab_instrument_valid(factory)) return -1;
-    for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++) {
-        uint8_t bank[BANK_BYTES];
-        bank_init(bank,b);
-        for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)
-            instrument_encode(record_at(bank,slot),factory);
-        write16(bank+6,crc16(bank+BANK_HEADER,BANK_BYTES-BANK_HEADER));
-        if(plat_store_save(OBJ_INSTRUMENTS0+b,bank,BANK_BYTES)) return -1;
-    }
+    for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++)
+        if(fm1lab_store_library_format_bank(b,factory)) return -1;
     return 0;
 }
