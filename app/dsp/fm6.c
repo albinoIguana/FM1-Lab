@@ -508,13 +508,21 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
         for (i = 0; i < count; i++) {
             int32_t delta=(int32_t)master_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
-            if(seq_start_pending) { seq_position=0u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u; seq_start_pending=0u; }
+            /* Stop first: a rapid stop/start must release the old lane notes
+             * before start resets their gate counters. */
             if(seq_stop_pending) {
                 for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane]) {
                     fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
                     seq_gate_left[lane]=0u;
                 }
                 seq_stop_pending=0u;
+            }
+            if(seq_start_pending) {
+                for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane]) {
+                    fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
+                    seq_gate_left[lane]=0u;
+                }
+                seq_position=0u; transport_phase=0u; seq_start_pending=0u;
             }
             if(arp_clear_pending) {
                 if(arp_live) fm6_note_off_source(arp_live_note,0x0fu,3u);
