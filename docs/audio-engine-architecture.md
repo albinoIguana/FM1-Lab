@@ -41,7 +41,7 @@ The exact pinned fm1-base platform revision used by this branch (`2d8ed748cdade5
 - `plat_xruns()`: audio deadline misses since boot.
 - `plat_ticks24()`: a 24 MHz free-running timer for measuring short render spans.
 
-The platform exposes device-reported CPU percentage and xrun counters through `plat_cpu_pct()` and `plat_xruns()`. The current native UI does not yet surface both diagnostics. For hardware validation, enable all four patches, run dense two-lane sequences with the arpeggiator and effects enabled, and record peak CPU percentage and xrun changes. The reference firmware's 2.9 ms audio-block profiling is a useful comparator; host timing is not a device render-budget measurement.
+The app now exposes read-only `app_audio_cpu_pct()`, `app_audio_xruns()` and `app_audio_overload_shed_count()` accessors, backed directly by the pinned platform counters and FM6's overload counter. The host simulator's `app_expect` interface also exposes `cpu`, `xruns` and `shed` for automated checks. These are diagnostic interfaces only: no screen layout or render-path logging was added. On hardware, call/sample these accessors while enabling all four patches, dense two-lane sequences, the arpeggiator and all effects; record peak CPU percentage and xrun/shed counter deltas. The platform CPU value is smoothed over roughly 16 blocks, so also inspect xrun deltas during sustained stress. Host timing is not a device render-budget measurement.
 
 ## Active sequencer, arpeggiator and FX path
 
@@ -54,6 +54,10 @@ The active FM6 renderer now owns the timing and note generation; these are not c
 - **DSP buffers:** the effects use fixed-size integer ring/comb buffers and no allocation or flash I/O in the render path. The delay, chorus and three reverb comb buffers occupy 96 KiB in the platform `.pool` region.
 
 Sequencer patterns, both lane assignments, tempo, arp mode, FX enable/mix/time/feedback and all per-patch FX sends are now included in the CRC-protected settings record. SAVE snapshots the live FM6 performance state; boot restores it stopped. Existing compact settings records have migration paths. Runtime transport phase, held notes and delay/reverb history are intentionally not persisted. The two-lane UI is an initial functional editor, not yet the final sequencing workflow (no swing, tie editing or MIDI clock sync).
+
+## Settings-record integrity tests
+
+The active app and host tests now share the same settings-record codec in `app/fm1lab_settings_record.h`. The native suite checks the current CRC envelope against single-bit corruption at every byte, rejects correctly re-sealed but out-of-range fields, validates both legacy V1 and V2 records, and verifies migration preserves the new performance defaults while importing supported legacy fields. Invalid legacy records are rejected without partially modifying the destination. These are codec-level tests; the physical FM1 flash A/B write/recovery path remains a separate hardware validation item.
 
 ## Remaining validation
 
