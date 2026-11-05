@@ -102,7 +102,11 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE };
+enum {
+    EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE,
+    EV_SELECT_INSTRUMENT, EV_MACRO, EV_ALGORITHM, EV_NAME_CHAR,
+    EV_SNAPSHOT, EV_MARK_SAVED
+};
 typedef struct { volatile uint8_t type, a, b; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -142,6 +146,19 @@ static void ui_events_drain(void)
             fm6_panic();
         else if (type == EV_PATCH_ENABLE)
             fm6_patch_set_enabled(a, b);
+        else if (type == EV_SELECT_INSTRUMENT)
+            fm6_select_instrument(a);
+        else if (type == EV_MACRO)
+            fm6_macro_set(a >> 2, a & 3u, b);
+        else if (type == EV_ALGORITHM)
+            fm6_patch_set_algorithm(a, b);
+        else if (type == EV_NAME_CHAR)
+            fm6_instrument_set_name_char(a, b);
+        else if (type == EV_SNAPSHOT) {
+            fm6_instrument_export_current(&save_snapshot);
+            snapshot_ready = 1;
+        } else if (type == EV_MARK_SAVED)
+            fm6_instrument_mark_saved(a);
     }
 }
 
