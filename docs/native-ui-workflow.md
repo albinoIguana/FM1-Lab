@@ -52,7 +52,7 @@ The macro transforms are non-destructive: they are derived from the base DX7 voi
 
 ## FX — upstream performance effects
 
-FX continues to use the official M-VAVE effects page and engine API rather than inventing a parallel DSP path. The upstream page exposes track sends, shared effects and delay/tap controls. Its own page selector and encoder mappings remain authoritative.
+FX opens the official M-VAVE effects page. It exposes track reverb/delay sends, shared reverb/delay parameters and delay/tap controls through the upstream `groove_effects_get/edit` APIs. However, the current FM1-Lab audio bridge adds the four-patch instrument after the prebuilt engine render. That means the stock FX DSP currently processes the stock engine mix, not the added FM1-Lab instrument signal. The UI exists, but FX-on-FM1-Lab-audio is not integrated yet; do not treat this part of the workflow as complete. The next audio milestone is to route the custom instrument through the official effects stage or a verified equivalent shared DSP path.
 
 ## SEQ — two-lane sequencer
 

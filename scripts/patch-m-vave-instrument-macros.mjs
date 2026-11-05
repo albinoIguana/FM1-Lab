@@ -35,12 +35,11 @@ static void fm1lab_macro_draw(void)
     text(8, 17, patch_name[0] ? patch_name : "UNTITLED PATCH", 2, ACCENT, BACK);
     text(184, 8, "PATCH", 1, DIM, BACK);
     number(218, 8, (int)fm1lab_home_runtime.selected_patch + 1, 1, 1, TEXT, BACK);
-    if (fm1lab_home_runtime.dirty) text(8, 37, "UNSAVED", 1, AMBER, BACK);
+    if (fm1lab_home_runtime.dirty) text(58, 37, "UNSAVED", 1, AMBER, BACK);
     uint8_t algorithm = 0;
     (void)fm1lab_voice_global_get(patch->voice, FM1LAB_GLOBAL_ALGORITHM, &algorithm);
     text(8, 37, "ALG", 1, DIM, BACK);
     number(32, 36, algorithm, 2, 1, TEXT, BACK);
-    text(58, 37, "ROLES", 1, DIM, BACK);
     for (unsigned op = 1; op <= 6; ++op) {
         int carrier = fm1lab_voice_operator_is_carrier(patch->voice, op);
         unsigned x = 101U + (op - 1U) * 21U;

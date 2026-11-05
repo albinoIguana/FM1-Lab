@@ -46,7 +46,8 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 - [ ] Add a true operator connection graph, undo/compare, and patch audition/voice-engine integration; the current topology strip reports roles/depth but does not yet draw every routing edge.
 - [x] Save the four voice records and metadata together through one version-2 bank transaction, preserving the other seven Instruments in that bank.
 - [ ] Integrate the native model with the FM1 device app and actual voice engine.
-- [ ] Connect patch enable and level state to the device mixer / voice routing.
+- [ ] Connect patch enable and level state to the device mixer / voice routing
+- [ ] Route the four-patch FM1-Lab audio through the FX processing controlled by the native FX page; verify reverb/delay sends and shared returns affect the custom instrument.
 
 ## Device storage and controls
 
