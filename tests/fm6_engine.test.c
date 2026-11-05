@@ -108,6 +108,8 @@ int main(void) {
     assert(fm6_sequencer_step()==1u); /* sample 5513: first tick */
     assert(fm6_sequencer_running()==1u);
     assert(fm6_active_voices_patch(0u)>=2u); /* both independent lanes reached the same FM6 patch */
+    memset(output,0,sizeof output); fm6_render(output,128u,4096u);
+    seq_peak=peak(output,TEST_WORDS);
     assert(seq_peak>0);
     fm6_sequencer_set_running(0u);
     assert(fm6_sequencer_running()==0u);
