@@ -28,17 +28,15 @@ static void fm6_zero_bytes(void *dst, uint32_t n)
     while (n--)
         *d++ = 0;
 }
-static void fm6_zero_volatile_bytes(volatile void *dst,uint32_t n)
-{
-    volatile uint8_t *d=(volatile uint8_t *)dst;
-    while(n--) *d++=0u;
-}
 
 #define PATCHES FM1LAB_PATCH_COUNT
 #define VOICES (PATCHES * FM1LAB_VOICE_LIMIT)
 #define Q24_ONE (1 << 24)
 #define Q24_DB6 (1 << 24)
 #define OUTPUT_LIMIT 8388607
+#ifndef PLAT_POOL
+#define PLAT_POOL __attribute__((section(".pool")))
+#endif
 
 typedef struct {
     uint8_t base[FP_SIZE + 1u];
@@ -88,8 +86,8 @@ static volatile uint32_t transport_bpm=120u;
 static uint32_t transport_phase;
 static volatile uint8_t arp_mode, arp_notes[16], arp_count, arp_index, arp_direction=1u;
 static uint8_t arp_live_note, arp_live;
-static int32_t fx_delay[FM6_DELAY_SIZE], fx_chorus[FM6_CHORUS_SIZE];
-static int32_t fx_comb_a[256], fx_comb_b[512], fx_comb_c[1024];
+static int32_t fx_delay[FM6_DELAY_SIZE] PLAT_POOL, fx_chorus[FM6_CHORUS_SIZE] PLAT_POOL;
+static int32_t fx_comb_a[256] PLAT_POOL, fx_comb_b[512] PLAT_POOL, fx_comb_c[1024] PLAT_POOL;
 static uint16_t fx_delay_pos, fx_chorus_pos, fx_comb_pos_a, fx_comb_pos_b, fx_comb_pos_c;
 static volatile uint8_t fx_enabled[3], fx_mix[3]={18u,24u,20u}, fx_time[3]={48u,52u,45u}, fx_feedback[3]={40u,42u,60u};
 static volatile uint8_t fx_send[PATCHES][3];
@@ -308,12 +306,18 @@ void fm6_init(void)
     age_counter = 0;
     output_gain_q12 = 0;
     pitch_bend_16 = 0;
-    fm6_zero_volatile_bytes(seq_pattern,sizeof(seq_pattern)); fm6_zero_bytes(seq_gate_left,sizeof(seq_gate_left));
+    for(uint32_t lane=0;lane<2u;lane++) for(uint32_t step=0;step<64u;step++) {
+        seq_pattern[lane][step].enabled=0u; seq_pattern[lane][step].note=0u;
+        seq_pattern[lane][step].velocity=0u; seq_pattern[lane][step].gate=0u;
+    }
+    fm6_zero_bytes(seq_gate_left,sizeof(seq_gate_left));
     fm6_zero_bytes(seq_live_note,sizeof(seq_live_note)); fm6_zero_bytes(seq_live_patch,sizeof(seq_live_patch));
-    fm6_zero_volatile_bytes(arp_notes,sizeof(arp_notes)); fm6_zero_bytes(fx_delay,sizeof(fx_delay));
+    for(uint32_t n=0;n<16u;n++) arp_notes[n]=0u;
+    fm6_zero_bytes(fx_delay,sizeof(fx_delay));
     fm6_zero_bytes(fx_chorus,sizeof(fx_chorus)); fm6_zero_bytes(fx_comb_a,sizeof(fx_comb_a));
     fm6_zero_bytes(fx_comb_b,sizeof(fx_comb_b)); fm6_zero_bytes(fx_comb_c,sizeof(fx_comb_c));
-    fm6_zero_volatile_bytes(fx_enabled,sizeof(fx_enabled)); fm6_zero_volatile_bytes(fx_send,sizeof(fx_send));
+    for(uint32_t fx=0;fx<3u;fx++) fx_enabled[fx]=0u;
+    for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=0u;
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=100u;
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u;
     seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
