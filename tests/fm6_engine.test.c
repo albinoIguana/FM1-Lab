@@ -5,6 +5,7 @@
 #include "fm6.h"
 enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
 static int32_t output[TEST_WORDS];
+static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
 static int32_t peak(const int32_t *samples, unsigned count) {
     int32_t result = 0;
     for (unsigned i = 0; i < count; ++i) {
@@ -266,6 +267,57 @@ int main(void) {
     assert(fm6_overload_shed_count() == 2u);
     fm6_panic();
     assert(fm6_active_voices() == 0u);
+
+    /* Render chunking must not change the audio stream. This compares
+     * ordinary device-sized blocks against irregular sub-block calls with
+     * the same notes and all three FX buses active. */
+    fm6_init();
+    memcpy(voice, fm6_patch_data(0), 155u);
+    for (unsigned patch = 1; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        assert(fm6_patch_set_voice(patch, voice) == 0);
+        fm6_patch_set_enabled(patch, 1u);
+        fm6_patch_set_level(patch, 127u);
+    }
+    for (unsigned fx = 0; fx < 3u; ++fx) {
+        fm6_fx_set_enabled((uint8_t)fx, 1u);
+        fm6_fx_set_mix((uint8_t)fx, (uint8_t)(35u + fx * 20u));
+        fm6_fx_set_time((uint8_t)fx, (uint8_t)(45u + fx * 10u));
+        fm6_fx_set_feedback((uint8_t)fx, (uint8_t)(30u + fx * 15u));
+        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+            fm6_fx_set_send((uint8_t)patch, (uint8_t)fx, 80u);
+    }
+    fm6_note_on_mask(60u, 105u, 0x0Fu);
+    for (unsigned offset = 0; offset < 4096u; offset += TEST_FRAMES)
+        fm6_render(chunk_a + offset * 2u, TEST_FRAMES, 4096u);
+
+    fm6_init();
+    memcpy(voice, fm6_patch_data(0), 155u);
+    for (unsigned patch = 1; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        assert(fm6_patch_set_voice(patch, voice) == 0);
+        fm6_patch_set_enabled(patch, 1u);
+        fm6_patch_set_level(patch, 127u);
+    }
+    for (unsigned fx = 0; fx < 3u; ++fx) {
+        fm6_fx_set_enabled((uint8_t)fx, 1u);
+        fm6_fx_set_mix((uint8_t)fx, (uint8_t)(35u + fx * 20u));
+        fm6_fx_set_time((uint8_t)fx, (uint8_t)(45u + fx * 10u));
+        fm6_fx_set_feedback((uint8_t)fx, (uint8_t)(30u + fx * 15u));
+        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+            fm6_fx_set_send((uint8_t)patch, (uint8_t)fx, 80u);
+    }
+    fm6_note_on_mask(60u, 105u, 0x0Fu);
+    {
+        static const unsigned chunks[] = {1u, 7u, 31u, 89u, 127u, 16u};
+        unsigned offset = 0u, chunk = 0u;
+        while (offset < 4096u) {
+            unsigned count = chunks[chunk++ % (sizeof chunks / sizeof chunks[0])];
+            if (count > 4096u - offset) count = 4096u - offset;
+            fm6_render(chunk_b + offset * 2u, count, 4096u);
+            offset += count;
+        }
+    }
+    assert(memcmp(chunk_a, chunk_b, sizeof chunk_a) == 0);
+    fm6_panic();
 
     /* Performance state snapshot/restore covers every sequencer step, lane
      * assignment, tempo, arp mode, effect control and per-patch send. */
