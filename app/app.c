@@ -535,7 +535,9 @@ static void input(void)
             set_dirty = 1;
             app_say("PATCH", fm6_patch_name(set.patch));
         } else if (k == EN_PRESET) {
-            if (instrument_dirty) {
+            if (instrument_apply_pending) {
+                app_say("INSTRUMENT", "LOADING");
+            } else if (instrument_dirty) {
                 app_say("SAVE INSTRUMENT", "BEFORE CHANGING");
             } else {
                 int32_t next = ((int32_t)instrument_index + e) % USER_INSTRUMENT_COUNT;
@@ -761,7 +763,7 @@ static void draw(void)
             page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
             page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
-        cv_text(10, 18, &FONT_XS, fm6_patch_name(set.patch), accent);
+        cv_text(10, 18, &FONT_XS, current_instrument.name, accent);
         if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
         if (note >= 0) {
             note_name(note, t);
