@@ -9,6 +9,8 @@
 #define FM1LAB_INSTRUMENT_COUNT 16u
 #define FM1LAB_INSTRUMENT_NAME_LEN 12u
 #define FM1LAB_PACKED_PATCH_BYTES 128u
+#define FM1LAB_SEQ_LANES 2u
+#define FM1LAB_SEQ_STEPS 16u
 
 typedef struct {
     uint8_t valid;
@@ -16,6 +18,9 @@ typedef struct {
     uint8_t name[FM1LAB_INSTRUMENT_NAME_LEN];
     uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT];
     uint8_t patches[FM1LAB_PATCH_COUNT][FM1LAB_PACKED_PATCH_BYTES];
+    uint8_t seq_note[FM1LAB_SEQ_LANES][FM1LAB_SEQ_STEPS];
+    uint8_t seq_velocity[FM1LAB_SEQ_LANES][FM1LAB_SEQ_STEPS];
+    uint8_t seq_tempo;
 } fm1lab_instrument_record_t;
 
 enum {
@@ -29,6 +34,8 @@ void fm6_init(void);
 void fm6_panic(void);
 void fm6_note_on(uint8_t note, uint8_t velocity);
 void fm6_note_off(uint8_t note);
+void fm6_note_on_source(uint8_t note, uint8_t velocity, uint8_t source);
+void fm6_note_off_source(uint8_t note, uint8_t source);
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12);
 
 uint32_t fm6_patch_count(void);
