@@ -37,7 +37,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE };
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -63,7 +63,8 @@ static void instrument_apply_engine(void)
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const fm1lab_patch_t *part = &current_instrument.patches[p];
         (void)fm6_patch_set_voice(p, part->voice);
-        fm6_patch_set_enabled(p, part->enabled);
+        /* Layer activation is controlled exclusively by its HOME volume. */
+        fm6_patch_set_enabled(p, 1u);
         fm6_patch_set_level(p, part->level);
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             fm6_macro_set(p, m, part->macros[m]);
@@ -76,7 +77,7 @@ static void instrument_factory_capture(void)
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const uint8_t *voice = fm6_patch_data(p);
         if (voice) (void)fm1lab_patch_set_voice(&factory_instrument, p, voice);
-        factory_instrument.patches[p].enabled = fm6_patch_enabled(p);
+        factory_instrument.patches[p].enabled = 1u;
         factory_instrument.patches[p].level = 127u;
     }
 }
@@ -88,10 +89,9 @@ static void instrument_factory_defaults(void)
 
 static void instrument_sync_settings(void)
 {
-    set.enabled_mask = 0;
+    set.enabled_mask = 0x0fu; /* compatibility field; layer volume is authoritative */
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const fm1lab_patch_t *part = &current_instrument.patches[p];
-        if (part->enabled) set.enabled_mask |= (uint8_t)(1u << p);
         set.levels[p] = part->level;
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             set.macros[p][m] = part->macros[m];
@@ -138,7 +138,7 @@ static void ui_events_drain(void)
         fm6_panic();
         if (instrument_loaded) instrument_apply_engine();
         else for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-            fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
+            fm6_patch_set_enabled(p, 1u);
             fm6_patch_set_level(p, set.levels[p]);
             for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
                 fm6_macro_set(p, m, set.macros[p][m]);
@@ -158,8 +158,6 @@ static void ui_events_drain(void)
             fm6_note_off(a);
         else if (type == EV_PANIC)
             fm6_panic();
-        else if (type == EV_PATCH_ENABLE)
-            fm6_patch_set_enabled(a, b);
         else if (type == EV_MACRO_SET)
             fm6_macro_set(a, b, c);
         else if (type == EV_PATCH_LEVEL)
@@ -601,17 +599,6 @@ static void input(void)
             fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
             set_dirty = 1u;
             app_say("FX",fm6_fx_enabled(fx)?"ON":"BYPASS");
-        } else if (k == B_EDIT && page == PAGE_HOME) {
-            /* HOME / EDIT toggles the selected layer without changing its voice.
-             * Publish to the audio thread; instrument save persists the choice. */
-            uint8_t enabled = (uint8_t)!current_instrument.patches[set.patch].enabled;
-            current_instrument.patches[set.patch].enabled = enabled;
-            if (enabled) set.enabled_mask |= (uint8_t)(1u << set.patch);
-            else set.enabled_mask &= (uint8_t)~(1u << set.patch);
-            ui_event_push(EV_PATCH_ENABLE, set.patch, enabled, 0u);
-            instrument_dirty = 1u;
-            set_dirty = 1u;
-            app_say("LAYER", enabled ? "ON" : "OFF");
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", fm6_patch_name(set.patch));
@@ -887,7 +874,7 @@ static void draw_home_panel(void)
         int32_t x = 4 + (int32_t)(p & 1u) * 118;
         int32_t y = 4 + (int32_t)(p >> 1u) * 68;
         uint16_t accent = patch_color(p);
-        int enabled = (set.enabled_mask >> p) & 1u;
+        int enabled = set.levels[p] != 0u;
         rounded_panel(x, y, 112, 62, 7, panel_fill(), p == set.patch ? accent : C_LINE);
         cv_rect(x + 5, y + 8, 3, 46, accent);
         cv_text(x + 13, y + 7, &FONT_XS, fm6_patch_name(p), C_WHITE);
@@ -902,7 +889,7 @@ static void draw_home_panel(void)
         cv_rect(x + 59, y + 45, 43, 5, C_LINE);
         cv_rect(x + 59, y + 45, (int32_t)set.levels[p] * 43 / 127, 5, accent);
     }
-    cv_text(5, 138, &FONT_XS, "EDIT: LAYER ON/OFF   SEL: SHAPE", C_GRAY);
+    cv_text(5, 138, &FONT_XS, "K1-K4: LAYER VOLUME   0 = OFF   SEL: SHAPE", C_GRAY);
 }
 
 static void draw_macro_panel(void)
@@ -1198,7 +1185,7 @@ static void draw(void)
             cv_text(x + 6, 33, &FONT_XS, "K1-K4 EDIT", ink);
         } else cv_text(x + 6, 27, &FONT_XS, "-", C_GRAY);
     }
-    if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-K4 SELECT + LEVEL   SELECT KNOB CYCLES PATCH", C_GRAY);
+    if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-K4 CONTROL PATCH VOLUME   0 = OFF   SELECT KNOB CYCLES PATCH", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
     else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
