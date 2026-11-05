@@ -118,6 +118,27 @@ int main(void)
     require(fm6_macro_get(0u, FM1LAB_MACRO_BODY) == 73u, "macro value survives export/import");
     require(!fm6_instrument_dirty(2u), "loaded Instrument starts clean");
 
+    /* Raw operator edits and algorithm routing are reflected by the editor API. */
+    fm6_init();
+    {
+        uint8_t routes_before[6], changed = 0;
+        uint32_t op;
+        uint8_t level = fm6_operator_value(0u, 1u, FM6_OP_LEVEL);
+        for (op = 1; op <= 6u; op++)
+            routes_before[op - 1u] = fm6_operator_route(0u, op);
+        require(fm6_operator_set_value(0u, 1u, FM6_OP_LEVEL,
+                    (uint8_t)(level < 90u ? level + 5u : level - 5u)),
+                "operator level edit accepted");
+        require(fm6_operator_value(0u, 1u, FM6_OP_LEVEL) != level,
+                "operator level edit changes the patch");
+        require(fm6_instrument_dirty(0u), "raw operator edit marks Instrument dirty");
+        fm6_patch_set_algorithm(0u, 31u);
+        for (op = 1; op <= 6u; op++)
+            if (routes_before[op - 1u] != fm6_operator_route(0u, op))
+                changed = 1;
+        require(changed, "algorithm change updates operator routing topology");
+    }
+
     fm6_init();
     for (p = 0; p < 4u; p++)
         fm6_patch_set_enabled(p, 1);
