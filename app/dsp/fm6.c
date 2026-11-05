@@ -118,7 +118,7 @@ static void fm6_transport_step(void)
         else ++arp_index;
     } else if(arp_live) { fm6_note_off(arp_live_note); arp_live=0u; }
 }
-static void fm6_fx_process(int32_t input,const int32_t sends[3],int32_t *left,int32_t *right)
+static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,int64_t *right)
 {
     int32_t chorus=0,delay=0,reverb=0;
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
@@ -152,7 +152,7 @@ static void fm6_fx_process(int32_t input,const int32_t sends[3],int32_t *left,in
     if(fx_enabled[0]) wet+=(int64_t)chorus*fx_mix[0]/100;
     if(fx_enabled[1]) wet+=(int64_t)delay*fx_mix[1]/100;
     if(fx_enabled[2]) wet+=(int64_t)reverb*fx_mix[2]/100;
-    *left=fm6_sat_q23(wet); *right=fm6_sat_q23(wet);
+    *left=wet; *right=wet;
 }
 
 static int32_t clamp_i32(int32_t x, int32_t lo, int32_t hi)
@@ -476,8 +476,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
                 for(uint32_t fx=0;fx<3u;fx++) send_accum[fx]+=sample*fx_send[p][fx]/100;
             }
             int32_t sends[3]={fm6_sat_q23(send_accum[0]),fm6_sat_q23(send_accum[1]),fm6_sat_q23(send_accum[2])};
-            int32_t left=0,right=0;
-            fm6_fx_process(fm6_sat_q23(dry),sends,&left,&right);
+            int64_t left=0,right=0;
+            fm6_fx_process(dry,sends,&left,&right);
             stereo[(base+i)*2u]=fm6_soft_clip(((int64_t)left*output_gain_q12)>>15);
             stereo[(base+i)*2u+1u]=fm6_soft_clip(((int64_t)right*output_gain_q12)>>15);
         }
