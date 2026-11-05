@@ -641,7 +641,7 @@ static void input(void)
     ui.keys = keys;
     ui.btn = btn;
     plat_glow(1);                            /* the unlit buttons glow, readable in the dark */
-    plat_leds(btn | ((set_dirty || fm6_instrument_dirty(set.instrument)) ? 1u << B_SAVE : 0u), keys);
+    plat_leds(btn | ((set_dirty || fm6_instrument_dirty(set.instrument) || seq_instrument_dirty(set.instrument)) ? 1u << B_SAVE : 0u), keys);
 }
 
 void app_input_only(void) { input(); }
@@ -810,7 +810,7 @@ static void draw(void)
         int32_t cursor_x = 104 + (int32_t)ui.rename_pos * 6;
         cv_line(cursor_x, 20, cursor_x + 5, 20, C_WHITE);
     }
-    if (fm6_instrument_dirty(set.instrument))
+    if (fm6_instrument_dirty(set.instrument) || seq_instrument_dirty(set.instrument))
         cv_text(178, 8, &FONT_XS, "UNSAVED", C_HI);
     if (FM1B_BLE)
         cv_text(210, 8, &FONT_XS, "BT", plat_ble_connected() ? C_HI : C_DIM);
@@ -955,7 +955,7 @@ int app_expect(const char *what, int *got)
     else if (!strcmp(what, "instrument"))
         *got = set.instrument;
     else if (!strcmp(what, "instrument_dirty"))
-        *got = fm6_instrument_dirty(set.instrument);
+        *got = fm6_instrument_dirty(set.instrument) || seq_instrument_dirty(set.instrument);
     else if (!strcmp(what, "seq_running"))
         *got = seq_running();
     else if (!strcmp(what, "seq_tempo"))
