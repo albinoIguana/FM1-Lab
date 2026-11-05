@@ -5,11 +5,19 @@ on:
   push:
     branches:
       - feat/m-vave-native-instrument
+      - feature/native-instrument-macro-workflow
     paths:
       - 'firmware/**'
       - 'scripts/build-device-firmware.ps1'
       - 'scripts/patch-m-vave-device-dx7-core.mjs'
       - 'scripts/patch-m-vave-audio-mixer.mjs'
+      - 'scripts/patch-m-vave-instrument-home.mjs'
+      - 'scripts/patch-m-vave-instrument-sequencer-screen.mjs'
+      - 'scripts/patch-m-vave-native-patch-editor.mjs'
+      - 'scripts/patch-m-vave-instrument-macros.mjs'
+      - 'scripts/patch-m-vave-instrument-storage.mjs'
+      - 'scripts/patch-m-vave-two-track-sequencer.mjs'
+      - 'scripts/patch-m-vave-physical-controls.mjs'
       - '.github/workflows/device-firmware.yml'
 
 permissions:

@@ -71,6 +71,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Native sequencer screen patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-native-patch-editor.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Native patch editor screen patch failed.' }
+    node (Join-Path $root 'scripts/patch-m-vave-instrument-macros.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Instrument macro screen patch failed.' }
     node (Join-Path $root 'scripts/patch-m-vave-audio-mixer.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Native FM6 audio integration patch failed.' }
 } finally {
