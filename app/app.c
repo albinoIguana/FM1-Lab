@@ -367,6 +367,14 @@ static void settings_defaults(void)
     settings_seal(&set);
 }
 
+/* Called by fm1-base after a measured audio block exceeds 90% of its
+ * 5.8 ms deadline. The DSP fades the globally oldest voice over 32 samples;
+ * no allocation, flash access, UI work, or cross-patch allocator mutation. */
+void app_overload(void)
+{
+    fm6_overload();
+}
+
 void app_init(void)
 {
     settings_v1_t old_v1;
