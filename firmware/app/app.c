@@ -692,12 +692,113 @@ static void draw_patch_card(uint32_t patch, int32_t x, int32_t y)
     }
 }
 
+static void draw_editor(void)
+{
+    static const char *const PARAM_NAME[FM6_OP_PARAM_COUNT] = {
+        "LEVEL", "COARSE RATIO", "FINE", "ATTACK RATE",
+        "DECAY RATE", "SUSTAIN LEVEL", "RELEASE RATE", "RATIO / FIXED"
+    };
+    static const char *const MACRO_NAME[4] = {"BRIGHT", "BODY", "MOTION", "DIRT"};
+    char t[24];
+    uint32_t op, i;
+    uint8_t alg = fm6_patch_algorithm(set.patch);
+    uint8_t selected_op = (uint8_t)(ui.op_index + 1u);
+    uint8_t value = fm6_operator_value(set.patch, selected_op, ui.op_param);
+
+    cv_begin(240, 144, C_BLACK);
+    cv_text(6, 4, &FONT_B, "FM6 / OPERATOR EDITOR", C_WHITE);
+    cv_text(150, 7, &FONT_XS, fm6_instrument_name(set.instrument), C_HI);
+    cv_line(4, 21, 236, 21, C_LINE);
+    cv_text(6, 23, &FONT_S, fm6_patch_name(set.patch), C_WHITE);
+    int_text(alg, t);
+    text_cat(t, ui.alg_edit ? " ALG*" : " ALG");
+    cv_text(180, 23, &FONT_XS, t, C_HI);
+
+    /* Six operators, their carrier/modulator roles and their algorithm buses. */
+    cv_line(5, 88, 235, 88, C_DIM);
+    cv_line(5, 102, 235, 102, C_DIM);
+    cv_text(2, 78, &FONT_XS, "1", C_GRAY);
+    cv_text(2, 92, &FONT_XS, "2", C_GRAY);
+    for (op = 1; op <= 6; op++) {
+        int32_t x = 11 + (int32_t)(op - 1u) * 37;
+        uint8_t route = fm6_operator_route(set.patch, op);
+        uint8_t carrier = fm6_operator_is_carrier(set.patch, op);
+        uint8_t out_bus = route & 3u;
+        uint8_t in_bus = (route >> 4) & 3u;
+        uint8_t level = fm6_operator_value(set.patch, op, FM6_OP_LEVEL);
+        uint16_t role_color = carrier ? C_HI : C_DIM;
+        cv_rect(x, 39, 29, 27, C_BLACK);
+        cv_line(x, 39, x + 28, 39, op == selected_op ? C_WHITE : role_color);
+        cv_line(x, 66, x + 28, 66, op == selected_op ? C_WHITE : role_color);
+        cv_line(x, 39, x, 66, op == selected_op ? C_WHITE : role_color);
+        cv_line(x + 28, 39, x + 28, 66, op == selected_op ? C_WHITE : role_color);
+        int_text((int32_t)op, t);
+        text_cat(t, carrier ? " C" : " M");
+        cv_text(x + 3, 42, &FONT_XS, t, carrier ? C_HI : C_GRAY);
+        cv_rect(x + 3, 58, (int32_t)level * 23 / 99, 3, role_color);
+        if (route & 0xC0u)
+            cv_text(x + 18, 48, &FONT_XS, "FB", C_WHITE);
+
+        if (out_bus & 1u) {
+            cv_line(x + 14, 66, x + 14, 88, C_DIM);
+            cv_rect(x + 12, 86, 4, 4, C_HI);
+        }
+        if (out_bus & 2u) {
+            cv_line(x + 14, 66, x + 14, 102, C_DIM);
+            cv_rect(x + 12, 100, 4, 4, C_HI);
+        }
+        if (in_bus & 1u)
+            cv_line(x + 14, 39, x + 14, 88, C_LINE);
+        if (in_bus & 2u)
+            cv_line(x + 14, 39, x + 14, 102, C_LINE);
+        if (!out_bus)
+            cv_rect(x + 10, 72, 8, 5, C_HI);
+    }
+    cv_text(6, 115, &FONT_XS, "C = CARRIER   M = MODULATOR", C_GRAY);
+    cv_text(6, 130, &FONT_XS, "SELECT: OPERATOR   ENV: PARAM   GLO: ALGORITHM", C_DIM);
+    cv_blit(0, 0);
+
+    cv_begin(240, 96, C_BLACK);
+    cv_text(6, 3, &FONT_XS, ui.alg_edit ? "ALGORITHM EDIT" : "OPERATOR PARAMETER", C_GRAY);
+    int_text(selected_op, t);
+    text_cat(t, carrier ? " CARRIER" : " MODULATOR");
+    cv_text(6, 17, &FONT_B, t, C_WHITE);
+    cv_text(116, 17, &FONT_XS, PARAM_NAME[ui.op_param], C_HI);
+    int_text(value, t);
+    cv_text(6, 36, &FONT_B, t, C_WHITE);
+    cv_rect(48, 39, 180, 7, C_LINE);
+    {
+        uint32_t max = ui.op_param == FM6_OP_RATIO ? 31u :
+                       ui.op_param == FM6_OP_FIXED_MODE ? 1u : 99u;
+        cv_rect(48, 39, (int32_t)value * 180 / (int32_t)max, 7, C_HI);
+    }
+    if (ui.op_param == FM6_OP_RATIO || ui.op_param == FM6_OP_FIXED_MODE) {
+        cv_text(6, 52, &FONT_XS,
+                fm6_operator_value(set.patch, selected_op, FM6_OP_FIXED_MODE) ? "FIXED FREQUENCY" : "RATIO FREQUENCY",
+                C_GRAY);
+    } else {
+        cv_text(6, 52, &FONT_XS, ui.alg_edit ? "TURN ALGO TO CHANGE ROUTING" : "TURN ALGO TO EDIT VALUE", C_GRAY);
+    }
+    for (i = 0; i < 4; i++) {
+        int32_t x = 6 + (int32_t)i * 59;
+        uint32_t mv = fm6_macro_get(set.patch, i);
+        cv_text(x, 68, &FONT_XS, MACRO_NAME[i], C_GRAY);
+        cv_rect(x, 82, 48, 4, C_LINE);
+        cv_rect(x, 82, (int32_t)mv * 48 / 100, 4, C_HI);
+    }
+    cv_blit(0, 144);
+}
+
 static void draw(void)
 {
     char t[24];
     int32_t note = voice_note;
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u, i;
     static const char *const MACRO_NAME[4] = {"BRIGHT", "BODY", "MOTION", "DIRT"};
+    if (ui.editor) {
+        draw_editor();
+        return;
+    }
 
     /* Header and the 2x2 patch matrix. */
     cv_begin(240, 144, C_BLACK);
