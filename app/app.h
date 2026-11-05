@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Charles Vestal */
-/* The template: the smallest complete fm1-base firmware. Copy this directory to start a firmware.
+/* The FM1-Lab: the smallest complete fm1-base firmware. Copy this directory to start a firmware.
  * This header is the app's half of the contract with the platform (device/unity.c, host/plat_host.c). */
 #pragma once
 #include <stdint.h>
@@ -11,8 +11,8 @@
 #define APP_BLOCK 256u                   /* frames per audio block: 5.8 ms at 44.1 kHz */
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_BTDEV                        /* Bluetooth MIDI devices (lib/btdev.h) */
-#define APP_BLE_AT_BOOT (!template_ble_off())   /* Bluetooth at power-on: as the player left it (REC held) */
-int template_ble_off(void);
+#define APP_BLE_AT_BOOT (!FM1-Lab_ble_off())   /* Bluetooth at power-on: as the player left it (REC held) */
+int FM1-Lab_ble_off(void);
 
 /* the store: the app's objects, the panel calibration (the platform's) and Bluetooth's address and pairing among
  * them, and their flash offsets */
