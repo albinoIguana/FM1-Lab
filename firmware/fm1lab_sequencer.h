@@ -30,8 +30,9 @@ typedef struct {
     fm1lab_sequence_lane_t lanes[FM1LAB_SEQUENCE_LANES];
 } fm1lab_sequence_state_t;
 
-/* Bind two distinct, normal M-VAVE project tracks. The other six tracks are
- * never read-modified-written by this adapter. No implicit track assignment. */
+/* Bind two distinct NORMAL DX7 tracks. Other NORMAL tracks are temporarily
+ * set OFF through the official role API and restored on unbind. Existing
+ * PLAY/OFF roles are preserved. Role changes may invalidate project undo. */
 int fm1lab_sequencer_bind(unsigned backend_track_a, unsigned backend_track_b);
 int fm1lab_sequencer_unbind(void);
 int fm1lab_sequencer_read(fm1lab_sequence_state_t *state);
