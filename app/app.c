@@ -615,6 +615,18 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
+        } else if (k == EN_ALGO && page == PAGE_HOME) {
+            if (instrument_apply_pending || instrument_dirty) {
+                app_say(instrument_dirty ? "SAVE INSTRUMENT" : "INSTRUMENT", instrument_dirty ? "BEFORE CHANGING" : "LOADING");
+            } else {
+                int32_t bank = ((int32_t)(instrument_index / 8u) + e) % 4;
+                if (bank < 0) bank += 4;
+                uint32_t next = (uint32_t)bank * 8u + instrument_index % 8u;
+                if (next != instrument_index) {
+                    instrument_load(next, 1);
+                    app_say("BANK", "SELECTED");
+                }
+            }
         } else if (k == EN_ALGO && page == PAGE_ENV) {
             int32_t next = ((int32_t)env_operator - 1 + e) % 6;
             if (next < 0) next += 6;
@@ -633,10 +645,11 @@ static void input(void)
             } else if (instrument_dirty) {
                 app_say("SAVE INSTRUMENT", "BEFORE CHANGING");
             } else {
-                int32_t next = ((int32_t)instrument_index + e) % USER_INSTRUMENT_COUNT;
-                if (next < 0) next += USER_INSTRUMENT_COUNT;
-                if ((uint32_t)next != instrument_index) {
-                    instrument_load((uint32_t)next, 1);
+                int32_t slot = ((int32_t)(instrument_index % 8u) + e) % 8;
+                if (slot < 0) slot += 8;
+                uint32_t next = (instrument_index / 8u) * 8u + (uint32_t)slot;
+                if (next != instrument_index) {
+                    instrument_load(next, 1);
                     app_say("INSTRUMENT", "SELECTED");
                 }
             }
