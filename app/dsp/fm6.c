@@ -87,7 +87,7 @@ static uint32_t transport_phase;
 static volatile uint8_t arp_mode, arp_notes[16], arp_count, arp_index, arp_direction=1u;
 static uint8_t arp_live_note, arp_live;
 static int32_t fx_delay[FM6_DELAY_SIZE] PLAT_POOL, fx_chorus[FM6_CHORUS_SIZE] PLAT_POOL;
-static int32_t fx_comb_a[256] PLAT_POOL, fx_comb_b[512] PLAT_POOL, fx_comb_c[1024] PLAT_POOL;
+static int32_t fx_comb_a[2048] PLAT_POOL, fx_comb_b[4096] PLAT_POOL, fx_comb_c[8192] PLAT_POOL;
 static uint16_t fx_delay_pos, fx_chorus_pos, fx_comb_pos_a, fx_comb_pos_b, fx_comb_pos_c;
 static volatile uint8_t fx_enabled[3], fx_mix[3]={18u,24u,20u}, fx_time[3]={48u,52u,45u}, fx_feedback[3]={40u,42u,60u};
 static volatile uint8_t fx_send[PATCHES][3];
@@ -151,10 +151,10 @@ static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,in
         fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2]+(int64_t)b*(decay+3u)/100);
         fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2]+(int64_t)c*(decay+6u)/100);
     } else { fx_comb_a[fx_comb_pos_a]=fx_comb_b[fx_comb_pos_b]=fx_comb_c[fx_comb_pos_c]=0; }
-    fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&255u);
-    fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&511u);
-    fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&1023u);
-    fx_lfo_phase+=0x18000u;
+    fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&2047u);
+    fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&4095u);
+    fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&8191u);
+    fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
     int64_t wet=input;
     if(fx_enabled[0]) wet+=(int64_t)chorus*fx_mix[0]/100;
     if(fx_enabled[1]) wet+=(int64_t)delay*fx_mix[1]/100;
@@ -317,7 +317,6 @@ void fm6_init(void)
     fm6_zero_bytes(fx_chorus,sizeof(fx_chorus)); fm6_zero_bytes(fx_comb_a,sizeof(fx_comb_a));
     fm6_zero_bytes(fx_comb_b,sizeof(fx_comb_b)); fm6_zero_bytes(fx_comb_c,sizeof(fx_comb_c));
     for(uint32_t fx=0;fx<3u;fx++) fx_enabled[fx]=0u;
-    for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=0u;
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=100u;
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u;
     seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
