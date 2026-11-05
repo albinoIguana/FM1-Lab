@@ -26,7 +26,7 @@ static uint32_t sample_clock;
 static uint32_t next_step_sample;
 static uint32_t step_samples;
 static uint32_t gate_samples;
-static uint8_t current_step;
+static volatile uint8_t current_step;
 static volatile uint8_t running;
 static uint8_t active_note[LANES];
 
