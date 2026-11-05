@@ -461,6 +461,8 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
+        if (ui.rename && k != B_HOME)
+            continue;
         if (k == B_OCTDN)
             octave_step(-1);
         else if (k == B_OCTUP)
@@ -698,6 +700,10 @@ static void draw(void)
     cv_begin(240, 144, C_BLACK);
     cv_text(7, 5, &FONT_B, APP_NAME, C_WHITE);
     cv_text(104, 8, &FONT_XS, fm6_instrument_name(set.instrument), C_HI);
+    if (ui.rename) {
+        int32_t cursor_x = 104 + (int32_t)ui.rename_pos * 6;
+        cv_line(cursor_x, 20, cursor_x + 5, 20, C_WHITE);
+    }
     if (fm6_instrument_dirty(set.instrument))
         cv_text(178, 8, &FONT_XS, "UNSAVED", C_HI);
     if (FM1B_BLE)
