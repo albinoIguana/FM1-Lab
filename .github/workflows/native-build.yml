@@ -27,7 +27,7 @@ jobs:
       sdk: true
       build: |
         set -euo pipefail
-        git submodule update --init --recursive base
+        git submodule update --init --recursive base upstream/felucca
         sh build.sh
         python3 base/tools/build.py app --host
       packages: app/build/fm1lab.fwsc
