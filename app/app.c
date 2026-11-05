@@ -516,212 +516,195 @@ static void outline(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t color)
     cv_rect(x + w - 1, y, 1, h, color);
 }
 
+static void rounded_panel(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t fill, uint16_t border)
+{
+    for (int32_t row = 0; row < h; ++row) {
+        int32_t inset = row < r ? r - row - 1 : row >= h - r ? row - (h - r) : 0;
+        int32_t span = w - 2 * inset;
+        if (span <= 0) continue;
+        cv_rect(x + inset, y + row, span, 1, border);
+        if (span > 2) cv_rect(x + inset + 1, y + row, span - 2, 1, fill);
+    }
+}
+static uint16_t patch_color(uint32_t p)
+{
+    static const uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
+    return colors[p & 3u];
+}
+static uint16_t panel_fill(void) { return RGB(17,29,39); }
+static uint16_t screen_bg(void) { return RGB(8,13,19); }
+
 static void draw_home_panel(void)
 {
     char t[24];
-    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+    for (uint32_t p = 0; p < 4u; ++p) {
         int32_t x = 4 + (int32_t)(p & 1u) * 118;
-        int32_t y = 4 + (int32_t)(p >> 1) * 68;
-        uint16_t accent = p == set.patch ? C_HI : C_LINE;
+        int32_t y = 4 + (int32_t)(p >> 1u) * 68;
+        uint16_t accent = patch_color(p);
         int enabled = (set.enabled_mask >> p) & 1u;
-        cv_rect(x, y, 112, 62, C_BLACK);
-        outline(x, y, 112, 62, accent);
-        if (p == set.patch)
-            cv_rect(x + 3, y + 6, 2, 10, C_HI);
-        cv_text(x + 6, y + 6, &FONT_XS, fm6_patch_name(p), C_WHITE);
-        cv_text(x + 6, y + 24, &FONT_XS, enabled ? "ACTIVE" : "MUTED", enabled ? C_HI : C_DIM);
-        cv_text(x + 58, y + 24, &FONT_XS, "ALG", C_GRAY);
+        rounded_panel(x, y, 112, 62, 7, panel_fill(), p == set.patch ? accent : C_LINE);
+        cv_rect(x + 5, y + 8, 3, 46, accent);
+        cv_text(x + 13, y + 7, &FONT_XS, fm6_patch_name(p), C_WHITE);
+        cv_text(x + 13, y + 24, &FONT_XS, enabled ? "ON" : "OFF",
+                enabled ? RGB(75,235,135) : RGB(255,82,101));
+        cv_text(x + 48, y + 24, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
-        cv_text(x + 82, y + 24, &FONT_XS, t, C_WHITE);
-        cv_text(x + 6, y + 42, &FONT_XS, "LVL", C_GRAY);
+        cv_text(x + 78, y + 24, &FONT_XS, t, C_WHITE);
+        cv_text(x + 13, y + 42, &FONT_XS, "VOL", C_GRAY);
         int_text(set.levels[p], t);
-        cv_text(x + 32, y + 42, &FONT_XS, t, C_WHITE);
-        cv_rect(x + 54, y + 45, 50, 6, C_LINE);
-        cv_rect(x + 54, y + 45, (int32_t)set.levels[p] * 50 / 127, 6, C_HI);
+        cv_text(x + 38, y + 42, &FONT_XS, t, accent);
+        cv_rect(x + 59, y + 45, 43, 5, C_LINE);
+        cv_rect(x + 59, y + 45, (int32_t)set.levels[p] * 43 / 127, 5, accent);
     }
-    cv_text(4, 138, &FONT_XS, "SELECT PATCH  SEL MACROS  GLO SET", C_GRAY);
+    cv_text(5, 138, &FONT_XS, "SELECT PATCH   PRESS SEL TO SHAPE", C_GRAY);
 }
 
 static void draw_macro_panel(void)
 {
-    static const char *const names[FM1LAB_MACRO_COUNT] = {"BRIGHTNESS", "BODY", "MOTION", "EDGE"};
-    char t[24];
+    static const char *const names[4] = {"BRIGHTNESS", "BODY", "MOTION", "EDGE"};
+    static const char *const hints[4] = {"FM DEPTH", "RATIO / ENV", "LFO / DEPTH", "FEEDBACK"};
     uint32_t now = plat_ms();
+    uint16_t accent = patch_color(set.patch);
+    char t[24];
     cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(164, 2, &FONT_XS, "ALGO", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
-    cv_text(204, 2, &FONT_XS, t, C_HI);
-    for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m) {
-        int32_t y = 28 + (int32_t)m * 27;
+    cv_text(204, 2, &FONT_XS, t, accent);
+    for (uint32_t m = 0; m < 4u; ++m) {
+        int32_t x = 4 + (int32_t)(m & 1u) * 118;
+        int32_t y = 4 + (int32_t)(m >> 1u) * 68;
         uint32_t value = set.macros[set.patch][m];
-        uint16_t ink = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u
-                           ? C_HI : C_LINE;
-        if (ink == C_HI)
-            outline(2, y - 4, 232, 20, C_HI);
-        cv_text(6, y, &FONT_XS, names[m], C_WHITE);
+        uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
+        rounded_panel(x, y, 112, 62, 7, panel_fill(), border);
+        cv_text(x + 9, y + 8, &FONT_XS, names[m], C_WHITE);
         int_text((int32_t)value, t);
-        cv_text(78, y, &FONT_XS, t, C_HI);
-        cv_rect(108, y + 2, 124, 8, C_LINE);
-        cv_rect(108, y + 2, (int32_t)value * 124 / 100, 8, C_HI);
-        cv_rect(169, y, 2, 12, C_WHITE); /* neutral midpoint at 50 */
-        cv_rect(107 + (int32_t)value * 124 / 100, y, 3, 12, C_WHITE);
+        cv_text(x + 91, y + 7, &FONT_XS, t, accent);
+        cv_rect(x + 9, y + 31, 94, 7, C_LINE);
+        cv_rect(x + 9, y + 31, (int32_t)value * 94 / 100, 7, accent);
+        cv_rect(x + 55, y + 28, 2, 13, C_WHITE);
+        cv_rect(x + 8 + (int32_t)value * 94 / 100, y + 28, 3, 13, C_WHITE);
+        cv_text(x + 9, y + 49, &FONT_XS, hints[m], C_GRAY);
     }
-    cv_text(4, 128, &FONT_XS, "50 = NEUTRAL", C_GRAY);
-    cv_text(4, 138, &FONT_XS, "K1 BRIGHT  K2 BODY  K3 MOVE  K4 EDGE", C_GRAY);
 }
 
-/* Read-only role map: reflects the selected algorithm's carrier assignment
- * without pretending to expose operator routing or editable values. */
+/* Four operator quadrants; roles come from the selected algorithm's actual data. */
 static void draw_operator_map(void)
 {
     char t[24];
-    cv_text(6, 2, &FONT_XS, "OPERATOR ROLES", C_WHITE);
+    uint16_t accent = patch_color(set.patch);
+    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(154, 2, &FONT_XS, "ALGO", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
-    cv_text(204, 2, &FONT_XS, t, C_HI);
-    for (uint32_t op = 1; op <= 6u; ++op) {
-        int32_t x = 6 + (int32_t)((op - 1u) % 3u) * 78;
-        int32_t y = 24 + (int32_t)((op - 1u) / 3u) * 49;
-        int carrier = fm6_operator_is_carrier(set.patch, op);
-        uint16_t accent = carrier ? C_HI : C_LINE;
-        cv_rect(x, y, 70, 42, C_BLACK);
-        outline(x, y, 70, 42, accent);
-        cv_text(x + 5, y + 5, &FONT_XS, "OP", C_GRAY);
-        int_text((int32_t)op, t);
-        cv_text(x + 23, y + 5, &FONT_XS, t, C_WHITE);
-        cv_rect(x + 5, y + 23, 60, 12, carrier ? C_HI : C_LINE);
-        cv_text(x + 8, y + 24, &FONT_XS, carrier ? "CARRIER" : "MODULATOR",
-                carrier ? C_BLACK : C_WHITE);
+    cv_text(204, 2, &FONT_XS, t, accent);
+    for (uint32_t pair = 0; pair < 3u; ++pair) {
+        int32_t x = 4 + (int32_t)(pair & 1u) * 118;
+        int32_t y = 4 + (int32_t)(pair >> 1u) * 68;
+        uint32_t op_a = pair * 2u + 1u, op_b = op_a + 1u;
+        int ca = fm6_operator_is_carrier(set.patch, op_a);
+        int cb = fm6_operator_is_carrier(set.patch, op_b);
+        rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
+        cv_text(x + 9, y + 8, &FONT_XS, "OPERATOR PAIR", C_GRAY);
+        cv_text(x + 9, y + 25, &FONT_B, "OP", C_WHITE);
+        int_text((int32_t)op_a, t); cv_text(x + 27, y + 25, &FONT_B, t, accent);
+        cv_text(x + 57, y + 25, &FONT_B, "OP", C_WHITE);
+        int_text((int32_t)op_b, t); cv_text(x + 75, y + 25, &FONT_B, t, accent);
+        cv_text(x + 9, y + 45, &FONT_XS, ca ? "CARRIER" : "MODULATOR", ca ? accent : C_GRAY);
+        cv_text(x + 65, y + 45, &FONT_XS, cb ? "CARRIER" : "MODULATOR", cb ? accent : C_GRAY);
     }
-    cv_text(6, 128, &FONT_XS, "CARRIERS: AUDIO OUT   MODULATORS: FM", C_GRAY);
+    rounded_panel(122, 72, 112, 62, 7, panel_fill(), C_LINE);
+    cv_text(131, 81, &FONT_XS, "ALGORITHM", C_GRAY);
+    int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
+    cv_text(131, 99, &FONT_B, t, accent);
+    cv_text(131, 119, &FONT_XS, "ROLES FROM ENGINE", C_GRAY);
 }
 
 static void draw_global_panel(uint32_t pct)
 {
     char t[24];
-    cv_text(8, 8, &FONT_XS, "MASTER", C_GRAY);
-    int_text((int32_t)pct, t); text_cat(t, "%");
-    cv_text(90, 8, &FONT_XS, t, C_HI);
-    cv_text(8, 34, &FONT_XS, "OCTAVE", C_GRAY);
-    octave_text(t);
-    cv_text(90, 34, &FONT_XS, t, C_WHITE);
-    cv_text(8, 60, &FONT_XS, "BLUETOOTH", C_GRAY);
-    cv_text(90, 60, &FONT_XS, set.ble_off ? "OFF" : "ON", set.ble_off ? C_DIM : C_HI);
-    cv_text(8, 86, &FONT_XS, "BLE MIDI", C_GRAY);
-    cv_text(90, 86, &FONT_XS, plat_ble_connected() ? "CONNECTED" : "WAITING", plat_ble_connected() ? C_HI : C_DIM);
-    cv_text(8, 112, &FONT_XS, "MIDI IN", C_GRAY);
-    int_text((int32_t)midi_count, t);
-    cv_text(90, 112, &FONT_XS, t, C_WHITE);
-    /* Device-side render-budget telemetry from the pinned fm1-base ISR. */
-    cv_text(8, 136, &FONT_XS, "CPU", C_GRAY);
-    int_text((int32_t)plat_cpu_pct(), t); text_cat(t, "%");
-    cv_text(40, 136, &FONT_XS, t, C_HI);
-    cv_text(122, 136, &FONT_XS, "XRUNS", C_GRAY);
-    int_text((int32_t)plat_xruns(), t);
-    cv_text(168, 136, &FONT_XS, t, C_HI);
+    const char *labels[4] = {"MASTER", "OCTAVE", "BLUETOOTH", "MIDI IN"};
+    uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
+    for (uint32_t i = 0; i < 4u; ++i) {
+        int32_t x = 4 + (int32_t)(i & 1u) * 118;
+        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        rounded_panel(x, y, 112, 62, 7, panel_fill(), colors[i]);
+        cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_GRAY);
+        if (i == 0) {
+            int_text((int32_t)pct, t); text_cat(t, "%");
+            cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text(x + 9, y + 47, &FONT_XS, "OUTPUT LEVEL", C_GRAY);
+        } else if (i == 1) {
+            octave_text(t);
+            cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text(x + 9, y + 47, &FONT_XS, "TRANSPOSE", C_GRAY);
+        } else if (i == 2) {
+            cv_text(x + 9, y + 27, &FONT_B, set.ble_off ? "OFF" : "ON", colors[i]);
+            cv_text(x + 9, y + 47, &FONT_XS, plat_ble_connected() ? "CONNECTED" : "WAITING", C_GRAY);
+        } else {
+            int_text((int32_t)midi_count, t);
+            cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text(x + 9, y + 47, &FONT_XS, "MESSAGES RECEIVED", C_GRAY);
+        }
+    }
 }
 
 static void draw(void)
 {
     char t[24];
     int32_t note = voice_note;
-    uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
-    static const uint8_t WK[16] = PLAT_WHITE_KEYS, BK[11] = PLAT_BLACK_KEYS;
-    /* the header: the name and the note, or a message for a moment */
-    cv_begin(240, 32, C_BLACK);
+    uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
+    uint16_t accent = patch_color(set.patch);
+    cv_begin(240, 32, screen_bg());
+    cv_rect(0, 29, 240, 3, accent);
     if (now < ui.msg_until) {
         int32_t x = cv_text(10, 6, &FONT_B, ui.msg[0], C_WHITE);
-        cv_text(x + 8, 6, &FONT_B, ui.msg[1], C_HI);
+        cv_text(x + 8, 6, &FONT_B, ui.msg[1], accent);
     } else {
         const char *title = page == PAGE_MACRO ? "PATCH MACROS" :
             page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
-            page == PAGE_OPERATOR_MAP ? "OPERATOR ROLES" : APP_NAME;
-        int32_t x = cv_text(10, 6, &FONT_B, title, C_WHITE);
-        if (FM1B_BLE)                        /* Bluetooth: grey while it waits, lit while a computer is connected */
-            x = cv_text(x + 8, 10, &FONT_XS, "BLE", plat_ble_connected() ? C_HI : C_DIM);
-        if (FM1B_BLE_CENTRAL)                /* a Bluetooth MIDI device: lit while connected */
-            cv_text(x + 6, 10, &FONT_XS, "DEV", plat_ble_device() == BLE_DEV_READY ? C_HI : C_DIM);
-        if (note >= 0) {                     /* the note, and the last key's velocity and pressure */
-            int32_t x;
+            page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" : "INSTRUMENT";
+        cv_text(10, 5, &FONT_B, title, C_WHITE);
+        cv_text(10, 18, &FONT_XS, fm6_patch_name(set.patch), accent);
+        if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
+        if (note >= 0) {
             note_name(note, t);
-            x = 230 - text_w(&FONT_B, t);
-            cv_text(x, 6, &FONT_B, t, C_HI);
-            if (ui.keys >> ui.last_key & 1u) {
-                char n[24] = "V ";
-                int_text(ui.vel[ui.last_key], t);
-                text_cat(n, t);
-                text_cat(n, "  P ");
-                int_text(ui.prs[ui.last_key], t);
-                text_cat(n, t);
-                cv_text(x - 12 - text_w(&FONT_XS, n), 10, &FONT_XS, n, C_GRAY);
-            }
-        }
+            cv_text(220 - text_w(&FONT_B, t), 7, &FONT_B, t, C_WHITE);
+        } else cv_text(220, 10, &FONT_XS, "FM1", C_GRAY);
     }
     cv_blit(0, 0);
-    /* HOME tiles, the selected patch's four performance macros, or global settings. */
-    cv_begin(240, 144, C_BLACK);
+    cv_begin(240, 144, screen_bg());
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
     else if (page == PAGE_OPERATOR_MAP) draw_operator_map();
     else draw_global_panel(pct);
     cv_blit(0, 36);
-    /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
-    cv_begin(240, 60, C_BLACK);
-    for (i = 0; i < 16u; i++)
-        key_cell(4 + (int32_t)i * 14, 14, 13, 14, WK[i], C_DIM);
-    for (i = 0; i < 11u; i++) {
-        static const uint8_t AT[11] = {0, 1, 2, 4, 5, 7, 8, 9, 11, 12, 14};   /* the white key each one follows */
-        key_cell(4 + (int32_t)AT[i] * 14 + 8, 0, 11, 12, BK[i], C_LINE);
+
+    /* Real control legend replaces the old piano-key graphic. */
+    cv_begin(240, 60, screen_bg());
+    for (uint32_t k = 0; k < 4u; ++k) {
+        int32_t x = 4 + (int32_t)k * 58;
+        uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
+        rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
+        cv_text(x + 6, 10, &FONT_XS, k == 0 ? "K1" : k == 1 ? "K2" : k == 2 ? "K3" : "K4", ink);
+        if (page == PAGE_HOME) {
+            cv_text(x + 6, 23, &FONT_XS, k == 0 ? "P1 VOL" : k == 1 ? "P2 VOL" :
+                    k == 2 ? "P3 VOL" : "P4 VOL", C_WHITE);
+            int_text(set.levels[k], t); cv_text(x + 6, 33, &FONT_XS, t, ink);
+        } else if (page == PAGE_MACRO) {
+            static const char *const short_names[4] = {"BRIGHT", "BODY", "MOTION", "EDGE"};
+            cv_text(x + 6, 23, &FONT_XS, short_names[k], C_WHITE);
+            int_text(set.macros[set.patch][k], t); cv_text(x + 6, 33, &FONT_XS, t, ink);
+        } else cv_text(x + 6, 27, &FONT_XS, "-", C_GRAY);
     }
-    octave_text(t);
-    if (page == PAGE_HOME) {
-        cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
-        cv_text(30, 36, &FONT_XS, t, C_HI);
-        cv_text(64, 36, &FONT_XS, "PATCH", C_GRAY);
-        cv_text(112, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
-        cv_text(202, 36, &FONT_XS, (set.enabled_mask >> set.patch) & 1u ? "ON" : "OFF",
-                (set.enabled_mask >> set.patch) & 1u ? C_HI : C_DIM);
-    } else if (page == PAGE_MACRO) {
-        cv_text(4, 36, &FONT_XS, "MACROS", C_GRAY);
-        cv_text(64, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
-        cv_text(178, 36, &FONT_XS, "NEUTRAL", C_GRAY);
-        cv_text(218, 36, &FONT_XS, "50", C_HI);
-    } else if (page == PAGE_OPERATOR_MAP) {
-        cv_text(4, 36, &FONT_XS, "ROLES", C_GRAY);
-        cv_text(64, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
-        cv_text(178, 36, &FONT_XS, "ALGO", C_GRAY);
-        int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
-        cv_text(218 - text_w(&FONT_XS, t), 36, &FONT_XS, t, C_HI);
-    } else {
-        cv_text(4, 36, &FONT_XS, "GLOBAL", C_GRAY);
-        cv_text(64, 36, &FONT_XS, "SETTINGS", C_HI);
-        cv_text(178, 36, &FONT_XS, "VOL", C_GRAY);
-        int_text((int32_t)pct, t); text_cat(t, "%");
-        cv_text(204, 36, &FONT_XS, t, C_HI);
-    }
-    if (midi_count) {                        /* the last MIDI message in, and where from */
-        static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
-        static const char HEX[] = "0123456789ABCDEF";
-        uint32_t m = midi_last, b;
-        char h[12];
-        for (b = 0; b < 3u; b++) {
-            uint32_t v = (m >> (8u + 8u * b)) & 0xFFu;
-            h[3 * b] = HEX[v >> 4];
-            h[3 * b + 1] = HEX[v & 15u];
-            h[3 * b + 2] = b < 2u ? ' ' : 0;
-        }
-        cv_text(4, 48, &FONT_XS, "MIDI IN", C_GRAY);
-        cv_text(52, 48, &FONT_XS, midi_last_port < NPORTS ? PORT[midi_last_port] : "", C_HI);
-        cv_text(82, 48, &FONT_XS, h, C_WHITE);
-    }
-    /* Persistent, low-profile page index in the display's bottom-right corner. */
+    if (page == PAGE_HOME) cv_text(4, 53, &FONT_XS, "SELECT PATCH   SEL OPEN", C_GRAY);
+    else if (page == PAGE_MACRO) cv_text(4, 53, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 53, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
+    else cv_text(4, 53, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
+    int_text((int32_t)page + 1, t);
     {
-        char page_text[8];
-        int_text((int32_t)page + 1, page_text);
-        int_text((int32_t)PAGE_COUNT, t);
-        text_cat(page_text, "/");
-        text_cat(page_text, t);
-        cv_text(218, 52, &FONT_XS, page_text, C_GRAY);
+        char page_text[8] = "";
+        text_cat(page_text, t); text_cat(page_text, "/");
+        int_text((int32_t)PAGE_COUNT, t); text_cat(page_text, t);
+        cv_text(218, 51, &FONT_XS, page_text, C_GRAY);
     }
     cv_blit(0, 180);
 }
@@ -729,7 +712,7 @@ static void draw(void)
 void app_ui_init(void)
 {
     touch_on(1);                             /* velocity and pressure: the keys' readings on */
-    lcd_fill(0, 0, 240, 240, C_BLACK);
+    lcd_fill(0, 0, 240, 240, screen_bg());
     ui.redraw = 1;
 }
 
