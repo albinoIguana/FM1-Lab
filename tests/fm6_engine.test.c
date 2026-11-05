@@ -307,7 +307,9 @@ int main(void) {
     }
     fm6_note_on_mask(60u, 105u, 0x0Fu);
     {
-        static const unsigned chunks[] = {1u, 7u, 31u, 89u, 127u, 16u};
+        /* fm6_render advances its voice core in 128-frame quanta; the
+         * device app supplies 256-frame calls. Vary only legal multiples. */
+        static const unsigned chunks[] = {256u, 512u, 128u, 384u};
         unsigned offset = 0u, chunk = 0u;
         while (offset < 4096u) {
             unsigned count = chunks[chunk++ % (sizeof chunks / sizeof chunks[0])];
