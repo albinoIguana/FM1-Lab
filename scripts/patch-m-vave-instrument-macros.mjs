@@ -63,7 +63,7 @@ static void fm1lab_macro_draw(void)
         paint_fill(113, y + 29, 1, 9, ACCENT);
     }
     text(8, 225, "KNOB 1-4 ADJUST   50 = NEUTRAL   SAVE = STORE", 1, DIM, BACK);
-    text(8, 236, "GLO / HOME RETURNS TO INSTRUMENT", 1, DIM, BACK);
+    text(8, 236, "HOME RETURNS   GLO = GLOBAL SETTINGS", 1, DIM, BACK);
 }
 `;
 replaceOnce("static void draw_page_body(const struct fm1_ble_status *ble)\n{",draw+"\nstatic void draw_page_body(const struct fm1_ble_status *ble)\n{","macro page drawing");
@@ -73,18 +73,9 @@ replaceOnce("    if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return; }",
 "    if (visible == FM1LAB_PATCH) { fm1lab_patch_draw(); return; }\n    if (visible == FM1LAB_MACRO_PAGE) { fm1lab_macro_draw(); return; }","macro page render dispatch");
 if (!source.includes("FM1-LAB performance macro controls")) {
 const controls = String.raw`
-    if ((page == FM1LAB_HOME || page == FM1LAB_PATCH) && (pressed & BUTTON(GLO)) && !(pressed & BUTTON(HOME))) {
-        glo_down = 0;
-        glo_used = 1;
-        fm1lab_macro_return_page = (unsigned)page;
-        page = FM1LAB_MACRO_PAGE;
-        goto controls_done;
-    }
     if (page == FM1LAB_MACRO_PAGE) {
-        if (pressed & (BUTTON(HOME) | BUTTON(GLO))) {
-            glo_down = 0;
-            glo_used = 1;
-            page = fm1lab_macro_return_page == FM1LAB_PATCH ? FM1LAB_PATCH : FM1LAB_HOME;
+        if (pressed & BUTTON(HOME)) {
+            page = FM1LAB_HOME;
             goto controls_done;
         }
         if (pressed & BUTTON(SAVE)) {

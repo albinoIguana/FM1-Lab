@@ -13,7 +13,7 @@ The device boots to the four-patch Instrument page. The four tiles show patch na
 - SEL button: toggle the selected patch active/muted.
 - SAVE: store the complete four-patch Instrument as one bank transaction.
 - EDIT or SCL: open the focused patch editor.
-- GLO: open the performance macro page.
+- GLO: open the native global mixer/settings page.
 - SEQ: open the two-lane sequencer.
 - FX: open the upstream effects page.
 
@@ -32,13 +32,13 @@ The focused editor works on the selected Instrument patch, not the current proje
 - KNOB 1–4: edit the four values displayed in the active group.
 - SAVE: store the Instrument.
 - HOME or EDIT: return to HOME.
-- GLO: open the macro page and return to this editor with GLO.
+- GLO: open native global mixer/settings; HOME returns to the Instrument.
 
 The current topology view identifies carrier/modulator roles, depth and directed routing text. It is not yet a node-and-connector graph; undo/compare and audition workflow remain open work.
 
 ## MACROS — four role-based performance controls
 
-GLO opens the macro page from HOME or PATCH. The page shows the selected patch, algorithm number, current carrier/modulator roles, all four macro values and the neutral marker at 50.
+The macro page is a focused subpage of the selected HOME patch. GLO remains reserved for native global mixer/settings. The page shows the selected patch, algorithm number, current carrier/modulator roles, all four macro values and the neutral marker at 50.
 
 - KNOB 1: BRIGHTNESS — topology-depth-scaled modulator output.
 - KNOB 2: BODY — carrier sustain level.
@@ -46,7 +46,7 @@ GLO opens the macro page from HOME or PATCH. The page shows the selected patch, 
 - KNOB 4: DIRT — bounded global feedback.
 - PRESETS: choose the patch whose macros are being edited.
 - SAVE: store the Instrument.
-- GLO: return to the previous HOME or PATCH page; HOME returns to HOME.
+- HOME: return to the four-patch HOME screen. GLO: open native global mixer/settings.
 
 The macro transforms are non-destructive: they are derived from the base DX7 voice and stored as macro values in the Instrument metadata. Live changes are synchronized to the audio engine.
 
