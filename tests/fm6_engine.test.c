@@ -113,6 +113,17 @@ int main(void) {
     assert(seq_peak>0);
     fm6_sequencer_set_running(0u);
     assert(fm6_sequencer_running()==0u);
+    /* A rapid restart resets the shared transport phase and does not strand
+     * the previous lane notes in a held state. */
+    fm6_sequencer_set_running(1u);
+    for(unsigned block=0;block<43u;block++) {
+        memset(output,0,sizeof output); fm6_render(output,128u,4096u);
+    }
+    assert(fm6_sequencer_step()==0u);
+    memset(output,0,sizeof output); fm6_render(output,8u,4096u);
+    assert(fm6_sequencer_step()==0u);
+    memset(output,0,sizeof output); fm6_render(output,1u,4096u);
+    assert(fm6_sequencer_step()==1u);
 
     /* Arpeggiator captures held key input, then emits timed FM6 note events. */
     fm6_init();
