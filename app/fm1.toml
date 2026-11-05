@@ -12,5 +12,9 @@ ble_central = true
 ble_pairing = false
 usb_audio_in = true
 usb_audio_out = false
-o2 = ["dsp/*.c"]
+o2 = ["dsp/fm6.c"]
 include = ["dsp"]
+gen = [
+  "../upstream/felucca/tools/gen_tables.py {gen}/felucca_tables.h",
+  "../upstream/felucca/tools/gen_fm6_patches.py {gen}/felucca_fm6.h"
+]
