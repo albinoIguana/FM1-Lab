@@ -58,6 +58,7 @@ typedef struct {
     uint8_t used;
     uint8_t source;
     uint8_t fade_in;
+    uint8_t fade_out;
     int16_t tune16;
 } fm1lab_voice_t;
 
@@ -67,6 +68,7 @@ static fm6_lfo_t patch_lfo[PATCHES];
 static int32_t patch_lfo_value[PATCHES];
 static int32_t patch_lfo_delay[PATCHES];
 static uint32_t age_counter;
+static uint32_t overload_shed_count;
 static int32_t output_gain_q12;
 static int16_t pitch_bend_16;
 
@@ -305,6 +307,7 @@ void fm6_init(void)
     fm6_zero_bytes(patch_lfo_value, sizeof(patch_lfo_value));
     fm6_zero_bytes(patch_lfo_delay, sizeof(patch_lfo_delay));
     age_counter = 0;
+    overload_shed_count = 0u;
     output_gain_q12 = 0;
     pitch_bend_16 = 0;
     for(uint32_t lane=0;lane<2u;lane++) for(uint32_t step=0;step<64u;step++) {
@@ -337,6 +340,26 @@ void fm6_init(void)
     }
 }
 
+void fm6_overload(void)
+{
+    fm1lab_voice_t *oldest = 0;
+    for (uint32_t i = 0; i < VOICES; ++i) {
+        fm1lab_voice_t *voice = &voices[i];
+        if (!voice->used || voice->fade_out) continue;
+        if (!oldest || (int32_t)(voice->age - oldest->age) < 0)
+            oldest = voice;
+    }
+    /* Fade the globally oldest active voice over 32 samples. This does not
+     * alter any patch's allocator ownership; the slot becomes free after the
+     * next FM6 block has rendered its short fade. */
+    if (oldest) {
+        oldest->fade_out = 32u;
+        ++overload_shed_count;
+    }
+}
+
+uint32_t fm6_overload_shed_count(void) { return overload_shed_count; }
+
 void fm6_panic(void)
 {
     fm6_zero_bytes(voices, sizeof(voices));
@@ -364,6 +387,7 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
         v->source = source;
         v->age = ++age_counter;
         v->fade_in = 32;
+        v->fade_out = 0u;
         v->tune16 = tune16;
         fm6_note_init(&v->state, p->effective, (int32_t)note + p->effective[FP_TRNSP] - 24, velocity, 1);
         fm6_lfo_key(&patch_lfo[i]);
@@ -487,6 +511,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
                                  patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
                                  pitch, patch->effective[FP_ALG], fb, patch->detune, patch->mod_level)) {
                 int32_t dc = voice->state.dc;
+                uint8_t shedding = voice->fade_out != 0u;
                 for (i = 0; i < FM6_N; i++) {
                     int32_t x = bus[i] - dc;
                     dc += x >> 10; /* ~7 Hz high-pass; FM sidebands can otherwise leave DC. */
@@ -495,11 +520,19 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
                         x = (int32_t)(((int64_t)x * gain) >> 5);
                         voice->fade_in--;
                     }
+                    if (voice->fade_out) {
+                        x = (int32_t)(((int64_t)x * voice->fade_out) >> 5);
+                        --voice->fade_out;
+                    }
                     patch_mix[voice->patch][i] += ((int64_t)x * patch_gain_q15[voice->patch]) >> 15;
                 }
                 voice->state.dc = dc;
+                if (shedding && !voice->fade_out) {
+                    voice->state.live = 0;
+                    voice->used = 0;
+                }
             }
-            if (fm6_note_done(&voice->state, patch->effective, patch->effective[FP_ALG])) {
+            if (voice->used && fm6_note_done(&voice->state, patch->effective, patch->effective[FP_ALG])) {
                 voice->state.live = 0;
                 voice->used = 0;
             }
