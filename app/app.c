@@ -227,7 +227,7 @@ static void octave_step(int32_t d)
     app_say("OCTAVE", t);
 }
 
-int template_ble_off(void) { return set.ble_off; }
+int fm1lab_ble_off(void) { return set.ble_off; }
 
 /* REC held a second: Bluetooth off or on (kept with the settings, so it stays so at the next power-on) */
 static void ble_toggle(void)
