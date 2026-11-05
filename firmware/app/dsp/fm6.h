@@ -12,6 +12,12 @@
 #define FM1LAB_SEQ_LANES 2u
 #define FM1LAB_SEQ_STEPS 16u
 
+enum {
+    FM6_OP_LEVEL = 0, FM6_OP_RATIO, FM6_OP_FINE,
+    FM6_OP_ATTACK, FM6_OP_DECAY, FM6_OP_SUSTAIN, FM6_OP_RELEASE, FM6_OP_FIXED_MODE,
+    FM6_OP_PARAM_COUNT
+};
+
 typedef struct {
     uint8_t valid;
     uint8_t enabled_mask;
