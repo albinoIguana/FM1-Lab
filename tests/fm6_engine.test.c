@@ -242,6 +242,31 @@ int main(void) {
     fm6_sequencer_set_running(0u);
     fm6_arpeggiator_set_mode(0u);
 
+    /* Platform overload callback must shed one globally oldest voice,
+     * fade it rather than hard-cutting it, and preserve the other patch pools. */
+    fm6_init();
+    memcpy(voice, fm6_patch_data(0), 155u);
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        if (patch) assert(fm6_patch_set_voice(patch, voice) == 0);
+        fm6_patch_set_enabled(patch, 1u);
+        fm6_note_on_mask((uint8_t)(60u + patch), 100u,
+                         (uint8_t)(1u << patch));
+    }
+    memset(output, 0, sizeof output);
+    fm6_render(output, TEST_FRAMES, 4096u);
+    assert(fm6_active_voices() == 4u);
+    fm6_overload();
+    assert(fm6_overload_shed_count() == 1u);
+    memset(output, 0, sizeof output);
+    fm6_render(output, TEST_FRAMES, 4096u);
+    assert(fm6_active_voices() == 3u);
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        assert(fm6_active_voices_patch(patch) <= 1u);
+    fm6_overload();
+    assert(fm6_overload_shed_count() == 2u);
+    fm6_panic();
+    assert(fm6_active_voices() == 0u);
+
     /* Performance state snapshot/restore covers every sequencer step, lane
      * assignment, tempo, arp mode, effect control and per-patch send. */
     fm6_performance_state_t saved, restored;
