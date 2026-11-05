@@ -127,13 +127,14 @@ static void fm6_transport_step(void)
 }
 static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,int64_t *right)
 {
-    int32_t chorus=0,delay=0,reverb=0;
+    int32_t chorus=0,chorus_r=0,delay=0,reverb=0;
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
     if(fx_enabled[0] && fx_mix[0]) {
         uint32_t tri=(fx_lfo_phase>>16)&1023u, depth=tri<512u?tri:1023u-tri;
         uint32_t d=120u+(uint32_t)fx_time[0]*3u+depth*(120u+(uint32_t)fx_time[0]*3u)/511u;
-        uint32_t read=(cp-d)&(FM6_CHORUS_SIZE-1u);
-        chorus=fx_chorus[read];
+        uint32_t read_l=(cp-d)&(FM6_CHORUS_SIZE-1u);
+        uint32_t read_r=(cp-(d+160u))&(FM6_CHORUS_SIZE-1u);
+        chorus=fx_chorus[read_l]; chorus_r=fx_chorus[read_r];
     }
     fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0]+(int64_t)chorus*fx_feedback[0]/100u);
     fx_chorus_pos=(uint16_t)((cp+1u)&(FM6_CHORUS_SIZE-1u));
@@ -155,11 +156,14 @@ static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,in
     fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&4095u);
     fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&8191u);
     fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
-    int64_t wet=input;
-    if(fx_enabled[0]) wet+=(int64_t)chorus*fx_mix[0]/100;
-    if(fx_enabled[1]) wet+=(int64_t)delay*fx_mix[1]/100;
-    if(fx_enabled[2]) wet+=(int64_t)reverb*fx_mix[2]/100;
-    *left=wet; *right=wet;
+    int64_t wet_l=input,wet_r=input;
+    if(fx_enabled[0]) {
+        wet_l+=(int64_t)chorus*fx_mix[0]/100;
+        wet_r+=(int64_t)chorus_r*fx_mix[0]/100;
+    }
+    if(fx_enabled[1]) { wet_l+=(int64_t)delay*fx_mix[1]/100; wet_r+=(int64_t)delay*fx_mix[1]/100; }
+    if(fx_enabled[2]) { wet_l+=(int64_t)reverb*fx_mix[2]/100; wet_r+=(int64_t)reverb*fx_mix[2]/100; }
+    *left=wet_l; *right=wet_r;
 }
 
 static int32_t clamp_i32(int32_t x, int32_t lo, int32_t hi)
