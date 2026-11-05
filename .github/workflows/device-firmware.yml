@@ -9,7 +9,8 @@ on:
     paths:
       - 'firmware/**'
       - 'scripts/build-device-firmware.ps1'
-      - 'scripts/patch-m-vave-device-dx7-core.mjs'
+      - 'app/dsp/**'
+      - 'upstream/felucca'
       - 'scripts/patch-m-vave-audio-mixer.mjs'
       - 'scripts/patch-m-vave-instrument-home.mjs'
       - 'scripts/patch-m-vave-instrument-sequencer-screen.mjs'
@@ -33,6 +34,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Set up Python for pinned Felucca table generation
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Set up Node.js for source staging
         uses: actions/setup-node@v4
