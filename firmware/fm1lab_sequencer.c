@@ -3,7 +3,7 @@
 #include "fm1lab_instrument.h"
 #include <string.h>
 
-/* Use the native FM1 application API only. The similarly named functions in
+/* Use the official pinned M-VAVE native application API. The similarly named functions in
  * web/engine/sequencer.c are browser-simulator internals and are not linked
  * into the device firmware. Preserve every project's track role while this
  * two-lane view temporarily isolates its selected tracks. */
