@@ -21,6 +21,7 @@ typedef struct {
 } seq_pattern_t;
 
 static seq_pattern_t patterns[FM1LAB_INSTRUMENT_COUNT];
+static uint8_t pattern_dirty[FM1LAB_INSTRUMENT_COUNT];
 static uint32_t current_instrument;
 static uint32_t sample_clock;
 static uint32_t next_step_sample;
@@ -59,6 +60,8 @@ void seq_init(void)
             }
     }
     current_instrument = 0;
+    for (p = 0; p < FM1LAB_INSTRUMENT_COUNT; p++)
+        pattern_dirty[p] = 0;
     sample_clock = 0;
     current_step = STEPS - 1u;
     running = 0;
@@ -79,6 +82,7 @@ void seq_instrument_load(uint32_t slot, const fm1lab_instrument_record_t *record
             patterns[slot].velocity[lane][step] = record->seq_velocity[lane][step] > 127u
                 ? 127u : record->seq_velocity[lane][step];
         }
+    pattern_dirty[slot] = 0;
     if (slot == current_instrument)
         update_timing();
 }
@@ -183,6 +187,7 @@ void seq_set_step(uint32_t lane, uint32_t step, uint8_t note, uint8_t velocity)
         return;
     patterns[current_instrument].note[lane][step] = note <= 127u ? note : EMPTY_NOTE;
     patterns[current_instrument].velocity[lane][step] = velocity > 127u ? 127u : velocity;
+    pattern_dirty[current_instrument] = 1;
 }
 void seq_clear_step(uint32_t lane, uint32_t step)
 {
@@ -190,12 +195,26 @@ void seq_clear_step(uint32_t lane, uint32_t step)
         return;
     patterns[current_instrument].note[lane][step] = EMPTY_NOTE;
     patterns[current_instrument].velocity[lane][step] = 0;
+    pattern_dirty[current_instrument] = 1;
 }
 uint8_t seq_tempo(void) { return patterns[current_instrument].tempo; }
 void seq_set_tempo(uint8_t bpm)
 {
-    patterns[current_instrument].tempo = clamp_tempo(bpm);
+    bpm = clamp_tempo(bpm);
+    if (patterns[current_instrument].tempo != bpm)
+        pattern_dirty[current_instrument] = 1;
+    patterns[current_instrument].tempo = bpm;
     update_timing();
     if (running)
         next_step_sample = sample_clock + step_samples;
+}
+
+uint8_t seq_instrument_dirty(uint32_t slot)
+{
+    return slot < FM1LAB_INSTRUMENT_COUNT ? pattern_dirty[slot] : 0u;
+}
+void seq_instrument_mark_saved(uint32_t slot)
+{
+    if (slot < FM1LAB_INSTRUMENT_COUNT)
+        pattern_dirty[slot] = 0;
 }
