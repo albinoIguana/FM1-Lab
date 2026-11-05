@@ -52,6 +52,8 @@ jobs:
           node --test tests/instrument-session.test.js tests/sequencer-model.test.js
       - name: Test Instrument and macro behavior
         run: npm test
+      - name: Run native C adapter and audio-engine tests
+        run: bash tests/test-native-instrument.sh
       - name: Build official M-VAVE browser simulator
         run: bash scripts/build-m-vave-simulator.sh
       - name: Verify required native engine API
