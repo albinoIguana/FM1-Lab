@@ -27,11 +27,13 @@ The browser workshop is a development and audition surface. The corresponding cu
 
 ## Native firmware core
 
-The active `app/app.c` build now compiles the same four-patch Instrument model used by the host-side C tests and connects it to the Felucca FM6 voice engine. The PRESET encoder selects among three native Instrument storage slots; each slot holds four expanded DX7 voices plus macro, mute, and level state. SEL/SELECT still select and edit patches independently of the Instrument selector. SAVE persists the active Instrument and the global settings, and changing Instrument is blocked while its edits are unsaved. Loading is handed to the audio task through the app's event queue so the UI thread does not write live FM voice state.
+The active `app/app.c` build connects the four-patch Instrument model to the Felucca FM6 voice engine. PRESET selects among 32 Instruments arranged as four banks of eight; SELECT chooses one of the four patches inside the active Instrument. Each Instrument stores four packed DX7 voices plus per-patch macro, enable and level state. The four bank records use the platform's existing pooled, CRC-protected A/B object store (four 3,840-byte objects in the 12-sector pool), not the upstream FM1 synth engine or reserved factory/system sectors. The bank payload has its own version and CRC16. The on-device label shows the current bank and Instrument index.
+
+The bank format uses 11-character persisted Instrument names to fit all 32 voices and their per-patch state inside the platform's 3,840-byte object limit. Existing three-slot Instrument objects are migrated into the first three Instrument positions when the bank format is initialized. Instrument loading is handed to the audio task through the app event queue so the UI thread does not write live FM voice state.
 
 The active app also has dedicated operator-envelope and two-page LFO editors. The envelope page edits each DX7 operator's four rates and four levels; the LFO pages follow the official FM1 voice map for waveform, speed, pitch/amp depth, delay, pitch sensitivity, LFO key sync, and oscillator sync. These edits are queued to the audio task as voice snapshots rather than writing DSP state from the UI thread.
 
-This is the first working native storage bridge, not yet the full 32-Instrument / four-bank library. The existing 400-byte metadata codec and the upstream M-VAVE bank journal remain separate work; the active app currently uses three platform storage objects rather than claiming that the full bank format is connected. Sequencer, arpeggiator, ENV/LFO editing, and FX audio routing are also not yet connected in this native app.
+Sequencer, arpeggiator and FX audio routing remain unfinished; do not treat their current screen/control work as completed audio-path features.
 
 ## Build and validation
 
