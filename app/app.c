@@ -5,20 +5,20 @@
  * too), OCT- / OCT+ set the octave, PRESET the wave, MASTER the volume, SAVE stores the settings; the keys are
  * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
-#include "fastmath.h"
+#include "fm6.h"
 
-#define SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
+#define SET_MAGIC 0x4C314D46u            /* "FM1L": native Instrument settings */
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t wave;                        /* 0 sine, 1 triangle */
+    uint8_t patch;                       /* selected patch in the four-patch Instrument */
+    uint8_t enabled_mask;                /* one bit per patch */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
     uint8_t rsv[1];
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const WAVE_NAME[] = {"SINE", "TRIANGLE"};
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
@@ -27,16 +27,15 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* MIDI note, -1 = released */
-static volatile float voice_vel = 1.0f;      /* the note's velocity, 0..1 */
-static float voice_phase, voice_level, gain_now;   /* gain_now glides to MASTER: no step at a block's edge */
 
 static void note_on(int32_t note, uint32_t vel)
 {
-    voice_vel = (float)vel / 127.0f;
     voice_note = note;
+    fm6_note_on((uint8_t)note, (uint8_t)vel);
 }
 static void note_off(int32_t note)
 {
+    fm6_note_off((uint8_t)note);
     if (voice_note == note)
         voice_note = -1;
 }
@@ -62,30 +61,14 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
-    uint32_t i;
-    int32_t note = voice_note;
-    float target = note >= 0 ? 0.25f * voice_vel : 0.0f;
-    float inc = note >= 0 ? 440.0f * fm_exp2f((float)(note - 69) / 12.0f) / 44100.0f : 0.0f;
-    float gain = (float)master_q12 / 4096.0f * 8300000.0f;   /* MASTER, read once a block */
     midi_in();
-    for (i = 0; i < n; i++) {
-        float s;
-        voice_level += (target - voice_level) * 0.002f;          /* ~10 ms attack and release */
-        gain_now += (gain - gain_now) * 0.004f;                  /* ~5 ms: turning MASTER does not click */
-        voice_phase += inc;
-        if (voice_phase >= 1.0f)
-            voice_phase -= 1.0f;
-        s = set.wave ? 4.0f * fm_fabsf(voice_phase - 0.5f) - 1.0f : fm_sinf(voice_phase * 6.2831853f);
-        s *= voice_level * gain_now;
-        lr[2 * i] = (int32_t)s;
-        lr[2 * i + 1] = (int32_t)s;
-    }
+    fm6_render(lr, n, master_q12);
 }
 
 void app_panic(void)
 {
     voice_note = -1;
-    voice_level = 0.0f;
+    fm6_panic();
 }
 
 /* --------------------------------------------------------------- settings --- */
@@ -93,15 +76,21 @@ static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
     set.octave = 0;
-    set.wave = 0;
+    set.patch = 0;
+    set.enabled_mask = 1u;
     set.ble_off = 0;
 }
 
 void app_init(void)
 {
+    uint32_t i;
+    fm6_init();
     if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
-        || set.octave < -2 || set.octave > 2 || set.wave > 1u || set.ble_off > 1u)
+        || set.octave < -2 || set.octave > 2 || set.patch >= FM1LAB_PATCH_COUNT
+        || (set.enabled_mask & 0xF0u) || set.ble_off > 1u)
         settings_defaults();
+    for (i = 0; i < FM1LAB_PATCH_COUNT; i++)
+        fm6_patch_set_enabled(i, (set.enabled_mask >> i) & 1u);
 }
 
 /* --------------------------------------------------------------------- UI --- */
@@ -182,7 +171,7 @@ static void speak(void)
         text_cat(t, APP_NAME ". OCTAVE ");
         text_cat(t, o);
         text_cat(t, ". WAVE ");
-        text_cat(t, WAVE_NAME[set.wave]);
+        text_cat(t, fm6_patch_name(set.patch));
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
             static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
             static const char HEX[] = "0123456789ABCDEF";
@@ -221,6 +210,7 @@ static void octave_step(int32_t d)
     if (o == set.octave)
         return;
     voice_note = -1;                         /* a key held across the change would not find its note off */
+    fm6_panic();
     set.octave = (int8_t)o;
     set_dirty = 1;
     octave_text(t);
@@ -297,7 +287,12 @@ static void input(void)
             octave_step(1);
         else if (k == B_REC && FM1B_BLE)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
-        else if (k == B_SAVE) {
+        else if (k == B_SEL) {
+            set.enabled_mask ^= (uint8_t)(1u << set.patch);
+            fm6_patch_set_enabled(set.patch, (set.enabled_mask >> set.patch) & 1u);
+            set_dirty = 1;
+            app_say(fm6_patch_name(set.patch), fm6_patch_enabled(set.patch) ? "ON" : "OFF");
+        } else if (k == B_SAVE) {
             if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
                 set_dirty = 0;
                 app_say("SAVED", "");
@@ -332,10 +327,13 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
-        } else if (k == EN_PRESET) {
-            set.wave ^= 1u;
+         } else if (k == EN_PRESET) {
+            int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
+            if (next < 0)
+                next += (int32_t)FM1LAB_PATCH_COUNT;
+            set.patch = (uint8_t)next;
             set_dirty = 1;
-            app_say("WAVE", WAVE_NAME[set.wave]);
+            app_say("PATCH", fm6_patch_name(set.patch));
         } else {
             int_text(ui.turns[k], t);
             app_say(ENC_NAME[k], t);
@@ -427,8 +425,9 @@ static void draw(void)
     octave_text(t);
     cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
     cv_text(30, 36, &FONT_XS, t, C_HI);
-    cv_text(64, 36, &FONT_XS, "PRESET", C_GRAY);
-    cv_text(112, 36, &FONT_XS, WAVE_NAME[set.wave], C_HI);
+    cv_text(64, 36, &FONT_XS, "PATCH", C_GRAY);
+    cv_text(112, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
+    cv_text(202, 36, &FONT_XS, fm6_patch_enabled(set.patch) ? "ON" : "OFF", fm6_patch_enabled(set.patch) ? C_HI : C_DIM);
     if (midi_count) {                        /* the last MIDI message in, and where from */
         static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
         static const char HEX[] = "0123456789ABCDEF";
@@ -505,8 +504,8 @@ int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "octave"))
         *got = set.octave;
-    else if (!strcmp(what, "wave"))
-        *got = set.wave;
+    else if (!strcmp(what, "patch") || !strcmp(what, "wave"))
+        *got = set.patch;
     else if (!strcmp(what, "note"))
         *got = voice_note;
     else if (!strcmp(what, "dirty"))
