@@ -1,18 +1,16 @@
 # FM1 physical control map
 
-The printed labels on the FM1 panel are the names used in FM1-Lab code and UI specifications. The numeric values below are implementation indices in upstream `struct fm1_controls.encoders[]`, not physical labels.
-
-| Printed panel label | Upstream input | Confirmed existing use |
+| Printed panel label | Upstream input | FM1-Lab use |
 |---|---:|---|
-| MASTER | ADC channel 4 | Master potentiometer |
-| SELECT | `encoders[0]` | Track/item selection |
-| ALGORITHM | `encoders[1]` | DX7 algorithm editing |
-| KNOB 1 | `encoders[2]` | First of four parameter knobs |
-| KNOB 2 | `encoders[3]` | Second of four parameter knobs |
-| KNOB 3 | `encoders[4]` | Third of four parameter knobs |
-| KNOB 4 | `encoders[5]` | Fourth of four parameter knobs |
-| PRESETS | `encoders[6]` | Preset/project navigation |
+| MASTER | ADC channel 4 | Master output level |
+| SELECT | `encoders[0]` | Selects one of four patches on HOME |
+| ALGORITHM | `encoders[1]` | Algorithm editing / BLE device selection where enabled |
+| KNOB 1 | `encoders[2]` | HOME: patch 1 volume; macro page: BRIGHTNESS |
+| KNOB 2 | `encoders[3]` | HOME: patch 2 volume; macro page: BODY |
+| KNOB 3 | `encoders[4]` | HOME: patch 3 volume; macro page: MOTION |
+| KNOB 4 | `encoders[5]` | HOME: patch 4 volume; macro page: EDGE |
+| PRESETS | `encoders[6]` | Instrument/preset navigation (library not yet implemented) |
 
-The seven encoder indices are confirmed by the upstream scanner and screen handlers. The MASTER potentiometer is read separately through ADC channel 4; it is not encoder 7 or part of the seven-element encoder array.
+The physical **SEL button** (`B_SEL`) is separate from the SELECT encoder: on HOME it opens the selected patch's macro page. HOME returns to the four-patch overview. The HOME K1–K4 volume assignment is current Phase 1 behavior and is deferred for reconsideration in Phase 2.
 
-Source basis: pinned upstream M-VAVE FM1 source, `app/board/fm1_input.h`, `app/board/panel.c`, `app/board/device.c`, and `app/screen.c`. The C constants live in `firmware/fm1lab_physical_controls.h`; tests lock the mapping.
+The seven encoder indices are confirmed by the upstream scanner and screen handlers. MASTER is read separately through ADC channel 4, not part of the seven-element encoder array.

@@ -5,8 +5,11 @@ This document preserves the agreed physical-screen workflow. It distinguishes im
 ## Navigation contract
 
 - HOME is the four-patch Instrument overview.
-- On HOME, SELECT chooses the focused patch.
-- Pressing the physical **SEL** button opens that patch's performance macro page.
+- The physical SELECT encoder moves the selected patch on HOME.
+- Pressing the physical **SEL** button opens the selected patch's performance macro page.
+- K1–K4 on HOME control patch slots 1–4 volume respectively; they do not follow the selected patch.
+- K1–K4 on the macro page control BRIGHTNESS, BODY, MOTION and EDGE for the selected patch.
+- Reconsidering HOME K1–K4 volume assignment is Phase 2; do not remap it in the current pass.
 - HOME returns from the macro page to HOME.
 - GLO remains reserved for global settings/mixer; it must never be repurposed as a macro shortcut.
 - EDIT/SCL opens the deep patch editor; FX, ENV and LFO retain their dedicated pages.
@@ -34,11 +37,12 @@ The page should show the selected patch name, algorithm, live carrier/modulator 
 
 ## Visual language
 
-- Dark, high-contrast instrument UI with a restrained accent color per patch.
+- Physical display: 240×240 pixels. Every screen uses the same rounded 2×2 quadrant composition and compact bottom control/status strip.
+- Dark, high-contrast base with four bold patch identities: cyan, magenta, yellow and red. A patch retains its color across HOME, macro and operator views.
 - Four HOME tiles in a 2×2 grid, each showing patch name, active/muted state, algorithm and level.
 - Use the algorithm's actual topology to distinguish carriers and modulators; do not imply connections that are not in the selected algorithm.
 - Use small, purposeful animation for selection and value changes; avoid decorative motion during audio-critical interaction.
-- The screen should remain readable at the FM1's 240×280 resolution. Keep labels short and make the selected control/value obvious.
+- HOME, macro and operator screens reuse the same quadrant geometry. The bottom band shows real physical-control assignments and the page index; do not draw a decorative piano keyboard. Keep labels short and make the selected control/value obvious.
 
 ## Implementation boundary
 
