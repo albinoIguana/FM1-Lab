@@ -28,8 +28,14 @@ static void write32(uint8_t *p, uint32_t v)
 static uint16_t crc16(const uint8_t *p, unsigned n)
 {
     uint16_t crc=0xffffu;
-    while(n--) { crc^=(uint16_t)*p++<<8; for(unsigned b=0;b<8;b++)
-        crc=(uint16_t)((crc&0x8000u)?(crc<<1)^0x1021u:crc<<1); }
+    while(n--) {
+        crc ^= (uint16_t)((uint16_t)*p++ << 8);
+        for(unsigned b=0;b<8;b++) {
+            uint16_t shifted=(uint16_t)(crc << 1);
+            if(crc & 0x8000u) shifted ^= (uint16_t)0x1021u;
+            crc=shifted;
+        }
+    }
     return crc;
 }
 
