@@ -54,8 +54,8 @@ int main(void)
     assert(fm6_active_voices() == 3u);
     fm6_pitch_bend(16383u);
     memset(output, 0, sizeof output);
-    fm6_render(output, FM1_BLOCK_FRAMES, 4096u);
-    assert(peak(output, FM1_BLOCK_WORDS) > 0);
+    fm6_render(output, TEST_FRAMES, 4096u);
+    assert(peak(output, TEST_WORDS) > 0);
 
     fm6_patch_set_level(1, 0u);
     assert(fm6_active_voices() == 1u);

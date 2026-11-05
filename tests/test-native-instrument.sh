@@ -49,5 +49,6 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
 "$SEQUENCER_BIN"
 echo "FM1-Lab native voice editor tests passed."
 
-# Exercise the actual six-operator M-VAVE DSP core through the four-layer mixer.
+# Exercise the legacy M-VAVE SDK prototype engine, then the active Felucca FM6 device core.
 bash "$ROOT/tests/test-audio-engine.sh"
+bash "$ROOT/tests/test-fm6-engine.sh"
