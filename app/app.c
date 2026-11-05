@@ -653,8 +653,10 @@ static void input(void)
             btdev_choose(btdev_pick() + e);
             ble_device_say();
         } else if (k == EN_ALGO && page == PAGE_HOME) {
-            if (instrument_apply_pending || instrument_dirty) {
-                app_say(instrument_dirty ? "SAVE INSTRUMENT" : "INSTRUMENT", instrument_dirty ? "BEFORE CHANGING" : "LOADING");
+            if (instrument_apply_pending) {
+                app_say("INSTRUMENT", "LOADING");
+            } else if (instrument_dirty && instrument_save() != 0) {
+                app_say("SAVE FAILED", "BANK NOT CHANGED");
             } else {
                 int32_t bank = ((int32_t)(instrument_index / 8u) + e) % 4;
                 if (bank < 0) bank += 4;
@@ -675,9 +677,6 @@ static void input(void)
             if (next < 0) next += 64;
             seq_ui_step = (uint8_t)next;
             app_say("STEP", "SELECTED");
-        } else if (k == EN_PRESET && page == PAGE_SEQ) {
-            seq_ui_lane ^= 1u;
-            app_say("SEQUENCER LANE", seq_ui_lane ? "B" : "A");
         } else if (k == EN_ALGO && page == PAGE_SEQ) {
             int32_t patch = ((int32_t)seq_ui_patch[seq_ui_lane] + e) % 4;
             if (patch < 0) patch += 4;
