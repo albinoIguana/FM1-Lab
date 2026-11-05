@@ -67,6 +67,7 @@ uint8_t fm6_fx_time(uint8_t effect);
 uint8_t fm6_fx_feedback(uint8_t effect);
 void fm6_fx_set_send(uint8_t patch, uint8_t effect, uint8_t send);
 uint8_t fm6_fx_get_send(uint8_t patch, uint8_t effect);
+/* Render length must be a multiple of the FM6 core's 128-frame quantum. */
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12);
 
 uint32_t fm6_patch_count(void);
