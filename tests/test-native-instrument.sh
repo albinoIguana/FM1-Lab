@@ -44,7 +44,7 @@ cc -std=c11 -Wall -Wextra -Werror \
 "$SEQUENCER_BIN"
 echo "FM1-Lab native sequencer adapter tests passed."
 
-cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app/dsp" \
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" -I"$ROOT/app/dsp" \
   "$ROOT/tests/settings_record.test.c" -o "$SETTINGS_BIN"
 "$SETTINGS_BIN"
 
