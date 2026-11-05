@@ -59,44 +59,38 @@ static int lane_track(unsigned lane, unsigned *track)
 
 int fm1lab_sequencer_bind(unsigned a, unsigned b)
 {
-    if (a >= GROOVE_TRACKS || b >= GROOVE_TRACKS || a == b)
-        return -1;
+    if (a >= GROOVE_TRACKS || b >= GROOVE_TRACKS || a == b) return -1;
+    if (binding_active && fm1lab_sequencer_unbind()) return -4;
     if (groove_track_role(a) != GROOVE_TRACK_NORMAL ||
         groove_track_role(b) != GROOVE_TRACK_NORMAL ||
         groove_source_type(a) != GROOVE_DX7 || groove_source_type(b) != GROOVE_DX7)
         return -2;
-    fm1lab_native_transport(0);
-    if (!roles_saved) {
-        for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
-            saved_track_roles[track] = (uint8_t)groove_track_role(track);
-        roles_saved = 1;
-    }
-    for (unsigned track = 0; track < GROOVE_TRACKS; ++track) {
-        unsigned role = (track == a || track == b)
-            ? GROOVE_TRACK_NORMAL : GROOVE_TRACK_OFF;
-        if (groove_track_role_set(track, role)) {
-            for (unsigned restore = 0; restore < GROOVE_TRACKS; ++restore)
-                (void)groove_track_role_set(restore, saved_track_roles[restore]);
-            roles_saved = 0;
+
+    (void)fm1lab_native_transport(0);
+    changed_roles = 0;
+    for (unsigned t = 0; t < GROOVE_TRACKS; ++t)
+        saved_track_roles[t] = (uint8_t)groove_track_role(t);
+    binding_active = 1;
+
+    /* Change only non-lane NORMAL tracks. Existing PLAY/OFF roles stay put. */
+    for (unsigned t = 0; t < GROOVE_TRACKS; ++t) {
+        if (t == a || t == b || saved_track_roles[t] != GROOVE_TRACK_NORMAL)
+            continue;
+        if (groove_track_role_set(t, GROOVE_TRACK_OFF)) {
+            if (restore_changed_roles()) return -4;
             return -3;
         }
+        changed_roles |= (uint8_t)(1U << t);
     }
-    bound_tracks[0] = a;
-    bound_tracks[1] = b;
-    selected_lane = 0;
-    bound_patch[0] = 0;
-    bound_patch[1] = 1;
+    bound_tracks[0] = a; bound_tracks[1] = b;
+    selected_lane = 0; bound_patch[0] = 0; bound_patch[1] = 1;
     return 0;
 }
 
 int fm1lab_sequencer_unbind(void)
 {
-    fm1lab_native_transport(0);
-    if (roles_saved) {
-        for (unsigned track = 0; track < GROOVE_TRACKS; ++track)
-            if (groove_track_role_set(track, saved_track_roles[track])) return -1;
-        roles_saved = 0;
-    }
+    (void)fm1lab_native_transport(0);
+    if (binding_active && restore_changed_roles()) return -1;
     bound_tracks[0] = bound_tracks[1] = 255U;
     selected_lane = 0;
     return 0;
