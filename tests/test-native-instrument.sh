@@ -52,3 +52,6 @@ echo "FM1-Lab native voice editor tests passed."
 # Exercise the legacy M-VAVE SDK prototype engine, then the active Felucca FM6 device core.
 bash "$ROOT/tests/test-audio-engine.sh"
 bash "$ROOT/tests/test-fm6-engine.sh"
+
+# The active app's compact 4-bank store is separate from the legacy SDK bank codec.
+bash "$ROOT/tests/test-store-library.sh"
