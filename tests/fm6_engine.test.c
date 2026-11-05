@@ -17,7 +17,11 @@ static int32_t peak(const int32_t *samples, unsigned count) {
 int main(void) {
     assert(fm6_patch_count() == FM1LAB_PATCH_COUNT);
     fm6_init();
-    assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 0u);
+    assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 1u &&
+           fm6_patch_enabled(2) == 1u && fm6_patch_enabled(3) == 1u);
+    fm6_note_on(60u, 100u);
+    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT);
+    fm6_panic();
     assert(fm6_patch_algorithm(0) < 32u && fm6_patch_name(0)[0]);
     uint8_t voice[156] = {0};
     memcpy(voice, fm6_patch_data(0), 155u);
