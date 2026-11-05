@@ -10,7 +10,9 @@ SDK_PARENT="${RUNNER_TEMP:-$ROOT/.cache}"
 SDK_ROOT="$SDK_PARENT/wasi-sdk-${SDK_VERSION}-x86_64-linux"
 OUT="$SOURCE/build/web"
 
-# Compile the FM1-Lab native Instrument and bank-metadata modules with the official app sources.
+# Compile the FM1-Lab Instrument wrapper against the same six-op M-VAVE
+# engine implementation used by the device. The simulator compiles the
+# pinned web/synth sources once; the device links the SDK's prebuilt archive.
 cp "$ROOT/firmware/fm1lab_instrument.h" "$SOURCE/app/fm1lab_instrument.h"
 cp "$ROOT/firmware/fm1lab_instrument.c" "$SOURCE/app/fm1lab_instrument.c"
 cp "$ROOT/firmware/fm1lab_library.h" "$SOURCE/app/fm1lab_library.h"
@@ -24,16 +26,12 @@ cp "$ROOT/firmware/fm1lab_voice_editor.c" "$SOURCE/app/fm1lab_voice_editor.c"
 cp "$ROOT/firmware/fm1lab_bank_metadata.h" "$SOURCE/app/fm1lab_bank_metadata.h"
 cp "$ROOT/firmware/fm1lab_bank_metadata.c" "$SOURCE/app/fm1lab_bank_metadata.c"
 cp "$ROOT/firmware/fm1lab_physical_controls.h" "$SOURCE/app/fm1lab_physical_controls.h"
+cp "$ROOT/firmware/fm1lab_audio_engine.h" "$SOURCE/app/fm1lab_audio_engine.h"
+cp "$ROOT/firmware/fm1lab_audio_engine.c" "$SOURCE/app/fm1lab_audio_engine.c"
 cp "$ROOT/firmware/fm1lab_audio_bridge.h" "$SOURCE/app/fm1lab_audio_bridge.h"
 cp "$ROOT/firmware/fm1lab_audio_bridge.c" "$SOURCE/app/fm1lab_audio_bridge.c"
 
-mkdir -p "$SOURCE/app/dsp"
-sed 's#../../upstream/felucca/firmware/src/fm6_core.c#fm6_core.inc#' \
-  "$ROOT/app/dsp/fm6.c" > "$SOURCE/app/dsp/fm6.c"
-cp "$ROOT/app/dsp/fm6.h" "$SOURCE/app/dsp/fm6.h"
-cp "$ROOT/upstream/felucca/firmware/src/fm6_core.c" "$SOURCE/app/dsp/fm6_core.inc"
-python3 "$ROOT/upstream/felucca/tools/gen_tables.py" "$SOURCE/app/dsp/felucca_tables.h"
-python3 "$ROOT/upstream/felucca/tools/gen_fm6_patches.py" "$SOURCE/app/dsp/felucca_fm6.h"
+node "$ROOT/scripts/patch-m-vave-device-dx7-core.mjs"
 node "$ROOT/scripts/patch-m-vave-instrument-storage.mjs"
 node "$ROOT/scripts/patch-m-vave-two-track-sequencer.mjs"
 node "$ROOT/scripts/patch-m-vave-physical-controls.mjs"

@@ -7,13 +7,13 @@ const vendor = path.join(root, "vendor/m-vave-fm1");
 const app = path.join(vendor, "app");
 const source = path.join(vendor, "web/synth");
 const synthDir = path.join(app, "synth");
-const generatedCore = path.join(app, "fm1lab_dx7");
 
 /* The pinned FM1 SDK archive already contains this six-operator DX7 engine.
- * Remove artifacts from the earlier source-vendoring implementation instead
- * of compiling a duplicate core and duplicate lookup tables into the image. */
-fs.rmSync(generatedCore, { recursive: true, force: true });
+ * Remove artifacts from earlier source-vendoring/Felucca staging attempts
+ * instead of compiling a duplicate core and duplicate lookup tables. */
+fs.rmSync(path.join(app, "fm1lab_dx7"), { recursive: true, force: true });
 fs.rmSync(path.join(app, "fm1lab_dx7_rename.h"), { force: true });
+fs.rmSync(path.join(app, "dsp"), { recursive: true, force: true });
 fs.mkdirSync(synthDir, { recursive: true });
 
 const engineHeader = fs.readFileSync(path.join(synthDir, "engine.h"), "utf8");
@@ -30,4 +30,4 @@ fs.copyFileSync(path.join(source, "synth_dx7.h"),
 fs.copyFileSync(path.join(root, "firmware/fm1lab_dx7_api.h"),
                  path.join(app, "fm1lab_dx7_api.h"));
 
-console.log("Staged the pinned FM1 SDK six-operator synth API header; no second DX7 DSP core is compiled.");
+console.log("Staged the pinned FM1 SDK six-operator synth API header; no second DSP core is compiled.");

@@ -45,6 +45,8 @@ $files = @(
     'fm1lab_bank_metadata.h',
     'fm1lab_bank_metadata.c',
     'fm1lab_physical_controls.h',
+    'fm1lab_audio_engine.h',
+    'fm1lab_audio_engine.c',
     'fm1lab_audio_bridge.h',
     'fm1lab_audio_bridge.c'
 )
@@ -52,19 +54,8 @@ $app = Join-Path $vendor 'app'
 foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $root "firmware/$file") -Destination $app -Force
 }
-$dsp = Join-Path $app 'dsp'
-New-Item -ItemType Directory -Path $dsp -Force | Out-Null
-$fm6Source = Get-Content -LiteralPath (Join-Path $root 'app/dsp/fm6.c') -Raw
-$fm6Source = $fm6Source.Replace('../../upstream/felucca/firmware/src/fm6_core.c', 'fm6_core.inc')
-Set-Content -LiteralPath (Join-Path $dsp 'fm6.c') -Value $fm6Source -NoNewline
-Copy-Item -LiteralPath (Join-Path $root 'app/dsp/fm6.h') -Destination $dsp -Force
-Copy-Item -LiteralPath (Join-Path $root 'upstream/felucca/firmware/src/fm6_core.c') -Destination (Join-Path $dsp 'fm6_core.inc') -Force
-$felucca = Join-Path $root 'upstream/felucca'
-& python (Join-Path $felucca 'tools/gen_tables.py') (Join-Path $dsp 'felucca_tables.h')
-if ($LASTEXITCODE -ne 0) { throw 'Felucca FM6 lookup-table generation failed.' }
-& python (Join-Path $felucca 'tools/gen_fm6_patches.py') (Join-Path $dsp 'felucca_fm6.h')
-if ($LASTEXITCODE -ne 0) { throw 'Felucca FM6 factory-patch generation failed.' }
-Write-Host 'Staged the pinned Felucca FM6 core, tables and factory patches.'
+node (Join-Path $root 'scripts/patch-m-vave-device-dx7-core.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'FM1 SDK native DX7 API staging failed.' }
 
 Push-Location $root
 try {
