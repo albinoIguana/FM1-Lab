@@ -90,6 +90,7 @@ static volatile uint8_t fx_send[PATCHES][3];
 static uint32_t fx_lfo_phase;
 static int32_t fm6_sat_q23(int64_t x) { return x>OUTPUT_LIMIT?OUTPUT_LIMIT:x< -OUTPUT_LIMIT?-OUTPUT_LIMIT:(int32_t)x; }
 static uint32_t fm6_step_period(void) { return (FM6_SAMPLE_RATE*60u)/((uint32_t)transport_bpm*4u); }
+static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16);
 static void fm6_transport_step(void)
 {
     for(uint32_t lane=0;lane<2u;lane++) {
@@ -98,7 +99,7 @@ static void fm6_transport_step(void)
             volatile fm6_step_t *s=&seq_pattern[lane][seq_position];
             if(s->enabled && s->velocity) {
                 uint8_t patch=seq_lane_patch[lane];
-                fm6_note_on_mask(s->note,s->velocity,(uint8_t)(1u<<patch));
+                fm6_note_start_tuned_mask(s->note,s->velocity,(uint8_t)(1u<<patch),0);
                 seq_live_note[lane]=s->note; seq_live_patch[lane]=patch;
                 seq_gate_left[lane]=fm6_step_period()*(s->gate?s->gate:50u)/100u;
                 if(!seq_gate_left[lane]) seq_gate_left[lane]=1u;
@@ -114,7 +115,7 @@ static void fm6_transport_step(void)
             if(arp_index>=arp_count) { arp_index=arp_count>1u?(uint8_t)(arp_count-2u):0u; arp_direction=0u; }
             else if(!arp_direction && arp_index==0u) arp_direction=1u;
         }
-        arp_live_note=arp_notes[arp_index]; fm6_note_on_mask(arp_live_note,100u,0x0fu); arp_live=1u;
+        arp_live_note=arp_notes[arp_index]; fm6_note_start_tuned_mask(arp_live_note,100u,0x0fu,0); arp_live=1u;
         if(arp_mode==3u) { if(arp_direction) ++arp_index; else if(arp_index) --arp_index; }
         else ++arp_index;
     } else if(arp_live) { fm6_note_off(arp_live_note); arp_live=0u; }
@@ -332,17 +333,11 @@ void fm6_panic(void)
     arp_count=0u; arp_live=0u; arp_index=0u;
 }
 
-void fm6_note_on_tuned_mask(uint8_t note, uint8_t velocity,
-                                           uint8_t patch_mask, int16_t tune16)
+static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16)
 {
     uint32_t i;
     if (note > 127u || !velocity)
         return;
-    if (arp_mode) {
-        for(uint32_t k=0;k<arp_count;k++) if(arp_notes[k]==note) return;
-        if(arp_count<16u) arp_notes[arp_count++]=note;
-        return;
-    }
     if (tune16 > 32) tune16 = 32;
     if (tune16 < -32) tune16 = -32;
     for (i = 0; i < PATCHES; i++) {
@@ -360,6 +355,17 @@ void fm6_note_on_tuned_mask(uint8_t note, uint8_t velocity,
         fm6_note_init(&v->state, p->effective, (int32_t)note + p->effective[FP_TRNSP] - 24, velocity, 1);
         fm6_lfo_key(&patch_lfo[i]);
     }
+}
+
+void fm6_note_on_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16)
+{
+    if(note>127u || !velocity) return;
+    if(arp_mode) {
+        for(uint32_t k=0;k<arp_count;k++) if(arp_notes[k]==note) return;
+        if(arp_count<16u) arp_notes[arp_count++]=note;
+        return;
+    }
+    fm6_note_start_tuned_mask(note,velocity,patch_mask,tune16);
 }
 
 void fm6_note_on_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask)
