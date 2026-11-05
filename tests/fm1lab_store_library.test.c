@@ -22,8 +22,15 @@ static void make_instrument(fm1lab_instrument_t *in) {
     fm1lab_instrument_init(in,"TEST QUAD VOICE");
     for(unsigned p=0;p<4;p++) {
         uint8_t *v=in->patches[p].voice;
-        for(unsigned i=0;i<156;i++) v[i]=(uint8_t)((i*3u+p*7u)&127u);
+        for(unsigned op=0;op<6;op++) {
+            uint8_t *q=v+op*21u;
+            for(unsigned i=0;i<11;i++) q[i]=(uint8_t)((i*3u+p*7u)%100u);
+            q[11]=1; q[12]=2; q[13]=3; q[14]=1; q[15]=3;
+            q[16]=88; q[17]=1; q[18]=14; q[19]=77; q[20]=4;
+        }
+        for(unsigned i=126;i<156;i++) v[i]=(uint8_t)(i%90u);
         v[134]=(uint8_t)(p+2u); v[135]=(uint8_t)(p+1u);
+        v[136]=1; v[141]=1; v[142]=4; v[143]=6; v[155]=63;
         in->patches[p].enabled=(uint8_t)(p&1u);
         in->patches[p].level=(uint8_t)(100u+p);
         for(unsigned m=0;m<4;m++) in->patches[p].macros[m]=(uint8_t)(20u+p*10u+m);
