@@ -12,7 +12,7 @@
 #define INST_STORE_MAGIC 0x31494D46u      /* "FM1I" */
 #define INST_STORE_VERSION 1u
 #define INST_CHUNKS 3u
-#define INST_HEADER_BYTES 8u
+#define INST_HEADER_BYTES 12u
 #define INST_CHUNK_MAX_RECORDS 6u
 typedef char fm1lab_record_size_check[(sizeof(fm1lab_instrument_record_t) == 607u) ? 1 : -1];
 typedef char fm1lab_chunk_size_check[(INST_HEADER_BYTES + INST_CHUNK_MAX_RECORDS * sizeof(fm1lab_instrument_record_t) <= 3840u) ? 1 : -1];
@@ -30,6 +30,7 @@ typedef struct {
     uint16_t version;
     uint8_t first;
     uint8_t count;
+    uint32_t crc;
 } instrument_chunk_header_t;
 
 static fm1lab_instrument_record_t instrument_cache[FM1LAB_INSTRUMENT_COUNT];
@@ -42,6 +43,17 @@ static void app_copy_bytes(void *dst, const void *src, uint32_t n)
     const uint8_t *s = (const uint8_t *)src;
     while (n--)
         *d++ = *s++;
+}
+
+static uint32_t app_crc32(const uint8_t *data, uint32_t n)
+{
+    uint32_t crc = 0xFFFFFFFFu, i, bit;
+    for (i = 0; i < n; i++) {
+        crc ^= data[i];
+        for (bit = 0; bit < 8u; bit++)
+            crc = (crc >> 1) ^ (0xEDB88320u & (uint32_t)-(int32_t)(crc & 1u));
+    }
+    return ~crc;
 }
 
 static void instrument_store_load(void)
@@ -57,7 +69,9 @@ static void instrument_store_load(void)
             continue;
         app_copy_bytes(&h, buf, sizeof(h));
         if (h.magic != INST_STORE_MAGIC || h.version != INST_STORE_VERSION
-            || h.first != first[chunk] || h.count != count[chunk])
+            || h.first != first[chunk] || h.count != count[chunk]
+            || h.crc != app_crc32(buf + INST_HEADER_BYTES,
+                                  count[chunk] * sizeof(fm1lab_instrument_record_t)))
             continue;
         for (i = 0; i < count[chunk]; i++) {
             uint32_t slot = first[chunk] + i;
@@ -88,10 +102,11 @@ static int instrument_store_save(uint32_t slot, const fm1lab_instrument_record_t
     h.version = INST_STORE_VERSION;
     h.first = first[chunk];
     h.count = count[chunk];
-    app_copy_bytes(buf, &h, sizeof(h));
     for (i = 0; i < count[chunk]; i++)
         app_copy_bytes(buf + INST_HEADER_BYTES + i * sizeof(fm1lab_instrument_record_t),
                        &instrument_cache[first[chunk] + i], sizeof(fm1lab_instrument_record_t));
+    h.crc = app_crc32(buf + INST_HEADER_BYTES, count[chunk] * sizeof(fm1lab_instrument_record_t));
+    app_copy_bytes(buf, &h, sizeof(h));
     return plat_store_save(OBJ_INSTRUMENTS0 + chunk, buf,
                            INST_HEADER_BYTES + count[chunk] * sizeof(fm1lab_instrument_record_t)) == 0;
 }
