@@ -91,7 +91,8 @@ static void instrument_sync_settings(void)
 {
     set.enabled_mask = 0x0fu; /* compatibility field; layer volume is authoritative */
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-        const fm1lab_patch_t *part = &current_instrument.patches[p];
+        fm1lab_patch_t *part = &current_instrument.patches[p];
+        part->enabled = 1u; /* normalize legacy records to volume-controlled layers */
         set.levels[p] = part->level;
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             set.macros[p][m] = part->macros[m];
