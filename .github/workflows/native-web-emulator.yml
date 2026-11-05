@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: native-web-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   emulator:
     runs-on: ubuntu-latest
@@ -52,6 +56,13 @@ jobs:
       - name: Publish browser preview on the feature branch
         id: publish
         run: |
+          git fetch origin "$GITHUB_REF_NAME"
+          remote_sha="$(git rev-parse FETCH_HEAD)"
+          if ! git diff --quiet "$GITHUB_SHA" "$remote_sha" -- app firmware base upstream/felucca .gitmodules; then
+            echo "Firmware sources changed during this build; a newer run must publish the emulator."
+            exit 1
+          fi
+          git reset --hard "$remote_sha"
           mkdir -p native-emulator
           cp app/build/emu/index.html app/build/emu/app.wasm app/build/emu/worklet.js native-emulator/
           git config user.name "github-actions[bot]"
