@@ -24,6 +24,28 @@ From the last device link diagnostics:
 
 That rejection did **not** prove the image exceeded the FM1's physical application slot. The fix is not to blindly change a constant in the stock packager. Use a proven linker, flash map, update loader and package builder as one consistent system, then enforce the 581,564-byte XIP boundary in that system.
 
+## Verified Felucca-compatible storage map
+
+The fm1-base package builder is not the stale generic layout described in one comment in `device/storage.c`. Its pinned BSP defines the actual writable windows:
+- XDATA1: `0xE7000..0xFBFFF`; Felucca uses `0xE7000` for its voice bank.
+- OTA staging: `0xE0000..0xE4FFF` (five sectors), not the entire `0xE0000..0xFBFFF` range.
+- Autosave: `0xE5000..0xE6FFF`.
+- Global sectors: `0xFC000..`; Felucca uses `0xFC000/0xFD000` for settings and `0xFE000` for the second FM6 bank copy.
+
+Felucca's existing data map is:
+- Projects: `0x97000..0x9EFFF`.
+- FM6 patch bank A/B: `0x9F000` and `0xFE000`.
+- User samples: `0xA0000..0xDBFFF`.
+- User preset banks: `0xDC000..0xDFFFF`.
+- OTA staging: `0xE0000..0xE4FFF`.
+- Autosave: `0xE5000..0xE6FFF`.
+- FM6 voice bank: `0xE7000`.
+- Felucca globals/settings: `0xFC000..`.
+
+The fm1-base template's default map (`0xFC000`, `0xDC000`, `0xDE000`) would collide with Felucca globals and user preset banks. This rebuild explicitly relocates its three small app objects to `0xEA000..0xEFFFF` and reserves the 12-sector pool `0xF0000..0xFBFFF` for our Instrument bank. These lie in the package's preserved USER range and BSP XDATA1 window; they do not overlap Felucca projects, samples, user preset banks, autosave, voice bank or FM6 bank copies. The old stock USER patch area is repurposed for FM1-Lab app objects; Felucca's project and preset banks are preserved. The OTA staging window remains untouched.
+
+The BSP's OTA implementation and flash-window definitions are the authority here: `chip/ota.c` defines five staging sectors at `0xE0000`, and `chip/fm1_flash.h` defines XDATA1 as `0xE7000..0xFC000`. The broader staging comment in fm1-base's storage source is stale and is not used as the flash map.
+
 ## Component selection
 
 | Layer | Selected source | Use |
