@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Charles Vestal */
 /* FM1-Lab native foundation bring-up app: every control on the screen as it arrives, by the name the app knows it by (plat.h B_*, EN_*,
  * the keys), and a few of them doing something: the keys play a voice and go out over USB-MIDI (MIDI in plays it
- * too), OCT- / OCT+ set the octave, PRESET the wave, MASTER the volume, SAVE stores the settings; the keys are
+ * too), OCT- / OCT+ set the octave, PRESET changes the Instrument, SELECT chooses one of its four patches, K1-K4 are the four macros, SAVE stores the Instrument; the keys are
  * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
@@ -100,7 +100,7 @@ static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO
 static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2", "K3", "K4"};
 
 /* ------------------------------------------------------------------ voice --- */
-/* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
+/* MIDI runs in the audio interrupt; UI changes are serialized through the event queue. */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
 enum {
     EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE,
@@ -567,9 +567,11 @@ static void draw(void)
     /* Header and the 2x2 patch matrix. */
     cv_begin(240, 144, C_BLACK);
     cv_text(7, 5, &FONT_B, APP_NAME, C_WHITE);
-    cv_text(104, 8, &FONT_XS, "FOUR-PATCH FM", C_HI);
+    cv_text(104, 8, &FONT_XS, fm6_instrument_name(set.instrument), C_HI);
+    if (fm6_instrument_dirty(set.instrument))
+        cv_text(178, 8, &FONT_XS, "UNSAVED", C_HI);
     if (FM1B_BLE)
-        cv_text(194, 8, &FONT_XS, "BLE", plat_ble_connected() ? C_HI : C_DIM);
+        cv_text(210, 8, &FONT_XS, "BT", plat_ble_connected() ? C_HI : C_DIM);
     if (now < ui.msg_until) {
         cv_rect(4, 23, 232, 17, C_LINE);
         cv_text(9, 24, &FONT_XS, ui.msg[0], C_WHITE);
@@ -671,6 +673,8 @@ void app_frame(void)
             ui.msg_until = 0;
         ui.redraw = 1;
     }
+    if (fm6_current_instrument() != set.instrument)
+        ui.redraw = 1;
     if (ui.redraw) {
         ui.redraw = 0;
         draw();
@@ -682,8 +686,12 @@ int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "octave"))
         *got = set.octave;
-    else if (!strcmp(what, "patch") || !strcmp(what, "wave"))
+    else if (!strcmp(what, "patch"))
         *got = set.patch;
+    else if (!strcmp(what, "instrument"))
+        *got = set.instrument;
+    else if (!strcmp(what, "instrument_dirty"))
+        *got = fm6_instrument_dirty(set.instrument);
     else if (!strcmp(what, "note"))
         *got = voice_note;
     else if (!strcmp(what, "dirty"))
