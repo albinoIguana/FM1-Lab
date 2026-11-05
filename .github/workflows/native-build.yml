@@ -10,6 +10,8 @@ on:
       - ".gitmodules"
       - "build.sh"
       - ".github/workflows/native-build.yml"
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions: {}
@@ -18,7 +20,7 @@ jobs:
   build:
     uses: zvenson/fm1-build/.github/workflows/build.yml@v1
     permissions:
-      contents: read
+      contents: write
       id-token: write
       attestations: write
     with:
