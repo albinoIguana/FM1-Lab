@@ -337,8 +337,21 @@ void app_init(void)
     }
     page = PAGE_HOME;
     instrument_factory_capture();
-    if (plat_store_size(OBJ_INSTRUMENTS0) < 0) {
-        (void)fm1lab_store_library_format(&factory_instrument);
+    for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
+        int size = plat_store_size(OBJ_INSTRUMENTS0 + bank);
+        fm1lab_instrument_t probe;
+        if (size == 3840 && !fm1lab_store_library_load(bank * 8u, &probe))
+            continue;
+        if (bank < 3u && size == (int)sizeof(fm1lab_instrument_t)) {
+            fm1lab_instrument_t legacy;
+            if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &legacy, sizeof legacy) ==
+                    (int)sizeof legacy && fm1lab_instrument_valid(&legacy)) {
+                if (!fm1lab_store_library_format_bank(bank, &factory_instrument))
+                    (void)fm1lab_store_library_save(bank, &legacy);
+                continue;
+            }
+        }
+        (void)fm1lab_store_library_format_bank(bank, &factory_instrument);
     }
     instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
