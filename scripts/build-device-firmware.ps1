@@ -15,6 +15,20 @@ if (!(Test-Path -LiteralPath $sdkBuild)) {
 if (!(Test-Path -LiteralPath $Toolchain)) {
     throw 'The matching JieLi toolchain directory does not exist.'
 }
+# The pinned JieLi clang driver does not automatically add its target C
+# library headers to the search path. The FM1 SDK Build.ps1 supplies its own
+# project includes, so expose the matching PI32 C headers through Clang's
+# documented CPATH environment variable without editing upstream SDK files.
+$systemInclude = Join-Path $Toolchain 'q32s-include'
+if (!(Test-Path -LiteralPath (Join-Path $systemInclude 'ctype.h') -PathType Leaf)) {
+    throw "JieLi PI32 C library headers are missing: $systemInclude"
+}
+if ([string]::IsNullOrWhiteSpace($env:CPATH)) {
+    $env:CPATH = $systemInclude
+} else {
+    $env:CPATH = $systemInclude + ';' + $env:CPATH
+}
+Write-Host "Clang target C headers: $systemInclude"
 # Stage the same FM1-Lab C modules and source transformations used by CI's
 # official simulator build. The SDK recursively compiles every app/*.c unit.
 $files = @(
