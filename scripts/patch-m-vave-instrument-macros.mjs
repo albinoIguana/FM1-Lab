@@ -99,8 +99,8 @@ const controls = String.raw`
         if (encoder_active(controls->encoders)) goto controls_done;
     }
 `;
-replaceOnce("    /* Panel shortcuts precede modal editors.",
-"    /* FM1-LAB performance macro controls */\n"+controls+"\n    /* FM1-LAB native patch editor controls */","macro page controls");
+replaceOnce("    /* Panel shortcuts precede modal editors. A menu must not swallow a\n     * navigation key, transport control or the release of a held gesture. */",
+"    /* FM1-LAB performance macro controls */\n"+controls+"\n    /* Panel shortcuts precede modal editors. A menu must not swallow a\n     * navigation key, transport control or the release of a held gesture. */","macro page controls");
 }
 fs.writeFileSync(screenPath, source);
 console.log("Applied FM1-Lab four-macro performance page and physical controls.");
