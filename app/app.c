@@ -7,17 +7,24 @@
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
 
-#define SET_MAGIC 0x4C314D46u            /* "FM1L": native Instrument settings */
+#define SET_MAGIC_V1 0x4C314D46u
+#define SET_MAGIC    0x4C314D47u
 typedef struct {
     uint32_t magic;
-    int8_t octave;                       /* -2 .. +2 */
-    uint8_t patch;                       /* selected patch in the four-patch Instrument */
-    uint8_t enabled_mask;                /* one bit per patch */
-    uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
-    uint8_t rsv[1];
+    int8_t octave;
+    uint8_t patch, enabled_mask, ble_off, rsv[1];
+} settings_v1_t;
+typedef struct {
+    uint32_t magic;
+    int8_t octave;
+    uint8_t patch, enabled_mask, ble_off;
+    uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT];
+    uint8_t levels[FM1LAB_PATCH_COUNT];
 } settings_t;
 static settings_t set;
-static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
+static uint8_t set_dirty;
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL };
+static uint8_t page = PAGE_HOME;
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -27,14 +34,14 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE };
-typedef struct { volatile uint8_t type, a, b; } ui_event_t;
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_PATCH_ENABLE, EV_MACRO_SET, EV_PATCH_LEVEL };
+typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
 
 /* Main-loop controls never write FM voice state directly. They publish compact events;
  * the audio interrupt is the sole runtime writer of the synthesizer state. */
-static void ui_event_push(uint8_t type, uint8_t a, uint8_t b)
+static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 {
     uint8_t head = ui_event_head, next = (uint8_t)((head + 1u) & 63u);
     if (next == ui_event_tail) {
@@ -44,6 +51,7 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b)
     ui_events[head].type = type;
     ui_events[head].a = a;
     ui_events[head].b = b;
+    ui_events[head].c = c;
     ui_event_head = next;
 }
 
@@ -54,10 +62,17 @@ static void ui_events_drain(void)
         ui_event_tail = ui_event_head;
         ui_event_overflow = 0;
         fm6_panic();
+        for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+            fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
+            fm6_patch_set_level(p, set.levels[p]);
+            for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
+                fm6_macro_set(p, m, set.macros[p][m]);
+        }
         return;
     }
     while ((tail = ui_event_tail) != ui_event_head) {
-        uint8_t type = ui_events[tail].type, a = ui_events[tail].a, b = ui_events[tail].b;
+        uint8_t type = ui_events[tail].type, a = ui_events[tail].a;
+        uint8_t b = ui_events[tail].b, c = ui_events[tail].c;
         ui_event_tail = (uint8_t)((tail + 1u) & 63u);
         if (type == EV_NOTE_ON)
             fm6_note_on(a, b);
@@ -67,17 +82,21 @@ static void ui_events_drain(void)
             fm6_panic();
         else if (type == EV_PATCH_ENABLE)
             fm6_patch_set_enabled(a, b);
+        else if (type == EV_MACRO_SET)
+            fm6_macro_set(a, b, c);
+        else if (type == EV_PATCH_LEVEL)
+            fm6_patch_set_level(a, b);
     }
 }
 
 static void note_on(int32_t note, uint32_t vel)
 {
     voice_note = note;
-    ui_event_push(EV_NOTE_ON, (uint8_t)note, (uint8_t)vel);
+    ui_event_push(EV_NOTE_ON, (uint8_t)note, (uint8_t)vel, 0);
 }
 static void note_off(int32_t note)
 {
-    ui_event_push(EV_NOTE_OFF, (uint8_t)note, 0);
+    ui_event_push(EV_NOTE_OFF, (uint8_t)note, 0, 0);
     if (voice_note == note)
         voice_note = -1;
 }
@@ -121,6 +140,25 @@ void app_panic(void)
 }
 
 /* --------------------------------------------------------------- settings --- */
+static int settings_v1_valid(const settings_v1_t *v)
+{
+    return v->magic == SET_MAGIC_V1 && v->octave >= -2 && v->octave <= 2 &&
+        v->patch < FM1LAB_PATCH_COUNT && !(v->enabled_mask & 0xF0u) && v->ble_off <= 1u;
+}
+
+static int settings_valid(const settings_t *v)
+{
+    if (v->magic != SET_MAGIC || v->octave < -2 || v->octave > 2 ||
+        v->patch >= FM1LAB_PATCH_COUNT || (v->enabled_mask & 0xF0u) || v->ble_off > 1u)
+        return 0;
+    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        if (v->levels[p] > 127u) return 0;
+        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
+            if (v->macros[p][m] > 100u) return 0;
+    }
+    return 1;
+}
+
 static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
@@ -128,18 +166,39 @@ static void settings_defaults(void)
     set.patch = 0;
     set.enabled_mask = 1u;
     set.ble_off = 0;
+    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        set.levels[p] = 127u;
+        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
+            set.macros[p][m] = 50u;
+    }
 }
 
 void app_init(void)
 {
-    uint32_t i;
+    settings_v1_t old;
+    int loaded;
     fm6_init();
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
-        || set.octave < -2 || set.octave > 2 || set.patch >= FM1LAB_PATCH_COUNT
-        || (set.enabled_mask & 0xF0u) || set.ble_off > 1u)
-        settings_defaults();
-    for (i = 0; i < FM1LAB_PATCH_COUNT; i++)
-        fm6_patch_set_enabled(i, (set.enabled_mask >> i) & 1u);
+    loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+    if (loaded != (int)sizeof set || !settings_valid(&set)) {
+        if (plat_store_load(OBJ_SETTINGS, &old, sizeof old) == (int)sizeof old &&
+            settings_v1_valid(&old)) {
+            settings_defaults();
+            set.octave = old.octave;
+            set.patch = old.patch;
+            set.enabled_mask = old.enabled_mask;
+            set.ble_off = old.ble_off;
+            set_dirty = 1u; /* save once to migrate the previous compact settings record */
+        } else {
+            settings_defaults();
+        }
+    }
+    page = PAGE_HOME;
+    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        fm6_patch_set_enabled(p, (set.enabled_mask >> p) & 1u);
+        fm6_patch_set_level(p, set.levels[p]);
+        for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
+            fm6_macro_set(p, m, set.macros[p][m]);
+    }
 }
 
 /* --------------------------------------------------------------------- UI --- */
@@ -259,7 +318,7 @@ static void octave_step(int32_t d)
     if (o == set.octave)
         return;
     voice_note = -1;                         /* a key held across the change would not find its note off */
-    ui_event_push(EV_PANIC, 0, 0);
+    ui_event_push(EV_PANIC, 0, 0, 0);
     set.octave = (int8_t)o;
     set_dirty = 1;
     octave_text(t);
@@ -336,11 +395,17 @@ static void input(void)
             octave_step(1);
         else if (k == B_REC && FM1B_BLE)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
-        else if (k == B_SEL) {
-            set.enabled_mask ^= (uint8_t)(1u << set.patch);
-            ui_event_push(EV_PATCH_ENABLE, set.patch, (set.enabled_mask >> set.patch) & 1u);
-            set_dirty = 1;
-            app_say(fm6_patch_name(set.patch), fm6_patch_enabled(set.patch) ? "ON" : "OFF");
+        else if (k == B_HOME) {
+            page = PAGE_HOME;
+            app_say("HOME", fm6_patch_name(set.patch));
+        } else if (k == B_GLO) {
+            page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
+            app_say("GLOBAL", page == PAGE_GLOBAL ? "SETTINGS" : "HOME");
+        } else if (k == B_SEL) {
+            if (page == PAGE_HOME) {
+                page = PAGE_MACRO;
+                app_say("MACROS", fm6_patch_name(set.patch));
+            }
         } else if (k == B_SAVE) {
             if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
                 set_dirty = 0;
@@ -376,13 +441,36 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
-         } else if (k == EN_PRESET) {
+        } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
-            if (next < 0)
-                next += (int32_t)FM1LAB_PATCH_COUNT;
+            if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
             set.patch = (uint8_t)next;
             set_dirty = 1;
             app_say("PATCH", fm6_patch_name(set.patch));
+        } else if (k == EN_PRESET) {
+            app_say("INSTRUMENT", "LIBRARY NOT READY");
+        } else if (k >= EN_K1 && k <= EN_K4) {
+            uint32_t index = (uint32_t)k - EN_K1;
+            if (page == PAGE_MACRO) {
+                int32_t value = (int32_t)set.macros[set.patch][index] + e;
+                if (value < 0) value = 0;
+                if (value > 100) value = 100;
+                set.macros[set.patch][index] = (uint8_t)value;
+                ui_event_push(EV_MACRO_SET, set.patch, (uint8_t)index, (uint8_t)value);
+                set_dirty = 1;
+                app_say("MACRO", "UPDATED");
+            } else if (page == PAGE_HOME) {
+                int32_t value = (int32_t)set.levels[index] + e;
+                if (value < 0) value = 0;
+                if (value > 127) value = 127;
+                set.levels[index] = (uint8_t)value;
+                ui_event_push(EV_PATCH_LEVEL, (uint8_t)index, (uint8_t)value, 0);
+                set_dirty = 1;
+                app_say("PATCH LEVEL", "UPDATED");
+            } else {
+                int_text(ui.turns[k], t);
+                app_say(ENC_NAME[k], t);
+            }
         } else {
             int_text(ui.turns[k], t);
             app_say(ENC_NAME[k], t);
@@ -417,6 +505,78 @@ static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uin
         cv_rect(x + 2, y + h - p, w - 4, p, C_WHITE);
 }
 
+static void outline(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t color)
+{
+    cv_rect(x, y, w, 1, color);
+    cv_rect(x, y + h - 1, w, 1, color);
+    cv_rect(x, y, 1, h, color);
+    cv_rect(x + w - 1, y, 1, h, color);
+}
+
+static void draw_home_panel(void)
+{
+    char t[24];
+    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        int32_t x = 4 + (int32_t)(p & 1u) * 118;
+        int32_t y = 4 + (int32_t)(p >> 1) * 68;
+        uint16_t accent = p == set.patch ? C_HI : C_LINE;
+        int enabled = (set.enabled_mask >> p) & 1u;
+        cv_rect(x, y, 112, 62, C_BLACK);
+        outline(x, y, 112, 62, accent);
+        cv_text(x + 6, y + 6, &FONT_XS, fm6_patch_name(p), C_WHITE);
+        cv_text(x + 6, y + 24, &FONT_XS, enabled ? "ACTIVE" : "MUTED", enabled ? C_HI : C_DIM);
+        cv_text(x + 58, y + 24, &FONT_XS, "ALG", C_GRAY);
+        int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
+        cv_text(x + 82, y + 24, &FONT_XS, t, C_WHITE);
+        cv_text(x + 6, y + 42, &FONT_XS, "LVL", C_GRAY);
+        int_text(set.levels[p], t);
+        cv_text(x + 32, y + 42, &FONT_XS, t, C_WHITE);
+        cv_rect(x + 54, y + 45, 50, 6, C_LINE);
+        cv_rect(x + 54, y + 45, (int32_t)set.levels[p] * 50 / 127, 6, C_HI);
+    }
+    cv_text(4, 138, &FONT_XS, "SELECT: PATCH   SEL: MACROS   GLO: GLOBAL", C_GRAY);
+}
+
+static void draw_macro_panel(void)
+{
+    static const char *const names[FM1LAB_MACRO_COUNT] = {"BRIGHTNESS", "BODY", "MOTION", "DIRT"};
+    char t[24];
+    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
+    cv_text(164, 2, &FONT_XS, "ALGO", C_GRAY);
+    int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
+    cv_text(204, 2, &FONT_XS, t, C_HI);
+    for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m) {
+        int32_t y = 28 + (int32_t)m * 27;
+        uint32_t value = set.macros[set.patch][m];
+        cv_text(6, y, &FONT_XS, names[m], C_WHITE);
+        int_text((int32_t)value, t);
+        cv_text(78, y, &FONT_XS, t, C_HI);
+        cv_rect(108, y + 2, 124, 8, C_LINE);
+        cv_rect(108, y + 2, (int32_t)value * 124 / 100, 8, C_HI);
+        cv_rect(169, y, 2, 12, C_WHITE); /* neutral midpoint at 50 */
+    }
+    cv_text(4, 138, &FONT_XS, "K1 BRIGHT  K2 BODY  K3 MOTION  K4 DIRT", C_GRAY);
+}
+
+static void draw_global_panel(uint32_t pct)
+{
+    char t[24];
+    cv_text(8, 8, &FONT_XS, "MASTER", C_GRAY);
+    int_text((int32_t)pct, t); text_cat(t, "%");
+    cv_text(90, 8, &FONT_XS, t, C_HI);
+    cv_text(8, 34, &FONT_XS, "OCTAVE", C_GRAY);
+    octave_text(t);
+    cv_text(90, 34, &FONT_XS, t, C_WHITE);
+    cv_text(8, 60, &FONT_XS, "BLUETOOTH", C_GRAY);
+    cv_text(90, 60, &FONT_XS, set.ble_off ? "OFF" : "ON", set.ble_off ? C_DIM : C_HI);
+    cv_text(8, 86, &FONT_XS, "BLE MIDI", C_GRAY);
+    cv_text(90, 86, &FONT_XS, plat_ble_connected() ? "CONNECTED" : "WAITING", plat_ble_connected() ? C_HI : C_DIM);
+    cv_text(8, 112, &FONT_XS, "MIDI IN", C_GRAY);
+    int_text((int32_t)midi_count, t);
+    cv_text(90, 112, &FONT_XS, t, C_WHITE);
+    cv_text(4, 138, &FONT_XS, "REC HOLD: BLUETOOTH   SAVE: STORE SETTINGS", C_GRAY);
+}
+
 static void draw(void)
 {
     char t[24];
@@ -429,7 +589,9 @@ static void draw(void)
         int32_t x = cv_text(10, 6, &FONT_B, ui.msg[0], C_WHITE);
         cv_text(x + 8, 6, &FONT_B, ui.msg[1], C_HI);
     } else {
-        int32_t x = cv_text(10, 6, &FONT_B, APP_NAME, C_WHITE);
+        const char *title = page == PAGE_MACRO ? "PATCH MACROS" :
+            page == PAGE_GLOBAL ? "GLOBAL SETTINGS" : APP_NAME;
+        int32_t x = cv_text(10, 6, &FONT_B, title, C_WHITE);
         if (FM1B_BLE)                        /* Bluetooth: grey while it waits, lit while a computer is connected */
             x = cv_text(x + 8, 10, &FONT_XS, "BLE", plat_ble_connected() ? C_HI : C_DIM);
         if (FM1B_BLE_CENTRAL)                /* a Bluetooth MIDI device: lit while connected */
@@ -451,17 +613,11 @@ static void draw(void)
         }
     }
     cv_blit(0, 0);
-    /* the buttons, 4 to a row, lit while held; the encoders and their counts, lit for a moment after a turn */
+    /* HOME tiles, the selected patch's four performance macros, or global settings. */
     cv_begin(240, 144, C_BLACK);
-    for (i = 0; i < NB; i++)
-        cell(4 + (int32_t)(i % 4u) * 58, (int32_t)(i / 4u) * 21, 56, BTN_NAME[i], (ui.btn >> i) & 1u);
-    for (i = 0; i < NE; i++) {
-        int32_t x = 4 + (int32_t)(i % 4u) * 58, y = 88 + (int32_t)(i / 4u) * 28;
-        int lit = ui.turned_at[i] && now - ui.turned_at[i] < 300u;
-        cv_text(x, y, &FONT_XS, ENC_NAME[i], lit ? C_HI : C_GRAY);
-        int_text(ui.turns[i], t);
-        cv_text(x, y + 13, &FONT_XS, t, lit ? C_WHITE : C_DIM);
-    }
+    if (page == PAGE_HOME) draw_home_panel();
+    else if (page == PAGE_MACRO) draw_macro_panel();
+    else draw_global_panel(pct);
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
     cv_begin(240, 60, C_BLACK);
@@ -472,11 +628,25 @@ static void draw(void)
         key_cell(4 + (int32_t)AT[i] * 14 + 8, 0, 11, 12, BK[i], C_LINE);
     }
     octave_text(t);
-    cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
-    cv_text(30, 36, &FONT_XS, t, C_HI);
-    cv_text(64, 36, &FONT_XS, "PATCH", C_GRAY);
-    cv_text(112, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
-    cv_text(202, 36, &FONT_XS, fm6_patch_enabled(set.patch) ? "ON" : "OFF", fm6_patch_enabled(set.patch) ? C_HI : C_DIM);
+    if (page == PAGE_HOME) {
+        cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
+        cv_text(30, 36, &FONT_XS, t, C_HI);
+        cv_text(64, 36, &FONT_XS, "PATCH", C_GRAY);
+        cv_text(112, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
+        cv_text(202, 36, &FONT_XS, (set.enabled_mask >> set.patch) & 1u ? "ON" : "OFF",
+                (set.enabled_mask >> set.patch) & 1u ? C_HI : C_DIM);
+    } else if (page == PAGE_MACRO) {
+        cv_text(4, 36, &FONT_XS, "MACROS", C_GRAY);
+        cv_text(64, 36, &FONT_XS, fm6_patch_name(set.patch), C_HI);
+        cv_text(178, 36, &FONT_XS, "NEUTRAL", C_GRAY);
+        cv_text(218, 36, &FONT_XS, "50", C_HI);
+    } else {
+        cv_text(4, 36, &FONT_XS, "GLOBAL", C_GRAY);
+        cv_text(64, 36, &FONT_XS, "SETTINGS", C_HI);
+        cv_text(178, 36, &FONT_XS, "VOL", C_GRAY);
+        int_text((int32_t)pct, t); text_cat(t, "%");
+        cv_text(204, 36, &FONT_XS, t, C_HI);
+    }
     if (midi_count) {                        /* the last MIDI message in, and where from */
         static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
         static const char HEX[] = "0123456789ABCDEF";
@@ -492,10 +662,6 @@ static void draw(void)
         cv_text(52, 48, &FONT_XS, midi_last_port < NPORTS ? PORT[midi_last_port] : "", C_HI);
         cv_text(82, 48, &FONT_XS, h, C_WHITE);
     }
-    cv_text(178, 36, &FONT_XS, "VOL", C_GRAY);
-    int_text((int32_t)pct, t);
-    text_cat(t, "%");
-    cv_text(204, 36, &FONT_XS, t, C_HI);
     cv_blit(0, 180);
 }
 
@@ -559,6 +725,8 @@ int app_expect(const char *what, int *got)
         *got = voice_note;
     else if (!strcmp(what, "dirty"))
         *got = set_dirty;
+    else if (!strcmp(what, "page"))
+        *got = page;
     else if (!strcmp(what, "vel"))           /* the last key's velocity and pressure */
         *got = ui.vel[ui.last_key];
     else if (!strcmp(what, "prs"))
