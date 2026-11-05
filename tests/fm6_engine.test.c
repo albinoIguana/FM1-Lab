@@ -111,10 +111,12 @@ int main(void) {
     fm6_arpeggiator_set_mode(1u);
     fm6_note_on(60u,100u); fm6_note_on(64u,100u); fm6_note_on(67u,100u);
     assert(fm6_active_voices()==0u);
+    int32_t arp_peak=0;
     for(unsigned block=0;block<48u;block++) {
         memset(output,0,sizeof output); fm6_render(output,128u,4096u);
+        int32_t p=peak(output,TEST_WORDS); if(p>arp_peak) arp_peak=p;
     }
-    assert(fm6_active_voices()>0u);
+    assert(arp_peak>0); /* prove the generated arp note reaches the FM6 output */
     fm6_note_off(60u); fm6_note_off(64u); fm6_note_off(67u);
     fm6_arpeggiator_set_mode(0u);
 
