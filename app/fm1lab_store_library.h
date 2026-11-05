@@ -11,6 +11,7 @@
  * Control task only. Each Instrument contains four packed DX7 voices. */
 int fm1lab_store_library_load(unsigned index, fm1lab_instrument_t *out);
 int fm1lab_store_library_save(unsigned index, const fm1lab_instrument_t *instrument);
+int fm1lab_store_library_format_bank(unsigned bank, const fm1lab_instrument_t *factory_instrument);
 int fm1lab_store_library_format(const fm1lab_instrument_t *factory_instrument);
 
 #endif
