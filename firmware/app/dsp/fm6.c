@@ -3,8 +3,8 @@
  *
  * FM6 core: Felucca's integer-only MSFA/Dexed-derived core, Apache-2.0.
  * The core is included in this translation unit because its compact API is
- * intentionally static; this wrapper supplies the four-patch instrument and
- * a single shared eight-voice allocator.
+ * intentionally static; this wrapper supplies a bank of four-patch Instruments
+ * and one shared eight-voice allocator.
  */
 #include <stdint.h>
 #include "fm6.h"
@@ -56,6 +56,13 @@ typedef struct {
 } fm1lab_voice_t;
 
 static fm1lab_patch_t instrument[PATCHES];
+typedef struct {
+    fm1lab_instrument_record_t record;
+    uint8_t dirty;
+} fm1lab_instrument_slot_t;
+
+static fm1lab_instrument_slot_t bank[FM1LAB_INSTRUMENT_COUNT];
+static uint32_t current_instrument;
 static fm1lab_voice_t voices[VOICES];
 static fm6_lfo_t patch_lfo[PATCHES];
 static int32_t patch_lfo_value[PATCHES];
@@ -127,6 +134,33 @@ static void fm6_unpack(const uint8_t *b, uint8_t *v)
     fm6_sanitize(v);
 }
 
+/* 155-byte FM6 voice -> Felucca's 128-byte bank record. */
+static void fm6_pack(const uint8_t *v, uint8_t *b)
+{
+    uint32_t k, i;
+    for (k = 0; k < 6u; k++) {
+        const uint8_t *o = v + k * FP_OP;
+        uint8_t *d = b + k * 17u;
+        for (i = 0; i < 11u; i++)
+            d[i] = o[i] & 0x7Fu;
+        d[11] = (o[FP_LC] & 3u) | ((o[FP_RC] & 3u) << 2);
+        d[12] = (o[FP_RS] & 7u) | ((o[FP_DET] & 15u) << 3);
+        d[13] = (o[FP_AMS] & 3u) | ((o[FP_KVS] & 7u) << 2);
+        d[14] = o[FP_OL] & 0x7Fu;
+        d[15] = (o[FP_MODE] & 1u) | ((o[FP_FC] & 31u) << 1);
+        d[16] = o[FP_FF] & 0x7Fu;
+    }
+    for (i = 0; i < 9u; i++)
+        b[102u + i] = v[FP_PR1 + i] & 0x7Fu;
+    b[111] = (v[FP_FB] & 7u) | ((v[FP_OKS] & 1u) << 3);
+    for (i = 0; i < 4u; i++)
+        b[112u + i] = v[FP_LFS + i] & 0x7Fu;
+    b[116] = (v[FP_LKS] & 1u) | ((v[FP_LFW] & 7u) << 1) | ((v[FP_LPMS] & 7u) << 4);
+    b[117] = v[FP_TRNSP] & 0x7Fu;
+    for (i = 0; i < 10u; i++)
+        b[118u + i] = v[FP_NAME + i] & 0x7Fu;
+}
+
 static void fm6_rebuild_patch(uint32_t index)
 {
     fm1lab_patch_t *p = &instrument[index];
@@ -192,25 +226,68 @@ static fm1lab_voice_t *fm6_allocate_voice(void)
     return &voices[oldest];
 }
 
+static void fm6_activate_instrument(uint32_t slot)
+{
+    uint32_t p, m;
+    fm1lab_instrument_record_t *r = &bank[slot].record;
+    for (p = 0; p < PATCHES; p++) {
+        if (r->valid)
+            fm6_unpack(r->patches[p], instrument[p].base);
+        else
+            fm6_unpack(FM6_FACTORY[p], instrument[p].base);
+        for (m = 0; m < FM1LAB_MACRO_COUNT; m++)
+            instrument[p].macro[m] = r->valid ? (r->macros[p][m] > 100u ? 100u : r->macros[p][m]) : 50u;
+        instrument[p].enabled = r->valid ? ((r->enabled_mask >> p) & 1u) : (p == 0u);
+        fm6_rebuild_patch(p);
+    }
+}
+
+static void fm6_save_active_to_bank(uint32_t slot)
+{
+    uint32_t p, m;
+    fm1lab_instrument_record_t *r = &bank[slot].record;
+    r->enabled_mask = 0;
+    for (p = 0; p < PATCHES; p++) {
+        if (instrument[p].enabled)
+            r->enabled_mask |= (uint8_t)(1u << p);
+        for (m = 0; m < FM1LAB_MACRO_COUNT; m++)
+            r->macros[p][m] = instrument[p].macro[m];
+        fm6_pack(instrument[p].base, r->patches[p]);
+    }
+}
+
 void fm6_init(void)
 {
-    uint32_t i;
+    uint32_t i, p, m;
     fm6_zero_bytes(instrument, sizeof(instrument));
+    fm6_zero_bytes(bank, sizeof(bank));
     fm6_zero_bytes(voices, sizeof(voices));
     fm6_zero_bytes(patch_lfo, sizeof(patch_lfo));
     fm6_zero_bytes(patch_lfo_value, sizeof(patch_lfo_value));
     fm6_zero_bytes(patch_lfo_delay, sizeof(patch_lfo_delay));
     age_counter = 0;
     output_gain_q12 = 0;
-    for (i = 0; i < PATCHES; i++) {
-        fm6_unpack(FM6_FACTORY[i], instrument[i].base);
-        instrument[i].macro[0] = 50;
-        instrument[i].macro[1] = 50;
-        instrument[i].macro[2] = 50;
-        instrument[i].macro[3] = 50;
-        instrument[i].enabled = (i == 0u); /* one layer by default; enable more as desired */
-        fm6_rebuild_patch(i);
+    current_instrument = 0;
+    for (i = 0; i < FM1LAB_INSTRUMENT_COUNT; i++) {
+        bank[i].record.name[0] = 'N';
+        bank[i].record.name[1] = 'E';
+        bank[i].record.name[2] = 'W';
+        bank[i].record.name[3] = ' ';
+        bank[i].record.name[4] = (uint8_t)('0' + ((i + 1u) / 10u));
+        bank[i].record.name[5] = (uint8_t)('0' + ((i + 1u) % 10u));
+        bank[i].record.name[6] = 0;
+        for (p = 0; p < PATCHES; p++)
+            for (m = 0; m < FM1LAB_MACRO_COUNT; m++)
+                bank[i].record.macros[p][m] = 50u;
     }
+    bank[0].record.valid = 1;
+    bank[0].record.name[0] = 'I';
+    bank[0].record.name[1] = 'N';
+    bank[0].record.name[2] = 'I';
+    bank[0].record.name[3] = 'T';
+    bank[0].record.name[4] = 0;
+    fm6_activate_instrument(0);
+    fm6_save_active_to_bank(0);
 }
 
 void fm6_panic(void)
@@ -315,6 +392,8 @@ void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled)
     if (patch >= PATCHES)
         return;
     instrument[patch].enabled = enabled != 0;
+    bank[current_instrument].record.valid = 1;
+    bank[current_instrument].dirty = 1;
     if (!enabled)
         for (i = 0; i < VOICES; i++)
             if (voices[i].used && voices[i].patch == patch)
@@ -337,6 +416,8 @@ void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
     instrument[patch].base[byte_index] = value;
     fm6_sanitize(instrument[patch].base);
     fm6_rebuild_patch(patch);
+    bank[current_instrument].record.valid = 1;
+    bank[current_instrument].dirty = 1;
 }
 void fm6_macro_set(uint32_t patch, uint32_t macro, uint8_t value)
 {
@@ -344,11 +425,92 @@ void fm6_macro_set(uint32_t patch, uint32_t macro, uint8_t value)
         return;
     instrument[patch].macro[macro] = value > 100u ? 100u : value;
     fm6_rebuild_patch(patch);
+    bank[current_instrument].record.valid = 1;
+    bank[current_instrument].dirty = 1;
 }
 uint8_t fm6_macro_get(uint32_t patch, uint32_t macro)
 {
     return patch < PATCHES && macro < FM1LAB_MACRO_COUNT ? instrument[patch].macro[macro] : 50u;
 }
+
+void fm6_instrument_load(uint32_t slot, const fm1lab_instrument_record_t *record)
+{
+    uint32_t p, m;
+    if (slot >= FM1LAB_INSTRUMENT_COUNT || !record || !record->valid)
+        return;
+    fm6_copy_bytes(&bank[slot].record, record, sizeof(*record));
+    bank[slot].record.name[FM1LAB_INSTRUMENT_NAME_LEN - 1u] = 0;
+    for (p = 0; p < PATCHES; p++)
+        for (m = 0; m < FM1LAB_MACRO_COUNT; m++)
+            if (bank[slot].record.macros[p][m] > 100u)
+                bank[slot].record.macros[p][m] = 100u;
+    bank[slot].dirty = 0;
+    if (slot == current_instrument)
+        fm6_activate_instrument(slot);
+}
+
+void fm6_instrument_export_current(fm1lab_instrument_record_t *record)
+{
+    if (!record)
+        return;
+    fm6_save_active_to_bank(current_instrument);
+    bank[current_instrument].record.valid = 1;
+    bank[current_instrument].dirty = 1;
+    fm6_copy_bytes(record, &bank[current_instrument].record, sizeof(*record));
+}
+
+void fm6_select_instrument(uint32_t slot)
+{
+    if (slot >= FM1LAB_INSTRUMENT_COUNT || slot == current_instrument)
+        return;
+    fm6_save_active_to_bank(current_instrument);
+    fm6_panic();
+    current_instrument = slot;
+    fm6_activate_instrument(slot);
+}
+
+uint32_t fm6_current_instrument(void) { return current_instrument; }
+const char *fm6_instrument_name(uint32_t slot)
+{
+    return slot < FM1LAB_INSTRUMENT_COUNT ? (const char *)bank[slot].record.name : "";
+}
+uint8_t fm6_instrument_valid(uint32_t slot)
+{
+    return slot < FM1LAB_INSTRUMENT_COUNT ? bank[slot].record.valid : 0;
+}
+uint8_t fm6_instrument_dirty(uint32_t slot)
+{
+    return slot < FM1LAB_INSTRUMENT_COUNT ? bank[slot].dirty : 0;
+}
+void fm6_instrument_set_name_char(uint32_t position, uint8_t character)
+{
+    if (position >= FM1LAB_INSTRUMENT_NAME_LEN - 1u)
+        return;
+    if (!((character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9')
+          || character == ' ' || character == '-'))
+        character = ' ';
+    bank[current_instrument].record.name[position] = character;
+    bank[current_instrument].record.name[FM1LAB_INSTRUMENT_NAME_LEN - 1u] = 0;
+    bank[current_instrument].record.valid = 1;
+    bank[current_instrument].dirty = 1;
+}
+void fm6_instrument_mark_saved(uint32_t slot)
+{
+    if (slot < FM1LAB_INSTRUMENT_COUNT)
+        bank[slot].dirty = 0;
+}
+uint8_t fm6_patch_set_algorithm(uint32_t patch, uint8_t algorithm)
+{
+    if (patch >= PATCHES)
+        return 0;
+    instrument[patch].base[FP_ALG] = algorithm & 31u;
+    fm6_sanitize(instrument[patch].base);
+    fm6_rebuild_patch(patch);
+    bank[current_instrument].record.valid = 1;
+    bank[current_instrument].dirty = 1;
+    return 1;
+}
+
 uint32_t fm6_active_voices(void)
 {
     uint32_t i, n = 0;
