@@ -26,7 +26,11 @@ typedef enum {
     FM1LAB_GLOBAL_LFO_SPEED,
     FM1LAB_GLOBAL_LFO_DELAY,
     FM1LAB_GLOBAL_LFO_PITCH_DEPTH,
-    FM1LAB_GLOBAL_LFO_AMP_DEPTH
+    FM1LAB_GLOBAL_LFO_AMP_DEPTH,
+    FM1LAB_GLOBAL_LFO_WAVE,
+    FM1LAB_GLOBAL_LFO_SYNC,
+    FM1LAB_GLOBAL_OSC_SYNC,
+    FM1LAB_GLOBAL_PITCH_SENS
 } fm1lab_global_field_t;
 
 /* Expanded M-VAVE DX7 voice accessors. Operator numbers are the panel labels
