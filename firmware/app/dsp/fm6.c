@@ -441,6 +441,11 @@ void fm6_instrument_load(uint32_t slot, const fm1lab_instrument_record_t *record
     if (slot >= FM1LAB_INSTRUMENT_COUNT || !record || !record->valid)
         return;
     fm6_copy_bytes(&bank[slot].record, record, sizeof(*record));
+    for (p = 0; p < FM1LAB_INSTRUMENT_NAME_LEN - 1u; p++) {
+        uint8_t ch = bank[slot].record.name[p];
+        if (!((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == ' ' || ch == '-'))
+            bank[slot].record.name[p] = ' ';
+    }
     bank[slot].record.name[FM1LAB_INSTRUMENT_NAME_LEN - 1u] = 0;
     for (p = 0; p < PATCHES; p++)
         for (m = 0; m < FM1LAB_MACRO_COUNT; m++)
