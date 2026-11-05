@@ -8,6 +8,24 @@
 #define FM1LAB_MACRO_COUNT 4u
 #define FM1LAB_VOICE_LIMIT 8u /* voices per patch; four independent pools */
 
+/* Persistent musical/effect controls. Transport playback state and delay buffers
+ * are intentionally not serialized; a restored pattern always boots stopped. */
+typedef struct {
+    uint16_t tempo_bpm;
+    uint8_t seq_length;
+    uint8_t lane_patch[2];
+    uint8_t seq_enabled[2][64];
+    uint8_t seq_note[2][64];
+    uint8_t seq_velocity[2][64];
+    uint8_t seq_gate[2][64];
+    uint8_t arp_mode;
+    uint8_t fx_enabled[3];
+    uint8_t fx_mix[3];
+    uint8_t fx_time[3];
+    uint8_t fx_feedback[3];
+    uint8_t fx_send[4][3];
+} fm6_performance_state_t;
+
 enum {
     FM1LAB_MACRO_BRIGHTNESS = 0,
     FM1LAB_MACRO_BODY,
@@ -34,6 +52,9 @@ uint8_t fm6_sequencer_step(void);
 uint8_t fm6_sequencer_running(void);
 void fm6_arpeggiator_set_mode(uint8_t mode);
 uint8_t fm6_arpeggiator_mode(void);
+int fm6_performance_state_valid(const fm6_performance_state_t *state);
+void fm6_performance_state_get(fm6_performance_state_t *state);
+int fm6_performance_state_set(const fm6_performance_state_t *state);
 void fm6_fx_set_enabled(uint8_t effect, uint8_t enabled);
 void fm6_fx_set_mix(uint8_t effect, uint8_t mix);
 void fm6_fx_set_time(uint8_t effect, uint8_t value);
