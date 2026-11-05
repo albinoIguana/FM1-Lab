@@ -94,13 +94,19 @@ int main(void) {
     fm6_sequencer_set_step(1u,0u,1u,67u,100u,75u);
     fm6_sequencer_set_running(1u);
     int32_t seq_peak=0;
-    for(unsigned block=0;block<48u;block++) {
+    /* At 44.1 kHz / 120 BPM, a 16th note is 5512.5 samples.
+     * The phase accumulator must not advance early or drift at 48 kHz. */
+    for(unsigned block=0;block<43u;block++) {
         memset(output,0,sizeof output);
         fm6_render(output,128u,4096u);
         int32_t p=peak(output,TEST_WORDS); if(p>seq_peak) seq_peak=p;
     }
+    assert(fm6_sequencer_step()==0u);
+    memset(output,0,sizeof output); fm6_render(output,8u,4096u);
+    assert(fm6_sequencer_step()==0u); /* 5512 samples: just before the tick */
+    memset(output,0,sizeof output); fm6_render(output,1u,4096u);
+    assert(fm6_sequencer_step()==1u); /* sample 5513: first tick */
     assert(fm6_sequencer_running()==1u);
-    assert(fm6_sequencer_step()==1u); /* one 16th-note at 120 BPM */
     assert(fm6_active_voices_patch(0u)>=2u); /* both independent lanes reached the same FM6 patch */
     assert(seq_peak>0);
     fm6_sequencer_set_running(0u);
