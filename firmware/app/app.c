@@ -31,7 +31,7 @@ typedef struct {
 
 static fm1lab_instrument_record_t instrument_cache[FM1LAB_INSTRUMENT_COUNT];
 static fm1lab_instrument_record_t save_snapshot;
-static volatile uint8_t snapshot_ready;
+static volatile uint8_t snapshot_ready, snapshot_slot;
 
 static void app_copy_bytes(void *dst, const void *src, uint32_t n)
 {
@@ -155,8 +155,11 @@ static void ui_events_drain(void)
         else if (type == EV_NAME_CHAR)
             fm6_instrument_set_name_char(a, b);
         else if (type == EV_SNAPSHOT) {
-            fm6_instrument_export_current(&save_snapshot);
-            snapshot_ready = 1;
+            if (!snapshot_ready) {
+                fm6_instrument_export_current(&save_snapshot);
+                snapshot_slot = (uint8_t)fm6_current_instrument();
+                snapshot_ready = 1;
+            }
         } else if (type == EV_MARK_SAVED)
             fm6_instrument_mark_saved(a);
     }
@@ -501,7 +504,7 @@ static void input(void)
     ui.keys = keys;
     ui.btn = btn;
     plat_glow(1);                            /* the unlit buttons glow, readable in the dark */
-    plat_leds(btn | (set_dirty ? 1u << B_SAVE : 0u), keys);
+    plat_leds(btn | ((set_dirty || fm6_instrument_dirty(set.instrument)) ? 1u << B_SAVE : 0u), keys);
 }
 
 void app_input_only(void) { input(); }
@@ -626,6 +629,18 @@ void app_frame(void)
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     input();
     speak();
+    if (snapshot_ready) {
+        uint8_t slot = snapshot_slot;
+        int instrument_ok;
+        snapshot_ready = 0;
+        instrument_ok = instrument_store_save(slot, &save_snapshot);
+        if (instrument_ok)
+            ui_event_push(EV_MARK_SAVED, slot, 0);
+        if (set_dirty && plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0)
+            set_dirty = 0;
+        app_say(instrument_ok ? "INSTRUMENT SAVED" : "SAVE FAILED",
+                fm6_instrument_name(slot));
+    }
     for (i = 0; i < NE; i++)                 /* an encoder's light goes out */
         if (ui.turned_at[i] && now - ui.turned_at[i] < 400u && now > lit_until)
             lit_until = ui.turned_at[i] + 300u;
