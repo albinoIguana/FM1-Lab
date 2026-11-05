@@ -1,3 +1,9 @@
 [submodule "vendor/fm1-emu"]
 	path = vendor/fm1-emu
 	url = https://github.com/joakimeriksson/fm1-emu.git
+[submodule "firmware/base"]
+	path = firmware/base
+	url = https://github.com/charlesvestal/fm1-base.git
+[submodule "firmware/upstream/felucca"]
+	path = firmware/upstream/felucca
+	url = https://github.com/hugelton/Felucca.git
