@@ -1179,11 +1179,17 @@ static void draw(void)
     else if (page == PAGE_ARP) cv_text(4,43,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
     else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
     else cv_text(4, 43, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
-    int_text((int32_t)page + 1, t);
     {
         char page_text[8] = "";
-        text_cat(page_text, t); text_cat(page_text, "/");
-        int_text((int32_t)PAGE_COUNT, t); text_cat(page_text, t);
+        if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
+            /* FX pages are a local three-page group, not global pages 10-12. */
+            int_text((int32_t)(page - PAGE_FX_CHORUS) + 1, t);
+            text_cat(page_text, t); text_cat(page_text, "/3");
+        } else {
+            int_text((int32_t)page + 1, t);
+            text_cat(page_text, t); text_cat(page_text, "/");
+            int_text((int32_t)PAGE_COUNT, t); text_cat(page_text, t);
+        }
         cv_text(218, 43, &FONT_XS, page_text, C_GRAY);
     }
     cv_blit(0, 180);
