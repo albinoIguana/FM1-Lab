@@ -1,0 +1,31 @@
+name: Native FM1 build
+
+on:
+  push:
+    branches: [rewrite/native-fm1-foundation]
+    paths:
+      - "app/**"
+      - "base"
+      - "upstream/felucca"
+      - ".gitmodules"
+      - "build.sh"
+      - ".github/workflows/native-build.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    with:
+      sdk: true
+      build: |
+        set -euo pipefail
+        git submodule update --init --recursive base
+        ./build.sh
+        python3 base/tools/build.py app --host
+      packages: app/build/fm1lab.fwsc
