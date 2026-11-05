@@ -5,6 +5,9 @@ on:
     branches: [rewrite/native-fm1-foundation]
     paths:
       - "app/**"
+      - "firmware/**"
+      - "tests/**"
+      - "docs/**"
       - "base"
       - "upstream/felucca"
       - ".gitmodules"
