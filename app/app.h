@@ -35,6 +35,9 @@ enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_INSTRUMENTS0, OBJ_INSTRUMENTS1, OBJ
 void app_init(void);                     /* boot: the engine, then the saved settings (or defaults) */
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12);   /* audio interrupt: n stereo frames, 24-bit */
 void app_overload(void);                /* audio deadline >90%: shed one voice with a short fade */
+uint32_t app_audio_cpu_pct(void);       /* measured, smoothed device render load (percent) */
+uint32_t app_audio_xruns(void);          /* audio DMA deadline misses since boot */
+uint32_t app_audio_overload_shed_count(void); /* FM6 voices faded after overload callbacks */
 void app_panic(void);                    /* silence now (before an update rewrites the flash) */
 void app_ui_init(void);                  /* the first screen, after the splash */
 void app_frame(void);                    /* the UI: input and a redraw, about 60 times a second */
