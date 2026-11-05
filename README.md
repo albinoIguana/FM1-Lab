@@ -23,7 +23,7 @@ The pinned submodule vendor/m-vave-fm1 points to [M-VAVE's official FM1 open-sou
 - Algorithm-aware macro transforms.
 - Browser audio powered by the official M-VAVE simulator and its own WASM audio worklet.
 
-The browser workshop is a development and audition surface. The corresponding custom Instrument navigation and macro controls still need to be integrated into the FM1's on-device application and verified with the device toolchain before this can be called flashable firmware.
+The browser workshop is a development and audition surface. The active native fm1-base app is a separate Felucca FM6 implementation; native device builds are checked in CI, but physical FM1 playback and performance validation remain outstanding.
 
 ## Native firmware core
 
@@ -33,7 +33,7 @@ The bank format uses 11-character persisted Instrument names to fit all 32 voice
 
 The active app also has dedicated operator-envelope and two-page LFO editors. The envelope page edits each DX7 operator's four rates and four levels; the LFO pages follow the official FM1 voice map for waveform, speed, pitch/amp depth, delay, pitch sensitivity, LFO key sync, and oscillator sync. These edits are queued to the audio task as voice snapshots rather than writing DSP state from the UI thread.
 
-Sequencer, arpeggiator and FX audio routing remain unfinished; do not treat their current screen/control work as completed audio-path features.
+The active FM6 audio path now includes a sample-clocked two-lane sequencer, held-note arpeggiator (UP / DOWN / UP-DOWN), and parallel CHORUS / DELAY / REVERB send buses with per-patch send levels. These are implemented in `app/dsp/fm6.c`, not the older SDK adapter. Sequencer patterns and performance settings are currently volatile and reset to defaults at boot. CI host tests are being expanded to exercise generated note dispatch and effect send isolation; physical FM1 playback and device CPU/xrun validation are still required.
 
 ## Build and validation
 
