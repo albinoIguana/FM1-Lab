@@ -71,20 +71,23 @@ jobs:
             throw "innoextract could not unpack the JieLi 2.5.3 Inno Setup payload (exit $LASTEXITCODE)."
           }
 
-          $compiler = Get-ChildItem -LiteralPath $extract -Filter 'clang.exe' -File -Recurse |
-            Where-Object { $_.FullName -match '[\/]pi32[\/]bin[\/]clang\.exe$' } |
-            Select-Object -First 1
-          if (!$compiler) {
-            Write-Host 'Extracted installer contents:'
-            Get-ChildItem -LiteralPath $extract -Force | Select-Object Name,Mode
-            throw 'The JieLi installer archive did not expose pi32/bin/clang.exe; refusing to guess an installation layout.'
+          # Innoextract preserves the installer's absolute Windows drive layout.
+          # The verified 2.5.3 payload is therefore under C$/JL/pi32, not at
+          # the extraction root. Use that explicit path rather than a regex
+          # search whose separator assumptions can silently reject valid output.
+          $pi32Root = Join-Path $extract 'C$\\JL\\pi32'
+          $clang = Join-Path $pi32Root 'bin\\clang.exe'
+          if (!(Test-Path -LiteralPath $clang -PathType Leaf)) {
+            Write-Host 'Extracted installer directory tree:'
+            Get-ChildItem -LiteralPath $extract -Force -Recurse |
+              Select-Object -ExpandProperty FullName
+            throw "Expected JieLi compiler was not found at $clang."
           }
 
-          $pi32Root = Split-Path -Parent (Split-Path -Parent $compiler.FullName)
-          New-Item -ItemType Directory -Path 'C:\JL' -Force | Out-Null
+          New-Item -ItemType Directory -Path 'C:\\JL' -Force | Out-Null
           Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
           Copy-Item -LiteralPath $pi32Root -Destination $target -Recurse -Force
-          if (!(Test-Path -LiteralPath $clang)) { throw "Extracted toolchain did not produce $clang" }
+          if (!(Test-Path -LiteralPath $clang -PathType Leaf)) { throw "Extracted toolchain did not produce $clang" }
 
           & $clang --version
           if ($LASTEXITCODE -ne 0) { throw 'Extracted JieLi clang.exe failed to execute.' }
