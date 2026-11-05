@@ -167,6 +167,10 @@ int main(void) {
     /* Per-patch send controls isolate each instrument from every shared FX bus. */
     for(unsigned effect=0;effect<3u;effect++) {
         fm6_init();
+        /* Isolate patch 0 so the other default-on factory layers cannot
+         * contribute their own sends to this single-layer routing check. */
+        for (unsigned patch = 1u; patch < FM1LAB_PATCH_COUNT; ++patch)
+            fm6_patch_set_enabled((uint8_t)patch, 0u);
         fm6_fx_set_enabled((uint8_t)effect,1u);
         fm6_fx_set_mix((uint8_t)effect,100u);
         fm6_fx_set_send(0u,(uint8_t)effect,0u);
