@@ -10,6 +10,8 @@
 #define BANK_MAGIC 0x32424c46u /* FLB2 */
 #define BANK_VERSION 1u
 
+static PLAT_POOL uint8_t bank_work[BANK_BYTES];
+
 static void bytes_copy(uint8_t *d, const uint8_t *s, unsigned n)
 { while (n--) *d++ = *s++; }
 static void bytes_zero(uint8_t *d, unsigned n)
@@ -142,32 +144,29 @@ static void instrument_encode(uint8_t *r, const fm1lab_instrument_t *in)
 int fm1lab_store_library_load(unsigned index, fm1lab_instrument_t *out)
 {
     if(index>=32u||!out) return -1;
-    uint8_t bank[BANK_BYTES];
     unsigned b=index/8u, slot=index%8u;
-    if(bank_read(b,bank)) return -1;
-    instrument_decode(record_at(bank,slot),out);
+    if(bank_read(b,bank_work)) return -1;
+    instrument_decode(record_at(bank_work,slot),out);
     return fm1lab_instrument_valid(out)?0:-1;
 }
 int fm1lab_store_library_save(unsigned index, const fm1lab_instrument_t *in)
 {
     if(index>=32u||!fm1lab_instrument_valid(in)) return -1;
-    uint8_t bank[BANK_BYTES];
     unsigned b=index/8u, slot=index%8u;
-    if(bank_read(b,bank)) return -1;
-    instrument_encode(record_at(bank,slot),in);
-    write16(bank+6,crc16(bank+BANK_HEADER,BANK_BYTES-BANK_HEADER));
-    return plat_store_save(OBJ_INSTRUMENTS0+b,bank,BANK_BYTES);
+    if(bank_read(b,bank_work)) return -1;
+    instrument_encode(record_at(bank_work,slot),in);
+    write16(bank_work+6,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
+    return plat_store_save(OBJ_INSTRUMENTS0+b,bank_work,BANK_BYTES);
 }
 
 int fm1lab_store_library_format_bank(unsigned b, const fm1lab_instrument_t *factory)
 {
     if(b>=FM1LAB_STORE_BANK_COUNT || !fm1lab_instrument_valid(factory)) return -1;
-    uint8_t bank[BANK_BYTES];
-    bank_init(bank,b);
+    bank_init(bank_work,b);
     for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)
-        instrument_encode(record_at(bank,slot),factory);
-    write16(bank+6,crc16(bank+BANK_HEADER,BANK_BYTES-BANK_HEADER));
-    return plat_store_save(OBJ_INSTRUMENTS0+b,bank,BANK_BYTES);
+        instrument_encode(record_at(bank_work,slot),factory);
+    write16(bank_work+6,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
+    return plat_store_save(OBJ_INSTRUMENTS0+b,bank_work,BANK_BYTES);
 }
 int fm1lab_store_library_format(const fm1lab_instrument_t *factory)
 {
