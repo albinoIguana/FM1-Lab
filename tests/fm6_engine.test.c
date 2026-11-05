@@ -181,7 +181,7 @@ int main(void) {
     /* Combined worst-case functional stress: all 32 patch voices occupied,
      * both sequencer lanes advancing, 16 held arp notes, and every FX bus
      * enabled at maximum wet/send. Render one second of 44.1 kHz audio in
-     * device-sized 128-frame blocks. This checks integration and bounds, not
+     * 128-frame host-test chunks (the device app callback is 256 frames). This checks integration and bounds, not
      * the target's real-time CPU deadline. */
     fm6_init();
     memcpy(voice, fm6_patch_data(0), 155u);
@@ -307,8 +307,8 @@ int main(void) {
     }
     fm6_note_on_mask(60u, 105u, 0x0Fu);
     {
-        /* fm6_render advances its voice core in 128-frame quanta; the
-         * device app supplies 256-frame calls. Vary only legal multiples. */
+        /* The FM6 core advances in 32-frame CTL quanta; the device app
+         * supplies 256-frame calls. Vary only legal multiples. */
         static const unsigned chunks[] = {256u, 512u, 128u, 384u};
         unsigned offset = 0u, chunk = 0u;
         while (offset < 4096u) {
