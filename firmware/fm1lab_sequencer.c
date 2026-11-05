@@ -142,7 +142,7 @@ int fm1lab_sequencer_set_tempo(int bpm)
 
 int fm1lab_sequencer_set_swing(unsigned swing)
 {
-    if (bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
+    if (!binding_active || restore_pending || bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
     if (swing > 50) return -1;
     int delta = (int)swing - (int)groove_sequence_setting(0);
     groove_sequence_setting_edit(0, delta);
