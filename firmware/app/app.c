@@ -486,8 +486,22 @@ static void input(void)
             uint8_t enabled = (uint8_t)!fm6_patch_enabled(set.patch);
             ui_event_push(EV_PATCH_ENABLE, set.patch, enabled);
             app_say(fm6_patch_name(set.patch), enabled ? "ON" : "OFF");
+        } else if (k == B_EDIT) {
+            ui.editor ^= 1u;
+            if (ui.editor)
+                ui.seq_edit = 0;
+            ui.alg_edit = 0;
+            app_say("FM6 EDITOR", ui.editor ? "OPEN" : "HOME");
+        } else if (k == B_ENV && ui.editor) {
+            ui.op_param = (uint8_t)((ui.op_param + 1u) % FM6_OP_PARAM_COUNT);
+            app_say("OPERATOR PARAM", "CHANGED");
+        } else if (k == B_GLO && ui.editor) {
+            ui.alg_edit ^= 1u;
+            app_say("ALGORITHM EDIT", ui.alg_edit ? "ON" : "OFF");
         } else if (k == B_SEQ) {
             ui.seq_edit ^= 1u;
+            if (ui.seq_edit)
+                ui.editor = 0;
             app_say("SEQUENCER", ui.seq_edit ? "EDIT MODE" : "HOME");
         } else if (k == B_PLAY) {
             ui_event_push(seq_running() ? EV_SEQ_STOP : EV_SEQ_START, 0, 0);
@@ -504,6 +518,10 @@ static void input(void)
                 ui_event_push(EV_NAME_CHAR, (uint8_t)pos, (uint8_t)ui.rename_backup[pos]);
             ui.rename = 0;
             app_say("RENAME", "CANCELLED");
+        } else if (k == B_HOME && ui.editor) {
+            ui.editor = 0;
+            ui.alg_edit = 0;
+            app_say("HOME", "INSTRUMENT");
         } else if (k == B_HOME && ui.seq_edit) {
             ui.seq_edit = 0;
             ui.seq_tempo_mode = 0;
@@ -590,6 +608,13 @@ static void input(void)
             ui_event_push(EV_SELECT_INSTRUMENT, set.instrument, 0);
             set_dirty = 1;
             app_say("INSTRUMENT", fm6_instrument_name(set.instrument));
+        } else if (k == EN_SELECT && ui.editor) {
+            int32_t next = ((int32_t)ui.op_index + e) % 6;
+            if (next < 0)
+                next += 6;
+            ui.op_index = (uint8_t)next;
+            int_text((int32_t)ui.op_index + 1, t);
+            app_say("OPERATOR", t);
         } else if (k == EN_SELECT && ui.seq_edit) {
             int32_t next = ((int32_t)ui.seq_step + e) % (int32_t)FM1LAB_SEQ_STEPS;
             if (next < 0)
@@ -603,6 +628,23 @@ static void input(void)
             set.patch = (uint8_t)next;
             set_dirty = 1;
             app_say("PATCH", fm6_patch_name(set.patch));
+        } else if (k == EN_ALGO && ui.editor && ui.alg_edit) {
+            int32_t next = ((int32_t)fm6_patch_algorithm(set.patch) + e) % 32;
+            if (next < 0)
+                next += 32;
+            ui_event_push(EV_ALGORITHM, set.patch, (uint8_t)next);
+            int_text(next, t);
+            app_say("ALGORITHM", t);
+        } else if (k == EN_ALGO && ui.editor) {
+            uint32_t max = ui.op_param == FM6_OP_RATIO ? 31u :
+                           ui.op_param == FM6_OP_FIXED_MODE ? 1u : 99u;
+            int32_t value = (int32_t)fm6_operator_value(set.patch, ui.op_index + 1u, ui.op_param) + e;
+            value = value < 0 ? 0 : value > (int32_t)max ? (int32_t)max : value;
+            ui_event_push3(EV_OPERATOR_SET,
+                           (uint8_t)(set.patch * FM6_OP_PARAM_COUNT + ui.op_param),
+                           (uint8_t)(ui.op_index + 1u), (uint8_t)value);
+            int_text(value, t);
+            app_say("OPERATOR VALUE", t);
         } else if (k == EN_ALGO && ui.seq_edit) {
             if (ui.seq_tempo_mode) {
                 int32_t bpm = (int32_t)seq_tempo() + e;
