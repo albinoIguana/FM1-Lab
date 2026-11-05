@@ -590,6 +590,10 @@ static void input(void)
                 page = PAGE_MACRO;
                 app_say("MACROS", fm6_patch_name(set.patch));
             }
+        } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
+            uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
+            fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
+            app_say("FX",fm6_fx_enabled(fx)?"ON":"BYPASS");
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", fm6_patch_name(set.patch));
@@ -612,10 +616,6 @@ static void input(void)
             } else {
                 app_say("PLAY", "SELECT SEQUENCER");
             }
-        } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
-            uint8_t fx = (uint8_t)(page - PAGE_FX_CHORUS);
-            fm6_fx_set_enabled(fx, (uint8_t)!fm6_fx_enabled(fx));
-            app_say("FX", fm6_fx_enabled(fx) ? "ON" : "BYPASS");
         } else if (k == B_SAVE) {
             int instrument_result = instrument_save();
             int settings_result = plat_store_save(OBJ_SETTINGS, &set, sizeof set);
