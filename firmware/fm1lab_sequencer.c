@@ -50,6 +50,7 @@ static int lane_track(unsigned lane, unsigned *track)
 {
     if (lane >= FM1LAB_SEQUENCE_LANES || bound_tracks[lane] >= GROOVE_TRACKS)
         return -1;
+    if (restore_pending) return -3;
     if (groove_track_role(bound_tracks[lane]) != GROOVE_TRACK_NORMAL ||
         groove_source_type(bound_tracks[lane]) != GROOVE_DX7)
         return -2;
@@ -71,13 +72,14 @@ int fm1lab_sequencer_bind(unsigned a, unsigned b)
     for (unsigned t = 0; t < GROOVE_TRACKS; ++t)
         saved_track_roles[t] = (uint8_t)groove_track_role(t);
     binding_active = 1;
+    restore_pending = 0;
 
     /* Change only non-lane NORMAL tracks. Existing PLAY/OFF roles stay put. */
     for (unsigned t = 0; t < GROOVE_TRACKS; ++t) {
         if (t == a || t == b || saved_track_roles[t] != GROOVE_TRACK_NORMAL)
             continue;
         if (groove_track_role_set(t, GROOVE_TRACK_OFF)) {
-            if (restore_changed_roles()) return -4;
+            if (restore_changed_roles()) { restore_pending = 1; return -4; }
             return -3;
         }
         changed_roles |= (uint8_t)(1U << t);
@@ -90,7 +92,7 @@ int fm1lab_sequencer_bind(unsigned a, unsigned b)
 int fm1lab_sequencer_unbind(void)
 {
     (void)fm1lab_native_transport(0);
-    if (binding_active && restore_changed_roles()) return -1;
+    if (binding_active && restore_changed_roles()) { restore_pending = 1; return -1; }
     bound_tracks[0] = bound_tracks[1] = 255U;
     selected_lane = 0;
     return 0;
@@ -225,6 +227,6 @@ int fm1lab_sequencer_select_lane(unsigned lane)
 
 int fm1lab_sequencer_transport(unsigned playing)
 {
-    if (playing > 1U || bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
+    if (playing > 1U || !binding_active || restore_pending || bound_tracks[0] >= GROOVE_TRACKS || bound_tracks[1] >= GROOVE_TRACKS) return -1;
     return fm1lab_native_transport(playing) ? -2 : 0;
 }
