@@ -24,6 +24,8 @@ python3 base/tools/build.py app --host
 sh tests/run_tests.sh
 ```
 
+Instrument data is stored as versioned, CRC32-checked 607-byte records in three A/B pooled objects (6/5/5 Instruments per object); each object stays below the 3,840-byte sector payload limit. The platform store provides atomic copy rotation, and the app codec rejects corrupt or mismatched chunks.
+
 The build uses the pinned `fm1-base` platform/BSP and the pinned Felucca integer FM6 core and patch generator. Do not update either submodule without rerunning the device build, host audio regression tests, storage checks and size checks.
 
 ## Hardware and validation status
