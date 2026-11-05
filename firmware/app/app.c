@@ -454,7 +454,7 @@ static void input(void)
                 app_say("BUTTON", "REC");
         }
     }
-    for (k = 0; k < NE; k++) {               /* an encoder turned: its count; PRESET also changes the wave */
+    for (k = 0; k < NE; k++) {
         char t[12];
         if ((e = plat_enc((int)k)) == 0)
             continue;
@@ -464,16 +464,36 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
-         } else if (k == EN_PRESET) {
+        } else if (k == EN_PRESET) {
+            int32_t next = ((int32_t)set.instrument + e) % (int32_t)FM1LAB_INSTRUMENT_COUNT;
+            if (next < 0)
+                next += (int32_t)FM1LAB_INSTRUMENT_COUNT;
+            set.instrument = (uint8_t)next;
+            ui_event_push(EV_SELECT_INSTRUMENT, set.instrument, 0);
+            set_dirty = 1;
+            app_say("INSTRUMENT", fm6_instrument_name(set.instrument));
+        } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0)
                 next += (int32_t)FM1LAB_PATCH_COUNT;
             set.patch = (uint8_t)next;
             set_dirty = 1;
             app_say("PATCH", fm6_patch_name(set.patch));
-        } else {
-            int_text(ui.turns[k], t);
-            app_say(ENC_NAME[k], t);
+        } else if (k == EN_ALGO) {
+            int32_t next = ((int32_t)fm6_patch_algorithm(set.patch) + e) % 32;
+            if (next < 0)
+                next += 32;
+            ui_event_push(EV_ALGORITHM, set.patch, (uint8_t)next);
+            int_text(next, t);
+            app_say("ALGORITHM", t);
+        } else if (k >= EN_K1 && k <= EN_K4) {
+            uint32_t macro = k - EN_K1;
+            int32_t value = (int32_t)fm6_macro_get(set.patch, macro) + e;
+            static const char *const names[4] = {"BRIGHTNESS", "BODY", "MOTION", "DIRT"};
+            value = value < 0 ? 0 : value > 100 ? 100 : value;
+            ui_event_push(EV_MACRO, (uint8_t)(set.patch * 4u + macro), (uint8_t)value);
+            int_text(value, t);
+            app_say(names[macro], t);
         }
     }
     if (keys != ui.keys || btn != ui.btn)
