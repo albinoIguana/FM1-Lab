@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FM1-Lab · Firmware Screen Preview</title>
+<style>
+:root{color-scheme:dark;background:#090c11;color:#e9edf2;font:14px system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 20%,#1a2732,#090c11 65%)}
+main{width:min(100%,620px);display:grid;justify-items:center;gap:18px}
+h1{font-size:14px;letter-spacing:.2em;font-weight:700;color:#b8c5d1;margin:0}
+.device{width:min(82vw,440px);aspect-ratio:1;padding:12px;border-radius:30px;background:linear-gradient(145deg,#343b43,#101419 55%,#050709);box-shadow:0 22px 65px #000b,inset 0 1px 1px #ffffff35;overflow:hidden}
+.glass{width:100%;height:100%;aspect-ratio:1;border-radius:18px;overflow:hidden;background:#000;box-shadow:inset 0 0 0 1px #ffffff22}
+canvas{display:block;width:100%;height:100%;aspect-ratio:1;image-rendering:pixelated;background:#000}
+.controls{width:min(100%,560px);display:grid;gap:12px}
+.group{display:flex;flex-wrap:wrap;justify-content:center;gap:7px}
+button{border:1px solid #35414c;border-radius:8px;background:#151d25;color:#dce4eb;padding:9px 12px;font:600 11px system-ui;letter-spacing:.08em}
+button:active,button.active{background:#d6a34c;color:#111;border-color:#d6a34c}
+.caption{color:#82909d;font-size:11px;text-align:center;line-height:1.5;max-width:480px}
+@media(max-width:420px){body{padding:16px}.device{width:min(88vw,440px);padding:9px;border-radius:24px}.glass{border-radius:14px}}
+</style>
+</head>
+<body>
+<main>
+<h1>FM1-LAB · ON-DEVICE FIRMWARE PREVIEW</h1>
+<div class="device" aria-label="Rounded FM1 device display frame"><div class="glass"><canvas id="screen" width="240" height="240" aria-label="240 by 240 pixel FM1 firmware screen"></canvas></div></div>
+<div class="controls">
+<div class="group" aria-label="Physical page buttons">
+<button data-btn="HOME">HOME</button><button data-btn="SEL">SEL</button><button data-btn="EDIT">EDIT</button><button data-btn="GLO">GLO</button><button data-btn="SAVE">SAVE</button>
+</div>
+<div class="group" aria-label="Encoder simulation">
+<button data-enc="select">SELECT −</button><button data-enc="select" data-delta="1">SELECT +</button>
+<button data-enc="k1">K1 −</button><button data-enc="k1" data-delta="1">K1 +</button>
+<button data-enc="k2">K2 −</button><button data-enc="k2" data-delta="1">K2 +</button>
+<button data-enc="k3">K3 −</button><button data-enc="k3" data-delta="1">K3 +</button>
+<button data-enc="k4">K4 −</button><button data-enc="k4" data-delta="1">K4 +</button>
+</div></div>
+<p class="caption">A 1:1 pixel canvas for the firmware's 240 × 240 layout. Rounded glass clips the display edges; text and graphics stay inside the panel. Buttons and encoders simulate the on-device controls. Audio and hardware behavior are not simulated.</p>
+</main>
+<script>
+const canvas=document.querySelector('#screen'),c=canvas.getContext('2d');
+c.imageSmoothingEnabled=false;
+const C={black:'#000000',white:'#ffffff',gray:'#9aa0a6',dim:'#555b62',line:'#41464d',hi:'#e4ad4e'};
+const state={page:0,patch:0,level:[127,127,127,127],macro:[50,50,50,50],enabled:[true,false,false,false],turned:-1,turnAt:0,msg:'',msgUntil:0,octave:0,master:82,ble:true,midi:0};
+const names=['BRIGHTNESS','BODY','MOTION','EDGE'];
+const patchNames=['TINE EP','GLASS BELL','ROUND BASS','BRASS SECT'];
+function rect(x,y,w,h,color){c.fillStyle=color;c.fillRect(x,y,w,h)}
+function text(s,x,y,color=C.white,size=7,align='left'){c.font='bold '+size+'px monospace';c.textAlign=align;c.textBaseline='top';c.fillStyle=color;c.fillText(String(s),x,y)}
+function fit(s,max){s=String(s);while(s.length>max)s=s.slice(0,-1);return s}
+function outline(x,y,w,h,color){rect(x,y,w,1,color);rect(x,y+h-1,w,1,color);rect(x,y,1,h,color);rect(x+w-1,y,1,h,color)}
+function frame(){rect(0,0,240,240,C.black);drawHeader();drawPanel();drawKeys();requestAnimationFrame(()=>{});}
+function drawHeader(){
+ rect(0,0,240,32,C.black);
+ const title=['FM1 LAB','PATCH MACROS','GLOBAL SETTINGS','OPERATOR ROLES'][state.page];
+ if(state.msgUntil>Date.now()){text(state.msg,10,6,C.white,11)}
+ else{text(title,10,6,C.white,11)}
+}
+function drawHome(){
+ for(let p=0;p<4;p++){
+  const x=4+(p&1)*118,y=4+(p>>1)*68,accent=p===state.patch?C.hi:C.line;
+  rect(x,y,112,62,C.black);outline(x,y,112,62,accent);
+  if(p===state.patch)rect(x+3,y+6,2,10,C.hi);
+  text(patchNames[p],x+6,y+6,C.white,7);
+  text(state.enabled[p]?'ACTIVE':'MUTED',x+6,y+24,state.enabled[p]?C.hi:C.dim,7);
+  text('ALG',x+58,y+24,C.gray,7);text(p+1,x+82,y+24,C.white,7);
+  text('LVL',x+6,y+42,C.gray,7);text(state.level[p],x+32,y+42,C.white,7);
+  rect(x+54,y+45,50,6,C.line);rect(x+54,y+45,state.level[p]*50/127,6,C.hi);
+ }
+ text('SELECT PATCH  SEL MACROS  GLO SET',4,138,C.gray,7);
+}
+function drawMacro(){
+ text(patchNames[state.patch],6,2,C.white,7);text('ALGO',164,2,C.gray,7);text('5',204,2,C.hi,7);
+ for(let m=0;m<4;m++){
+  const y=28+m*27,v=state.macro[m];
+  if(state.turned===m&&Date.now()-state.turnAt<650)outline(2,y-4,232,20,C.hi);
+  text(names[m],6,y,C.white,7);text(v,78,y,C.hi,7);
+  rect(108,y+2,124,8,C.line);rect(108,y+2,v*124/100,8,C.hi);
+  rect(169,y,2,12,C.white);rect(107+v*124/100,y,3,12,C.white);
+ }
+ text('50 = NEUTRAL',4,128,C.gray,7);text('K1 BRIGHT  K2 BODY  K3 MOVE  K4 EDGE',4,138,C.gray,7);
+}
+function drawRoles(){
+ text('OPERATOR ROLES',6,2,C.white,7);text('ALGO',154,2,C.gray,7);text(state.patch+1,204,2,C.hi,7);
+ // Visual role map is a compact display representation; carrier assignment varies by algorithm.
+ const carrierSets=[[1,3,5],[1,4,6],[2,4,6],[1,2,5]];
+ const carriers=carrierSets[state.patch%carrierSets.length];
+ for(let op=1;op<=6;op++){
+  const x=6+((op-1)%3)*78,y=24+Math.floor((op-1)/3)*49,carrier=carriers.includes(op),accent=carrier?C.hi:C.line;
+  rect(x,y,70,42,C.black);outline(x,y,70,42,accent);text('OP',x+5,y+5,C.gray,7);text(op,x+23,y+5,C.white,7);
+  rect(x+5,y+23,60,12,accent);text(carrier?'CARRIER':'MODULATOR',x+8,y+24,carrier?C.black:C.white,6);
+ }
+ text('CARRIERS: AUDIO OUT   MODULATORS: FM',6,128,C.gray,7);
+}
+function drawGlobal(){
+ text('MASTER',8,8,C.gray,7);text(state.master+'%',90,8,C.hi,7);
+ text('OCTAVE',8,34,C.gray,7);text((state.octave<0?'-':'+')+Math.abs(state.octave),90,34,C.white,7);
+ text('BLUETOOTH',8,60,C.gray,7);text(state.ble?'ON':'OFF',90,60,state.ble?C.hi:C.dim,7);
+ text('BLE MIDI',8,86,C.gray,7);text('WAITING',90,86,C.dim,7);
+ text('MIDI IN',8,112,C.gray,7);text(state.midi,90,112,C.white,7);
+ text('CPU',8,136,C.gray,7);text('--%',40,136,C.hi,7);text('XRUNS',122,136,C.gray,7);text('--',168,136,C.hi,7);
+}
+function drawPanel(){rect(0,36,240,144,C.black);if(state.page===0)drawHome();else if(state.page===1)drawMacro();else if(state.page===2)drawGlobal();else drawRoles()}
+function drawKeys(){
+ rect(0,180,240,60,C.black);
+ for(let i=0;i<16;i++){const x=4+i*14;rect(x,194,13,14,C.dim)}
+ for(const i of [0,1,2,4,5,7,8,9,11,12,14])rect(4+i*14+8,180,11,12,C.line);
+ text('OCT',4,216,C.gray,7);text((state.octave<0?'-':'+')+Math.abs(state.octave),30,216,C.hi,7);
+ const labels=['PATCH','MACROS','GLOBAL','ROLES'];text(labels[state.page],64,216,C.gray,7);text(patchNames[state.patch],112,216,C.hi,7);
+ text(state.enabled[state.patch]?'ON':'OFF',202,216,state.enabled[state.patch]?C.hi:C.dim,7);
+ // Page indicator occupies the same lower-right screen corner as the firmware.
+ text((state.page+1)+'/4',218,232,C.gray,7,'right');
+}
+function render(){frame();drawPanel();drawKeys()}
+function say(s){state.msg=s;state.msgUntil=Date.now()+1000}
+function button(b){
+ if(b==='HOME'){state.page=0;say('HOME')}
+ if(b==='SEL'&&state.page===0){state.page=1;say('MACROS')}
+ if(b==='EDIT'){state.page=state.page===3?1:3;say('OPERATOR ROLES')}
+ if(b==='GLO'){state.page=state.page===2?0:2;say('GLOBAL SETTINGS')}
+ if(b==='SAVE')say('SAVED');
+ render();
+}
+function encoder(k,d){
+ if(k==='select'){state.patch=(state.patch+d+4)%4;say('PATCH '+(state.patch+1))}
+ else {const i=Number(k.slice(1))-1;if(state.page===1){state.macro[i]=Math.max(0,Math.min(100,state.macro[i]+d));state.turned=i;state.turnAt=Date.now();say('MACRO UPDATED')}
+ else if(state.page===0){state.level[i]=Math.max(0,Math.min(127,state.level[i]+d));say('PATCH LEVEL UPDATED')}}
+ render();
+}
+document.querySelectorAll('[data-btn]').forEach(b=>b.addEventListener('click',()=>button(b.dataset.btn)));
+document.querySelectorAll('[data-enc]').forEach(b=>b.addEventListener('click',()=>encoder(b.dataset.enc,Number(b.dataset.delta||-1))));
+render();setInterval(render,120);
+</script>
+</body></html>
