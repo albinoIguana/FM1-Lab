@@ -201,7 +201,6 @@ static void voice_edit_changed(void)
     instrument_dirty = 1u;
     set_dirty = 1u;
     voice_dirty = 1u;
-    ui.redraw = 1u;
 }
 
 static void voice_edit_global(fm1lab_global_field_t field, int delta)
