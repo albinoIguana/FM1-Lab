@@ -1,6 +1,7 @@
 #include "fm1lab_store_library.h"
 #include "fm1lab_insert_state.h"
 #include "app.h"
+#include <string.h>
 
 #define BANK_BYTES 3840u
 #define BANK_HEADER 8u
@@ -187,16 +188,6 @@ static void inserts_header_seal(uint8_t *r){write32(r,INSERTS_MAGIC);write16(r+4
 static int inserts_record_valid(const uint8_t *r){
  const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_SNAPSHOT_BYTES;
  return read32(r)==INSERTS_MAGIC&&read16(r+4)==INSERTS_VERSION&&read16(r+6)==INSERTS_TOTAL_BYTES&&read16(r+8)==crc16(r,8)&&(inserts_snapshot_valid(a)||inserts_snapshot_valid(f));
-}
-static void inserts_snapshot_defaults(uint8_t *s,const uint16_t crc[FM1LAB_STORE_BANK_COUNT]){
- fm1lab_insert_state_t d;fm1lab_insert_state_init(&d);
- for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){
-  write16(s+b*2,crc[b]);
-  for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++){
-   unsigned index=b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot;
-   memcpy(s+INSERTS_STATE_OFFSET+index*sizeof(d),&d,sizeof(d));
-  }
- } inserts_snapshot_seal(s);
 }
 static int inserts_current_bank_crcs(uint16_t crc[FM1LAB_STORE_BANK_COUNT]){
  for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){if(bank_read(b,bank_work))return -1;crc[b]=read16(bank_work+6);}
