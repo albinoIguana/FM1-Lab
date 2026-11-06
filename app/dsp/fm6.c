@@ -1119,20 +1119,20 @@ void fm6_patch_insert_set(uint32_t patch,uint32_t field,uint8_t value)
     if(patch>=PATCHES||field>=FM6_INSERT_FIELD_COUNT)return;
     fm1lab_patch_t *p=&instrument[patch];
     if(field==FM6_INSERT_AMP_ENABLED)p->amp_enabled=value?1u:0u;
-    else if(field==FM6_INSERT_DRIVE){p->drive=value>100u?100u:value;p->amp_drive_gain_q15=fm6_amp_drive_gain(p->drive);}
-    else if(field==FM6_INSERT_TONE){p->tone=value>100u?100u:value;p->tone_alpha_q15=fm6_tone_alpha(p->tone);}
-    else if(field==FM6_INSERT_OUTPUT){p->output=value>100u?100u:value;p->amp_output_gain_q15=fm6_amp_output_gain(p->output);}
+    else if(field==FM6_INSERT_DRIVE){uint8_t v=value>100u?100u:value;if(p->drive!=v){p->drive=v;p->amp_drive_gain_q15=fm6_amp_drive_gain(v);}}
+    else if(field==FM6_INSERT_TONE){uint8_t v=value>100u?100u:value;if(p->tone!=v){p->tone=v;p->tone_alpha_q15=fm6_tone_alpha(v);}}
+    else if(field==FM6_INSERT_OUTPUT){uint8_t v=value>100u?100u:value;if(p->output!=v){p->output=v;p->amp_output_gain_q15=fm6_amp_output_gain(v);}}
     else if(field==FM6_INSERT_EQ_ENABLED){if(value)p->eq_enabled|=1u;else p->eq_enabled&=(uint8_t)~1u;}
     else {
         uint32_t offset=field-FM6_INSERT_EQ_LOW_FREQUENCY;
-        uint32_t band=offset/4u;
-        uint32_t param=offset%4u;
+        uint32_t band=offset/4u,param=offset%4u;
         if(band>=3u)return;
-        if(param==0u)p->eq_frequency[band]=value>100u?100u:value;
-        else if(param==1u)p->eq_gain[band]=value>24u?24u:value;
-        else if(param==2u)p->eq_q[band]=value>31u?31u:value;
+        uint8_t changed=0u;
+        if(param==0u){uint8_t v=value>100u?100u:value;if(p->eq_frequency[band]!=v){p->eq_frequency[band]=v;changed=1u;}}
+        else if(param==1u){uint8_t v=value>24u?24u:value;if(p->eq_gain[band]!=v){p->eq_gain[band]=v;changed=1u;}}
+        else if(param==2u){uint8_t v=value>31u?31u:value;if(p->eq_q[band]!=v){p->eq_q[band]=v;changed=1u;}}
         else {uint8_t bit=(uint8_t)(1u<<(band+1u));if(value)p->eq_enabled|=bit;else p->eq_enabled&=(uint8_t)~bit;}
-        if(param<3u)fm6_eq_coeff_update(p,band);
+        if(changed)fm6_eq_coeff_update(p,band);
     }
 }
 uint8_t fm6_patch_insert_get(uint32_t patch,uint32_t field)

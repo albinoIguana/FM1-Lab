@@ -69,6 +69,7 @@ static void instrument_apply_engine(void)
         fm6_patch_set_enabled(p, 1u);
         fm6_patch_set_level(p, part->level);
         fm6_patch_set_pan(p, fm1lab_patch_pan(&current_instrument, p));
+        fm6_patch_insert_reset_state(p);
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             fm6_macro_set(p, m, part->macros[m]);
         for (uint32_t field=0;field<FM6_INSERT_FIELD_COUNT;++field)
@@ -692,7 +693,20 @@ static void input(void)
             }
         } else if (k == B_SAVE) {
             int instrument_result = instrument_save();
+            uint8_t comp_enabled=set.performance.compressor_enabled;
+            uint8_t comp_threshold=set.performance.compressor_threshold;
+            uint8_t comp_ratio=set.performance.compressor_ratio;
+            uint8_t comp_attack=set.performance.compressor_attack;
+            uint8_t comp_release=set.performance.compressor_release;
+            uint8_t comp_makeup=set.performance.compressor_makeup;
             fm6_performance_state_get(&set.performance);
+            /* Preserve UI edits that may still be queued for the audio thread. */
+            set.performance.compressor_enabled=comp_enabled;
+            set.performance.compressor_threshold=comp_threshold;
+            set.performance.compressor_ratio=comp_ratio;
+            set.performance.compressor_attack=comp_attack;
+            set.performance.compressor_release=comp_release;
+            set.performance.compressor_makeup=comp_makeup;
             settings_seal(&set);
             int settings_result = plat_store_save(OBJ_SETTINGS, &set, sizeof set);
             if (instrument_result == 0 && settings_result == 0) {
