@@ -1,6 +1,6 @@
 # FM1-Lab Audio Engine 2.0 implementation plan
 
-Status: Phaser fourth bus and the calibrated gain/headroom foundation are implemented on the feature branch. The binding architecture contract is [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
+Status: Phaser fourth bus, calibrated gain/headroom foundation, and persistent per-patch dry pan are implemented on the feature branch. The binding architecture contract is [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
 
 ## Implementation checkpoint — Phaser bus
 
@@ -20,11 +20,13 @@ Status: Phaser fourth bus and the calibrated gain/headroom foundation are implem
 - Moved the shared FX buses into a Q19 internal domain (Q24 sends shifted right five bits), preserving existing int32 delay/comb memory while reserving 32× feedback headroom.
 - Replaced the tanh output clip with linear Q24-to-Q23 conversion and a distinct stereo-linked peak limiter at 7,470,000 Q23 (approximately −1 dBFS), instantaneous attack and approximately 5.8 ms release.
 - Native tests now measure the coherent reference, assert the default output is approximately −12 dBFS, verify no internal FX saturation in the reference feedback case, and exercise the final limiter under full-level stress.
-- Per-patch pan/stereo sends, master compressor, and device CPU/xrun qualification are not complete.
+- Per-patch pan is persisted in bank V2 using reserved bits without expanding the 479-byte record; V1 banks migrate to center. The dry strip uses smoothed constant-voltage balance pan, with hard-left/right/center and persistence tests.
+- Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,108 B, `.ram_text` 3,556 B, `.pool` 171,528 B, `.text` 167,960 B, `.noinit` 1,836 B; app.bin 174,484 B. Pool spare is 172,536 B; RAM `.data + .bss` spare is 51,228 B.
+- Per-patch stereo sends/pan-before-send, master compressor, pan UI control, and device CPU/xrun qualification are not complete.
 
 ## Architecture gate — before inserts and further DSP
 
-The gain foundation is now in place, but the architecture contract still gates the next processors. Freeze per-patch pan and stereo send/return ownership, instrument/performance/device state boundaries, parameter smoothing, memory/stack budget, and remaining saturation boundaries before adding Amp/Drive or EQ. Do not treat the current mono send accumulation or the completed peak limiter as completion of the full mixer or master-dynamics architecture.
+The gain foundation and per-patch dry pan/state migration are now in place, but the architecture contract still gates the next processors. Freeze stereo send/return ownership, instrument/performance/device state boundaries for sends/inserts, memory/stack budget, and remaining saturation boundaries before adding Amp/Drive or EQ. Do not treat the current mono send accumulation or the completed peak limiter as completion of the full mixer or master-dynamics architecture.
 
 ## Goals
 
