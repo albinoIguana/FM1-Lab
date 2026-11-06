@@ -97,7 +97,7 @@ static volatile uint8_t fx_enabled[4], fx_mix[4]={18u,24u,20u,35u},
     fx_time[4]={48u,52u,45u,35u}, fx_feedback[4]={40u,42u,60u,20u},
     fx_depth[4]={50u,50u,50u,65u};
 static volatile uint8_t fx_send[PATCHES][4];
-static uint32_t fx_lfo_phase;
+static uint32_t fx_lfo_phase, fx_phaser_phase;
 static int32_t fm6_sat_q23(int64_t x) { return x>OUTPUT_LIMIT?OUTPUT_LIMIT:x< -OUTPUT_LIMIT?-OUTPUT_LIMIT:(int32_t)x; }
 static uint32_t fm6_step_period(void) { return (FM6_SAMPLE_RATE*60u)/((uint32_t)transport_bpm*4u); }
 static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint8_t source);
@@ -189,8 +189,8 @@ static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,in
         fx_phaser_feedback_l=0;
         fx_phaser_feedback_r=0;
     }
-    fx_lfo_phase+=74u+(uint32_t)fx_time[0]*10u;
-    fx_lfo_phase+=(uint32_t)fx_time[3]*50u;
+    fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
+    fx_phaser_phase+=74u+(uint32_t)fx_time[3]*60u;
     int64_t wet_l=input,wet_r=input;
     if(fx_enabled[0]) { wet_l+=(int64_t)chorus*fx_mix[0]/100; wet_r+=(int64_t)chorus_r*fx_mix[0]/100; }
     if(fx_enabled[1]) { wet_l+=(int64_t)delay*fx_mix[1]/100; wet_r+=(int64_t)delay*fx_mix[1]/100; }
@@ -364,7 +364,7 @@ void fm6_init(void)
     seq_start_pending=seq_stop_pending=arp_clear_pending=0u;
     arp_mode=0u; arp_count=0u; arp_index=0u; arp_direction=1u; arp_live=0u;
     transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
-    fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=0u;
+    fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=fx_phaser_phase=0u;
     for (i = 0; i < PATCHES; i++) {
         fm6_unpack(FM6_FACTORY[i], instrument[i].base);
         instrument[i].macro[0] = 50;
