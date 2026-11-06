@@ -46,6 +46,26 @@ static int32_t render_master_peak(uint32_t master_gain_q12)
     return peak(output, TEST_WORDS);
 }
 
+static int32_t render_pan_channel_peak(uint8_t pan, unsigned channel)
+{
+    static int32_t warmup[512u * 2u];
+    fm6_init();
+    for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
+        fm6_patch_set_enabled((uint8_t)patch,0u);
+    fm6_patch_set_pan(0u,pan);
+    fm6_render(warmup,512u,4096u);
+    fm6_note_on_mask(60u,110u,0x01u);
+    memset(output,0,sizeof output);
+    fm6_render(output,TEST_FRAMES,4096u);
+    int32_t result=0;
+    for(unsigned frame=0;frame<TEST_FRAMES;frame++) {
+        int32_t value=output[frame*2u+channel];
+        if(value<0) value=-value;
+        if(value>result) result=value;
+    }
+    return result;
+}
+
 static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
 {
     uint8_t voice[156] = {0};
@@ -116,6 +136,19 @@ int main(void) {
     for (unsigned block = 0; block < 256u; ++block)
         fm6_render(output, TEST_FRAMES, 4096u);
     assert(fm6_test_fx_saturations() == 0u);
+    /* Per-patch pan is independent and leaves the centered reference unchanged. */
+    assert(render_pan_channel_peak(0u,0u)>0);
+    assert(render_pan_channel_peak(0u,1u)==0);
+    assert(render_pan_channel_peak(127u,0u)==0);
+    assert(render_pan_channel_peak(127u,1u)>0);
+    int32_t center_l=render_pan_channel_peak(64u,0u);
+    int32_t center_r=render_pan_channel_peak(64u,1u);
+    assert(center_l>0 && center_r>0);
+    assert(center_l*100>center_r*99 && center_l*100<center_r*101);
+    fm6_init();
+    fm6_patch_set_pan(0u,255u);
+    assert(fm6_patch_pan(0u)==127u);
+
     /* The platform passes APP_GAIN as Q12 (0..4096). At a settled
      * half-scale master setting, output must be approximately half of unity. */
     int32_t master_unity_peak = render_master_peak(4096u);
