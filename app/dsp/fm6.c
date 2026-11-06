@@ -141,8 +141,8 @@ static int32_t fm6_allpass_stage(int32_t input, int32_t *state, int32_t coeffici
 static int32_t fm6_phaser_channel(int32_t input, int32_t state[4], uint32_t phase)
 {
     uint32_t tri = phase < 32768u ? phase : 65535u - phase;
-    uint32_t span = 5000u + (uint32_t)fx_depth[3] * 100u;
-    int32_t coefficient = (int32_t)(6000u + (span * tri) / 32768u);
+    uint32_t span = (uint32_t)fx_depth[3] * 230u;
+    int32_t coefficient = (int32_t)(16500u - span/2u + (span * tri) / 32768u);
     for (uint32_t stage=0; stage<4u; ++stage)
         input = fm6_allpass_stage(input, &state[stage], coefficient);
     return input;
@@ -186,6 +186,10 @@ static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,in
         fx_phaser_feedback_l=phaser_l;
         fx_phaser_feedback_r=phaser_r;
     } else {
+        /* Feed silence through the all-pass states while bypassed so a stale
+         * resonant tail cannot jump out when the processor is re-enabled. */
+        (void)fm6_phaser_channel(0,fx_phaser_state_l,fx_phaser_phase&0xFFFFu);
+        (void)fm6_phaser_channel(0,fx_phaser_state_r, (fx_phaser_phase+16384u)&0xFFFFu);
         fx_phaser_feedback_l=0;
         fx_phaser_feedback_r=0;
     }
