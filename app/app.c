@@ -753,7 +753,7 @@ static void input(void)
                     set_dirty = 1u;
                     app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN");
                 }
-            } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
+            } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
                 /* The four hardware knobs always map left-to-right to the
                  * four primary controls for the effect on this page:
                  * K1 wet, K2 rate/time/decay, K3 feedback, K4 patch send. */
@@ -1200,14 +1200,14 @@ static void draw(void)
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
     else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"K1 ENABLE  K2 NOTE  K3 VELOCITY  K4 GATE",C_GRAY);
     else if (page == PAGE_ARP) cv_text(4,43,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
-    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
+    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
     else cv_text(4, 43, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     {
         char page_text[8] = "";
-        if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
-            /* FX pages are a local three-page group, not global pages 10-12. */
+        if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
+            /* FX pages are a local four-page group, not global pages 10-12. */
             int_text((int32_t)(page - PAGE_FX_CHORUS) + 1, t);
-            text_cat(page_text, t); text_cat(page_text, "/3");
+            text_cat(page_text, t); text_cat(page_text, "/4");
         } else {
             int_text((int32_t)page + 1, t);
             text_cat(page_text, t); text_cat(page_text, "/");
