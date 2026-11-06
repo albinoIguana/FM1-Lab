@@ -138,6 +138,34 @@ static int32_t render_compressor_peak(uint8_t enabled)
     return peak(output,TEST_WORDS);
 }
 
+/* Two identical layers are hard-panned apart and run through the same
+ * master detector. A stereo-linked compressor must apply the same gain
+ * envelope to both channels, preserving their level ratio sample by sample. */
+static void render_compressor_stereo(uint8_t enabled,int32_t *destination)
+{
+    static int32_t warmup[2048u*2u];
+    uint8_t voice[156]={0};
+    fm6_init();
+    memcpy(voice,fm6_patch_data(0u),155u);
+    assert(fm6_patch_set_voice(1u,voice)==0);
+    for(unsigned patch=2u;patch<FM1LAB_PATCH_COUNT;patch++)
+        fm6_patch_set_enabled((uint8_t)patch,0u);
+    fm6_patch_set_level(0u,127u);
+    fm6_patch_set_level(1u,31u);
+    fm6_patch_set_pan(0u,0u);
+    fm6_patch_set_pan(1u,127u);
+    fm6_master_comp_set(FM6_COMP_ENABLED,enabled);
+    fm6_master_comp_set(FM6_COMP_THRESHOLD,0u);
+    fm6_master_comp_set(FM6_COMP_RATIO,100u);
+    fm6_master_comp_set(FM6_COMP_ATTACK,0u);
+    fm6_master_comp_set(FM6_COMP_RELEASE,20u);
+    fm6_master_comp_set(FM6_COMP_MAKEUP,0u);
+    fm6_render(warmup,2048u,4096u); /* settle pan before the note */
+    fm6_note_on_mask(60u,110u,0x03u);
+    for(unsigned block=0u;block<8u;block++)
+        fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
+}
+
 int main(void) {
     assert(fm6_patch_count() == FM1LAB_PATCH_COUNT);
     fm6_init();
@@ -648,6 +676,28 @@ int main(void) {
     assert(compressor_active_peak>0);
     assert(compressor_active_peak<compressor_bypass_peak);
 
-    puts("Felucca FM6 engine: voice pools, sequencing, stereo FX, Instrument-wide Amp/Drive, parametric EQ and master compressor passed");
+    /* The loud left layer must also pull down the quiet right layer. Compare
+     * per-channel gain ratios against bypass; equal ratios prove one shared
+     * stereo detector/gain cell rather than independent L/R compressors. */
+    render_compressor_stereo(0u,chunk_a);
+    render_compressor_stereo(1u,chunk_b);
+    unsigned linked_frames=0u;
+    for(unsigned frame=0u;frame<8u*TEST_FRAMES;frame++) {
+        int64_t dry_l=chunk_a[frame*2u],dry_r=chunk_a[frame*2u+1u];
+        int64_t wet_l=chunk_b[frame*2u],wet_r=chunk_b[frame*2u+1u];
+        if(dry_l>1000 || dry_l< -1000) {
+            if(dry_r>1000 || dry_r< -1000) {
+                int64_t lhs=wet_l*dry_r,rhs=wet_r*dry_l;
+                int64_t difference=lhs-rhs;
+                if(difference<0)difference=-difference;
+                int64_t scale=lhs<0?-lhs:lhs;
+                assert(difference*100<=scale*2+1000000);
+                ++linked_frames;
+            }
+        }
+    }
+    assert(linked_frames>100u);
+
+    puts("Felucca FM6 engine: voice pools, sequencing, stereo FX, Instrument-wide Amp/Drive, parametric EQ and linked master compressor passed");
     return 0;
 }
