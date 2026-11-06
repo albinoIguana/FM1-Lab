@@ -66,6 +66,7 @@ static void instrument_apply_engine(void)
         /* Layer activation is controlled exclusively by its HOME volume. */
         fm6_patch_set_enabled(p, 1u);
         fm6_patch_set_level(p, part->level);
+        fm6_patch_set_pan(p, fm1lab_patch_pan(&current_instrument, p));
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             fm6_macro_set(p, m, part->macros[m]);
     }
@@ -170,6 +171,7 @@ static void ui_events_drain(void)
             voice_dirty = 0u;
         } else if (type == EV_PATCH_VOICE) {
             (void)fm6_patch_set_voice(a, voice_update_snapshot);
+            fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a));
             voice_update_pending = 0u;
         }
     }
