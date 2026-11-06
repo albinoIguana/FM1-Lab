@@ -43,17 +43,17 @@ Status: **design freeze in progress**. This document defines target interfaces a
 
 ## 3. Canonical signal topology
 
-    Patch 1 voice pool ─> patch strip 1 ─┬─> dry mixer ──────────────┐
-    Patch 2 voice pool ─> patch strip 2 ─┤                          │
-    Patch 3 voice pool ─> patch strip 3 ─┤                          ├─> master dynamics
-    Patch 4 voice pool ─> patch strip 4 ─┘                          │    compressor
-              │                                                     │    peak limiter
-              └─> per-patch sends ─> Chorus ─┐                      │    master trim
-                                    Phaser ──┤─> stereo FX return ──┘    stereo output
-                                    Delay ───┤
-                                    Reverb ──┘
+    Patch 1 voice pool ─> patch strip 1 ─┬─> stereo dry sum ───────────┐
+    Patch 2 voice pool ─> patch strip 2 ─┤                            │
+    Patch 3 voice pool ─> patch strip 3 ─┤                            ├─> global
+    Patch 4 voice pool ─> patch strip 4 ─┘                            │   Amp/Drive
+              │                                                       │   3-band EQ
+              └─> per-patch sends ─> Chorus ─┐                        │   compressor
+                                    Phaser ──┤─> stereo FX return ─────┤   peak limiter
+                                    Delay ───┤                        │   master gain
+                                    Reverb ──┘                        └─> stereo output
 
-Each patch strip owns voice-pool output, stable patch level, pan, Amp/Drive insert and independent bypass, three-band EQ insert and independent bypass, and smoothed parameter transitions.
+Each patch strip owns voice-pool output, stable patch level, smoothed pan, and four independent sends. After the dry and shared stereo FX returns are summed, one Instrument-wide Amp/Drive stage and one three-band parametric EQ process the complete stereo Instrument bus, followed by the stereo-linked master compressor and the separate peak limiter.
 
 The four shared FX buses own independent processor state and independent send levels from each patch. Each patch contributes independently panned left/right samples to each send. Chorus, Delay and Reverb have separate left/right feedback storage; Phaser has separate left/right all-pass state. Dry and wet paths remain separately measurable and summable.
 
@@ -75,7 +75,7 @@ Separate state into three lifetimes:
 2. **Performance state** — sequencer patterns/assignments, arp settings, tempo and performance controls intended to be saved with the performance/session.
 3. **Device state** — physical master setting, global MIDI/device preferences, diagnostics configuration, and other hardware-specific settings.
 
-Per-patch pan is Instrument-owned and persists in the fixed-size 479-byte library record using reserved bits; bank header V2 migrates V1 records to centered pan. Per-patch sends currently live in the versioned Performance/settings state (`fx_send[4][4]`), not in the Instrument bank. Amp/Drive and EQ are Instrument-owned in a versioned sidecar journal; master compressor state is Performance/settings-owned. The fixed 479-byte Instrument record remains unchanged.
+Per-patch pan is Instrument-owned and persists in the fixed-size 479-byte library record using reserved bits; bank header V2 migrates V1 records to centered pan. Per-patch sends currently live in the versioned Performance/settings state (`fx_send[4][4]`), not in the Instrument bank. Amp/Drive and EQ are one Instrument-wide stereo-bus chain stored in a versioned sidecar journal; master compressor state is Performance/settings-owned. The fixed 479-byte Instrument record remains unchanged.
 
 Persistence requirements:
 - Validate a complete candidate before applying any of it.
@@ -138,13 +138,13 @@ The current feature-branch implementation has several behaviors to reconcile bef
 - The current Phaser is a four-stage all-pass effect, while Chorus/Delay/Reverb still have simpler existing implementations. Their quality and parameter completeness remain separate work items.
 - Current settings schema is V5 (V4 imports are preserved). Instrument bank records persist four patch levels/macros/enabled flags; bank header V2 additionally stores 7-bit pan in reserved bits (three bits in DX7 VMEM byte 111 and one unused high bit in each macro byte). The fixed 479-byte record size is unchanged. V1 bank migration defaults pan to 64 (center). The bank record remains authoritative for voices, levels, macros, enabled flags and pan. Per-patch FX sends live in the versioned Performance/settings state (`fx_send[4][4]`). Amp/Drive and EQ state is Instrument-owned in a separate versioned sidecar object; it travels with the Instrument index without expanding the 479-byte bank record. The sidecar has an active and fallback snapshot per bank, each tagged with the bank CRC and a six-bit bank-save generation. The generation is stored in the six previously unused high bits of the bank identity byte; the low two bits retain the bank index. This catches insert-only saves where the voice record CRC would otherwise remain unchanged.
 
-The sidecar's V1 layout migrates to V2 in memory and is rewritten on the next successful save. The existing V1 Instrument-bank migration remains unchanged. The two-object save order is journal-first, bank-second: after an interrupted write, the active sidecar is accepted only if both bank CRC and generation match; otherwise the embedded fallback is selected.
+The sidecar's V1 and V2 layouts (four per-patch insert records per Instrument) migrate to V3's single global insert record per Instrument. If all four legacy patch states agree, migration retains their settings; if they differ, the shared processor is bypassed and the parameter values are averaged for safe manual recovery. The new compact sidecar is rewritten on the next successful save. The existing V1 Instrument-bank migration remains unchanged. The two-object save order is journal-first, bank-second: after an interrupted write, the active sidecar is accepted only if both bank CRC and generation match; otherwise the embedded fallback is selected.
 
 ## 11. Implementation sequence
 
 1. **Architecture freeze:** signal units, insert ownership, settings migration, fixed-point contracts and routing interfaces are settled for this milestone.
 2. **Mixer foundation:** calibrated patch gain, smoothed pan, pan-before-send stereo routing, Q19 FX headroom, −12 dB master trim and independent final limiter are implemented.
-3. **Patch inserts:** per-patch Amp/Drive and three-band parametric EQ are implemented with independent controls, band bypass and Instrument persistence.
+3. **Instrument FX inserts:** one global stereo Amp/Drive and one three-band parametric EQ process the summed Instrument bus; parameters persist with the Instrument.
 4. **Master dynamics:** stereo-linked master compressor is implemented and persisted in Performance/settings state; the peak limiter remains a separate final safety stage.
 5. **Native UI integration:** compact Amp, EQ and compressor pages are connected to the physical encoders/buttons.
 6. **FX refinement:** continue improving Chorus, Phaser, Delay and Reverb quality; Reverb diffusion remains a future quality pass.
@@ -228,17 +228,17 @@ This is a host-calibrated signal reference, not a universal loudness guarantee f
 - Host regression probes inspect every effect's pre-FX stereo send accumulator at hard-left, hard-right and center. Native engine checks and the target device build both pass. Hardware CPU/xrun and listening qualification remain outstanding.
 
 
-## 17. Instrument-owned Amp/Drive and parametric EQ — 2026-11-06
+## 17. Instrument-wide Amp/Drive and parametric EQ — 2026-11-06
 
-- Each of the four patches in each of the 32 Instruments has independent Amp/Drive state: enable, drive, tone and output trim. The insert is placed after patch gain/calibration and before pan and shared FX sends. Drive uses bounded pre-gain and a monotonic soft-knee saturator; tone is a one-pole low-pass control; output is an independent trim.
-- Each patch has a three-band parametric EQ with logarithmic 20 Hz–20 kHz frequency control, ±12 dB gain, Q approximately 0.5–4.0, global bypass and independent per-band enable. The implementation uses fixed-point Q15 peaking biquads with coefficient lookup tables; no floating-point math or dynamic allocation is added to the audio callback.
-- The screen remains a compact four-card editor. B-SEL cycles PATCH MACROS → AMP/DRIVE → PARAMETRIC EQ. On the Amp page K1/K2/K3 set drive/tone/output and K4 toggles the insert. On the EQ page ALGO selects LOW/MID/HIGH; K1/K2/K3 set frequency/gain/Q; K4 toggles that band; EDIT toggles global EQ bypass. Each insert state is independent per patch.
-- Insert settings are stored in `OBJ_INSERTS`, a fifth pooled store object. The original eight-record bank and 479-byte Instrument record are untouched. The sidecar carries all 32 Instruments × four patches and is protected by snapshot CRCs plus the bank CRC/generation journal. V1 sidecars migrate to V2; legacy bank V1 migration still centers pan and keeps the same record size.
-- Host tests cover per-patch Amp/Drive and EQ signal changes, parameter clamping, performance-state round-trip, sidecar round-trip, sidecar V1 migration, and simulated power loss after sidecar commit but before bank commit. The fallback snapshot must win.
+- Each of the 32 Instruments has one global Amp/Drive state: enable, drive, tone and output trim. It runs once on the summed stereo signal after the shared FX returns and before the master compressor. Drive uses bounded pre-gain and a monotonic soft-knee saturator; tone is a one-pole low-pass control; output is an independent trim.
+- Each Instrument has one three-band parametric EQ with logarithmic 20 Hz–20 kHz frequency control, ±12 dB gain, Q approximately 0.5–4.0, global bypass and independent per-band enable. The implementation uses fixed-point Q15 peaking biquads with coefficient lookup tables; L/R filter histories are independent and no floating-point math or dynamic allocation is added to the audio callback.
+- Amp/Drive, EQ and Compressor are contiguous pages at the start of the FX section. B-FX enters/cycles AMP/DRIVE → PARAMETRIC EQ → COMPRESSOR → Chorus/Delay/Reverb/Phaser → send routing; SELECT cycles the same FX pages. K1/K2/K3 set drive/tone/output and K4 toggles Amp/Drive. On EQ, ALGO selects LOW/MID/HIGH; K1/K2/K3 set frequency/gain/Q; K4 toggles the selected band and EDIT toggles global EQ bypass. The Compressor page exposes threshold/ratio/attack/release, SELECT adjusts makeup and EDIT bypasses it. No patch-menu detour is needed.
+- Global insert settings are stored in `OBJ_INSERTS`, a fifth pooled store object: one 14-byte state per Instrument (32 total). The original eight-record bank and 479-byte Instrument record are untouched. The sidecar uses active/fallback snapshots protected by snapshot CRCs plus the bank CRC/generation journal. V1/V2 per-patch sidecars migrate to V3 global state; divergent legacy patch settings are safely bypassed rather than unexpectedly applied to the whole Instrument. Legacy bank V1 migration still centers pan and keeps the same record size.
+- Host tests cover global Amp/Drive and EQ signal changes across the combined Instrument bus, parameter clamping, performance-state round-trip, V1/V2 sidecar migration, sidecar round-trip, and simulated power loss after sidecar commit but before bank commit. The fallback snapshot must win.
 
 ## 18. Master compressor and compact control page — 2026-11-06
 
 - A stereo-linked peak detector and smoothed attack/release envelope drive a threshold/ratio compressor after the FX returns and before master gain. Threshold, ratio, attack, release and makeup are independent parameters. Compressor bypass is independent from the final −1 dB peak limiter.
 - Compressor parameters are part of the Performance/settings record. The new settings layout is versioned; the previous current V4 settings structure is explicitly imported with the compressor bypassed and neutral defaults. V3 migration also supplies compressor defaults. The settings CRC covers an explicit reserved field so no unprotected tail padding remains.
-- B-GLO cycles GLOBAL SETTINGS → MASTER COMPRESSOR → HOME. On the compressor page K1/K2/K3/K4 set threshold/ratio/attack/release; SELECT adjusts makeup; EDIT toggles bypass.
+- B-FX opens the global FX chain. The compressor page follows Amp/Drive and EQ; K1/K2/K3/K4 set threshold/ratio/attack/release; SELECT adjusts makeup; EDIT toggles bypass.
 - Native engine tests confirm the compressor reduces a sustained four-layer peak, parameter state survives Performance-state round-trip, and invalid settings are rejected. Native device build and browser-emulator integration are separate CI checks; physical hardware CPU/xrun/listening qualification remains outstanding.
