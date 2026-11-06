@@ -59,6 +59,11 @@ typedef struct {
     int32_t detune[6];
     uint8_t feedback;
     uint8_t ready;
+    uint8_t amp_enabled, drive, tone, output, eq_enabled;
+    uint8_t eq_frequency[3], eq_gain[3], eq_q[3];
+    int32_t amp_tone_state;
+    int32_t eq_x1[3], eq_x2[3], eq_y1[3], eq_y2[3];
+    int32_t eq_coeff[3][5];
 } fm1lab_patch_t;
 
 typedef struct {
