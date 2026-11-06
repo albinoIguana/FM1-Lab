@@ -14,6 +14,22 @@ static int32_t peak(const int32_t *samples, unsigned count) {
     }
     return result;
 }
+static void render_phaser_test(uint8_t rate, uint8_t depth, int32_t *destination)
+{
+    fm6_init();
+    for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
+        fm6_patch_set_enabled((uint8_t)patch,0u);
+    fm6_fx_set_enabled(FM6_FX_PHASER,1u);
+    fm6_fx_set_mix(FM6_FX_PHASER,100u);
+    fm6_fx_set_time(FM6_FX_PHASER,rate);
+    fm6_fx_set_depth(FM6_FX_PHASER,depth);
+    fm6_fx_set_feedback(FM6_FX_PHASER,90u);
+    fm6_fx_set_send(0u,FM6_FX_PHASER,100u);
+    fm6_note_on_mask(60u,110u,0x01u);
+    for (unsigned block=0u; block<64u; ++block)
+        fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
+}
+
 int main(void) {
     assert(fm6_patch_count() == FM1LAB_PATCH_COUNT);
     fm6_init();
@@ -197,6 +213,18 @@ int main(void) {
         for(unsigned i=0;i<64u*TEST_WORDS;i++) assert(wet[i]==dry[i]);
     }
 
+
+
+    /* Phaser rate and depth must independently alter the filter sweep. */
+    render_phaser_test(0u,100u,dry);
+    render_phaser_test(100u,100u,wet);
+    assert(memcmp(dry,wet,sizeof dry)!=0);
+    render_phaser_test(45u,0u,dry);
+    render_phaser_test(45u,100u,wet);
+    assert(memcmp(dry,wet,sizeof dry)!=0);
+    assert(fm6_fx_depth(FM6_FX_PHASER)==100u);
+    fm6_fx_set_depth(FM6_FX_PHASER,255u);
+    assert(fm6_fx_depth(FM6_FX_PHASER)==100u);
 
     /* Combined worst-case functional stress: all 32 patch voices occupied,
      * both sequencer lanes advancing, 16 held arp notes, and every FX bus
