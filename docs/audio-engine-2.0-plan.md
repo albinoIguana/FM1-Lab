@@ -8,7 +8,7 @@ Status: calibrated mixer, pan-aware stereo sends/returns, per-Instrument Amp/Dri
 - Four cascaded first-order all-pass stages per channel; dry/wet summing creates the phase-cancellation notches.
 - Independent LFO phase accumulator (approximately 0.05–4.05 Hz), 90-degree stereo phase offset, depth, bounded feedback/resonance, and wet return.
 - Per-patch Phaser send is independent of Chorus, Delay, and Reverb sends.
-- Performance-state schema expanded to four buses with a versioned settings-record migration from V3; legacy V1/V2/V3 records remain supported.
+- Performance-state schema expanded to four buses and master compressor state; settings V1/V2/V3/V4 migrations are supported into the current V5 record.
 - Host tests cover audible signal change, stereo spread, per-patch send isolation, combined four-bus stress, state round-trip, depth validation, and render chunk consistency.
 - Wired to a dedicated native PHASER FX page with wet, rate, depth and resonance controls. A separate SEND ROUTING page exposes the four independent per-patch bus sends. Both SELECT and the FX button cycle the four processor pages plus routing. Device CPU/xrun qualification remains outstanding.
 
