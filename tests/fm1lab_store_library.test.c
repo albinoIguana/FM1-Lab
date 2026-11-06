@@ -20,6 +20,28 @@ static uint16_t test_crc16(const uint8_t *p, unsigned n) {
     }
     return crc;
 }
+
+static void downgrade_insert_sidecar_to_v1(void)
+{
+    uint8_t old[3616];
+    memset(old,0,sizeof old);
+    old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x31u; /* INS1 */
+    old[4]=1u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
+    for(unsigned bank=0;bank<4u;bank++)objects[bank][5]=(uint8_t)bank; /* V1 had no generation bits */
+    for(unsigned copy=0;copy<2u;copy++){
+        const uint8_t *src=objects[4]+12u+copy*1806u;
+        uint8_t *dst=old+12u+copy*1802u;
+        memcpy(dst,src,8u);
+        memcpy(dst+8u,src+12u,1792u);
+        uint16_t crc=test_crc16(dst,1800u);
+        dst[1800]=(uint8_t)crc;dst[1801]=(uint8_t)(crc>>8);
+    }
+    uint16_t header_crc=test_crc16(old,8u);
+    old[8]=(uint8_t)header_crc;old[9]=(uint8_t)(header_crc>>8);
+    memcpy(objects[4],old,sizeof old);
+    object_len[4]=(uint16_t)sizeof old;
+}
+
 int plat_store_size(uint32_t obj) {
     if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || !present[obj-OBJ_INSTRUMENTS0]) return -1;
     return object_len[obj-OBJ_INSTRUMENTS0];
@@ -107,6 +129,11 @@ int main(void) {
     inserts.patches[2].eq_enabled=1u; inserts.patches[2].eq[1].frequency=67u;
     inserts.patches[2].eq[1].gain=19u; inserts.patches[2].eq[1].q=23u;
     assert(fm1lab_store_library_save_full(0u,&source,&inserts)==0);
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+    assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
+    /* The V1 sidecar layout migrates without touching the 479-byte Instrument
+     * records, preserving the full patch insert state. */
+    downgrade_insert_sidecar_to_v1();
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
 
