@@ -1,6 +1,6 @@
 # FM1-Lab Audio Engine 2.0 implementation plan
 
-Status: architecture decision with the first fourth-bus processor implemented on the feature branch. This document remains a build contract; items below are not complete unless explicitly marked.
+Status: Phaser fourth bus implemented on the feature branch. The binding architecture contract is now [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
 
 ## Implementation checkpoint — Phaser bus
 
@@ -11,6 +11,10 @@ Status: architecture decision with the first fourth-bus processor implemented on
 - Performance-state schema expanded to four buses with a versioned settings-record migration from V3; legacy V1/V2/V3 records remain supported.
 - Host tests cover audible signal change, stereo spread, per-patch send isolation, combined four-bus stress, state round-trip, depth validation, and render chunk consistency.
 - Wired to a dedicated native PHASER FX page with wet, rate, depth and resonance controls. A separate SEND ROUTING page exposes the four independent per-patch bus sends. Both SELECT and the FX button cycle the four processor pages plus routing. Device CPU/xrun qualification remains outstanding.
+
+## Architecture gate — must precede more DSP
+
+The architecture contract defines the stable patch-gain model, ≤25% factory defaults, −12 dBFS master gain-staging reference, separate approximately −1 dBFS peak-safety limiter, stereo send/return routing, parameter smoothing, state ownership, numeric headroom, memory budget, diagnostics, and acceptance tests. Do not start Amp/Drive, EQ, or master processor implementation until the mixer/state contracts are frozen and the current source gaps are resolved. In particular, remove active-layer-count gain normalization only as part of the tested mixer foundation; do not merely lower the factory level and leave the current dynamic normalization in place.
 
 ## Goals
 
