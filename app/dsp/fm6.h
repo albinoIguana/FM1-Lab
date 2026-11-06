@@ -23,7 +23,8 @@ typedef struct {
     uint8_t fx_mix[3];
     uint8_t fx_time[3];
     uint8_t fx_feedback[3];
-    uint8_t fx_send[4][3];
+    uint8_t fx_send[4][4];
+    uint8_t fx_depth[4];
 } fm6_performance_state_t;
 
 enum {
@@ -61,10 +62,12 @@ void fm6_fx_set_enabled(uint8_t effect, uint8_t enabled);
 void fm6_fx_set_mix(uint8_t effect, uint8_t mix);
 void fm6_fx_set_time(uint8_t effect, uint8_t value);
 void fm6_fx_set_feedback(uint8_t effect, uint8_t value);
+void fm6_fx_set_depth(uint8_t effect, uint8_t value);
 uint8_t fm6_fx_enabled(uint8_t effect);
 uint8_t fm6_fx_mix(uint8_t effect);
 uint8_t fm6_fx_time(uint8_t effect);
 uint8_t fm6_fx_feedback(uint8_t effect);
+uint8_t fm6_fx_depth(uint8_t effect);
 void fm6_fx_set_send(uint8_t patch, uint8_t effect, uint8_t send);
 uint8_t fm6_fx_get_send(uint8_t patch, uint8_t effect);
 /* Render length must be a multiple of the FM6 core's 32-frame quantum (CTL). */
