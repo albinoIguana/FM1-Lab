@@ -20,10 +20,10 @@ typedef struct {
     uint8_t seq_velocity[2][64];
     uint8_t seq_gate[2][64];
     uint8_t arp_mode;
-    uint8_t fx_enabled[3];
-    uint8_t fx_mix[3];
-    uint8_t fx_time[3];
-    uint8_t fx_feedback[3];
+    uint8_t fx_enabled[4];
+    uint8_t fx_mix[4];
+    uint8_t fx_time[4];
+    uint8_t fx_feedback[4];
     uint8_t fx_send[4][4];
     uint8_t fx_depth[4];
 } fm6_performance_state_t;
