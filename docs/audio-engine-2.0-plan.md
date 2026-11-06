@@ -72,7 +72,7 @@ Four independent FM6 patch voice pools
 - Four shared FX buses and their per-patch sends remain in the versioned Performance/settings record. Master compressor parameters are also Performance/settings-owned; prior V4 settings migrate with compressor bypassed.
 - Amp/Drive and EQ are Instrument-owned as one global stereo chain in a separate versioned sidecar journal. The original 479-byte bank records are unchanged; V1/V2 four-patch sidecars migrate to V3 global state. Identical legacy patch settings are retained; divergent settings migrate bypassed with averaged values. Pending two-object saves are resolved by bank CRC plus generation.
 - All records are CRC-protected and range-validated before mutation; host tests cover legacy bank migration, settings V1–V4 migration and sidecar crash recovery.
-- One effect per page remains the UI navigation pattern. Every page must expose the four most musically useful controls for that processor, with live DSP-backed values and an explicit bypass state. Do not force the same four generic parameter names onto different processors.
+- The FX section is one contiguous page group navigated by both SELECT and the FX button. Amp/Drive, EQ and Compressor precede the four shared effects and routing. ALGO selects EQ bands or compressor makeup; each page exposes live DSP-backed values and explicit bypass. Do not force the same four generic parameter names onto different processors.
 - FX knob assignments are provisional until each processor has real independent DSP parameters. In particular, chorus rate/depth and reverb damping/pre-delay must be distinct controls.
 
 ## Sequencing / performance follow-through
