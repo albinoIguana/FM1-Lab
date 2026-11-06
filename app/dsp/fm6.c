@@ -72,6 +72,23 @@ static uint32_t overload_shed_count;
 static int32_t output_gain_q12;
 static int16_t pitch_bend_16;
 
+#ifdef FM6_TEST
+static uint64_t fm6_test_patch_peak_q24[PATCHES];
+static uint64_t fm6_test_dry_peak_q24;
+static uint64_t fm6_test_abs_i64(int64_t value)
+{
+    return value < 0 ? (uint64_t)(-(value + 1)) + 1u : (uint64_t)value;
+}
+uint64_t fm6_test_patch_peak(uint32_t patch)
+{
+    return patch < PATCHES ? fm6_test_patch_peak_q24[patch] : 0u;
+}
+uint64_t fm6_test_dry_peak(void)
+{
+    return fm6_test_dry_peak_q24;
+}
+#endif
+
 
 #define FM6_SAMPLE_RATE FM6_SAMPLE_RATE_HZ
 #define FM6_SEQ_LANES 2u
@@ -511,6 +528,10 @@ void fm6_pitch_bend(uint16_t value)
 
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
+#ifdef FM6_TEST
+    fm6_zero_bytes(fm6_test_patch_peak_q24, sizeof fm6_test_patch_peak_q24);
+    fm6_test_dry_peak_q24 = 0u;
+#endif
     uint32_t base;
     for (base = 0; base < frames; base += FM6_N) {
         int64_t patch_mix[PATCHES][FM6_N] = {{0}};
@@ -599,9 +620,20 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
             int64_t dry=0, send_accum[4]={0,0,0,0};
             for(uint32_t p=0;p<PATCHES;p++) {
-                int64_t sample=patch_mix[p][i]; dry+=sample;
+                int64_t sample=patch_mix[p][i];
+#ifdef FM6_TEST
+                uint64_t patch_abs=fm6_test_abs_i64(sample);
+                if(patch_abs>fm6_test_patch_peak_q24[p]) fm6_test_patch_peak_q24[p]=patch_abs;
+#endif
+                dry+=sample;
                 for(uint32_t fx=0;fx<4u;fx++) send_accum[fx]+=sample*fx_send[p][fx]/100;
             }
+#ifdef FM6_TEST
+            {
+                uint64_t dry_abs=fm6_test_abs_i64(dry);
+                if(dry_abs>fm6_test_dry_peak_q24) fm6_test_dry_peak_q24=dry_abs;
+            }
+#endif
             int32_t sends[4]={fm6_sat_q23(send_accum[0]),fm6_sat_q23(send_accum[1]),fm6_sat_q23(send_accum[2]),fm6_sat_q23(send_accum[3])};
             int64_t left=0,right=0;
             fm6_fx_process(dry,sends,&left,&right);
