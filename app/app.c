@@ -636,8 +636,10 @@ static void input(void)
             page = PAGE_HOME;
             app_say("HOME", fm6_patch_name(set.patch));
         } else if (k == B_GLO) {
-            page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
-            app_say("GLOBAL", page == PAGE_GLOBAL ? "SETTINGS" : "HOME");
+            page = page == PAGE_GLOBAL ? PAGE_COMPRESSOR :
+                page == PAGE_COMPRESSOR ? PAGE_HOME : PAGE_GLOBAL;
+            app_say(page==PAGE_COMPRESSOR?"MASTER COMPRESSOR":page==PAGE_GLOBAL?"GLOBAL":"HOME",
+                    page==PAGE_COMPRESSOR?(compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS"):"SETTINGS");
         } else if (k == B_ENV) {
             if (page == PAGE_ENV) env_levels ^= 1u;
             else page = PAGE_ENV;
@@ -647,9 +649,19 @@ static void input(void)
                 page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
             app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
-            /* SEL is a global return to the selected patch's options. */
-            page = PAGE_MACRO;
-            app_say("MACROS", fm6_patch_name(set.patch));
+            page = page==PAGE_MACRO?PAGE_AMP:page==PAGE_AMP?PAGE_EQ:PAGE_MACRO;
+            app_say(page==PAGE_AMP?"AMP / DRIVE":page==PAGE_EQ?"PARAMETRIC EQ":"MACROS",fm6_patch_name(set.patch));
+        } else if (k == B_EDIT && page == PAGE_AMP) {
+            patch_insert_edit(set.patch,FM6_INSERT_AMP_ENABLED,
+                (uint8_t)!current_inserts.patches[set.patch].amp_enabled);
+            app_say("AMP / DRIVE",current_inserts.patches[set.patch].amp_enabled?"ACTIVE":"BYPASS");
+        } else if (k == B_EDIT && page == PAGE_EQ) {
+            patch_insert_edit(set.patch,FM6_INSERT_EQ_ENABLED,
+                (uint8_t)!(current_inserts.patches[set.patch].eq_enabled&1u));
+            app_say("PATCH EQ",(current_inserts.patches[set.patch].eq_enabled&1u)?"ACTIVE":"BYPASS");
+        } else if (k == B_EDIT && page == PAGE_COMPRESSOR) {
+            compressor_edit(FM6_COMP_ENABLED,(uint8_t)!compressor_value(FM6_COMP_ENABLED));
+            app_say("MASTER COMPRESSOR",compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS");
         } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
             uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
             fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
@@ -731,6 +743,11 @@ static void input(void)
                     app_say("BANK", "SELECTED");
                 }
             }
+        } else if (k == EN_ALGO && page == PAGE_EQ) {
+            int32_t next=((int32_t)eq_ui_band+e)%3;
+            if(next<0)next+=3;
+            eq_ui_band=(uint8_t)next;
+            app_say("EQ BAND",eq_ui_band==0u?"LOW":eq_ui_band==1u?"MID":"HIGH");
         } else if (k == EN_ALGO && page == PAGE_ENV) {
             int32_t next = ((int32_t)env_operator - 1 + e) % 6;
             if (next < 0) next += 6;
@@ -761,6 +778,9 @@ static void input(void)
             if (next < 0) next += 5;
             page = (uint8_t)(PAGE_FX_CHORUS + next);
             app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : page == PAGE_FX_PHASER ? "PHASER" : "SEND ROUTING");
+        } else if (k == EN_SELECT && page == PAGE_COMPRESSOR) {
+            compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
+            app_say("COMP MAKEUP","UPDATED");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
@@ -825,6 +845,25 @@ static void input(void)
                 } else fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,90));
                 set_dirty = 1u;
                 app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):"FX FEEDBACK", "UPDATED");
+            } else if (page == PAGE_AMP) {
+                static const uint8_t fields[4]={FM6_INSERT_DRIVE,FM6_INSERT_TONE,FM6_INSERT_OUTPUT,FM6_INSERT_AMP_ENABLED};
+                uint8_t field=fields[index],value=fm1lab_patch_insert_state_get(&current_inserts.patches[set.patch],field);
+                if(index==3u)value=(uint8_t)!value;
+                else value=(uint8_t)clamp((int32_t)value+e,0,100);
+                patch_insert_edit(set.patch,field,value);
+                app_say(index==0u?"AMP DRIVE":index==1u?"AMP TONE":index==2u?"AMP OUTPUT":"AMP",index==3u?(value?"ON":"BYPASS"):"UPDATED");
+            } else if (page == PAGE_EQ) {
+                uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+index);
+                uint8_t value=fm1lab_patch_insert_state_get(&current_inserts.patches[set.patch],field);
+                if(index==3u)value=(uint8_t)!value;
+                else value=(uint8_t)clamp((int32_t)value+e,0,index==1u?24:index==2u?31:100);
+                patch_insert_edit(set.patch,field,value);
+                app_say(index==0u?"EQ FREQUENCY":index==1u?"EQ GAIN":index==2u?"EQ Q":"EQ BAND",index==3u?(value?"ON":"OFF"):"UPDATED");
+            } else if (page == PAGE_COMPRESSOR) {
+                static const uint8_t fields[4]={FM6_COMP_THRESHOLD,FM6_COMP_RATIO,FM6_COMP_ATTACK,FM6_COMP_RELEASE};
+                uint8_t field=fields[index];
+                compressor_edit(field,(uint8_t)clamp((int32_t)compressor_value(field)+e,0,100));
+                app_say(index==0u?"COMP THRESHOLD":index==1u?"COMP RATIO":index==2u?"COMP ATTACK":"COMP RELEASE","UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
                 app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
