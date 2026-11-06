@@ -309,6 +309,7 @@ void app_init(void)
 {
     settings_v1_t old_v1;
     settings_v2_t old_v2;
+    settings_v3_t old_v3;
     int performance_loaded = 0;
     int loaded;
     fm6_init();
@@ -321,6 +322,9 @@ void app_init(void)
         if (plat_store_load(OBJ_SETTINGS, &old_v2, sizeof old_v2) == (int)sizeof old_v2 &&
             settings_import_v2(&set, &old_v2) == 0) {
             set_dirty = 1u; /* migrate v2 settings into the CRC-protected performance record */
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v3, sizeof old_v3) == (int)sizeof old_v3 &&
+                   settings_import_v3(&set, &old_v3) == 0) {
+            set_dirty = 1u; /* migrate v3 three-bus performance into v4 four-bus state */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v1, sizeof old_v1) == (int)sizeof old_v1 &&
                    settings_import_v1(&set, &old_v1) == 0) {
             set_dirty = 1u; /* migrate the original compact settings record */
