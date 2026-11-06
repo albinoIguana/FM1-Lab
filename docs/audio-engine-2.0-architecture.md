@@ -55,7 +55,7 @@ Status: **design freeze in progress**. This document defines target interfaces a
 
 Each patch strip owns voice-pool output, stable patch level, pan, Amp/Drive insert and independent bypass, three-band EQ insert and independent bypass, and smoothed parameter transitions.
 
-The four shared FX buses own independent processor state and independent send levels from each patch. The return architecture is stereo-capable even where an individual effect is mono-in/stereo-out. Dry and wet paths remain separately measurable and summable.
+The four shared FX buses own independent processor state and independent send levels from each patch. Each patch contributes independently panned left/right samples to each send. Chorus, Delay and Reverb have separate left/right feedback storage; Phaser has separate left/right all-pass state. Dry and wet paths remain separately measurable and summable.
 
 ## 4. Stereo and routing contract
 
@@ -136,14 +136,14 @@ The current feature-branch implementation has several behaviors to reconcile bef
 - Per-patch sends are now stereo and pan-aware: each patch's smoothed L/R gains are applied before the four shared send accumulators. Chorus, Delay and Reverb now have independent L/R feedback buffers/networks; Phaser receives the panned L/R inputs and retains its stereo LFO offset. The FX returns remain in the Q19 domain and are summed with the stereo dry bus.
 - FX send accumulators remain wide until the fixed master trim, then enter a Q19 internal FX domain (Q24 input shifted right five bits). Independent left/right delay, chorus and comb buffers double the FX-buffer allocation from 98,304 to 196,608 bytes while preserving 32× internal headroom. Test-only saturation counters verify no internal saturation under the four-patch reference/feedback condition.
 - The current Phaser is a four-stage all-pass effect, while Chorus/Delay/Reverb still have simpler existing implementations. Their quality and parameter completeness remain separate work items.
-- Current settings schema is V4. Instrument bank records persist four patch levels/macros/enabled flags; bank header V2 additionally stores 7-bit pan in reserved bits (three bits in DX7 VMEM byte 111 and one unused high bit in each macro byte). The fixed 479-byte record size is unchanged. V1 bank migration defaults pan to 64 (center). The bank record is authoritative after an Instrument is loaded; the settings copy remains a compatibility/runtime mirror for levels/macros. Inserts and sends still need a documented persistence design.
+- Current settings schema is V4. Instrument bank records persist four patch levels/macros/enabled flags; bank header V2 additionally stores 7-bit pan in reserved bits (three bits in DX7 VMEM byte 111 and one unused high bit in each macro byte). The fixed 479-byte record size is unchanged. V1 bank migration defaults pan to 64 (center). The bank record is authoritative after an Instrument is loaded for voices, levels, macros, enabled flags and pan. Per-patch FX sends currently live in the versioned Performance/settings state (`fx_send[4][4]`); they are not yet carried with an Instrument when it is moved between banks/devices. Inserts and future processor state still need an explicit portable serialization boundary.
 
 These are audit findings, not permission to make a rushed compatibility-breaking rewrite. Resolve them in order and keep existing supported migration tests intact.
 
 ## 11. Implementation sequence
 
 1. **Architecture freeze:** settle signal units, state ownership, routing API, smoothing policy, memory budget, diagnostics, and migration ownership.
-2. **Mixer foundation:** stable calibrated patch gain, smoothed dry pan, wide accumulators, Q19 FX-bus headroom, −12 dB master trim, and a separate final limiter are implemented and under host regression. Per-patch stereo sends and pan-before-send remain outstanding.
+2. **Mixer foundation:** stable calibrated patch gain, smoothed dry pan, pan-before-send stereo routing, wide accumulators, Q19 FX-bus headroom, −12 dB master trim, and a separate final limiter are implemented and under host regression.
 3. **Patch inserts:** per-patch Amp/Drive and three-band EQ with independent state/bypass.
 4. **Master dynamics:** compressor and independent peak limiter, with diagnostics and independent tests.
 5. **FX refinement:** bring Chorus, Phaser, Delay, and Reverb to the shared parameter/routing contract; improve Reverb diffusion and document each processor's limits.
