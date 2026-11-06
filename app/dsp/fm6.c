@@ -205,7 +205,7 @@ static int32_t fm6_phaser_channel(int32_t input, int32_t state[4], uint32_t phas
 }
 static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4][2],int64_t *left,int64_t *right)
 {
-    int32_t chorus=0,chorus_r=0,delay=0,reverb=0,phaser_l=0,phaser_r=0;
+    int32_t chorus=0,chorus_r=0,reverb=0,phaser_l=0,phaser_r=0;
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
     uint32_t tri=(fx_lfo_phase>>16)&1023u, depth=tri<512u?tri:1023u-tri;
     uint32_t chorus_delay=120u+(uint32_t)fx_time[0]*3u+depth*(120u+(uint32_t)fx_time[0]*3u)/511u;
@@ -220,7 +220,6 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
     uint32_t delay_length=256u+(uint32_t)fx_time[1]*78u;
     int32_t delay_feedback_l=fx_delay[(dp-delay_length)&(FM6_DELAY_SIZE-1u)];
     int32_t delay_feedback_r=fx_delay_r[(dp-delay_length)&(FM6_DELAY_SIZE-1u)];
-    if(fx_enabled[1] && fx_mix[1]) { delay=delay_feedback_l; }
     fx_delay[dp]=fm6_sat_q23((int64_t)(fx_enabled[1]?sends[1][0]:0)+(int64_t)delay_feedback_l*fx_feedback[1]/100u);
     fx_delay_r[dp]=fm6_sat_q23((int64_t)(fx_enabled[1]?sends[1][1]:0)+(int64_t)delay_feedback_r*fx_feedback[1]/100u);
     fx_delay_pos=(uint16_t)((dp+1u)&(FM6_DELAY_SIZE-1u));
