@@ -21,7 +21,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 static uint8_t env_operator = 1u, env_levels;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
@@ -599,7 +599,7 @@ static void input(void)
             /* SEL is a global return to the selected patch's options. */
             page = PAGE_MACRO;
             app_say("MACROS", fm6_patch_name(set.patch));
-        } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
+        } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
             uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
             fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
             set_dirty = 1u;
@@ -698,12 +698,12 @@ static void input(void)
             fm6_sequencer_set_lane(seq_ui_lane, (uint8_t)patch);
             set_dirty = 1u;
             app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
-        } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB) {
+        } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
             int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
-            next %= 3;
-            if (next < 0) next += 3;
+            next %= 4;
+            if (next < 0) next += 4;
             page = (uint8_t)(PAGE_FX_CHORUS + next);
-            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : "REVERB");
+            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : "PHASER");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
@@ -763,7 +763,7 @@ static void input(void)
                 else if(index==2u) fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,fx==0u?70:90));
                 else fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
                 set_dirty = 1u;
-                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":"REVERB DECAY"):index==2u?"FX FEEDBACK":"PATCH SEND", "UPDATED");
+                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==3u?"PHASER RESONANCE":"FX FEEDBACK"):"PATCH SEND", "UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
                 app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
@@ -1079,16 +1079,16 @@ static void draw_arp_panel(void)
 }
 static void draw_fx_panel(uint8_t fx)
 {
-    const char *names[3]={"CHORUS","DELAY","REVERB"};
+    const char *names[4]={"CHORUS","DELAY","REVERB","PHASER"};
     uint8_t values[4]={fm6_fx_mix(fx),fm6_fx_time(fx),fm6_fx_feedback(fx),fm6_fx_get_send(set.patch,fx)};
-    char t[16]; uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):RGB(242,212,59);
+    char t[16]; uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
     cv_text(6,2,&FONT_XS,names[fx],C_WHITE);
     cv_text(154,2,&FONT_XS,fm6_fx_enabled(fx)?"ACTIVE":"BYPASS",fm6_fx_enabled(fx)?RGB(75,235,135):RGB(255,82,101));
     for(uint32_t k=0;k<4u;++k) {
         int32_t x=4+(int32_t)(k&1u)*118;
         int32_t y=18+(int32_t)(k>>1u)*54;
         rounded_panel(x,y,112,48,6,panel_fill(),accent);
-        cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?"K3 FEEDBACK":"K4 PATCH SEND",C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u||fx==3u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?(fx==3u?"K3 RESONANCE":"K3 FEEDBACK"):"K4 PATCH SEND",C_GRAY);
         int_text(values[k],t);
         cv_text(x+7,y+23,&FONT_B,t,accent);
         cv_rect(x+48,y+29,55,5,C_LINE);
@@ -1119,7 +1119,8 @@ static void draw(void)
             page == PAGE_ARP ? "ARPEGGIATOR" :
             page == PAGE_FX_CHORUS ? "FX / CHORUS" :
             page == PAGE_FX_DELAY ? "FX / DELAY" :
-            page == PAGE_FX_REVERB ? "FX / REVERB" : "INSTRUMENT";
+            page == PAGE_FX_REVERB ? "FX / REVERB" :
+            page == PAGE_FX_PHASER ? "FX / PHASER" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
         bank_label[5] = (char)('1' + instrument_index / 8u);
         bank_label[14] = (char)('0' + ((instrument_index % 8u + 1u) / 10u));
@@ -1144,13 +1145,14 @@ static void draw(void)
     else if (page == PAGE_FX_CHORUS) draw_fx_panel(0u);
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
+    else if (page == PAGE_FX_PHASER) draw_fx_panel(3u);
     else draw_global_panel(pct);
     cv_blit(0, 36);
 
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 60, screen_bg());
-    if (page != PAGE_HOME && page != PAGE_ENV && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_REVERB)) for (uint32_t k = 0; k < 4u; ++k) {
+    if (page != PAGE_HOME && page != PAGE_ENV && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER)) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
         uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
