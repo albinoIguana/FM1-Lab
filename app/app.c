@@ -373,6 +373,9 @@ void app_init(void)
             fm1lab_instrument_t legacy;
             if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &legacy, sizeof legacy) ==
                     (int)sizeof legacy && fm1lab_instrument_valid(&legacy)) {
+                /* V1's final voice byte was only a 63 sentinel, not pan. */
+                for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p)
+                    fm1lab_patch_set_pan(&legacy,p,64u);
                 if (!fm1lab_store_library_format_bank(bank, &factory_instrument))
                     (void)fm1lab_store_library_save(bank, &legacy);
                 continue;
