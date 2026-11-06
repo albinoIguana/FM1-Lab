@@ -78,6 +78,7 @@ int main(void) {
     memcpy(objects[1], objects[0], 3840u);
     present[1]=1;
     objects[1][4]=1u;
+    objects[1][5]=1u; /* bank identity is covered by the header CRC */
     for(unsigned slot=0;slot<8u;slot++)
         for(unsigned p=0;p<4u;p++) {
             uint8_t *m=objects[1]+8u+slot*479u+11u+448u+p*5u;
