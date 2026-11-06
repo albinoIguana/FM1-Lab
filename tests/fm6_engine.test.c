@@ -38,6 +38,7 @@ static int32_t render_master_peak(uint32_t master_gain_q12)
 {
     static int32_t warmup[256u * 2u];
     fm6_init();
+    fm6_patch_set_level(0u, 1u); /* keep the clip curve in its linear region */
     fm6_note_on_mask(60u, 110u, 0x01u);
     fm6_render(warmup, 256u, master_gain_q12); /* settle the master ramp */
     memset(output, 0, sizeof output);
@@ -45,21 +46,22 @@ static int32_t render_master_peak(uint32_t master_gain_q12)
     return peak(output, TEST_WORDS);
 }
 
-static int32_t render_stack_peak(uint8_t patch_mask)
+static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
 {
     uint8_t voice[156] = {0};
     fm6_init();
     memcpy(voice, fm6_patch_data(0u), 155u);
     for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
         if (patch && fm6_patch_set_voice(patch, voice) != 0)
-            return -1;
+            return 0u;
         fm6_patch_set_level(patch, 31u);
         fm6_patch_set_enabled(patch, (patch_mask & (1u << patch)) != 0u);
     }
     fm6_note_on_mask(60u, 110u, patch_mask);
     memset(output, 0, sizeof output);
     fm6_render(output, TEST_FRAMES, 4096u);
-    return peak(output, TEST_WORDS);
+    *dry_peak = fm6_test_dry_peak();
+    return fm6_test_patch_peak(0u);
 }
 
 int main(void) {
@@ -74,11 +76,14 @@ int main(void) {
     /* A patch's gain must not fall as additional identical patches are
      * enabled. Four coherent patches should sum, not be normalized back
      * to the single-patch level. */
-    int32_t single_patch_peak = render_stack_peak(0x01u);
-    int32_t four_patch_peak = render_stack_peak(0x0Fu);
-    assert(single_patch_peak > 0);
-    fprintf(stderr, "gain regression peaks: one=%ld four=%ld\n", (long)single_patch_peak, (long)four_patch_peak);
-    assert(four_patch_peak > single_patch_peak * 2);
+    uint64_t single_dry_peak = 0u, four_dry_peak = 0u;
+    uint64_t single_patch_peak = render_stack_patch_peak(0x01u, &single_dry_peak);
+    uint64_t four_patch_peak = render_stack_patch_peak(0x0Fu, &four_dry_peak);
+    assert(single_patch_peak > 0u);
+    assert(four_patch_peak == single_patch_peak);
+    /* Four identical patch buses add linearly before the output clipper.
+     * This avoids mistaking the old final soft clip for mixer headroom. */
+    assert(four_dry_peak == single_dry_peak * 4u);
 
     /* The platform passes APP_GAIN as Q12 (0..4096). At a settled
      * half-scale master setting, output must be approximately half of unity. */
