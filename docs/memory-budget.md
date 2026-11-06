@@ -35,7 +35,7 @@ The linker file is the authority for addresses. The builder separately checks th
 | Measurement | Used | Capacity | Remaining |
 |---|---:|---:|---:|
 | XIP application image | 176,068 B | 581,564 B | 405,496 B |
-| `.data + .bss` | 47,076 B | 98,304 B | 51,228 B |
+| `.data + .bss` | 47,084 B | 98,304 B | 51,220 B |
 | `.pool` | 269,832 B | 344,064 B | 74,232 B |
 | `.pool` after the builder's mandatory 8 KiB reserve | — | — | 66,040 B available above the reserve |
 
@@ -56,7 +56,7 @@ The 2026-11-06 device build emitted the following section sizes directly from `a
 | `.pool` | 269,832 B | 344,064 B |
 | `.noinit` | 1,836 B | 15,696 B |
 
-The builder's address-based `.data + .bss` check reports 47,076 B, equal to the raw ELF section sum (2,968 + 44,108). The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The application image size is exactly 176,068 B (169,544 + 3,556 + 2,968), before package wrapping.
+The raw ELF section sum is 47,076 B (2,968 + 44,108); the builder's address-based region check reports 47,084 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The application image size is exactly 176,068 B (169,544 + 3,556 + 2,968), before package wrapping.
 
 The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. Generated lookup tables are `const` data and are placed with XIP `.text/.rodata`, not copied into the 96 KiB RAM region. Only one FM6 core is linked; the four patches are data/voice pools, not four copies of the engine.
 
@@ -92,7 +92,7 @@ The latest successful native device build is commit 88924303d464266235d567b93f85
 | .ram_text | 3,556 B | 32,768 B | 29,212 B |
 | .data | 2,968 B | data + bss budget 98,304 B | — |
 | .bss | 44,108 B | data + bss budget 98,304 B | — |
-| .data + .bss | 47,076 B | 98,304 B | 51,228 B |
+| .data + .bss | 47,084 B | 98,304 B | 51,220 B |
 | .pool | 269,832 B | 344,064 B | 74,232 B |
 | .noinit | 1,836 B | 15,696 B | 13,860 B |
 | app.bin | 176,068 B | 581,564 B | 405,496 B |
