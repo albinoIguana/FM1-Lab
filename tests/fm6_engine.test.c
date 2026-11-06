@@ -157,9 +157,10 @@ int main(void) {
     fm6_init(); fm6_note_on(60u,110u);
     for(unsigned block=0;block<64u;block++)
         fm6_render(dry+block*TEST_WORDS,128u,4096u);
-    for(unsigned effect=0;effect<3u;effect++) {
+    for(unsigned effect=0;effect<FM6_FX_COUNT;effect++) {
         fm6_init(); fm6_fx_set_enabled((uint8_t)effect,1u);
         fm6_fx_set_mix((uint8_t)effect,100u);
+        if(effect==FM6_FX_PHASER) { fm6_fx_set_send(0u,(uint8_t)effect,100u); fm6_fx_set_depth((uint8_t)effect,90u); fm6_fx_set_time((uint8_t)effect,45u); }
         fm6_note_on(60u,110u);
         for(unsigned block=0;block<64u;block++)
             fm6_render(wet+block*TEST_WORDS,128u,4096u);
@@ -168,12 +169,12 @@ int main(void) {
         for(unsigned frame=0;frame<64u*128u;frame++)
             if(wet[frame*2u]!=wet[frame*2u+1u]) { stereo_spread=1; break; }
         assert(changed);
-        if(effect==0u) assert(stereo_spread);
+        if(effect==0u || effect==FM6_FX_PHASER) assert(stereo_spread);
     }
 
 
     /* Per-patch send controls isolate each instrument from every shared FX bus. */
-    for(unsigned effect=0;effect<3u;effect++) {
+    for(unsigned effect=0;effect<FM6_FX_COUNT;effect++) {
         fm6_init();
         /* Isolate patch 0 so the other default-on factory layers cannot
          * contribute their own sends to this single-layer routing check. */
@@ -213,7 +214,7 @@ int main(void) {
                              (uint8_t)(1u << patch));
         assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
     }
-    for (unsigned effect = 0; effect < 3u; ++effect) {
+    for (unsigned effect = 0; effect < FM6_FX_COUNT; ++effect) {
         fm6_fx_set_enabled((uint8_t)effect, 1u);
         fm6_fx_set_mix((uint8_t)effect, 100u);
         fm6_fx_set_time((uint8_t)effect, 100u);
@@ -297,7 +298,7 @@ int main(void) {
         fm6_patch_set_enabled(patch, 1u);
         fm6_patch_set_level(patch, 127u);
     }
-    for (unsigned fx = 0; fx < 3u; ++fx) {
+    for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx) {
         fm6_fx_set_enabled((uint8_t)fx, 1u);
         fm6_fx_set_mix((uint8_t)fx, (uint8_t)(35u + fx * 20u));
         fm6_fx_set_time((uint8_t)fx, (uint8_t)(45u + fx * 10u));
@@ -368,6 +369,7 @@ int main(void) {
         saved.fx_mix[fx] = (uint8_t)(30u + fx * 20u);
         saved.fx_time[fx] = (uint8_t)(40u + fx * 15u);
         saved.fx_feedback[fx] = (uint8_t)(fx == 0u ? 60u : 70u + fx * 5u);
+        saved.fx_depth[fx] = (uint8_t)(35u + fx * 15u);
         for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
             saved.fx_send[patch][fx] = (uint8_t)(patch * 20u + fx * 5u);
     }
