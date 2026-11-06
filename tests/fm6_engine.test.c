@@ -91,6 +91,8 @@ int main(void) {
     printf("FM6 calibrated reference: one-patch=%llu four-patch=%llu output=%llu\n",
            (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak,
            (unsigned long long)fm6_test_output_peak());
+    assert(fm6_test_output_peak() > 8388607u * 24u / 100u);
+    assert(fm6_test_output_peak() < 8388607u * 26u / 100u);
 
     /* At the reference level, all four parallel FX buses must retain their
      * headroom over sustained feedback without any internal Q23 saturation. */
