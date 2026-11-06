@@ -188,13 +188,13 @@ static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,in
     } else {
         /* Feed silence through the all-pass states while bypassed so a stale
          * resonant tail cannot jump out when the processor is re-enabled. */
-        (void)fm6_phaser_channel(0,fx_phaser_state_l,fx_phaser_phase&0xFFFFu);
-        (void)fm6_phaser_channel(0,fx_phaser_state_r, (fx_phaser_phase+16384u)&0xFFFFu);
+        (void)fm6_phaser_channel(0,fx_phaser_state_l,(fx_phaser_phase>>16)&0xFFFFu);
+        (void)fm6_phaser_channel(0,fx_phaser_state_r,((fx_phaser_phase+0x40000000u)>>16)&0xFFFFu);
         fx_phaser_feedback_l=0;
         fx_phaser_feedback_r=0;
     }
     fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
-    fx_phaser_phase+=74u+(uint32_t)fx_time[3]*60u;
+    fx_phaser_phase+=4870u+(uint32_t)fx_time[3]*3896u;
     int64_t wet_l=input,wet_r=input;
     if(fx_enabled[0]) { wet_l+=(int64_t)chorus*fx_mix[0]/100; wet_r+=(int64_t)chorus_r*fx_mix[0]/100; }
     if(fx_enabled[1]) { wet_l+=(int64_t)delay*fx_mix[1]/100; wet_r+=(int64_t)delay*fx_mix[1]/100; }
