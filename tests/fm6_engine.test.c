@@ -17,6 +17,10 @@ static int32_t peak(const int32_t *samples, unsigned count) {
 static void render_phaser_test(uint8_t rate, uint8_t depth, int32_t *destination)
 {
     fm6_init();
+    assert(fm6_fx_mix(FM6_FX_PHASER)==35u);
+    assert(fm6_fx_time(FM6_FX_PHASER)==35u);
+    assert(fm6_fx_feedback(FM6_FX_PHASER)==20u);
+    assert(fm6_fx_depth(FM6_FX_PHASER)==65u);
     for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
         fm6_patch_set_enabled((uint8_t)patch,0u);
     fm6_fx_set_enabled(FM6_FX_PHASER,1u);
