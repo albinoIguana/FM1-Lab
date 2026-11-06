@@ -317,7 +317,7 @@ int main(void) {
         fm6_patch_set_enabled(patch, 1u);
         fm6_patch_set_level(patch, 127u);
     }
-    for (unsigned fx = 0; fx < 3u; ++fx) {
+    for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx) {
         fm6_fx_set_enabled((uint8_t)fx, 1u);
         fm6_fx_set_mix((uint8_t)fx, (uint8_t)(35u + fx * 20u));
         fm6_fx_set_time((uint8_t)fx, (uint8_t)(45u + fx * 10u));
@@ -379,6 +379,9 @@ int main(void) {
     assert(fm6_sequencer_running() == 0u);
     fm6_performance_state_get(&restored);
     assert(memcmp(&saved, &restored, sizeof saved) == 0);
+    restored.fx_depth[FM6_FX_PHASER] = 101u;
+    assert(!fm6_performance_state_valid(&restored));
+    restored.fx_depth[FM6_FX_PHASER] = saved.fx_depth[FM6_FX_PHASER];
     restored.tempo_bpm = 29u;
     assert(!fm6_performance_state_valid(&restored));
     assert(fm6_performance_state_set(&restored) == -1);
