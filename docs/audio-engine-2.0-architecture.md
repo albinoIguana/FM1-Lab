@@ -136,19 +136,19 @@ The current feature-branch implementation has several behaviors to reconcile bef
 - Per-patch sends are now stereo and pan-aware: each patch's smoothed L/R gains are applied before the four shared send accumulators. Chorus, Delay and Reverb now have independent L/R feedback buffers/networks; Phaser receives the panned L/R inputs and retains its stereo LFO offset. The FX returns remain in the Q19 domain and are summed with the stereo dry bus.
 - FX send accumulators remain wide until the fixed master trim, then enter a Q19 internal FX domain (Q24 input shifted right five bits). Independent left/right delay, chorus and comb buffers double the FX-buffer allocation from 98,304 to 196,608 bytes while preserving 32× internal headroom. Test-only saturation counters verify no internal saturation under the four-patch reference/feedback condition.
 - The current Phaser is a four-stage all-pass effect, while Chorus/Delay/Reverb still have simpler existing implementations. Their quality and parameter completeness remain separate work items.
-- Current settings schema is V4. Instrument bank records persist four patch levels/macros/enabled flags; bank header V2 additionally stores 7-bit pan in reserved bits (three bits in DX7 VMEM byte 111 and one unused high bit in each macro byte). The fixed 479-byte record size is unchanged. V1 bank migration defaults pan to 64 (center). The bank record is authoritative after an Instrument is loaded for voices, levels, macros, enabled flags and pan. Per-patch FX sends currently live in the versioned Performance/settings state (`fx_send[4][4]`); they are not yet carried with an Instrument when it is moved between banks/devices. Inserts and future processor state still need an explicit portable serialization boundary.
+- Current settings schema is V4. Instrument bank records persist four patch levels/macros/enabled flags; bank header V2 additionally stores 7-bit pan in reserved bits (three bits in DX7 VMEM byte 111 and one unused high bit in each macro byte). The fixed 479-byte record size is unchanged. V1 bank migration defaults pan to 64 (center). The bank record remains authoritative for voices, levels, macros, enabled flags and pan. Per-patch FX sends live in the versioned Performance/settings state (`fx_send[4][4]`). Amp/Drive and EQ state is Instrument-owned in a separate versioned sidecar object; it travels with the Instrument index without expanding the 479-byte bank record. The sidecar has an active and fallback snapshot per bank, each tagged with the bank CRC and a six-bit bank-save generation. The generation is stored in the six previously unused high bits of the bank identity byte; the low two bits retain the bank index. This catches insert-only saves where the voice record CRC would otherwise remain unchanged.
 
-These are audit findings, not permission to make a rushed compatibility-breaking rewrite. Resolve them in order and keep existing supported migration tests intact.
+The sidecar's V1 layout migrates to V2 in memory and is rewritten on the next successful save. The existing V1 Instrument-bank migration remains unchanged. The two-object save order is journal-first, bank-second: after an interrupted write, the active sidecar is accepted only if both bank CRC and generation match; otherwise the embedded fallback is selected.
 
 ## 11. Implementation sequence
 
-1. **Architecture freeze:** settle signal units, state ownership, routing API, smoothing policy, memory budget, diagnostics, and migration ownership.
-2. **Mixer foundation:** stable calibrated patch gain, smoothed dry pan, pan-before-send stereo routing, wide accumulators, Q19 FX-bus headroom, −12 dB master trim, and a separate final limiter are implemented and under host regression.
-3. **Patch inserts:** per-patch Amp/Drive and three-band EQ with independent state/bypass.
-4. **Master dynamics:** compressor and independent peak limiter, with diagnostics and independent tests.
-5. **FX refinement:** bring Chorus, Phaser, Delay, and Reverb to the shared parameter/routing contract; improve Reverb diffusion and document each processor's limits.
-6. **Performance follow-through:** swing/ties, MIDI clock, arp extensions, and controller mapping after transport ownership is stable.
-7. **Native UI integration:** connect existing physical controls/pages to the frozen parameter model. Preserve the established screen design; no visual redesign is part of this work.
+1. **Architecture freeze:** signal units, insert ownership, settings migration, fixed-point contracts and routing interfaces are settled for this milestone.
+2. **Mixer foundation:** calibrated patch gain, smoothed pan, pan-before-send stereo routing, Q19 FX headroom, −12 dB master trim and independent final limiter are implemented.
+3. **Patch inserts:** per-patch Amp/Drive and three-band parametric EQ are implemented with independent controls, band bypass and Instrument persistence.
+4. **Master dynamics:** stereo-linked master compressor is implemented and persisted in Performance/settings state; the peak limiter remains a separate final safety stage.
+5. **Native UI integration:** compact Amp, EQ and compressor pages are connected to the physical encoders/buttons.
+6. **FX refinement:** continue improving Chorus, Phaser, Delay and Reverb quality; Reverb diffusion remains a future quality pass.
+7. **Performance follow-through:** swing/ties, MIDI clock, arp extensions and controller mapping after transport ownership is stable.
 8. **Qualification:** full host regression, memory/stack audit, native device build, then sustained hardware CPU/xrun and audio checks.
 
 ## 12. Explicit guardrails
@@ -226,3 +226,19 @@ This is a host-calibrated signal reference, not a universal loudness guarantee f
 - Chorus has separate left/right ring buffers (with its existing offset taps), Delay has separate left/right feedback buffers, and Reverb has independent left/right comb networks. Phaser receives separate panned left/right send values and retains its stereo LFO offset.
 - FX buffer allocation is now 196,608 bytes, up from 98,304 bytes. The latest successful target ELF reports `.pool` 269,832 / 344,064 bytes, leaving 74,232 bytes (66,040 after the required 8 KiB reserve). `.data + .bss` remains 47,076 / 98,304 bytes; `app.bin` is 176,068 bytes.
 - Host regression probes inspect every effect's pre-FX stereo send accumulator at hard-left, hard-right and center. Native engine checks and the target device build both pass. Hardware CPU/xrun and listening qualification remain outstanding.
+
+
+## 17. Instrument-owned Amp/Drive and parametric EQ — 2026-11-06
+
+- Each of the four patches in each of the 32 Instruments has independent Amp/Drive state: enable, drive, tone and output trim. The insert is placed after patch gain/calibration and before pan and shared FX sends. Drive uses bounded pre-gain and a monotonic soft-knee saturator; tone is a one-pole low-pass control; output is an independent trim.
+- Each patch has a three-band parametric EQ with logarithmic 20 Hz–20 kHz frequency control, ±12 dB gain, Q approximately 0.5–4.0, global bypass and independent per-band enable. The implementation uses fixed-point Q15 peaking biquads with coefficient lookup tables; no floating-point math or dynamic allocation is added to the audio callback.
+- The screen remains a compact four-card editor. B-SEL cycles PATCH MACROS → AMP/DRIVE → PARAMETRIC EQ. On the Amp page K1/K2/K3 set drive/tone/output and K4 toggles the insert. On the EQ page ALGO selects LOW/MID/HIGH; K1/K2/K3 set frequency/gain/Q; K4 toggles that band; EDIT toggles global EQ bypass. Each insert state is independent per patch.
+- Insert settings are stored in `OBJ_INSERTS`, a fifth pooled store object. The original eight-record bank and 479-byte Instrument record are untouched. The sidecar carries all 32 Instruments × four patches and is protected by snapshot CRCs plus the bank CRC/generation journal. V1 sidecars migrate to V2; legacy bank V1 migration still centers pan and keeps the same record size.
+- Host tests cover per-patch Amp/Drive and EQ signal changes, parameter clamping, performance-state round-trip, sidecar round-trip, sidecar V1 migration, and simulated power loss after sidecar commit but before bank commit. The fallback snapshot must win.
+
+## 18. Master compressor and compact control page — 2026-11-06
+
+- A stereo-linked peak detector and smoothed attack/release envelope drive a threshold/ratio compressor after the FX returns and before master gain. Threshold, ratio, attack, release and makeup are independent parameters. Compressor bypass is independent from the final −1 dB peak limiter.
+- Compressor parameters are part of the Performance/settings record. The new settings layout is versioned; the previous current V4 settings structure is explicitly imported with the compressor bypassed and neutral defaults. V3 migration also supplies compressor defaults. The settings CRC covers an explicit reserved field so no unprotected tail padding remains.
+- B-GLO cycles GLOBAL SETTINGS → MASTER COMPRESSOR → HOME. On the compressor page K1/K2/K3/K4 set threshold/ratio/attack/release; SELECT adjusts makeup; EDIT toggles bypass.
+- Native engine tests confirm the compressor reduces a sustained four-layer peak, parameter state survives Performance-state round-trip, and invalid settings are rejected. Native device build and browser-emulator integration are separate CI checks; physical hardware CPU/xrun/listening qualification remains outstanding.

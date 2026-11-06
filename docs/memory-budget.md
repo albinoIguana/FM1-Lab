@@ -2,14 +2,14 @@
 
 **Target:** M-VAVE FM1, 1 MiB SPI NOR and 512 KiB internal SRAM  
 **Build:** native fm1-base + Felucca-BSP + one pinned Felucca FM6 core  
-**Branch baseline:** `88924303d464266235d567b93f85677474051c48` (2026-11-06)  
+**Branch baseline:** `c174e07c7355d7db28d9d554381feb5689575cfd` (2026-11-06)  
 **Audit status:** current target ELF section totals verified by the successful 2026-11-06 native device build; physical-device CPU, xrun and stack high-water validation remain outstanding.
 
 ## 1. Flash is not one 1 MiB application slot
 
 The active Felucca-family linker/loader reserves a **581,564-byte XIP application slot**. The rest of the 1 MiB flash is partitioned for boot/update, VM/configuration, Bluetooth data, user data and device reservations. The app must not treat those other regions as extra firmware capacity.
 
-The latest successful native build reported an application image of **176,068 bytes**, leaving **405,496 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
+The latest successful native build reported an application image of **188,500 bytes**, leaving **393,064 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
 
 The app's persistent Instrument store is separately reserved in the 12-sector `0xF0000..0xFBFFF` pool (48 KiB). Felucca projects, samples, user preset banks, autosave, voice banks, global settings and OTA staging remain outside that allocation. See [REBUILD_AUDIT.md](REBUILD_AUDIT.md); do not move these ranges without re-auditing the pinned BSP.
 
@@ -35,11 +35,11 @@ The linker file is the authority for addresses. The builder separately checks th
 | Measurement | Used | Capacity | Remaining |
 |---|---:|---:|---:|
 | XIP application image | 176,068 B | 581,564 B | 405,496 B |
-| `.data + .bss` | 47,084 B | 98,304 B | 51,220 B |
-| `.pool` | 269,832 B | 344,064 B | 74,232 B |
-| `.pool` after the builder's mandatory 8 KiB reserve | — | — | 66,040 B available above the reserve |
+| `.data + .bss` | 47,672 B | 98,304 B | 50,632 B |
+| `.pool` | 275,264 B | 344,064 B | 68,800 B |
+| `.pool` after the builder's mandatory 8 KiB reserve | — | — | 60,608 B available above the reserve |
 
-**Important correction:** the 269,832-byte `.pool` figure is not all FM6 voice/audio heap. The pinned graphics implementation declares a 16-bit canvas of `240 × 144` pixels (**69,120 bytes**); stereo FM6 FX buffers consume **196,608 bytes**. Those known allocations total 265,728 bytes, leaving 4,104 bytes of other pool users. The pool has 66,040 bytes available after preserving the builder's 8 KiB safety reserve.
+**Important correction:** the 269,832-byte `.pool` figure is not all FM6 voice/audio heap. The pinned graphics implementation declares a 16-bit canvas of `240 × 144` pixels (**69,120 bytes**); stereo FM6 FX buffers consume **196,608 bytes**. Those known allocations total 265,728 bytes, leaving 9,536 bytes of other pool users. The pool has 66,040 bytes available after preserving the builder's 8 KiB safety reserve.
 
 The FM6 note state is instead in the regular `.bss` region: the core's `fm6_note_t` is 244 bytes, so 32 live note records account for **7,808 bytes**, before the FM1-Lab voice wrapper, four patch records, LFO state and other engine/platform globals. The 43,752-byte total includes all linked app and platform globals; it is not an FM6-only figure.
 
@@ -49,14 +49,14 @@ The 2026-11-06 device build emitted the following section sizes directly from `a
 
 | ELF section | Used | Region capacity |
 |---|---:|---:|
-| `.text` (XIP code + const data) | 169,544 B | Included in the 581,564 B XIP image slot |
+| `.text` (XIP code + const data) | 181,976 B | Included in the 581,564 B XIP image slot |
 | `.ram_text` | 3,556 B | 32,768 B |
 | `.data` | 2,968 B | Part of 98,304 B |
-| `.bss` | 44,108 B | Part of 98,304 B |
+| `.bss` | 44,696 B | Part of 98,304 B |
 | `.pool` | 269,832 B | 344,064 B |
 | `.noinit` | 1,836 B | 15,696 B |
 
-The raw ELF section sum is 47,076 B (2,968 + 44,108); the builder's address-based region check reports 47,084 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The application image size is exactly 176,068 B (169,544 + 3,556 + 2,968), before package wrapping.
+The raw ELF section sum is 47,664 B (2,968 + 44,696); the builder's address-based region check reports 47,672 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The application image size is exactly 188,500 B (181,976 + 3,556 + 2,968), before package wrapping.
 
 The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. Generated lookup tables are `const` data and are placed with XIP `.text/.rodata`, not copied into the 96 KiB RAM region. Only one FM6 core is linked; the four patches are data/voice pools, not four copies of the engine.
 
@@ -84,11 +84,11 @@ No hardware flashing or on-device memory/CPU validation is claimed.
 
 ## 5. Current-source re-audit (2026-11-06)
 
-The latest successful native device build is commit 88924303d464266235d567b93f85677474051c48. Its linker ELF section report is the current capacity reference:
+The latest successful native device build used for this audit is commit c174e07c7355d7db28d9d554381feb5689575cfd. Its linker ELF section report is the current capacity reference:
 
 | ELF section | Used | Capacity | Spare |
 |---|---:|---:|---:|
-| .text | 169,544 B | XIP slot 581,564 B | 412,020 B before RAMTEXT/data contribution |
+| .text | 169,544 B | XIP slot 581,564 B | 399,588 B before RAMTEXT/data contribution |
 | .ram_text | 3,556 B | 32,768 B | 29,212 B |
 | .data | 2,968 B | data + bss budget 98,304 B | — |
 | .bss | 44,108 B | data + bss budget 98,304 B | — |
@@ -97,8 +97,29 @@ The latest successful native device build is commit 88924303d464266235d567b93f85
 | .noinit | 1,836 B | 15,696 B | 13,860 B |
 | app.bin | 176,068 B | 581,564 B | 405,496 B |
 
-After the builder's mandatory 8,192-byte pool reserve, **66,040 bytes** remain available for additional bounded buffers. The known 196,608-byte stereo FX buffers and 69,120-byte graphics canvas account for 265,728 bytes of the 269,832-byte pool total; other pool users account for 4,104 bytes.
+After the builder's mandatory 8,192-byte pool reserve, **60,608 bytes** remain available for additional bounded buffers. The known 196,608-byte stereo FX buffers and 69,120-byte graphics canvas account for 265,728 bytes of the 269,832-byte pool total; other pool users account for 4,104 bytes.
 
-The per-patch pan state adds only a few dozen bytes to .bss; it does not change the fixed 479-byte Instrument library record. Pan-aware stereo routing adds independent right-channel delay, chorus and comb buffers, increasing the FX allocation to 196,608 bytes. The latest ELF confirms the enlarged buffers fit with 66,040 bytes of pool capacity remaining after the mandatory reserve.
+The per-patch pan state adds only a few dozen bytes to .bss; it does not change the fixed 479-byte Instrument library record. Pan-aware stereo routing adds independent right-channel delay, chorus and comb buffers, increasing the FX allocation to 196,608 bytes. The latest ELF confirms the enlarged buffers and Instrument insert journal buffers fit with 60,608 bytes of pool capacity remaining after the mandatory reserve.
 
 The target build and host tests are green, but this report is still a linker-time measurement. Physical-device CPU percentage, audio callback worst-case time, xrun telemetry, stack high-water marks under MIDI/BLE, and listening qualification remain required. Do not treat spare .pool bytes as proof of real-time headroom.
+
+
+## 6. Insert and compressor memory update (2026-11-06)
+
+The successful native device build at `c174e07c7355d7db28d9d554381feb5689575cfd` includes the per-patch Amp/Drive and three-band parametric EQ, the master compressor, and the Instrument insert sidecar. Exact linker report:
+
+| ELF section | Used | Capacity | Spare |
+|---|---:|---:|---:|
+| `.text` | 181,976 B | XIP slot 581,564 B | 399,588 B before RAMTEXT/data contribution |
+| `.ram_text` | 3,556 B | 32,768 B | 29,212 B |
+| `.data` | 2,968 B | data + bss budget 98,304 B | — |
+| `.bss` | 44,696 B | data + bss budget 98,304 B | — |
+| `.data + .bss` | 47,672 B | 98,304 B | 50,632 B |
+| `.pool` | 275,264 B | 344,064 B | 68,800 B |
+| `.pool` after mandatory reserve | — | — | 60,608 B |
+| `.noinit` | 1,836 B | 15,696 B | 13,860 B |
+| `app.bin` | 188,500 B | 581,564 B | 393,064 B |
+
+Compared with the stereo-routing baseline, `.pool` increased by 5,432 bytes for the 3,624-byte sidecar record buffer and 1,806-byte snapshot scratch buffer plus alignment. `.bss` increased by 588 bytes for per-patch biquad/tone state and compressor state. The fixed-point EQ coefficient tables and DSP code are in XIP `.text`. Known graphics and stereo FX buffers remain 265,728 bytes; other pool users now account for 9,536 bytes.
+
+This is a link-time memory result. It does not establish worst-case callback cost, stack high-water, hardware xrun behavior or listening quality. Those remain qualification gates.

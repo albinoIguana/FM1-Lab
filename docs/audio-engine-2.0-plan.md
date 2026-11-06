@@ -1,6 +1,6 @@
 # FM1-Lab Audio Engine 2.0 implementation plan
 
-Status: Phaser fourth bus, calibrated gain/headroom foundation, persistent per-patch dry pan, and pan-aware stereo sends/returns are implemented on the feature branch. The binding architecture contract is [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
+Status: calibrated mixer, pan-aware stereo sends/returns, per-Instrument Amp/Drive + three-band EQ, stereo-linked master compressor, and their compact physical-control pages are implemented on the feature branch. The binding architecture contract is [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
 
 ## Implementation checkpoint — Phaser bus
 
@@ -22,11 +22,11 @@ Status: Phaser fourth bus, calibrated gain/headroom foundation, persistent per-p
 - Native tests now measure the coherent reference, assert the default output is approximately −12 dBFS, verify no internal FX saturation in the reference feedback case, and exercise the final limiter under full-level stress.
 - Per-patch pan is persisted in bank V2 using reserved bits without expanding the 479-byte record; V1 banks migrate to center. The dry strip uses smoothed constant-voltage balance pan, with hard-left/right/center and persistence tests.
 - Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,108 B, `.ram_text` 3,556 B, `.pool` 269,832 B, `.text` 169,544 B, `.noinit` 1,836 B; app.bin 176,068 B. Pool spare is 74,232 B (66,040 B after the mandatory 8 KiB reserve); RAM `.data + .bss` spare is 51,228 B.
-- Per-patch stereo sends/pan-before-send are implemented and covered by host probes. Master compressor, pan UI control, and device CPU/xrun qualification remain incomplete.
+- Per-patch stereo sends/pan-before-send are implemented and covered by host probes. Master compressor and Amp/EQ/compressor physical controls are implemented. Hardware CPU/xrun/listening qualification remains incomplete.
 
-## Architecture gate — before inserts and further DSP
+## Architecture gate — insert and master state ownership settled
 
-The gain foundation, per-patch dry pan/state migration, and pan-aware stereo send/return path are now in place. Before adding Amp/Drive or EQ, freeze the remaining Instrument/Performance/Device state boundaries for inserts and master dynamics, document the remaining stack budget, and audit saturation boundaries. Do not treat the completed peak limiter as completion of master dynamics.
+Per-Instrument inserts use a CRC-protected sidecar journal, while master compressor parameters are Performance/settings-owned with an explicit V4-to-current migration. The fixed 479-byte Instrument bank record is unchanged. The remaining architecture work is real-time command budgeting, worst-case stack measurement, FX quality refinement and hardware qualification. Do not treat the completed peak limiter as completion of musical compression.
 
 ## Goals
 
@@ -36,8 +36,9 @@ Complete the native FM1 audio path before spending time on visual polish. Every 
 
 ```text
 Four independent FM6 patch voice pools
-  -> per-patch level and pan
+  -> per-patch level
   -> per-patch INSERTS: Amp/Drive -> 3-band EQ
+  -> per-patch pan
   -> patch sum / headroom management
   -> parallel SEND buses: Chorus | Phaser | Delay | Reverb
   -> wet/dry return mix
@@ -60,18 +61,18 @@ Four independent FM6 patch voice pools
 4. Reverb: replace the current three-comb approximation with a small, documented diffusion network (input diffusion plus multiple decorrelated delay lines), with decay, damping/tone, pre-delay and wet controls. Keep buffer sizes inside the existing .pool reserve.
 
 ### Per-patch inserts
-5. Amp/Drive: bounded pre-gain, drive/character, tone and output trim; use a smooth, monotonic saturation curve with DC protection. Per-patch state and bypass must be independent.
-6. EQ: low, mid and high bands with stable fixed-point filters, bounded gain and no denormal/overflow issues. Per-patch state and bypass must be independent.
+5. Amp/Drive: implemented with bounded pre-gain, monotonic soft-knee saturation, tone and output trim. State and bypass are independent per patch.
+6. EQ: implemented as three fixed-point peaking bands with frequency, gain, Q, global bypass and independent band enable. State is independent per patch.
 
 ### Master
-7. Compressor: threshold, ratio/amount, attack, release and makeup gain; use a smoothed detector and gain envelope. Keep the final peak limiter separate, deterministic and non-oscillatory.
+7. Compressor: implemented with threshold, ratio, attack, release and makeup; stereo-linked detector and smoothed envelope. The final peak limiter remains separate.
 
 ## Controls and persistence
 
 - Use named effect and parameter enums; remove magic numeric indices from UI and DSP.
-- Replace the current three-effect arrays with an explicitly versioned performance-state layout for four shared buses plus per-patch insert state and master dynamics.
-- Preserve V1/V2/current settings imports. New records must be CRC-protected, range-validated before mutation, and migrated without partially applying invalid records.
-- Add pan and all new insert/master parameters to the same save/load transaction as tempo, sequencer, arp and FX.
+- Four shared FX buses and their per-patch sends remain in the versioned Performance/settings record. Master compressor parameters are also Performance/settings-owned; prior V4 settings migrate with compressor bypassed.
+- Amp/Drive and EQ are Instrument-owned in a separate versioned sidecar journal. The original 479-byte bank records are unchanged; V1 sidecars migrate to V2 and pending two-object saves are resolved by bank CRC plus generation.
+- All records are CRC-protected and range-validated before mutation; host tests cover legacy bank migration, settings V1–V4 migration and sidecar crash recovery.
 - One effect per page remains the UI navigation pattern. Every page must expose the four most musically useful controls for that processor, with live DSP-backed values and an explicit bypass state. Do not force the same four generic parameter names onto different processors.
 - FX knob assignments are provisional until each processor has real independent DSP parameters. In particular, chorus rate/depth and reverb damping/pre-delay must be distinct controls.
 
