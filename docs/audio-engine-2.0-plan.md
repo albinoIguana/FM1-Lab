@@ -1,6 +1,16 @@
 # FM1-Lab Audio Engine 2.0 implementation plan
 
-Status: architecture decision / implementation sequence. This document is a build contract, not a claim that the features below are implemented.
+Status: architecture decision with the first fourth-bus processor implemented on the feature branch. This document remains a build contract; items below are not complete unless explicitly marked.
+
+## Implementation checkpoint — Phaser bus
+
+- Implemented in the native FM6 render path as a fourth parallel send/return bus, not a Chorus alias.
+- Four cascaded first-order all-pass stages per channel; dry/wet summing creates the phase-cancellation notches.
+- Independent LFO phase accumulator (approximately 0.05–4.05 Hz), 90-degree stereo phase offset, depth, bounded feedback/resonance, and wet return.
+- Per-patch Phaser send is independent of Chorus, Delay, and Reverb sends.
+- Performance-state schema expanded to four buses with a versioned settings-record migration from V3; legacy V1/V2/V3 records remain supported.
+- Host tests cover audible signal change, stereo spread, per-patch send isolation, combined four-bus stress, state round-trip, depth validation, and render chunk consistency.
+- Not yet wired to a dedicated hardware FX page; physical control integration follows after DSP qualification. Device CPU/xrun qualification remains outstanding.
 
 ## Goals
 
