@@ -12,6 +12,9 @@ static void test_four_patch_contract(void)
     assert(fm1lab_instrument_valid(&instrument));
     assert(instrument.patches[0].enabled == 1);
     assert(instrument.patches[0].level == 31);
+    assert(fm1lab_patch_pan(&instrument, 0u) == 64u);
+    fm1lab_patch_set_pan(&instrument, 2u, 17u);
+    assert(fm1lab_patch_pan(&instrument, 2u) == 17u);
     for (unsigned i = 0; i < FM1LAB_PATCH_COUNT; ++i) {
         assert(instrument.patches[i].macros[0] == 50);
         assert(instrument.patches[i].macros[1] == 50);
@@ -24,6 +27,7 @@ static void test_four_patch_contract(void)
     instrument.patches[0].level = 127u;
     assert(fm1lab_patch_set_voice(&instrument, 0, voice) == 0);
     assert(instrument.patches[0].level == 31u);
+    assert(fm1lab_patch_pan(&instrument, 0u) == 64u);
     assert(fm1lab_patch_set_voice(&instrument, 3, voice) == 0);
     assert(instrument.patches[3].level == 31u);
     assert(fm1lab_instrument_valid(&instrument));
