@@ -79,11 +79,14 @@ int main(void) {
     present[1]=1;
     objects[1][4]=1u;
     objects[1][5]=1u; /* bank identity is covered by the header CRC */
-    for(unsigned slot=0;slot<8u;slot++)
+    for(unsigned slot=0;slot<8u;slot++) {
+        uint8_t *record=objects[1]+8u+slot*479u;
+        memset(record+11u,0,448u); /* legacy DX7 voices have no reserved pan bits */
         for(unsigned p=0;p<4u;p++) {
-            uint8_t *m=objects[1]+8u+slot*479u+11u+448u+p*5u;
-            m[3]&=0x7Fu;
+            uint8_t *m=record+11u+448u+p*5u;
+            m[0]=50u; m[1]=50u; m[2]=50u; m[3]=50u; m[4]=31u;
         }
+    }
     uint16_t crc=test_crc16(objects[1]+8u,3832u);
     objects[1][6]=(uint8_t)crc; objects[1][7]=(uint8_t)(crc>>8);
     assert(fm1lab_store_library_load(8u,&loaded)==0);
