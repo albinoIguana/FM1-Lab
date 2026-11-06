@@ -4,6 +4,9 @@
 #include <string.h>
 #include "fm1lab_settings_record.h"
 
+_Static_assert(offsetof(settings_v3_t, performance) == 28u, "legacy v3 settings prefix changed");
+_Static_assert(sizeof(fm6_performance_state_v3_t) == 542u, "legacy v3 performance layout changed");
+
 /* The record codec delegates performance-state validation to FM6. Keep this
  * unit test focused on the settings envelope and migration boundary. */
 int fm6_performance_state_valid(const fm6_performance_state_t *s)
