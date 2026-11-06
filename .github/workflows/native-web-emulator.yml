@@ -46,12 +46,22 @@ jobs:
         run: python3 base/tools/build.py app --web
 
       - name: Verify emulator bundle
+        id: verify
         run: |
           test -s app/build/emu/index.html
           test -s app/build/emu/app.wasm
           test -s app/build/emu/worklet.js
           echo "Native FM1 emulator bundle:"
           du -h app/build/emu/*
+
+      # Always preserve a downloadable build even if branch publishing is unavailable.
+      - name: Upload emulator bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: fm1lab-native-emulator-${{ github.sha }}
+          path: app/build/emu/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Publish browser preview on the feature branch
         id: publish
@@ -70,15 +80,21 @@ jobs:
           git add native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js
           if ! git diff --cached --quiet; then
             git commit -m "build: publish native emulator browser preview"
-            git push origin HEAD:${GITHUB_REF_NAME}
+            pushed=0
+            for attempt in 1 2 3; do
+              echo "Publishing preview (attempt ${attempt}/3)"
+              if git push origin HEAD:${GITHUB_REF_NAME}; then
+                pushed=1
+                break
+              fi
+              sleep $((attempt * 5))
+            done
+            if [ "$pushed" -ne 1 ]; then
+              echo "::warning::Preview bundle uploaded as an Actions artifact, but branch publishing failed after 3 attempts."
+              echo "preview_published=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
+          echo "preview_published=true" >> "$GITHUB_OUTPUT"
           echo "preview_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "Preview source commit: $(git rev-parse HEAD)"
-
-      - name: Upload emulator bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: fm1lab-native-emulator-${{ github.sha }}
-          path: app/build/emu/
-          if-no-files-found: error
-          retention-days: 14
