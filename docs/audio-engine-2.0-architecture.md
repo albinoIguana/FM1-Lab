@@ -75,7 +75,7 @@ Separate state into three lifetimes:
 2. **Performance state** — sequencer patterns/assignments, arp settings, tempo and performance controls intended to be saved with the performance/session.
 3. **Device state** — physical master setting, global MIDI/device preferences, diagnostics configuration, and other hardware-specific settings.
 
-Per-patch pan is Instrument-owned and persists in the fixed-size 479-byte library record using reserved bits; bank header V2 migrates V1 records to centered pan. Per-patch sends currently live in the versioned Performance/settings state (`fx_send[4][4]`), not in the Instrument bank. Inserts and future processor state still need an explicit portable serialization boundary. Do not duplicate authoritative values between the settings record and Instrument bank without a documented ownership rule.
+Per-patch pan is Instrument-owned and persists in the fixed-size 479-byte library record using reserved bits; bank header V2 migrates V1 records to centered pan. Per-patch sends currently live in the versioned Performance/settings state (`fx_send[4][4]`), not in the Instrument bank. Amp/Drive and EQ are Instrument-owned in a versioned sidecar journal; master compressor state is Performance/settings-owned. The fixed 479-byte Instrument record remains unchanged.
 
 Persistence requirements:
 - Validate a complete candidate before applying any of it.
@@ -174,14 +174,14 @@ The following findings were confirmed against the current feature-branch source 
 ### Numeric/API items still unresolved
 
 - `fm6_render()` smooths `master_gain_q12` as Q12 amplitude (0..4096), matching `fm1-base` `APP_GAIN(master)`. The output multiply shifts by 12; the fixed −12 dB trim is a separate Q15 stage (8231). The final Q24-to-Q23 conversion shifts by one, before the independent limiter.
-- Per-patch and dry/send accumulators use `int64_t`. After master trim, sends enter the Q19 FX domain (`Q24 >> 5`) before the int32 feedback buffers; this provides 32× headroom without increasing the current 98,304-byte FX-buffer allocation. `fm6_sat_q23()` remains an explicit internal-state boundary and is counted in host tests. The final output is now linear Q24-to-Q23 conversion followed by a distinct peak limiter, not the former tanh soft clip.
+- Per-patch and dry/send accumulators use `int64_t`. After master trim, sends enter the Q19 FX domain (`Q24 >> 5`) before the int32 feedback buffers; this provides 32× headroom without increasing the original int32 feedback-buffer allocation. `fm6_sat_q23()` remains an explicit internal-state boundary and is counted in host tests. The final output is now linear Q24-to-Q23 conversion followed by a distinct peak limiter, not the former tanh soft clip.
 - Patch level no longer divides by active-layer count. A measured Q15 calibration constant of 10,536 maps the pinned core's 13,045,204 Q24 reference peak at level 31 to 4,194,466 Q24 (25% of Q24 full scale); four coherent patches sum to 16,777,864 Q24, within 0.001% of unity.
 
 ### Current memory evidence and build target
 
 - The active device target is the native `app/fm1.toml` build, which compiles `app/dsp/fm6.c`. The separate `firmware/fm1lab_audio_engine.c` path is not listed in that target and must not be mistaken for the live DSP implementation or patched as a substitute.
-- The latest linked device ELF after stereo FX buffers reports `.pool` = 269,832 bytes, `.data` = 2,968, `.bss` = 44,108, `.ram_text` = 3,556, `.text` = 169,544, and `.noinit` = 1,836. The 196,608-byte stereo FX buffers plus the 69,120-byte graphics canvas account for 265,728 bytes of the pool; remaining pool users account for 4,104 bytes.
-- The older 69,384-byte `.pool` report in `docs/memory-budget.md` is historical. Latest target build used 269,832 / 344,064 pool bytes (74,232 spare; 66,040 after the mandatory 8,192-byte reserve), 47,076 / 98,304 RAM `.data + .bss` bytes (51,228 spare), and 3,556 / 32,768 RAMTEXT bytes (29,212 spare). The XIP image is 176,068 / 581,564 bytes. This fresh ELF evidence is from the successful native build on 2026-11-06.
+- The latest linked device ELF after inserts/compressor reports `.pool` = 275,264 bytes, `.data` = 2,968, `.bss` = 44,696, `.ram_text` = 3,556, `.text` = 181,976, and `.noinit` = 1,836. The 196,608-byte stereo FX buffers plus the 69,120-byte graphics canvas account for 265,728 bytes of the pool; remaining pool users account for 9,536 bytes.
+- The older 69,384-byte `.pool` report in `docs/memory-budget.md` is historical. Latest target build used 275,264 / 344,064 pool bytes (68,800 spare; 60,608 after the mandatory 8,192-byte reserve), 47,672 / 98,304 RAM `.data + .bss` bytes (50,632 spare), and 3,556 / 32,768 RAMTEXT bytes (29,212 spare). The XIP image is 188,500 / 581,564 bytes. This fresh ELF evidence is from the successful native build on 2026-11-06.
 
 ### Required next audit actions
 
@@ -224,7 +224,7 @@ This is a host-calibrated signal reference, not a universal loudness guarantee f
 
 - The per-sample send accumulators are now `[effect][channel]`; each patch's current smoothed pan gains are applied to its sample before the patch's send level is accumulated.
 - Chorus has separate left/right ring buffers (with its existing offset taps), Delay has separate left/right feedback buffers, and Reverb has independent left/right comb networks. Phaser receives separate panned left/right send values and retains its stereo LFO offset.
-- FX buffer allocation is now 196,608 bytes, up from 98,304 bytes. The latest successful target ELF reports `.pool` 269,832 / 344,064 bytes, leaving 74,232 bytes (66,040 after the required 8 KiB reserve). `.data + .bss` remains 47,076 / 98,304 bytes; `app.bin` is 176,068 bytes.
+- FX buffer allocation is now 196,608 bytes, up from 98,304 bytes. The latest successful target ELF reports `.pool` 275,264 / 344,064 bytes, leaving 68,800 bytes (60,608 after the required 8 KiB reserve). `.data + .bss` is 47,672 / 98,304 bytes; `app.bin` is 188,500 bytes.
 - Host regression probes inspect every effect's pre-FX stereo send accumulator at hard-left, hard-right and center. Native engine checks and the target device build both pass. Hardware CPU/xrun and listening qualification remain outstanding.
 
 

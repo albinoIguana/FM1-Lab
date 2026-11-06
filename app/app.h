@@ -22,7 +22,7 @@ enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_INSTRUMENTS0, OBJ_INSTRUMENTS1, OBJ
  * samples (0xA0000..0xDBFFF), user preset banks (0xDC000..0xDFFFF),
  * autosave (0xE5000..0xE6FFF), voice bank (0xE7000) and globals (0xFC000+).
  * App objects live in the otherwise unused user-reserved sectors EA000..EFFFF;
- * the 12-sector pool at F0000..FBFFF holds our Instrument bank. */
+ * the 12-sector pool at F0000..FBFFF holds four Instrument banks plus the insert sidecar. */
 #define APP_STORE_MAP {0xEA000u, 0xEC000u, 0xEE000u, 0xF0000u, 0xF0000u, 0xF0000u, 0xF0000u, 0xF0000u}
 #define APP_STORE_POOL
 #define APP_STORE_POOL_BASE 0xF0000u
