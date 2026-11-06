@@ -90,9 +90,13 @@ static volatile uint8_t arp_mode, arp_notes[16], arp_velocities[16], arp_count, 
 static uint8_t arp_live_note, arp_live;
 static int32_t fx_delay[FM6_DELAY_SIZE] PLAT_POOL, fx_chorus[FM6_CHORUS_SIZE] PLAT_POOL;
 static int32_t fx_comb_a[2048] PLAT_POOL, fx_comb_b[4096] PLAT_POOL, fx_comb_c[8192] PLAT_POOL;
+static int32_t fx_phaser_state_l[4], fx_phaser_state_r[4];
+static int32_t fx_phaser_feedback_l, fx_phaser_feedback_r;
 static uint16_t fx_delay_pos, fx_chorus_pos, fx_comb_pos_a, fx_comb_pos_b, fx_comb_pos_c;
-static volatile uint8_t fx_enabled[3], fx_mix[3]={18u,24u,20u}, fx_time[3]={48u,52u,45u}, fx_feedback[3]={40u,42u,60u};
-static volatile uint8_t fx_send[PATCHES][3];
+static volatile uint8_t fx_enabled[4], fx_mix[4]={18u,24u,20u,35u},
+    fx_time[4]={48u,52u,45u,35u}, fx_feedback[4]={40u,42u,60u,20u},
+    fx_depth[4]={50u,50u,50u,65u};
+static volatile uint8_t fx_send[PATCHES][4];
 static uint32_t fx_lfo_phase;
 static int32_t fm6_sat_q23(int64_t x) { return x>OUTPUT_LIMIT?OUTPUT_LIMIT:x< -OUTPUT_LIMIT?-OUTPUT_LIMIT:(int32_t)x; }
 static uint32_t fm6_step_period(void) { return (FM6_SAMPLE_RATE*60u)/((uint32_t)transport_bpm*4u); }
@@ -127,9 +131,25 @@ static void fm6_transport_step(void)
         else ++arp_index;
     } else if(arp_live) { fm6_note_off_source(arp_live_note,0x0fu,3u); arp_live=0u; }
 }
-static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,int64_t *right)
+static int32_t fm6_allpass_stage(int32_t input, int32_t *state, int32_t coefficient_q15)
 {
-    int32_t chorus=0,chorus_r=0,delay=0,reverb=0;
+    int64_t output = -(((int64_t)coefficient_q15 * input) >> 15) + *state;
+    int64_t next = (int64_t)input + ((int64_t)coefficient_q15 * output >> 15);
+    *state = fm6_sat_q23(next);
+    return fm6_sat_q23(output);
+}
+static int32_t fm6_phaser_channel(int32_t input, int32_t state[4], uint32_t phase)
+{
+    uint32_t tri = phase < 32768u ? phase : 65535u - phase;
+    uint32_t span = 5000u + (uint32_t)fx_depth[3] * 100u;
+    int32_t coefficient = (int32_t)(6000u + (span * tri) / 32768u);
+    for (uint32_t stage=0; stage<4u; ++stage)
+        input = fm6_allpass_stage(input, &state[stage], coefficient);
+    return input;
+}
+static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,int64_t *right)
+{
+    int32_t chorus=0,chorus_r=0,delay=0,reverb=0,phaser_l=0,phaser_r=0;
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
     uint32_t tri=(fx_lfo_phase>>16)&1023u, depth=tri<512u?tri:1023u-tri;
     uint32_t chorus_delay=120u+(uint32_t)fx_time[0]*3u+depth*(120u+(uint32_t)fx_time[0]*3u)/511u;
@@ -154,14 +174,28 @@ static void fm6_fx_process(int64_t input,const int32_t sends[3],int64_t *left,in
     fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&2047u);
     fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&4095u);
     fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&8191u);
-    fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
-    int64_t wet_l=input,wet_r=input;
-    if(fx_enabled[0]) {
-        wet_l+=(int64_t)chorus*fx_mix[0]/100;
-        wet_r+=(int64_t)chorus_r*fx_mix[0]/100;
+
+    /* Four cascaded first-order all-pass sections create phase rotation;
+     * dry/wet cancellation creates the notches. L/R LFOs are offset 90 deg.
+     * Rate spans approximately 0.05-4.05 Hz; resonance is bounded below unity. */
+    if (fx_enabled[3]) {
+        int32_t in_l=fm6_sat_q23((int64_t)sends[3]+(int64_t)fx_phaser_feedback_l*fx_feedback[3]/100u);
+        int32_t in_r=fm6_sat_q23((int64_t)sends[3]+(int64_t)fx_phaser_feedback_r*fx_feedback[3]/100u);
+        phaser_l=fm6_phaser_channel(in_l,fx_phaser_state_l,fx_lfo_phase&0xFFFFu);
+        phaser_r=fm6_phaser_channel(in_r,fx_phaser_state_r,(fx_lfo_phase+16384u)&0xFFFFu);
+        fx_phaser_feedback_l=phaser_l;
+        fx_phaser_feedback_r=phaser_r;
+    } else {
+        fx_phaser_feedback_l=0;
+        fx_phaser_feedback_r=0;
     }
+    fx_lfo_phase+=74u+(uint32_t)fx_time[0]*10u;
+    fx_lfo_phase+=(uint32_t)fx_time[3]*50u;
+    int64_t wet_l=input,wet_r=input;
+    if(fx_enabled[0]) { wet_l+=(int64_t)chorus*fx_mix[0]/100; wet_r+=(int64_t)chorus_r*fx_mix[0]/100; }
     if(fx_enabled[1]) { wet_l+=(int64_t)delay*fx_mix[1]/100; wet_r+=(int64_t)delay*fx_mix[1]/100; }
     if(fx_enabled[2]) { wet_l+=(int64_t)reverb*fx_mix[2]/100; wet_r+=(int64_t)reverb*fx_mix[2]/100; }
+    if(fx_enabled[3]) { wet_l+=(int64_t)phaser_l*fx_mix[3]/100; wet_r+=(int64_t)phaser_r*fx_mix[3]/100; }
     *left=wet_l; *right=wet_r;
 }
 
@@ -320,9 +354,12 @@ void fm6_init(void)
     fm6_zero_bytes(fx_delay,sizeof(fx_delay));
     fm6_zero_bytes(fx_chorus,sizeof(fx_chorus)); fm6_zero_bytes(fx_comb_a,sizeof(fx_comb_a));
     fm6_zero_bytes(fx_comb_b,sizeof(fx_comb_b)); fm6_zero_bytes(fx_comb_c,sizeof(fx_comb_c));
-    for(uint32_t fx=0;fx<3u;fx++) fx_enabled[fx]=0u;
-    for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<3u;fx++) fx_send[p][fx]=100u;
-    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u;
+    fm6_zero_bytes(fx_phaser_state_l,sizeof(fx_phaser_state_l));
+    fm6_zero_bytes(fx_phaser_state_r,sizeof(fx_phaser_state_r));
+    fx_phaser_feedback_l=fx_phaser_feedback_r=0;
+    for(uint32_t fx=0;fx<4u;fx++) fx_enabled[fx]=0u;
+    for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<4u;fx++) fx_send[p][fx]=fx==3u?0u:100u;
+    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
     seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
     seq_start_pending=seq_stop_pending=arp_clear_pending=0u;
     arp_mode=0u; arp_count=0u; arp_index=0u; arp_direction=1u; arp_live=0u;
@@ -565,12 +602,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
             if(transport_phase>=FM6_SAMPLE_RATE*60u) { transport_phase-=FM6_SAMPLE_RATE*60u; fm6_transport_step(); }
             for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane] && --seq_gate_left[lane]==0u)
                 fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
-            int64_t dry=0, send_accum[3]={0,0,0};
+            int64_t dry=0, send_accum[4]={0,0,0,0};
             for(uint32_t p=0;p<PATCHES;p++) {
                 int64_t sample=patch_mix[p][i]; dry+=sample;
-                for(uint32_t fx=0;fx<3u;fx++) send_accum[fx]+=sample*fx_send[p][fx]/100;
+                for(uint32_t fx=0;fx<4u;fx++) send_accum[fx]+=sample*fx_send[p][fx]/100;
             }
-            int32_t sends[3]={fm6_sat_q23(send_accum[0]),fm6_sat_q23(send_accum[1]),fm6_sat_q23(send_accum[2])};
+            int32_t sends[4]={fm6_sat_q23(send_accum[0]),fm6_sat_q23(send_accum[1]),fm6_sat_q23(send_accum[2]),fm6_sat_q23(send_accum[3])};
             int64_t left=0,right=0;
             fm6_fx_process(dry,sends,&left,&right);
             stereo[(base+i)*2u]=fm6_soft_clip(((int64_t)left*output_gain_q12)>>15);
@@ -609,16 +646,18 @@ void fm6_arpeggiator_set_mode(uint8_t mode) {
     arp_mode=mode;
 }
 uint8_t fm6_arpeggiator_mode(void) { return arp_mode; }
-void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled) { if(effect<3u) fx_enabled[effect]=enabled!=0u; }
-void fm6_fx_set_mix(uint8_t effect,uint8_t mix) { if(effect<3u) fx_mix[effect]=mix>100u?100u:mix; }
-void fm6_fx_set_time(uint8_t effect,uint8_t value) { if(effect<3u) fx_time[effect]=value>100u?100u:value; }
-void fm6_fx_set_feedback(uint8_t effect,uint8_t value) { if(effect<3u) fx_feedback[effect]=value>(effect==0u?70u:90u)?(effect==0u?70u:90u):value; }
-uint8_t fm6_fx_enabled(uint8_t effect) { return effect<3u?fx_enabled[effect]:0u; }
-uint8_t fm6_fx_mix(uint8_t effect) { return effect<3u?fx_mix[effect]:0u; }
-uint8_t fm6_fx_time(uint8_t effect) { return effect<3u?fx_time[effect]:0u; }
-uint8_t fm6_fx_feedback(uint8_t effect) { return effect<3u?fx_feedback[effect]:0u; }
-void fm6_fx_set_send(uint8_t patch,uint8_t effect,uint8_t send) { if(patch<PATCHES&&effect<3u) fx_send[patch][effect]=send>100u?100u:send; }
-uint8_t fm6_fx_get_send(uint8_t patch,uint8_t effect) { return patch<PATCHES&&effect<3u?fx_send[patch][effect]:0u; }
+void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled) { if(effect<4u) fx_enabled[effect]=enabled!=0u; }
+void fm6_fx_set_mix(uint8_t effect,uint8_t mix) { if(effect<4u) fx_mix[effect]=mix>100u?100u:mix; }
+void fm6_fx_set_time(uint8_t effect,uint8_t value) { if(effect<4u) fx_time[effect]=value>100u?100u:value; }
+void fm6_fx_set_feedback(uint8_t effect,uint8_t value) { if(effect<4u) fx_feedback[effect]=value>(effect==0u?70u:90u)?(effect==0u?70u:90u):value; }
+void fm6_fx_set_depth(uint8_t effect,uint8_t value) { if(effect<4u) fx_depth[effect]=value>100u?100u:value; }
+uint8_t fm6_fx_enabled(uint8_t effect) { return effect<4u?fx_enabled[effect]:0u; }
+uint8_t fm6_fx_mix(uint8_t effect) { return effect<4u?fx_mix[effect]:0u; }
+uint8_t fm6_fx_time(uint8_t effect) { return effect<4u?fx_time[effect]:0u; }
+uint8_t fm6_fx_feedback(uint8_t effect) { return effect<4u?fx_feedback[effect]:0u; }
+uint8_t fm6_fx_depth(uint8_t effect) { return effect<4u?fx_depth[effect]:0u; }
+void fm6_fx_set_send(uint8_t patch,uint8_t effect,uint8_t send) { if(patch<PATCHES&&effect<4u) fx_send[patch][effect]=send>100u?100u:send; }
+uint8_t fm6_fx_get_send(uint8_t patch,uint8_t effect) { return patch<PATCHES&&effect<4u?fx_send[patch][effect]:0u; }
 
 int fm6_performance_state_valid(const fm6_performance_state_t *s)
 {
@@ -661,11 +700,12 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
         }
     }
     s->arp_mode = arp_mode;
-    for (uint32_t fx = 0; fx < 3u; ++fx) {
+    for (uint32_t fx = 0; fx < 4u; ++fx) {
         s->fx_enabled[fx] = fx_enabled[fx];
         s->fx_mix[fx] = fx_mix[fx];
         s->fx_time[fx] = fx_time[fx];
         s->fx_feedback[fx] = fx_feedback[fx];
+        s->fx_depth[fx] = fx_depth[fx];
         for (uint32_t patch = 0; patch < PATCHES; ++patch)
             s->fx_send[patch][fx] = fx_send[patch][fx];
     }
@@ -699,11 +739,12 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
     arp_count = arp_index = arp_live = 0u;
     arp_direction = 1u;
     arp_clear_pending = 0u;
-    for (uint32_t fx = 0; fx < 3u; ++fx) {
+    for (uint32_t fx = 0; fx < 4u; ++fx) {
         fx_enabled[fx] = s->fx_enabled[fx];
         fx_mix[fx] = s->fx_mix[fx];
         fx_time[fx] = s->fx_time[fx];
         fx_feedback[fx] = s->fx_feedback[fx];
+        fx_depth[fx] = s->fx_depth[fx];
         for (uint32_t patch = 0; patch < PATCHES; ++patch)
             fx_send[patch][fx] = s->fx_send[patch][fx];
     }
