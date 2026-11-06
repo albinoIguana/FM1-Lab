@@ -39,7 +39,7 @@ Status: **design freeze in progress**. This document defines target interfaces a
 - Target a deterministic final ceiling around **−1 dBFS** (approximately 0.89125 linear amplitude).
 - Limiter input/output and gain reduction must be observable in diagnostics.
 - The limiter must not conceal clipping in patch strips, send buses, returns, or the master summing accumulator.
-- The existing soft-clip stage is not considered a substitute for a specified peak limiter.
+- Do not reintroduce the former tanh soft clip in the output path. Use linear Q24-to-Q23 conversion followed by the separately specified peak limiter.
 
 ## 3. Canonical signal topology
 
@@ -59,7 +59,7 @@ The four shared FX buses own independent processor state and independent send le
 
 ## 4. Stereo and routing contract
 
-- Internal patch-strip representation is stereo before the send split, so pan has one canonical location and FX sends can preserve the intended spatial image.
+- Each patch has a smoothed stereo dry-strip pan. The current shared send accumulators are still mono and are not yet panned; stereo per-patch sends and pan-before-send remain an explicit routing task.
 - Each patch has four independent send controls: Chorus, Phaser, Delay, Reverb.
 - Each send bus has a documented input format, internal headroom, wet-output format, and return gain.
 - FX return summing occurs in a wider accumulator than the final output sample format.
@@ -75,7 +75,7 @@ Separate state into three lifetimes:
 2. **Performance state** — sequencer patterns/assignments, arp settings, tempo and performance controls intended to be saved with the performance/session.
 3. **Device state** — physical master setting, global MIDI/device preferences, diagnostics configuration, and other hardware-specific settings.
 
-The precise serialization boundary must be reconciled with the existing four-voice Instrument bank metadata before any schema is changed. Do not duplicate authoritative values between the settings record and Instrument bank without a documented ownership rule.
+Per-patch pan is now Instrument-owned and persists in the fixed-size 479-byte library record using reserved bits; bank header V2 migrates V1 records to centered pan. Per-patch sends, inserts, and future processor state still need an explicit portable serialization boundary. Do not duplicate authoritative values between the settings record and Instrument bank without a documented ownership rule.
 
 Persistence requirements:
 - Validate a complete candidate before applying any of it.
@@ -131,19 +131,19 @@ Before calling the mixer foundation complete, tests must demonstrate:
 The current feature-branch implementation has several behaviors to reconcile before more DSP is added:
 
 - The active-layer-count normalization has been removed. Each patch now receives the same fixed linear level regardless of how many other patches are active; the coherent-sum test verifies exact 4:1 pre-master scaling.
-- The unsafe 127 default is repeated in settings_defaults(), instrument_factory_capture(), fm1lab_instrument_init(), fm1lab_patch_set_voice(), and the empty-bank record initializer in fm1lab_store_library.c. All factory/new-state entry points must agree on 31/127. Existing decoded/saved user records must retain their stored level; changing the default must not rewrite existing user data.
+- Factory/new-state entry points now agree on level 31/127, including settings defaults, factory capture, Instrument initialization, voice replacement, and empty-bank records. Existing decoded/saved user records retain their stored levels.
 - The `APP_GAIN` caller contract is Q12 amplitude (0..4096). A fixed Q15 −12 dB master trim (8231) now precedes FX routing; the output path uses linear Q24-to-Q23 conversion and a separate −1 dBFS peak limiter with instantaneous attack and bounded release.
-- The current shared FX send accumulator still folds patch samples to mono before the stereo returns. Per-patch stereo sends and pan-before-send remain outstanding; the present Q19 headroom work does not claim that routing requirement complete.
+- The current shared FX send accumulator still folds patch samples to mono before the stereo returns. Per-patch dry pan is implemented and smoothed, but pan-before-send and per-patch stereo sends remain outstanding; the Q19 headroom work does not claim that routing requirement complete.
 - FX send accumulators remain wide until the fixed master trim, then enter a Q19 internal FX domain (Q24 input shifted right five bits). The existing int32 delay/comb buffers retain their memory footprint while gaining 32× internal headroom. Test-only saturation counters verify no internal saturation under the four-patch reference/feedback condition.
 - The current Phaser is a four-stage all-pass effect, while Chorus/Delay/Reverb still have simpler existing implementations. Their quality and parameter completeness remain separate work items.
-- Current settings schema is V4. Instrument bank records already persist four patch levels/macros/enabled flags in their per-patch metadata, while the global settings record also duplicates levels/macros for compatibility and performance state. The bank record is the authoritative source after an Instrument is loaded; the settings copy is a compatibility/runtime mirror. Define explicit ownership before adding pan, inserts, sends, or master processor state. Do not expand the fixed 479-byte bank record or change its packed layout casually.
+- Current settings schema is V4. Instrument bank records persist four patch levels/macros/enabled flags; bank header V2 additionally stores 7-bit pan in reserved bits (three bits in DX7 VMEM byte 111 and one unused high bit in each macro byte). The fixed 479-byte record size is unchanged. V1 bank migration defaults pan to 64 (center). The bank record is authoritative after an Instrument is loaded; the settings copy remains a compatibility/runtime mirror for levels/macros. Inserts and sends still need a documented persistence design.
 
 These are audit findings, not permission to make a rushed compatibility-breaking rewrite. Resolve them in order and keep existing supported migration tests intact.
 
 ## 11. Implementation sequence
 
 1. **Architecture freeze:** settle signal units, state ownership, routing API, smoothing policy, memory budget, diagnostics, and migration ownership.
-2. **Mixer foundation:** stable calibrated patch gain, wide accumulators, Q19 FX-bus headroom, −12 dB master trim, and a separate final limiter are implemented and under host regression. Per-patch pan/stereo sends and the complete routing contract remain outstanding.
+2. **Mixer foundation:** stable calibrated patch gain, smoothed dry pan, wide accumulators, Q19 FX-bus headroom, −12 dB master trim, and a separate final limiter are implemented and under host regression. Per-patch stereo sends and pan-before-send remain outstanding.
 3. **Patch inserts:** per-patch Amp/Drive and three-band EQ with independent state/bypass.
 4. **Master dynamics:** compressor and independent peak limiter, with diagnostics and independent tests.
 5. **FX refinement:** bring Chorus, Phaser, Delay, and Reverb to the shared parameter/routing contract; improve Reverb diffusion and document each processor's limits.
@@ -180,8 +180,8 @@ The following findings were confirmed against the current feature-branch source 
 ### Current memory evidence and build target
 
 - The active device target is the native `app/fm1.toml` build, which compiles `app/dsp/fm6.c`. The separate `firmware/fm1lab_audio_engine.c` path is not listed in that target and must not be mistaken for the live DSP implementation or patched as a substitute.
-- Current `.pool` declarations in `app/dsp/fm6.c` total 98,304 bytes: 8,192 delay + 2,048 chorus + 2,048/4,096/8,192 comb samples, each 32-bit. The platform graphics canvas documented in the existing memory audit is another 69,120 bytes. These two known allocations alone total at least 167,424 bytes, before any other pool users.
-- Therefore the older 69,384-byte `.pool` report in `docs/memory-budget.md` cannot describe the current source revision. It is historical evidence only until a fresh ELF is built from this exact branch head. Re-run the native device build and section report before allocating new buffers or declaring memory headroom.
+- The latest linked device ELF reports `.pool` = 171,528 bytes, `.data` = 2,968, `.bss` = 44,108, `.ram_text` = 3,556, `.text` = 167,960, and `.noinit` = 1,836. The known 98,304-byte FX buffers plus the 69,120-byte graphics canvas account for 167,424 bytes of the pool; remaining pool users account for the difference.
+- The older 69,384-byte `.pool` report in `docs/memory-budget.md` is historical. Latest target build used 171,528 / 344,064 pool bytes (172,536 spare), 47,076 / 98,304 RAM `.data + .bss` bytes (51,228 spare), and 3,556 / 32,768 RAMTEXT bytes (29,212 spare). The XIP image is 174,484 / 581,564 bytes. This fresh ELF evidence is from the successful native build on 2026-11-06.
 
 ### Required next audit actions
 
@@ -206,6 +206,15 @@ The following values are implemented in `app/dsp/fm6.c` and covered by native ho
 | Device output conversion | Linear Q24 to signed Q23 | No tanh soft-clip stage in the output path |
 | Final peak limiter | 7,470,000 Q23 (approximately −1.01 dBFS) | Instantaneous attack, approximately 5.8 ms release, shared stereo gain envelope |
 
-The coherent four-patch test asserts a unity pre-trim dry sum and an output peak between 24% and 26% of Q23 full scale at default master gain. A separate four-bus feedback test asserts zero internal FX saturation at the reference patch level. A full-level combined stress test asserts the final output never exceeds the limiter ceiling and that gain reduction is exercised.
+The coherent four-patch test asserts a unity pre-trim dry sum and an output peak between 24% and 26% of Q23 full scale at default master gain. A separate four-bus feedback test asserts zero internal FX saturation at the reference patch level. A full-level combined stress test asserts the final output never exceeds the limiter ceiling and that gain reduction is exercised. Per-patch pan now has hard-left, hard-right, center, smoothing, persistence, and V1-to-V2 bank migration tests.
 
 This is a host-calibrated signal reference, not a universal loudness guarantee for arbitrary patches, notes, or resonant effect settings. The limiter is a final safety stage; it does not excuse intermediate saturation. The test-only probes are excluded from production builds. Hardware CPU/xrun, clipping behavior, and listening qualification remain outstanding.
+
+
+## 15. Persistent per-patch pan — 2026-11-06
+
+- The expanded 156-byte voice representation has a non-synthesis sentinel at byte 155; the FM6 core consumes only the first 155 bytes. FM1-Lab uses that sentinel to hold pan (0=left, 64=center, 127=right) without increasing the in-memory Instrument structure.
+- Library bank header V2 stores pan in existing reserved bits: three low bits in DX7 VMEM byte 111 (bits 4–6) and four high bits in the unused MSBs of the four macro metadata bytes. Macro values remain 0–100 in their lower seven bits. The record remains exactly 479 bytes.
+- Bank V1 migration assigns pan 64 to every patch and reseals the bank CRC. The next save persists the V2 representation. Legacy pre-bank Instrument objects also normalize the old byte-155 sentinel to center before migration.
+- The native dry strip uses constant-voltage balance pan: center is unity on both channels to preserve the measured reference level. Pan gains move toward their targets with a per-sample one-pole ramp (64-sample time constant). The current FX send buses remain mono and are not yet pan-aware; stereo per-patch sends are still required.
+- The native device build and host regression both pass with this state extension. Pan UI control wiring remains a separate UI integration item.
