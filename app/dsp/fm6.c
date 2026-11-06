@@ -226,7 +226,7 @@ static int64_t fm6_patch_insert_process(uint32_t patch, int64_t input)
     uint32_t tone_alpha = (cutoff * 32768u) / (cutoff + 7016u);
     int64_t amp = input;
     if (p->amp_enabled) {
-        uint32_t drive_gain = 32768u + (uint32_t)p->drive * 22938u / 100u;
+        uint32_t drive_gain = 32768u + (uint32_t)p->drive * 229376u / 100u;
         amp = (input * drive_gain) >> 15;
         if (p->drive) amp = fm6_amp_soft_clip(amp);
         int32_t tone_input = fm6_clamp_sample(amp);
