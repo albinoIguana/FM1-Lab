@@ -1056,6 +1056,81 @@ static void draw_operator_map(void)
     cv_text(131, 119, &FONT_XS, "ROLES FROM ENGINE", C_GRAY);
 }
 
+
+static void draw_amp_panel(void)
+{
+    static const char *const labels[4]={"DRIVE","TONE","OUTPUT","AMP STATE"};
+    const fm1lab_patch_insert_state_t *v=&current_inserts.patches[set.patch];
+    char t[16];uint16_t accent=patch_color(set.patch);
+    uint8_t values[4]={v->drive,v->tone,v->output,v->amp_enabled};
+    cv_text(6,2,&FONT_XS,fm6_patch_name(set.patch),C_WHITE);
+    cv_text(172,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
+    for(uint32_t i=0;i<4u;i++){
+        int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
+        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
+        if(i==3u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",accent);
+        else {int_text(values[i],t);cv_text(x+7,y+23,&FONT_B,t,accent);cv_rect(x+48,y+29,55,5,C_LINE);cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);}
+    }
+}
+static uint32_t eq_frequency_hz(uint8_t index)
+{
+    static const uint16_t anchors[11]={20,40,80,160,320,630,1260,2520,5000,10000,20000};
+    uint32_t step=index/10u,rem=index%10u;
+    if(step>=10u)return 20000u;
+    return anchors[step]+((uint32_t)(anchors[step+1u]-anchors[step])*rem)/10u;
+}
+static void draw_eq_panel(void)
+{
+    static const char *const bands[3]={"LOW","MID","HIGH"};
+    const fm1lab_patch_insert_state_t *v=&current_inserts.patches[set.patch];
+    const fm1lab_eq_band_state_t *b=&v->eq[eq_ui_band];
+    uint8_t enabled=(uint8_t)((v->eq_enabled>>(eq_ui_band+1u))&1u);
+    char t[16],qtext[8];uint16_t accent=patch_color(set.patch);
+    cv_text(6,2,&FONT_XS,fm6_patch_name(set.patch),C_WHITE);
+    cv_text(164,2,&FONT_XS,bands[eq_ui_band],accent);
+    cv_text(202,2,&FONT_XS,(v->eq_enabled&1u)?"ON":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
+    for(uint32_t i=0;i<4u;i++){
+        int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
+        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        cv_text(x+7,y+6,&FONT_XS,i==0u?"FREQUENCY":i==1u?"GAIN":i==2u?"Q":"BAND",C_GRAY);
+        if(i==0u){int_text((int32_t)eq_frequency_hz(b->frequency),t);text_cat(t,"Hz");}
+        else if(i==1u){int_text((int32_t)b->gain-12,t);text_cat(t,"dB");}
+        else if(i==2u){
+            uint32_t q=5u+(uint32_t)b->q*35u/31u;
+            int_text((int32_t)(q/10u),qtext);text_cat(qtext,".");
+            int_text((int32_t)(q%10u),qtext+2);
+            cv_text(x+7,y+23,&FONT_B,qtext,accent);continue;
+        } else {cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?accent:C_GRAY);continue;}
+        cv_text(x+7,y+23,&FONT_B,t,accent);
+    }
+}
+static void draw_compressor_panel(void)
+{
+    static const char *const labels[4]={"THRESHOLD","RATIO","ATTACK","RELEASE"};
+    uint8_t values[4]={compressor_value(FM6_COMP_THRESHOLD),compressor_value(FM6_COMP_RATIO),
+        compressor_value(FM6_COMP_ATTACK),compressor_value(FM6_COMP_RELEASE)};
+    char t[16];uint16_t accent=RGB(36,215,232);
+    cv_text(6,2,&FONT_XS,"MASTER BUS",C_WHITE);
+    cv_text(164,2,&FONT_XS,compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS",
+        compressor_value(FM6_COMP_ENABLED)?RGB(75,235,135):C_GRAY);
+    for(uint32_t i=0;i<4u;i++){
+        int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
+        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
+        if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
+        else if(i==2u){uint32_t ms=1u+(uint32_t)values[i]*49u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
+        else if(i==3u){uint32_t ms=20u+(uint32_t)values[i]*480u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
+        else int_text(values[i],t);
+        cv_text(x+7,y+23,&FONT_B,t,accent);
+        cv_rect(x+48,y+29,55,5,C_LINE);
+        cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);
+    }
+    int_text((int32_t)compressor_value(FM6_COMP_MAKEUP)*12/100,t);text_cat(t,"dB");
+    cv_text(6,132,&FONT_XS,"MAKEUP",C_GRAY);
+    cv_text(56,132,&FONT_XS,t,accent);
+}
+
 static void draw_global_panel(uint32_t pct)
 {
     char t[24];
@@ -1233,7 +1308,10 @@ static void draw(void)
         cv_text(x + 8, 6, &FONT_B, ui.msg[1], accent);
     } else {
         const char *title = page == PAGE_MACRO ? "PATCH MACROS" :
+            page == PAGE_AMP ? "PATCH AMP / DRIVE" :
+            page == PAGE_EQ ? "PATCH PARAMETRIC EQ" :
             page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
+            page == PAGE_COMPRESSOR ? "MASTER COMPRESSOR" :
             page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" :
             page == PAGE_ENV ? "OPERATOR ENVELOPE" :
             page == PAGE_LFO ? "LFO" :
@@ -1259,6 +1337,9 @@ static void draw(void)
     cv_begin(240, 144, screen_bg());
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
+    else if (page == PAGE_AMP) draw_amp_panel();
+    else if (page == PAGE_EQ) draw_eq_panel();
+    else if (page == PAGE_COMPRESSOR) draw_compressor_panel();
     else if (page == PAGE_OPERATOR_MAP) draw_operator_map();
     else if (page == PAGE_ENV) draw_envelope_panel();
     else if (page == PAGE_LFO) draw_lfo_panel(0);
@@ -1276,7 +1357,7 @@ static void draw(void)
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 60, screen_bg());
-    if (page != PAGE_HOME && page != PAGE_ENV && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING)) for (uint32_t k = 0; k < 4u; ++k) {
+    if (page != PAGE_HOME && page != PAGE_ENV && page != PAGE_AMP && page != PAGE_EQ && page != PAGE_COMPRESSOR && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING)) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
         uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
@@ -1318,6 +1399,9 @@ static void draw(void)
     }
     if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-K4 CONTROL PATCH VOLUME   0 = OFF   SELECT KNOB CYCLES PATCH", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
+    else if (page == PAGE_AMP) cv_text(4,43,&FONT_XS,"K1 DRIVE  K2 TONE  K3 OUTPUT  K4 AMP ON / OFF",C_GRAY);
+    else if (page == PAGE_EQ) cv_text(4,43,&FONT_XS,"ALGO: BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
+    else if (page == PAGE_COMPRESSOR) cv_text(4,43,&FONT_XS,"K1 THRESH  K2 RATIO  K3 ATTACK  K4 RELEASE",C_GRAY);
     else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
