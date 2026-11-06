@@ -1092,7 +1092,7 @@ static uint32_t eq_frequency_hz(uint8_t index)
 static void draw_eq_panel(void)
 {
     static const char *const bands[3]={"LOW","MID","HIGH"};
-    const fm1lab_patch_insert_state_t *v=&current_inserts.patches[set.patch];
+    const fm1lab_insert_state_t *v=&current_inserts;
     const fm1lab_eq_band_state_t *b=&v->eq[eq_ui_band];
     uint8_t enabled=(uint8_t)((v->eq_enabled>>(eq_ui_band+1u))&1u);
     char t[16],qtext[8];uint16_t accent=RGB(36,215,232);
