@@ -36,7 +36,7 @@ static void render_phaser_test(uint8_t rate, uint8_t depth, int32_t *destination
 
 static int32_t render_stack_peak(uint8_t patch_mask)
 {
-    uint8_t voice[156];
+    uint8_t voice[156] = {0};
     fm6_init();
     memcpy(voice, fm6_patch_data(0u), 155u);
     for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
