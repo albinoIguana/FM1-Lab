@@ -21,7 +21,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 static uint8_t env_operator = 1u, env_levels;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
@@ -617,9 +617,9 @@ static void input(void)
             set_dirty = 1u;
             app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
         } else if (k == B_FX) {
-            if (page < PAGE_FX_CHORUS || page > PAGE_FX_PHASER) page = PAGE_FX_CHORUS;
-            else page = page == PAGE_FX_PHASER ? PAGE_FX_CHORUS : (uint8_t)(page + 1u);
-            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : "PHASER");
+            if (page < PAGE_FX_CHORUS || page > PAGE_FX_ROUTING) page = PAGE_FX_CHORUS;
+            else page = page == PAGE_FX_ROUTING ? PAGE_FX_CHORUS : (uint8_t)(page + 1u);
+            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : page == PAGE_FX_PHASER ? "PHASER" : "SEND ROUTING");
         } else if (k == B_PLAY) {
             if (page == PAGE_SEQ) {
                 fm6_sequencer_set_running((uint8_t)!fm6_sequencer_running());
@@ -698,10 +698,10 @@ static void input(void)
             fm6_sequencer_set_lane(seq_ui_lane, (uint8_t)patch);
             set_dirty = 1u;
             app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
-        } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
+        } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING) {
             int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
-            next %= 4;
-            if (next < 0) next += 4;
+            next %= 5;
+            if (next < 0) next += 5;
             page = (uint8_t)(PAGE_FX_CHORUS + next);
             app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : "PHASER");
         } else if (k == EN_SELECT) {
@@ -753,17 +753,21 @@ static void input(void)
                     set_dirty = 1u;
                     app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN");
                 }
+            } else if (page == PAGE_FX_ROUTING) {
+                uint8_t fx=(uint8_t)index;
+                fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
+                set_dirty=1u;
+                app_say("PATCH FX SEND",fx==0u?"CHORUS":fx==1u?"DELAY":fx==2u?"REVERB":"PHASER");
             } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
-                /* The four hardware knobs always map left-to-right to the
-                 * four primary controls for the effect on this page:
-                 * K1 wet, K2 rate/time/decay, K3 feedback, K4 patch send. */
                 uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
                 if(index==0u) fm6_fx_set_mix(fx,(uint8_t)clamp((int32_t)fm6_fx_mix(fx)+e,0,100));
                 else if(index==1u) fm6_fx_set_time(fx,(uint8_t)clamp((int32_t)fm6_fx_time(fx)+e,0,100));
-                else if(index==2u) fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,fx==0u?70:90));
-                else fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
+                else if(index==2u) {
+                    if(fx==FM6_FX_PHASER) fm6_fx_set_depth(fx,(uint8_t)clamp((int32_t)fm6_fx_depth(fx)+e,0,100));
+                    else fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,fx==0u?70:90));
+                } else fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,90));
                 set_dirty = 1u;
-                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==3u?"PHASER RESONANCE":"FX FEEDBACK"):"PATCH SEND", "UPDATED");
+                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):"FX FEEDBACK", "UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
                 app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
@@ -1080,7 +1084,9 @@ static void draw_arp_panel(void)
 static void draw_fx_panel(uint8_t fx)
 {
     const char *names[4]={"CHORUS","DELAY","REVERB","PHASER"};
-    uint8_t values[4]={fm6_fx_mix(fx),fm6_fx_time(fx),fm6_fx_feedback(fx),fm6_fx_get_send(set.patch,fx)};
+    uint8_t values[4]={fm6_fx_mix(fx),fm6_fx_time(fx),
+        fx==FM6_FX_PHASER?fm6_fx_depth(fx):fm6_fx_feedback(fx),
+        fx==FM6_FX_PHASER?fm6_fx_feedback(fx):fm6_fx_get_send(set.patch,fx)};
     char t[16]; uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
     cv_text(6,2,&FONT_XS,names[fx],C_WHITE);
     cv_text(154,2,&FONT_XS,fm6_fx_enabled(fx)?"ACTIVE":"BYPASS",fm6_fx_enabled(fx)?RGB(75,235,135):RGB(255,82,101));
@@ -1088,11 +1094,32 @@ static void draw_fx_panel(uint8_t fx)
         int32_t x=4+(int32_t)(k&1u)*118;
         int32_t y=18+(int32_t)(k>>1u)*54;
         rounded_panel(x,y,112,48,6,panel_fill(),accent);
-        cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u||fx==3u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?(fx==3u?"K3 RESONANCE":"K3 FEEDBACK"):"K4 PATCH SEND",C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u||fx==3u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?(fx==FM6_FX_PHASER?"K3 DEPTH":"K3 FEEDBACK"):fx==FM6_FX_PHASER?"K4 RESONANCE":"K4 PATCH SEND",C_GRAY);
         int_text(values[k],t);
         cv_text(x+7,y+23,&FONT_B,t,accent);
         cv_rect(x+48,y+29,55,5,C_LINE);
         cv_rect(x+48,y+29,(int32_t)values[k]*55/100,5,accent);
+    }
+}
+
+static void draw_fx_routing_panel(void)
+{
+    static const char *const names[FM6_FX_COUNT]={"CHORUS SEND","DELAY SEND","REVERB SEND","PHASER SEND"};
+    char t[16];
+    uint16_t accent=patch_color(set.patch);
+    cv_text(6,2,&FONT_XS,fm6_patch_name(set.patch),C_WHITE);
+    cv_text(154,2,&FONT_XS,"SEND ROUTING",accent);
+    for(uint32_t fx=0;fx<FM6_FX_COUNT;++fx) {
+        uint8_t value=fm6_fx_get_send(set.patch,(uint8_t)fx);
+        int32_t x=4+(int32_t)(fx&1u)*118;
+        int32_t y=18+(int32_t)(fx>>1u)*54;
+        uint16_t color=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
+        rounded_panel(x,y,112,48,6,panel_fill(),color);
+        cv_text(x+7,y+6,&FONT_XS,names[fx],C_GRAY);
+        int_text(value,t);
+        cv_text(x+7,y+23,&FONT_B,t,color);
+        cv_rect(x+48,y+29,55,5,C_LINE);
+        cv_rect(x+48,y+29,(int32_t)value*55/100,5,color);
     }
 }
 
@@ -1120,7 +1147,7 @@ static void draw(void)
             page == PAGE_FX_CHORUS ? "FX / CHORUS" :
             page == PAGE_FX_DELAY ? "FX / DELAY" :
             page == PAGE_FX_REVERB ? "FX / REVERB" :
-            page == PAGE_FX_PHASER ? "FX / PHASER" : "INSTRUMENT";
+            page == PAGE_FX_PHASER ? "FX / PHASER" : page == PAGE_FX_ROUTING ? "FX / SEND ROUTING" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
         bank_label[5] = (char)('1' + instrument_index / 8u);
         bank_label[14] = (char)('0' + ((instrument_index % 8u + 1u) / 10u));
@@ -1146,13 +1173,14 @@ static void draw(void)
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
     else if (page == PAGE_FX_PHASER) draw_fx_panel(3u);
+    else if (page == PAGE_FX_ROUTING) draw_fx_routing_panel();
     else draw_global_panel(pct);
     cv_blit(0, 36);
 
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 60, screen_bg());
-    if (page != PAGE_HOME && page != PAGE_ENV && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER)) for (uint32_t k = 0; k < 4u; ++k) {
+    if (page != PAGE_HOME && page != PAGE_ENV && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING)) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
         uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
@@ -1200,14 +1228,14 @@ static void draw(void)
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
     else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"K1 ENABLE  K2 NOTE  K3 VELOCITY  K4 GATE",C_GRAY);
     else if (page == PAGE_ARP) cv_text(4,43,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
-    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
+    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
     else cv_text(4, 43, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     {
         char page_text[8] = "";
-        if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
-            /* FX pages are a local four-page group, not global pages 10-12. */
+        if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING) {
+            /* FX pages are a local five-page group, not global pages 10-12. */
             int_text((int32_t)(page - PAGE_FX_CHORUS) + 1, t);
-            text_cat(page_text, t); text_cat(page_text, "/4");
+            text_cat(page_text, t); text_cat(page_text, "/5");
         } else {
             int_text((int32_t)page + 1, t);
             text_cat(page_text, t); text_cat(page_text, "/");
