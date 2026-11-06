@@ -33,6 +33,18 @@ typedef struct {
     fm1lab_patch_t patches[FM1LAB_PATCH_COUNT];
 } fm1lab_instrument_t;
 
+/* The expanded 156-byte voice has one non-synthesis sentinel byte at index 155.
+ * FM1-Lab uses that reserved byte for per-patch pan (0=left, 64=center, 127=right).
+ * It is never sent to the FM6 core or encoded as DX7 operator data. */
+static inline uint8_t fm1lab_patch_pan(const fm1lab_instrument_t *instrument, unsigned patch)
+{
+    return instrument && patch < FM1LAB_PATCH_COUNT ? instrument->patches[patch].voice[155] : 64u;
+}
+static inline void fm1lab_patch_set_pan(fm1lab_instrument_t *instrument, unsigned patch, uint8_t pan)
+{
+    if (instrument && patch < FM1LAB_PATCH_COUNT) instrument->patches[patch].voice[155] = pan;
+}
+
 /* Initialize a valid, neutral four-patch Instrument. */
 void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name);
 
