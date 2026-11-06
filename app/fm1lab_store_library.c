@@ -8,7 +8,7 @@
 #define NAME_BYTES 11u
 #define PATCH_META_BYTES 5u
 #define BANK_MAGIC 0x32424c46u /* FLB2 */
-#define BANK_VERSION 1u
+#define BANK_VERSION 2u
 
 static PLAT_POOL uint8_t bank_work[BANK_BYTES];
 
@@ -90,7 +90,7 @@ static uint8_t *record_at(uint8_t *bank, unsigned slot)
 { return bank+BANK_HEADER+slot*RECORD_BYTES; }
 static int bank_valid(const uint8_t *b, unsigned bank)
 {
-    return read32(b)==BANK_MAGIC && b[4]==BANK_VERSION && b[5]==bank &&
+    return read32(b)==BANK_MAGIC && (b[4]==1u || b[4]==BANK_VERSION) && b[5]==bank &&
         read16(b+6)==crc16(b+BANK_HEADER,BANK_BYTES-BANK_HEADER);
 }
 static void bank_init(uint8_t *b, unsigned bank)
@@ -104,7 +104,7 @@ static void bank_init(uint8_t *b, unsigned bank)
         r[6]=(uint8_t)('0'+(s+1u)/10u); r[7]=(uint8_t)('0'+(s+1u)%10u);
         for(unsigned p=0;p<4;p++) {
             uint8_t *m=r+NAME_BYTES+448u+p*PATCH_META_BYTES;
-            m[0]=50; m[1]=50; m[2]=50; m[3]=50; m[4]=31; /* blank/new bank records start at safe patch level */
+            m[0]=50; m[1]=50; m[2]=50; m[3]=0xB2u; m[4]=31; /* macro 3=50 plus pan MSB for center; safe new patch level */
         }
     }
     write16(b+6,crc16(b+BANK_HEADER,BANK_BYTES-BANK_HEADER));
@@ -114,6 +114,19 @@ static int bank_read(unsigned bank, uint8_t *data)
     int n=plat_store_load(OBJ_INSTRUMENTS0+bank,data,BANK_BYTES);
     if(n<0) { bank_init(data,bank); return 0; }
     if(n!=(int)BANK_BYTES || !bank_valid(data,bank)) return -1;
+    /* V1 used the same fixed record size but had no pan extension. Migrate
+     * every old patch to centered pan using the reserved macro-byte MSBs. */
+    if(data[4]==1u) {
+        for(unsigned slot=0;slot<8u;slot++) {
+            uint8_t *r=record_at(data,slot);
+            for(unsigned p=0;p<4u;p++) {
+                uint8_t *m=r+NAME_BYTES+448u+p*PATCH_META_BYTES;
+                m[3]|=0x80u; /* pan 64: upper pan bit 3 */
+            }
+        }
+        data[4]=BANK_VERSION;
+        write16(data+6,crc16(data+BANK_HEADER,BANK_BYTES-BANK_HEADER));
+    }
     return 0;
 }
 static void instrument_decode(const uint8_t *r, fm1lab_instrument_t *out)
@@ -127,7 +140,12 @@ static void instrument_decode(const uint8_t *r, fm1lab_instrument_t *out)
         raw_to_voice(voice,raw);
         (void)fm1lab_patch_set_voice(out,p,voice);
         const uint8_t *m=r+NAME_BYTES+448u+p*PATCH_META_BYTES;
-        for(unsigned k=0;k<4;k++) out->patches[p].macros[k]=m[k];
+        uint8_t pan=(uint8_t)((raw[111]>>4)&7u);
+        for(unsigned k=0;k<4;k++) {
+            out->patches[p].macros[k]=(uint8_t)(m[k]&127u);
+            pan|=(uint8_t)(((m[k]>>7)&1u)<<(k+3u));
+        }
+        out->patches[p].voice[155]=pan;
         out->patches[p].enabled=(uint8_t)(m[4]>>7);
         out->patches[p].level=(uint8_t)(m[4]&127u);
     }
@@ -141,9 +159,12 @@ static void instrument_encode(uint8_t *r, const fm1lab_instrument_t *in)
     for(unsigned p=0;p<4;p++) {
         uint8_t raw[128];
         voice_to_raw(raw,in->patches[p].voice);
+        uint8_t pan=(uint8_t)(in->patches[p].voice[155]&127u);
+        raw[111]=(uint8_t)((raw[111]&0x0Fu)|((pan&7u)<<4));
         pack7(r+NAME_BYTES+p*VOICE_BYTES,raw);
         uint8_t *m=r+NAME_BYTES+448u+p*PATCH_META_BYTES;
-        for(unsigned k=0;k<4;k++) m[k]=in->patches[p].macros[k];
+        for(unsigned k=0;k<4;k++)
+            m[k]=(uint8_t)(in->patches[p].macros[k]|(((pan>>(k+3u))&1u)<<7));
         m[4]=(uint8_t)(in->patches[p].level|(in->patches[p].enabled?128u:0u));
     }
 }
