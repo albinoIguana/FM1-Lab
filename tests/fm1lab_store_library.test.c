@@ -27,7 +27,7 @@ static void make_legacy_insert_snapshot(uint8_t *dst,const uint8_t *src,int v2)
     memset(dst,0,snap);
     memcpy(dst,src,header);
     for(unsigned i=0;i<32u;i++){
-        const uint8_t *state=src+(v2?12u:8u)+i*14u;
+        const uint8_t *state=src+12u+i*14u;
         uint8_t *legacy=dst+header+i*56u;
         for(unsigned p=0;p<4u;p++)memcpy(legacy+p*14u,state,14u);
     }
@@ -157,6 +157,8 @@ int main(void) {
     downgrade_insert_sidecar_to_v2();
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
+    /* Persist the V2->V3 in-memory migration before constructing a V1 fixture. */
+    assert(fm1lab_store_library_save_full(0u,&loaded,&restored)==0);
     downgrade_insert_sidecar_to_v1();
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
