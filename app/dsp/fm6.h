@@ -80,6 +80,7 @@ uint8_t fm6_patch_enabled(uint32_t patch);
 void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled);
 int fm6_patch_set_voice(uint32_t patch, const uint8_t *voice);
 void fm6_patch_set_level(uint32_t patch, uint8_t level);
+uint8_t fm6_patch_level(uint32_t patch);
 uint8_t fm6_patch_algorithm(uint32_t patch);
 uint8_t fm6_operator_is_carrier(uint32_t patch, uint32_t operator_1_to_6);
 const uint8_t *fm6_patch_data(uint32_t patch);
