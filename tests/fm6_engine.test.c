@@ -57,6 +57,8 @@ static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
         fm6_patch_set_level(patch, 31u);
         fm6_patch_set_enabled(patch, (patch_mask & (1u << patch)) != 0u);
     }
+    static int32_t master_warmup[512u * 2u];
+    fm6_render(master_warmup, 512u, 4096u); /* settle the physical master ramp before measurement */
     fm6_note_on_mask(60u, 110u, patch_mask);
     memset(output, 0, sizeof output);
     fm6_render(output, TEST_FRAMES, 4096u);
