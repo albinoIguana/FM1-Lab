@@ -80,3 +80,21 @@ This report deliberately distinguishes:
 - values that still require physical-device measurement (stack high-water, runtime heap use, CPU load and xruns).
 
 No hardware flashing or on-device memory/CPU validation is claimed.
+
+
+## 5. Current-source re-audit warning (2026-11-05)
+
+The section totals above are a historical successful-build snapshot, not a verified measurement of the current feature-branch head. A source audit of the current `app/dsp/fm6.c` finds the following statically declared `.pool` arrays:
+
+| Buffer | Bytes |
+|---|---:|
+| Delay: 8,192 × int32 | 32,768 |
+| Chorus: 2,048 × int32 | 8,192 |
+| Reverb comb A: 2,048 × int32 | 8,192 |
+| Reverb comb B: 4,096 × int32 | 16,384 |
+| Reverb comb C: 8,192 × int32 | 32,768 |
+| **Current FM6 FX buffers** | **98,304** |
+
+The previously documented graphics canvas is 240 × 144 × 2 = 69,120 bytes. Those known allocations alone imply at least **167,424 bytes** of `.pool` use before any other pool allocations. This does not establish the final linked total; only the ELF from a build of the exact current branch can do that.
+
+Accordingly, do not use the 69,384-byte historical `.pool` figure or its derived remaining-headroom number to approve new buffers. The next native device build must refresh every ELF section total and confirm the builder's 8 KiB pool reserve. The older figures remain here as historical baseline data, not current capacity claims.
