@@ -33,6 +33,16 @@ typedef struct {
     fm1lab_patch_t patches[FM1LAB_PATCH_COUNT];
 } fm1lab_instrument_t;
 
+/* The expanded voice's non-synthesis sentinel byte stores patch pan. */
+static inline uint8_t fm1lab_patch_pan(const fm1lab_instrument_t *instrument, unsigned patch)
+{
+    return instrument && patch < FM1LAB_PATCH_COUNT ? instrument->patches[patch].voice[155] : 64u;
+}
+static inline void fm1lab_patch_set_pan(fm1lab_instrument_t *instrument, unsigned patch, uint8_t pan)
+{
+    if (instrument && patch < FM1LAB_PATCH_COUNT) instrument->patches[patch].voice[155] = pan > 127u ? 127u : pan;
+}
+
 /* Initialize a valid, neutral four-patch Instrument. */
 void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name);
 
