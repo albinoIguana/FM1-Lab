@@ -59,13 +59,6 @@ typedef struct {
     int32_t detune[6];
     uint8_t feedback;
     uint8_t ready;
-    uint8_t amp_enabled, drive, tone, output, eq_enabled;
-    uint8_t eq_frequency[3], eq_gain[3], eq_q[3];
-    uint32_t amp_drive_gain_q15, amp_output_gain_q15;
-    uint16_t tone_alpha_q15;
-    int32_t amp_tone_state;
-    int32_t eq_x1[3], eq_x2[3], eq_y1[3], eq_y2[3];
-    int32_t eq_coeff[3][5];
 } fm1lab_patch_t;
 
 typedef struct {
@@ -82,6 +75,12 @@ typedef struct {
 
 static fm1lab_patch_t instrument[PATCHES];
 static fm1lab_voice_t voices[VOICES];
+static fm1lab_insert_state_t fm6_master_inserts;
+static uint32_t fm6_amp_drive_gain_q15, fm6_amp_output_gain_q15;
+static uint16_t fm6_tone_alpha_q15;
+static int32_t fm6_amp_tone_state[2];
+static int32_t fm6_eq_x1[2][3],fm6_eq_x2[2][3],fm6_eq_y1[2][3],fm6_eq_y2[2][3];
+static int32_t fm6_eq_coeff[3][5];
 static fm6_lfo_t patch_lfo[PATCHES];
 static int32_t patch_lfo_value[PATCHES];
 static int32_t patch_lfo_delay[PATCHES];
@@ -180,11 +179,11 @@ static int32_t fm6_div_q15(int32_t numerator, uint32_t denominator)
     uint32_t result = denominator ? (magnitude * 32768u) / denominator : 0u;
     return numerator < 0 ? -(int32_t)result : (int32_t)result;
 }
-static void fm6_eq_coeff_update(fm1lab_patch_t *p, uint32_t band)
+static void fm6_eq_coeff_update(uint32_t band)
 {
-    uint32_t frequency = p->eq_frequency[band] > 100u ? 100u : p->eq_frequency[band];
-    uint32_t gain = p->eq_gain[band] > 24u ? 24u : p->eq_gain[band];
-    uint32_t q = p->eq_q[band] > 31u ? 31u : p->eq_q[band];
+    uint32_t frequency = fm6_master_inserts.eq[band].frequency > 100u ? 100u : fm6_master_inserts.eq[band].frequency;
+    uint32_t gain = fm6_master_inserts.eq[band].gain > 24u ? 24u : fm6_master_inserts.eq[band].gain;
+    uint32_t q = fm6_master_inserts.eq[band].q > 31u ? 31u : fm6_master_inserts.eq[band].q;
     uint32_t sine = (uint32_t)(fm6_eq_sin_q15[frequency] < 0 ? -fm6_eq_sin_q15[frequency] : fm6_eq_sin_q15[frequency]);
     int32_t cosine = fm6_eq_cos_q15[frequency];
     uint32_t alpha = (sine * 32768u) / (2u * fm6_eq_q_q15[q]);
@@ -196,11 +195,11 @@ static void fm6_eq_coeff_update(fm1lab_patch_t *p, uint32_t band)
     int32_t b2 = (int32_t)(32768u - alpha_a);
     int32_t a1 = b1;
     int32_t a2 = (int32_t)(32768u - alpha_over_a);
-    p->eq_coeff[band][0] = fm6_div_q15(b0, a0);
-    p->eq_coeff[band][1] = fm6_div_q15(b1, a0);
-    p->eq_coeff[band][2] = fm6_div_q15(b2, a0);
-    p->eq_coeff[band][3] = fm6_div_q15(a1, a0);
-    p->eq_coeff[band][4] = fm6_div_q15(a2, a0);
+    fm6_eq_coeff[band][0] = fm6_div_q15(b0, a0);
+    fm6_eq_coeff[band][1] = fm6_div_q15(b1, a0);
+    fm6_eq_coeff[band][2] = fm6_div_q15(b2, a0);
+    fm6_eq_coeff[band][3] = fm6_div_q15(a1, a0);
+    fm6_eq_coeff[band][4] = fm6_div_q15(a2, a0);
 }
 static int32_t fm6_clamp_sample(int64_t x)
 {
@@ -230,43 +229,61 @@ static uint16_t fm6_tone_alpha(uint8_t tone)
     uint32_t cutoff=300u+(uint32_t)tone*197u;
     return (uint16_t)((cutoff*32768u)/(cutoff+7016u));
 }
-static int64_t fm6_patch_insert_process(uint32_t patch, int64_t input)
+static void fm6_master_insert_recalculate(uint32_t field)
 {
-    fm1lab_patch_t *p = &instrument[patch];
-    int32_t raw = fm6_clamp_sample(input);
-    uint32_t tone_alpha = p->tone_alpha_q15;
-    int64_t amp = input;
-    if (p->amp_enabled) {
-        amp = (input * p->amp_drive_gain_q15) >> 15;
-        if (p->drive) amp = fm6_amp_soft_clip(amp);
-        int32_t tone_input = fm6_clamp_sample(amp);
-        p->amp_tone_state += (int32_t)((((int64_t)tone_input - p->amp_tone_state) * tone_alpha) >> 15);
-        amp = p->amp_tone_state;
-        amp = (amp * p->amp_output_gain_q15) >> 15;
-    } else {
-        p->amp_tone_state += (int32_t)((((int64_t)raw - p->amp_tone_state) * tone_alpha) >> 15);
+    if(field==FM6_INSERT_DRIVE)fm6_amp_drive_gain_q15=fm6_amp_drive_gain(fm6_master_inserts.drive);
+    else if(field==FM6_INSERT_TONE)fm6_tone_alpha_q15=fm6_tone_alpha(fm6_master_inserts.tone);
+    else if(field==FM6_INSERT_OUTPUT)fm6_amp_output_gain_q15=fm6_amp_output_gain(fm6_master_inserts.output);
+    else if(field>=FM6_INSERT_EQ_LOW_FREQUENCY && field<FM6_INSERT_FIELD_COUNT){
+        uint32_t offset=field-FM6_INSERT_EQ_LOW_FREQUENCY,band=offset/4u;
+        if(band<3u && (offset%4u)<3u)fm6_eq_coeff_update(band);
     }
-    int64_t eq_input = amp;
-    int64_t eq_output = eq_input;
-    for (uint32_t band = 0; band < 3u; ++band) {
-        int32_t x = fm6_clamp_sample(eq_output);
-        if (p->eq_gain[band] == 12u || !(p->eq_enabled & (uint8_t)(1u << (band+1u)))) {
-            p->eq_x2[band] = p->eq_x1[band]; p->eq_x1[band] = x;
-            p->eq_y2[band] = p->eq_y1[band]; p->eq_y1[band] = x;
+}
+static int64_t fm6_master_insert_channel(uint32_t channel,int64_t input)
+{
+    int64_t amp=input;
+    if(fm6_master_inserts.amp_enabled){
+        amp=(input*fm6_amp_drive_gain_q15)>>15;
+        if(fm6_master_inserts.drive)amp=fm6_amp_soft_clip(amp);
+        int32_t tone_input=fm6_clamp_sample(amp);
+        int32_t difference=tone_input-fm6_amp_tone_state[channel];
+        fm6_amp_tone_state[channel]+=(int32_t)(((int64_t)difference*fm6_tone_alpha_q15)>>15);
+        amp=((int64_t)fm6_amp_tone_state[channel]*fm6_amp_output_gain_q15)>>15;
+    } else {
+        fm6_amp_tone_state[channel]=fm6_clamp_sample(input);
+    }
+    if(!(fm6_master_inserts.eq_enabled&1u))return amp;
+    int64_t eq_output=amp;
+    for(uint32_t band=0;band<3u;band++){
+        int32_t x=fm6_clamp_sample(eq_output);
+        uint8_t enabled=(uint8_t)(fm6_master_inserts.eq_enabled&(1u<<(band+1u)));
+        if(!enabled || fm6_master_inserts.eq[band].gain==12u){
+            fm6_eq_x2[channel][band]=fm6_eq_x1[channel][band];
+            fm6_eq_x1[channel][band]=x;
+            fm6_eq_y2[channel][band]=fm6_eq_y1[channel][band];
+            fm6_eq_y1[channel][band]=x;
             continue;
         }
-        int64_t acc = (int64_t)p->eq_coeff[band][0] * x +
-            (int64_t)p->eq_coeff[band][1] * p->eq_x1[band] +
-            (int64_t)p->eq_coeff[band][2] * p->eq_x2[band] -
-            (int64_t)p->eq_coeff[band][3] * p->eq_y1[band] -
-            (int64_t)p->eq_coeff[band][4] * p->eq_y2[band];
-        int32_t y = fm6_clamp_sample(acc >> 15);
-        p->eq_x2[band] = p->eq_x1[band]; p->eq_x1[band] = x;
-        p->eq_y2[band] = p->eq_y1[band]; p->eq_y1[band] = y;
-        eq_output = y;
+        int64_t acc=(int64_t)fm6_eq_coeff[band][0]*x+
+            (int64_t)fm6_eq_coeff[band][1]*fm6_eq_x1[channel][band]+
+            (int64_t)fm6_eq_coeff[band][2]*fm6_eq_x2[channel][band]-
+            (int64_t)fm6_eq_coeff[band][3]*fm6_eq_y1[channel][band]-
+            (int64_t)fm6_eq_coeff[band][4]*fm6_eq_y2[channel][band];
+        int32_t y=fm6_clamp_sample(acc>>15);
+        fm6_eq_x2[channel][band]=fm6_eq_x1[channel][band];
+        fm6_eq_x1[channel][band]=x;
+        fm6_eq_y2[channel][band]=fm6_eq_y1[channel][band];
+        fm6_eq_y1[channel][band]=y;
+        eq_output=y;
     }
-    return (p->eq_enabled & 1u) ? eq_output : amp;
+    return eq_output;
 }
+static void fm6_master_insert_process(int64_t *left,int64_t *right)
+{
+    *left=fm6_master_insert_channel(0u,*left);
+    *right=fm6_master_insert_channel(1u,*right);
+}
+
 static uint32_t fm6_comp_makeup_q15(uint8_t value)
 {
     static const uint32_t gain[13] = {32768u,34716u,36781u,38968u,41285u,43739u,46341u,
@@ -582,6 +599,14 @@ void fm6_init(void)
     fm6_comp_enabled=0u; fm6_comp_threshold=65u; fm6_comp_ratio=40u;
     fm6_comp_attack=20u; fm6_comp_release=40u; fm6_comp_makeup=0u; fm6_comp_envelope=0;
     fm6_comp_params_update();
+    fm1lab_insert_state_init(&fm6_master_inserts);
+    fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
+    fm6_zero_bytes(fm6_eq_x1,sizeof(fm6_eq_x1));fm6_zero_bytes(fm6_eq_x2,sizeof(fm6_eq_x2));
+    fm6_zero_bytes(fm6_eq_y1,sizeof(fm6_eq_y1));fm6_zero_bytes(fm6_eq_y2,sizeof(fm6_eq_y2));
+    fm6_amp_drive_gain_q15=fm6_amp_drive_gain(fm6_master_inserts.drive);
+    fm6_amp_output_gain_q15=fm6_amp_output_gain(fm6_master_inserts.output);
+    fm6_tone_alpha_q15=fm6_tone_alpha(fm6_master_inserts.tone);
+    for(uint32_t band=0;band<3u;band++)fm6_eq_coeff_update(band);
     for(uint32_t lane=0;lane<2u;lane++) for(uint32_t step=0;step<64u;step++) {
         seq_pattern[lane][step].enabled=0u; seq_pattern[lane][step].note=0u;
         seq_pattern[lane][step].velocity=0u; seq_pattern[lane][step].gate=0u;
@@ -614,18 +639,6 @@ void fm6_init(void)
         instrument[i].enabled = 1u; /* factory instrument starts as a four-layer stack */
         instrument[i].level = 31u; /* 24.4% linear: safe factory starting level */
         instrument[i].pan = 64u; /* centered; constant-voltage pan preserves the reference level */
-        instrument[i].amp_enabled=0u; instrument[i].drive=0u; instrument[i].tone=50u; instrument[i].output=50u;
-        instrument[i].amp_drive_gain_q15=fm6_amp_drive_gain(0u);
-        instrument[i].amp_output_gain_q15=fm6_amp_output_gain(50u);
-        instrument[i].tone_alpha_q15=fm6_tone_alpha(50u);
-        instrument[i].eq_enabled=14u; instrument[i].amp_tone_state=0;
-        instrument[i].eq_frequency[0]=18u; instrument[i].eq_frequency[1]=50u; instrument[i].eq_frequency[2]=82u;
-        for(uint32_t band=0;band<3u;band++){
-            instrument[i].eq_gain[band]=12u; instrument[i].eq_q[band]=10u;
-            instrument[i].eq_x1[band]=instrument[i].eq_x2[band]=0;
-            instrument[i].eq_y1[band]=instrument[i].eq_y2[band]=0;
-            fm6_eq_coeff_update(&instrument[i],band);
-        }
         instrument[i].pan_l_current_q15 = 32768;
         instrument[i].pan_r_current_q15 = 32768;
         fm6_rebuild_patch(i);
@@ -857,7 +870,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
             int64_t dry=0, dry_l=0, dry_r=0, send_accum[4][2]={{0,0},{0,0},{0,0},{0,0}};
             for(uint32_t p=0;p<PATCHES;p++) {
-                int64_t sample=fm6_patch_insert_process(p,patch_mix[p][i]);
+                int64_t sample=patch_mix[p][i];
 #ifdef FM6_TEST
                 uint64_t patch_abs=fm6_test_abs_i64(sample);
                 if(patch_abs>fm6_test_patch_peak_q24[p]) fm6_test_patch_peak_q24[p]=patch_abs;
@@ -907,6 +920,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
             int64_t left=0,right=0;
             fm6_fx_process(trimmed_dry_l,trimmed_dry_r,sends,&left,&right);
+            /* One Instrument-wide post-mix chain: Amp/Drive -> parametric EQ -> stereo-linked compressor. */
+            fm6_master_insert_process(&left,&right);
             fm6_master_comp_process(&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * Keep the physical MASTER control at unity when it reaches 4096. */
@@ -1103,52 +1118,25 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
 }
 
 
-void fm6_patch_insert_reset_state(uint32_t patch)
+void fm6_master_insert_reset_state(void)
 {
-    if(patch>=PATCHES)return;
-    fm1lab_patch_t *p=&instrument[patch];
-    p->amp_tone_state=0;
-    for(uint32_t band=0;band<3u;band++){
-        p->eq_x1[band]=p->eq_x2[band]=0;
-        p->eq_y1[band]=p->eq_y2[band]=0;
-    }
+    fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
+    fm6_zero_bytes(fm6_eq_x1,sizeof(fm6_eq_x1));
+    fm6_zero_bytes(fm6_eq_x2,sizeof(fm6_eq_x2));
+    fm6_zero_bytes(fm6_eq_y1,sizeof(fm6_eq_y1));
+    fm6_zero_bytes(fm6_eq_y2,sizeof(fm6_eq_y2));
 }
-
-void fm6_patch_insert_set(uint32_t patch,uint32_t field,uint8_t value)
+void fm6_master_insert_set(uint32_t field,uint8_t value)
 {
-    if(patch>=PATCHES||field>=FM6_INSERT_FIELD_COUNT)return;
-    fm1lab_patch_t *p=&instrument[patch];
-    if(field==FM6_INSERT_AMP_ENABLED)p->amp_enabled=value?1u:0u;
-    else if(field==FM6_INSERT_DRIVE){uint8_t v=value>100u?100u:value;if(p->drive!=v){p->drive=v;p->amp_drive_gain_q15=fm6_amp_drive_gain(v);}}
-    else if(field==FM6_INSERT_TONE){uint8_t v=value>100u?100u:value;if(p->tone!=v){p->tone=v;p->tone_alpha_q15=fm6_tone_alpha(v);}}
-    else if(field==FM6_INSERT_OUTPUT){uint8_t v=value>100u?100u:value;if(p->output!=v){p->output=v;p->amp_output_gain_q15=fm6_amp_output_gain(v);}}
-    else if(field==FM6_INSERT_EQ_ENABLED){if(value)p->eq_enabled|=1u;else p->eq_enabled&=(uint8_t)~1u;}
-    else {
-        uint32_t offset=field-FM6_INSERT_EQ_LOW_FREQUENCY;
-        uint32_t band=offset/4u,param=offset%4u;
-        if(band>=3u)return;
-        uint8_t changed=0u;
-        if(param==0u){uint8_t v=value>100u?100u:value;if(p->eq_frequency[band]!=v){p->eq_frequency[band]=v;changed=1u;}}
-        else if(param==1u){uint8_t v=value>24u?24u:value;if(p->eq_gain[band]!=v){p->eq_gain[band]=v;changed=1u;}}
-        else if(param==2u){uint8_t v=value>31u?31u:value;if(p->eq_q[band]!=v){p->eq_q[band]=v;changed=1u;}}
-        else {uint8_t bit=(uint8_t)(1u<<(band+1u));if(value)p->eq_enabled|=bit;else p->eq_enabled&=(uint8_t)~bit;}
-        if(changed)fm6_eq_coeff_update(p,band);
-    }
+    if(field>=FM6_INSERT_FIELD_COUNT)return;
+    uint8_t before=fm1lab_insert_state_get(&fm6_master_inserts,field);
+    fm1lab_insert_state_set(&fm6_master_inserts,field,value);
+    uint8_t after=fm1lab_insert_state_get(&fm6_master_inserts,field);
+    if(before!=after)fm6_master_insert_recalculate(field);
 }
-uint8_t fm6_patch_insert_get(uint32_t patch,uint32_t field)
+uint8_t fm6_master_insert_get(uint32_t field)
 {
-    if(patch>=PATCHES||field>=FM6_INSERT_FIELD_COUNT)return 0u;
-    const fm1lab_patch_t *p=&instrument[patch];
-    if(field==FM6_INSERT_AMP_ENABLED)return p->amp_enabled;
-    if(field==FM6_INSERT_DRIVE)return p->drive;
-    if(field==FM6_INSERT_TONE)return p->tone;
-    if(field==FM6_INSERT_OUTPUT)return p->output;
-    if(field==FM6_INSERT_EQ_ENABLED)return (uint8_t)(p->eq_enabled&1u);
-    uint32_t offset=field-FM6_INSERT_EQ_LOW_FREQUENCY;
-    uint32_t band=offset/4u;
-    uint32_t param=offset%4u;
-    if(band>=3u)return 0u;
-    return param==0u?p->eq_frequency[band]:param==1u?p->eq_gain[band]:param==2u?p->eq_q[band]:(uint8_t)((p->eq_enabled>>(band+1u))&1u);
+    return fm1lab_insert_state_get(&fm6_master_inserts,field);
 }
 void fm6_master_comp_set(uint32_t field,uint8_t value)
 {
