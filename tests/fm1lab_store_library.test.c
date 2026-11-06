@@ -21,25 +21,47 @@ static uint16_t test_crc16(const uint8_t *p, unsigned n) {
     return crc;
 }
 
+static void make_legacy_insert_snapshot(uint8_t *dst,const uint8_t *src,int v2)
+{
+    unsigned header=v2?12u:8u, data=v2?1804u:1800u, snap=v2?1806u:1802u;
+    memset(dst,0,snap);
+    memcpy(dst,src,header);
+    for(unsigned i=0;i<32u;i++){
+        const uint8_t *state=src+(v2?12u:8u)+i*14u;
+        uint8_t *legacy=dst+header+i*56u;
+        for(unsigned p=0;p<4u;p++)memcpy(legacy+p*14u,state,14u);
+    }
+    uint16_t crc=test_crc16(dst,data);
+    dst[data]=(uint8_t)crc;dst[data+1u]=(uint8_t)(crc>>8);
+}
 static void downgrade_insert_sidecar_to_v1(void)
 {
     uint8_t old[3616];
     memset(old,0,sizeof old);
-    old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x31u; /* INS1 */
+    old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x31u;
     old[4]=1u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
-    for(unsigned bank=0;bank<4u;bank++)objects[bank][5]=(uint8_t)bank; /* V1 had no generation bits */
+    for(unsigned bank=0;bank<4u;bank++)objects[bank][5]=(uint8_t)bank;
     for(unsigned copy=0;copy<2u;copy++){
-        const uint8_t *src=objects[4]+12u+copy*1806u;
-        uint8_t *dst=old+12u+copy*1802u;
-        memcpy(dst,src,8u);
-        memcpy(dst+8u,src+12u,1792u);
-        uint16_t crc=test_crc16(dst,1800u);
-        dst[1800]=(uint8_t)crc;dst[1801]=(uint8_t)(crc>>8);
+        const uint8_t *src=objects[4]+12u+copy*462u;
+        make_legacy_insert_snapshot(old+12u+copy*1802u,src,0);
     }
     uint16_t header_crc=test_crc16(old,8u);
     old[8]=(uint8_t)header_crc;old[9]=(uint8_t)(header_crc>>8);
-    memcpy(objects[4],old,sizeof old);
-    object_len[4]=(uint16_t)sizeof old;
+    memcpy(objects[4],old,sizeof old);object_len[4]=(uint16_t)sizeof old;
+}
+static void downgrade_insert_sidecar_to_v2(void)
+{
+    uint8_t old[3624];
+    memset(old,0,sizeof old);
+    old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x32u;
+    old[4]=2u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
+    for(unsigned copy=0;copy<2u;copy++){
+        const uint8_t *src=objects[4]+12u+copy*462u;
+        make_legacy_insert_snapshot(old+12u+copy*1806u,src,1);
+    }
+    uint16_t header_crc=test_crc16(old,8u);
+    old[8]=(uint8_t)header_crc;old[9]=(uint8_t)(header_crc>>8);
+    memcpy(objects[4],old,sizeof old);object_len[4]=(uint16_t)sizeof old;
 }
 
 int plat_store_size(uint32_t obj) {
@@ -124,15 +146,17 @@ int main(void) {
     fm1lab_insert_state_t inserts, restored;
     fm1lab_insert_state_init(&inserts);
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
-    inserts.patches[2].amp_enabled=1u; inserts.patches[2].drive=73u;
-    inserts.patches[2].tone=29u; inserts.patches[2].output=61u;
-    inserts.patches[2].eq_enabled=1u; inserts.patches[2].eq[1].frequency=67u;
-    inserts.patches[2].eq[1].gain=19u; inserts.patches[2].eq[1].q=23u;
+    inserts.amp_enabled=1u; inserts.drive=73u; inserts.tone=29u; inserts.output=61u;
+    inserts.eq_enabled=1u; inserts.eq[1].frequency=67u; inserts.eq[1].gain=19u; inserts.eq[1].q=23u;
     assert(fm1lab_store_library_save_full(0u,&source,&inserts)==0);
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
-    /* The V1 sidecar layout migrates without touching the 479-byte Instrument
-     * records, preserving the full patch insert state. */
+    /* V2 and V1 per-patch sidecars migrate to one global chain without
+     * touching the fixed 479-byte Instrument records. Identical legacy patch
+     * values collapse losslessly; divergent values are safely bypassed. */
+    downgrade_insert_sidecar_to_v2();
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+    assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
     downgrade_insert_sidecar_to_v1();
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
@@ -141,7 +165,7 @@ int main(void) {
      * corresponding Instrument bank commits. The previous insert snapshot
      * must remain selected because its bank CRC still matches. */
     fm1lab_insert_state_t pending=inserts;
-    pending.patches[2].drive=91u;
+    pending.drive=91u;
     fail_obj=OBJ_INSTRUMENTS0;
     assert(fm1lab_store_library_save_full(0u,&source,&pending)<0);
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);

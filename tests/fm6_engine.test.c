@@ -104,21 +104,19 @@ static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
 static void render_insert_variant(uint8_t amp, uint8_t eq, int32_t *destination)
 {
     fm6_init();
-    for(unsigned patch=1u;patch<FM1LAB_PATCH_COUNT;patch++)fm6_patch_set_enabled(patch,0u);
-    fm6_patch_set_level(0u,31u);
     if(amp){
-        fm6_patch_insert_set(0u,FM6_INSERT_AMP_ENABLED,1u);
-        fm6_patch_insert_set(0u,FM6_INSERT_DRIVE,100u);
-        fm6_patch_insert_set(0u,FM6_INSERT_TONE,82u);
-        fm6_patch_insert_set(0u,FM6_INSERT_OUTPUT,50u);
+        fm6_master_insert_set(FM6_INSERT_AMP_ENABLED,1u);
+        fm6_master_insert_set(FM6_INSERT_DRIVE,100u);
+        fm6_master_insert_set(FM6_INSERT_TONE,82u);
+        fm6_master_insert_set(FM6_INSERT_OUTPUT,50u);
     }
     if(eq){
-        fm6_patch_insert_set(0u,FM6_INSERT_EQ_ENABLED,1u);
-        fm6_patch_insert_set(0u,FM6_INSERT_EQ_MID_FREQUENCY,54u);
-        fm6_patch_insert_set(0u,FM6_INSERT_EQ_MID_GAIN,24u);
-        fm6_patch_insert_set(0u,FM6_INSERT_EQ_MID_Q,18u);
+        fm6_master_insert_set(FM6_INSERT_EQ_ENABLED,1u);
+        fm6_master_insert_set(FM6_INSERT_EQ_MID_FREQUENCY,54u);
+        fm6_master_insert_set(FM6_INSERT_EQ_MID_GAIN,24u);
+        fm6_master_insert_set(FM6_INSERT_EQ_MID_Q,18u);
     }
-    fm6_note_on_mask(60u,110u,0x01u);
+    fm6_note_on_mask(60u,110u,0x0fu);
     for(unsigned block=0u;block<32u;block++)
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
@@ -629,18 +627,18 @@ int main(void) {
     assert(fm6_sequencer_running() == 1u);
     fm6_sequencer_set_running(0u);
 
-    /* Patch inserts are independent, bypassable, and operate before pan/sends. */
+    /* Amp/Drive and EQ are one bypassable Instrument-wide post-FX stereo chain. */
     render_insert_variant(0u,0u,chunk_a);
     render_insert_variant(1u,0u,chunk_b);
     assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)!=0);
     render_insert_variant(0u,1u,chunk_b);
     assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)!=0);
     fm6_init();
-    fm6_patch_insert_set(2u,FM6_INSERT_DRIVE,255u);
-    fm6_patch_insert_set(2u,FM6_INSERT_EQ_MID_GAIN,255u);
-    assert(fm6_patch_insert_get(2u,FM6_INSERT_DRIVE)==100u);
-    assert(fm6_patch_insert_get(2u,FM6_INSERT_EQ_MID_GAIN)==24u);
-    assert(fm6_patch_insert_get(2u,FM6_INSERT_EQ_MID_FREQUENCY)==50u);
+    fm6_master_insert_set(FM6_INSERT_DRIVE,255u);
+    fm6_master_insert_set(FM6_INSERT_EQ_MID_GAIN,255u);
+    assert(fm6_master_insert_get(FM6_INSERT_DRIVE)==100u);
+    assert(fm6_master_insert_get(FM6_INSERT_EQ_MID_GAIN)==24u);
+    assert(fm6_master_insert_get(FM6_INSERT_EQ_MID_FREQUENCY)==50u);
 
     /* Linked master compression reduces sustained four-layer peaks and is
      * fully bypassable; its state is included in performance persistence. */
@@ -650,6 +648,6 @@ int main(void) {
     assert(compressor_active_peak>0);
     assert(compressor_active_peak<compressor_bypass_peak);
 
-    puts("Felucca FM6 engine: voice pools, sequencing, stereo FX, patch Amp/Drive, parametric EQ and master compressor passed");
+    puts("Felucca FM6 engine: voice pools, sequencing, stereo FX, Instrument-wide Amp/Drive, parametric EQ and master compressor passed");
     return 0;
 }
