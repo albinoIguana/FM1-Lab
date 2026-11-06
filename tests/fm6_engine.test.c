@@ -46,6 +46,20 @@ static int32_t render_master_peak(uint32_t master_gain_q12)
     return peak(output, TEST_WORDS);
 }
 
+static uint64_t render_pan_send_peak(uint8_t pan, unsigned effect, unsigned channel)
+{
+    static int32_t warmup[2048u * 2u];
+    fm6_init();
+    for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
+        fm6_patch_set_enabled((uint8_t)patch,0u);
+    fm6_patch_set_pan(0u,pan);
+    fm6_fx_set_send(0u,(uint8_t)effect,100u);
+    fm6_render(warmup,2048u,4096u);
+    fm6_note_on_mask(60u,110u,0x01u);
+    fm6_render(output,TEST_FRAMES,4096u);
+    return fm6_test_fx_send_peak(effect,channel);
+}
+
 static int32_t render_pan_channel_peak(uint8_t pan, unsigned channel)
 {
     static int32_t warmup[2048u * 2u];
@@ -145,6 +159,15 @@ int main(void) {
     int32_t center_r=render_pan_channel_peak(64u,1u);
     assert(center_l>0 && center_r>0);
     assert(center_l*100>center_r*99 && center_l*100<center_r*101);
+    /* Every shared FX bus receives the patch after its smoothed pan stage. */
+    for(unsigned effect=0u;effect<FM6_FX_COUNT;effect++) {
+        assert(render_pan_send_peak(0u,effect,0u)>0u);
+        assert(render_pan_send_peak(0u,effect,1u)==0u);
+        assert(render_pan_send_peak(127u,effect,0u)==0u);
+        assert(render_pan_send_peak(127u,effect,1u)>0u);
+        assert(render_pan_send_peak(64u,effect,0u)>0u);
+        assert(render_pan_send_peak(64u,effect,1u)>0u);
+    }
     fm6_init();
     fm6_patch_set_pan(0u,255u);
     assert(fm6_patch_pan(0u)==127u);

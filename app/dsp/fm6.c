@@ -87,6 +87,7 @@ static int16_t pitch_bend_16;
 #ifdef FM6_TEST
 static uint64_t fm6_test_patch_peak_q24[PATCHES];
 static uint64_t fm6_test_dry_peak_q24;
+static uint64_t fm6_test_send_peak[4][2];
 static uint32_t fm6_test_fx_saturation_count;
 static uint32_t fm6_test_limiter_event_count;
 static uint64_t fm6_test_output_peak_q23;
@@ -101,6 +102,10 @@ uint64_t fm6_test_patch_peak(uint32_t patch)
 uint64_t fm6_test_dry_peak(void)
 {
     return fm6_test_dry_peak_q24;
+}
+uint64_t fm6_test_fx_send_peak(uint32_t effect, uint32_t channel)
+{
+    return effect < 4u && channel < 2u ? fm6_test_send_peak[effect][channel] : 0u;
 }
 uint32_t fm6_test_fx_saturations(void) { return fm6_test_fx_saturation_count; }
 uint32_t fm6_test_limiter_events(void) { return fm6_test_limiter_event_count; }
@@ -586,6 +591,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 #ifdef FM6_TEST
     fm6_zero_bytes(fm6_test_patch_peak_q24, sizeof fm6_test_patch_peak_q24);
     fm6_test_dry_peak_q24 = 0u;
+    fm6_zero_bytes(fm6_test_send_peak, sizeof fm6_test_send_peak);
 #endif
     uint32_t base;
     for (base = 0; base < frames; base += FM6_N) {
@@ -702,6 +708,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                     send_accum[fx][1]+=send_r*fx_send[p][fx]/100;
                 }
             }
+#ifdef FM6_TEST
+            for(uint32_t fx=0;fx<4u;fx++) for(uint32_t channel=0;channel<2u;channel++) {
+                uint64_t send_abs=fm6_test_abs_i64(send_accum[fx][channel]);
+                if(send_abs>fm6_test_send_peak[fx][channel]) fm6_test_send_peak[fx][channel]=send_abs;
+            }
+#endif
 #ifdef FM6_TEST
             {
                 uint64_t dry_abs=fm6_test_abs_i64(dry);

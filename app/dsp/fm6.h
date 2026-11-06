@@ -78,6 +78,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12);
 /* Test-only pre-clip Q24 probes; never used by the device UI/audio path. */
 uint64_t fm6_test_patch_peak(uint32_t patch);
 uint64_t fm6_test_dry_peak(void);
+uint64_t fm6_test_fx_send_peak(uint32_t effect, uint32_t channel);
 uint32_t fm6_test_fx_saturations(void);
 uint32_t fm6_test_limiter_events(void);
 uint64_t fm6_test_output_peak(void);
