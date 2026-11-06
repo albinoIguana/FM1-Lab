@@ -72,7 +72,8 @@ uint8_t fm6_fx_depth(uint8_t effect);
 void fm6_fx_set_send(uint8_t patch, uint8_t effect, uint8_t send);
 uint8_t fm6_fx_get_send(uint8_t patch, uint8_t effect);
 /* Render length must be a multiple of the FM6 core's 32-frame quantum (CTL). */
-void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12);
+/* master_gain_q12 is fm1-base APP_GAIN: Q12 amplitude, 0..4096. */
+void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12);
 
 uint32_t fm6_patch_count(void);
 const char *fm6_patch_name(uint32_t patch);
