@@ -6,9 +6,18 @@
 #include "fm6.h"
 #define SET_MAGIC_V1 0x4C314D46u
 #define SET_MAGIC_V2 0x4C314D47u
-#define SET_MAGIC 0x4C314D48u
+#define SET_MAGIC_V3 0x4C314D48u
+#define SET_MAGIC 0x4C314D49u
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off, rsv[1]; } settings_v1_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; } settings_v2_t;
+typedef struct {
+    uint16_t tempo_bpm; uint8_t seq_length; uint8_t lane_patch[2];
+    uint8_t seq_enabled[2][64]; uint8_t seq_note[2][64];
+    uint8_t seq_velocity[2][64]; uint8_t seq_gate[2][64]; uint8_t arp_mode;
+    uint8_t fx_enabled[3], fx_mix[3], fx_time[3], fx_feedback[3];
+    uint8_t fx_send[FM1LAB_PATCH_COUNT][3];
+} fm6_performance_state_v3_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v3_t performance; uint16_t crc; } settings_v3_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t crc; } settings_t;
 static inline uint16_t settings_crc16(const void *data, size_t length) {
     const uint8_t *bytes=(const uint8_t *)data; uint16_t crc=0xFFFFu;
@@ -24,6 +33,69 @@ static inline int settings_v2_valid(const settings_v2_t *v) {
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p) { if(v->levels[p]>127u) return 0; for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m) if(v->macros[p][m]>100u) return 0; }
     return 1;
 }
+
+static inline int settings_v3_valid(const settings_v3_t *v) {
+    if (!v || v->magic != SET_MAGIC_V3 || v->octave < -2 || v->octave > 2 ||
+        v->patch >= FM1LAB_PATCH_COUNT || (v->enabled_mask & 0xF0u) || v->ble_off > 1u)
+        return 0;
+    const fm6_performance_state_v3_t *p = &v->performance;
+    if (p->tempo_bpm < 30u || p->tempo_bpm > 300u || p->seq_length < 1u ||
+        p->seq_length > 64u || p->arp_mode > 3u) return 0;
+    for (uint32_t lane=0; lane<2u; ++lane) {
+        if (p->lane_patch[lane] >= FM1LAB_PATCH_COUNT) return 0;
+        for (uint32_t step=0; step<64u; ++step)
+            if (p->seq_enabled[lane][step] > 1u || p->seq_note[lane][step] > 127u ||
+                p->seq_velocity[lane][step] > 127u || p->seq_gate[lane][step] > 100u) return 0;
+    }
+    for (uint32_t fx=0; fx<3u; ++fx) {
+        if (p->fx_enabled[fx] > 1u || p->fx_mix[fx] > 100u || p->fx_time[fx] > 100u ||
+            p->fx_feedback[fx] > (fx == 0u ? 70u : 90u)) return 0;
+        for (uint32_t patch=0; patch<FM1LAB_PATCH_COUNT; ++patch)
+            if (p->fx_send[patch][fx] > 100u) return 0;
+    }
+    for (uint32_t patch=0; patch<FM1LAB_PATCH_COUNT; ++patch) {
+        if (v->levels[patch] > 127u) return 0;
+        for (uint32_t m=0; m<FM1LAB_MACRO_COUNT; ++m)
+            if (v->macros[patch][m] > 100u) return 0;
+    }
+    return 1;
+}
+static inline int settings_import_v3(settings_t *dst, const settings_v3_t *src) {
+    if (!dst || !settings_v3_valid(src)) return -1;
+    dst->octave=src->octave; dst->patch=src->patch; dst->enabled_mask=src->enabled_mask; dst->ble_off=src->ble_off;
+    for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p) {
+        dst->levels[p]=src->levels[p];
+        for (uint32_t m=0; m<FM1LAB_MACRO_COUNT; ++m) dst->macros[p][m]=src->macros[p][m];
+    }
+    dst->performance.tempo_bpm=src->performance.tempo_bpm;
+    dst->performance.seq_length=src->performance.seq_length;
+    dst->performance.arp_mode=src->performance.arp_mode;
+    for (uint32_t lane=0; lane<2u; ++lane) {
+        dst->performance.lane_patch[lane]=src->performance.lane_patch[lane];
+        for (uint32_t step=0; step<64u; ++step) {
+            dst->performance.seq_enabled[lane][step]=src->performance.seq_enabled[lane][step];
+            dst->performance.seq_note[lane][step]=src->performance.seq_note[lane][step];
+            dst->performance.seq_velocity[lane][step]=src->performance.seq_velocity[lane][step];
+            dst->performance.seq_gate[lane][step]=src->performance.seq_gate[lane][step];
+        }
+    }
+    for (uint32_t fx=0; fx<3u; ++fx) {
+        dst->performance.fx_enabled[fx]=src->performance.fx_enabled[fx];
+        dst->performance.fx_mix[fx]=src->performance.fx_mix[fx];
+        dst->performance.fx_time[fx]=src->performance.fx_time[fx];
+        dst->performance.fx_feedback[fx]=src->performance.fx_feedback[fx];
+        for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p)
+            dst->performance.fx_send[p][fx]=src->performance.fx_send[p][fx];
+    }
+    dst->performance.fx_enabled[3]=0u;
+    dst->performance.fx_mix[3]=35u;
+    dst->performance.fx_time[3]=35u;
+    dst->performance.fx_feedback[3]=20u;
+    dst->performance.fx_depth[3]=65u;
+    for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p) dst->performance.fx_send[p][3]=0u;
+    return 0;
+}
+
 static inline int settings_valid(const settings_t *v) {
     if(!v || v->magic!=SET_MAGIC || v->octave < -2 || v->octave>2 || v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u || !fm6_performance_state_valid(&v->performance) || v->crc!=settings_crc16(v,offsetof(settings_t,crc))) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p) { if(v->levels[p]>127u) return 0; for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m) if(v->macros[p][m]>100u) return 0; }
