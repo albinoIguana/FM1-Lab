@@ -52,6 +52,7 @@ typedef struct {
     uint8_t macro[FM1LAB_MACRO_COUNT];
     uint8_t enabled;
     uint8_t level;
+    uint8_t pan;
     int32_t mod_level;
     int32_t detune[6];
     uint8_t feedback;
@@ -130,6 +131,18 @@ static volatile uint8_t fx_enabled[4], fx_mix[4]={18u,24u,20u,35u},
     fx_depth[4]={50u,50u,50u,65u};
 static volatile uint8_t fx_send[PATCHES][4];
 static uint32_t fx_lfo_phase, fx_phaser_phase;
+static void fm6_pan_gains(uint8_t pan, int32_t *left_q15, int32_t *right_q15)
+{
+    /* Constant-voltage balance pan: center preserves the existing mono level. */
+    if (pan <= 64u) {
+        *left_q15 = 32768;
+        *right_q15 = (int32_t)((uint32_t)pan * 32768u / 64u);
+    } else {
+        *left_q15 = (int32_t)((uint32_t)(127u - pan) * 32768u / 63u);
+        *right_q15 = 32768;
+    }
+}
+
 static int32_t fm6_sat_q23(int64_t x)
 {
 #ifdef FM6_TEST
@@ -185,7 +198,7 @@ static int32_t fm6_phaser_channel(int32_t input, int32_t state[4], uint32_t phas
         input = fm6_allpass_stage(input, &state[stage], coefficient);
     return input;
 }
-static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,int64_t *right)
+static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4],int64_t *left,int64_t *right)
 {
     int32_t chorus=0,chorus_r=0,delay=0,reverb=0,phaser_l=0,phaser_r=0;
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
@@ -233,7 +246,7 @@ static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,in
     }
     fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
     fx_phaser_phase+=4870u+(uint32_t)fx_time[3]*3896u;
-    int64_t wet_l=input,wet_r=input;
+    int64_t wet_l=input_l,wet_r=input_r;
     /* FX state runs 32x below the Q24 dry bus. This preserves the int32
      * delay/comb memory footprint while reserving 30 dB for feedback growth. */
     if(fx_enabled[0]) { wet_l+=(int64_t)chorus*FM6_FX_HEADROOM_SCALE*fx_mix[0]/100; wet_r+=(int64_t)chorus_r*FM6_FX_HEADROOM_SCALE*fx_mix[0]/100; }
@@ -417,6 +430,7 @@ void fm6_init(void)
         instrument[i].macro[3] = 50;
         instrument[i].enabled = 1u; /* factory instrument starts as a four-layer stack */
         instrument[i].level = 31u; /* 24.4% linear: safe factory starting level */
+        instrument[i].pan = 64u; /* centered; constant-voltage pan preserves the reference level */
         fm6_rebuild_patch(i);
     }
 }
@@ -559,6 +573,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     for (base = 0; base < frames; base += FM6_N) {
         int64_t patch_mix[PATCHES][FM6_N] = {{0}};
         int32_t patch_gain_q15[PATCHES] = {0};
+        int32_t patch_pan_l_q15[PATCHES], patch_pan_r_q15[PATCHES];
         uint32_t p, v, i;
         uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
 
@@ -567,6 +582,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
         for (p = 0; p < PATCHES; ++p) {
             if (instrument[p].enabled && instrument[p].level)
                 patch_gain_q15[p] = (int32_t)((uint32_t)instrument[p].level * 32768u / 127u);
+            fm6_pan_gains(instrument[p].pan, &patch_pan_l_q15[p], &patch_pan_r_q15[p]);
         }
         for (p = 0; p < PATCHES; p++) {
             patch_lfo_value[p] = fm6_lfo_sample(&patch_lfo[p]);
@@ -641,14 +657,18 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             if(transport_phase>=FM6_SAMPLE_RATE*60u) { transport_phase-=FM6_SAMPLE_RATE*60u; fm6_transport_step(); }
             for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane] && --seq_gate_left[lane]==0u)
                 fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
-            int64_t dry=0, send_accum[4]={0,0,0,0};
+            int64_t dry=0, dry_l=0, dry_r=0, send_accum[4]={0,0,0,0};
             for(uint32_t p=0;p<PATCHES;p++) {
                 int64_t sample=patch_mix[p][i];
 #ifdef FM6_TEST
                 uint64_t patch_abs=fm6_test_abs_i64(sample);
                 if(patch_abs>fm6_test_patch_peak_q24[p]) fm6_test_patch_peak_q24[p]=patch_abs;
 #endif
-                dry+=sample;
+                dry+=sample; /* mono diagnostic reference, before pan */
+                dry_l+=(sample*patch_pan_l_q15[p])>>15;
+                dry_r+=(sample*patch_pan_r_q15[p])>>15;
+                /* FX sends remain mono in this foundation step; stereo per-patch
+                 * send routing is a separate memory/state architecture change. */
                 for(uint32_t fx=0;fx<4u;fx++) send_accum[fx]+=sample*fx_send[p][fx]/100;
             }
 #ifdef FM6_TEST
@@ -659,14 +679,15 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 #endif
             /* Master trim is part of the fixed gain budget, before FX sends
              * and returns. FX buses then enter their Q19 internal domain. */
-            int64_t trimmed_dry = (dry * FM6_MASTER_TRIM_Q15) >> 15;
+            int64_t trimmed_dry_l = (dry_l * FM6_MASTER_TRIM_Q15) >> 15;
+            int64_t trimmed_dry_r = (dry_r * FM6_MASTER_TRIM_Q15) >> 15;
             int32_t sends[4];
             for (uint32_t fx=0; fx<4u; ++fx) {
                 int64_t trimmed_send = (send_accum[fx] * FM6_MASTER_TRIM_Q15) >> 15;
                 sends[fx] = fm6_sat_q23(trimmed_send >> FM6_FX_HEADROOM_SHIFT);
             }
             int64_t left=0,right=0;
-            fm6_fx_process(trimmed_dry,sends,&left,&right);
+            fm6_fx_process(trimmed_dry_l,trimmed_dry_r,sends,&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * Keep the physical MASTER control at unity when it reaches 4096. */
             /* Q24 mixer -> Q23 device samples is a linear >>1 conversion.
@@ -895,6 +916,14 @@ void fm6_patch_set_level(uint32_t patch, uint8_t level)
 uint8_t fm6_patch_level(uint32_t patch)
 {
     return patch < PATCHES ? instrument[patch].level : 0u;
+}
+void fm6_patch_set_pan(uint32_t patch, uint8_t pan)
+{
+    if (patch < PATCHES) instrument[patch].pan = pan > 127u ? 127u : pan;
+}
+uint8_t fm6_patch_pan(uint32_t patch)
+{
+    return patch < PATCHES ? instrument[patch].pan : 64u;
 }
 void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
 {
