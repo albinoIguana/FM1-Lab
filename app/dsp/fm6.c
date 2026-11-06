@@ -243,6 +243,11 @@ static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,in
     *left=wet_l; *right=wet_r;
 }
 
+static uint64_t fm6_abs_i64(int64_t value)
+{
+    return value < 0 ? (uint64_t)(-(value + 1)) + 1u : (uint64_t)value;
+}
+
 static int32_t clamp_i32(int32_t x, int32_t lo, int32_t hi)
 {
     return x < lo ? lo : x > hi ? hi : x;
@@ -675,10 +680,13 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             fm6_fx_process(trimmed_dry,sends,&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * Keep the physical MASTER control at unity when it reaches 4096. */
-            int32_t out_l = fm6_soft_clip(((int64_t)left * output_gain_q12) >> 12);
-            int32_t out_r = fm6_soft_clip(((int64_t)right * output_gain_q12) >> 12);
-            uint64_t abs_l = out_l < 0 ? (uint64_t)(-(int64_t)out_l) : (uint64_t)out_l;
-            uint64_t abs_r = out_r < 0 ? (uint64_t)(-(int64_t)out_r) : (uint64_t)out_r;
+            /* Q24 mixer -> Q23 device samples is a linear >>1 conversion.
+             * Do not put the legacy tanh soft clip in front of the limiter:
+             * that changes the calibrated -12 dB reference level. */
+            int64_t out_l = ((left * output_gain_q12) >> 13);
+            int64_t out_r = ((right * output_gain_q12) >> 13);
+            uint64_t abs_l = fm6_abs_i64(out_l);
+            uint64_t abs_r = fm6_abs_i64(out_r);
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
             uint32_t target_gain = 32768u;
             if (peak > FM6_LIMITER_CEILING_Q23)
@@ -693,20 +701,20 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 limiter_gain_q15 += (int32_t)(release ? release : 1u); /* ~5.8 ms release */
                 if (limiter_gain_q15 > 32768) limiter_gain_q15 = 32768;
             }
-            out_l = (int32_t)(((int64_t)out_l * limiter_gain_q15) >> 15);
-            out_r = (int32_t)(((int64_t)out_r * limiter_gain_q15) >> 15);
+            out_l = (out_l * limiter_gain_q15) >> 15;
+            out_r = (out_r * limiter_gain_q15) >> 15;
             if (out_l > FM6_LIMITER_CEILING_Q23) out_l = FM6_LIMITER_CEILING_Q23;
             if (out_l < -FM6_LIMITER_CEILING_Q23) out_l = -FM6_LIMITER_CEILING_Q23;
             if (out_r > FM6_LIMITER_CEILING_Q23) out_r = FM6_LIMITER_CEILING_Q23;
             if (out_r < -FM6_LIMITER_CEILING_Q23) out_r = -FM6_LIMITER_CEILING_Q23;
 #ifdef FM6_TEST
-            abs_l = out_l < 0 ? (uint64_t)(-(int64_t)out_l) : (uint64_t)out_l;
-            abs_r = out_r < 0 ? (uint64_t)(-(int64_t)out_r) : (uint64_t)out_r;
+            abs_l = fm6_abs_i64(out_l);
+            abs_r = fm6_abs_i64(out_r);
             peak = abs_l > abs_r ? abs_l : abs_r;
             if (peak > fm6_test_output_peak_q23) fm6_test_output_peak_q23 = peak;
 #endif
-            stereo[(base+i)*2u] = out_l;
-            stereo[(base+i)*2u+1u] = out_r;
+            stereo[(base+i)*2u] = (int32_t)out_l;
+            stereo[(base+i)*2u+1u] = (int32_t)out_r;
         }
     }
 }
