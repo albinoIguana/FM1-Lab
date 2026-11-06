@@ -180,8 +180,8 @@ The following findings were confirmed against the current feature-branch source 
 ### Current memory evidence and build target
 
 - The active device target is the native `app/fm1.toml` build, which compiles `app/dsp/fm6.c`. The separate `firmware/fm1lab_audio_engine.c` path is not listed in that target and must not be mistaken for the live DSP implementation or patched as a substitute.
-- The latest linked device ELF after inserts/compressor reports `.pool` = 275,264 bytes, `.data` = 2,968, `.bss` = 44,696, `.ram_text` = 3,556, `.text` = 181,976, and `.noinit` = 1,836. The 196,608-byte stereo FX buffers plus the 69,120-byte graphics canvas account for 265,728 bytes of the pool; remaining pool users account for 9,536 bytes.
-- The older 69,384-byte `.pool` report in `docs/memory-budget.md` is historical. Latest target build used 275,264 / 344,064 pool bytes (68,800 spare; 60,608 after the mandatory 8,192-byte reserve), 47,672 / 98,304 RAM `.data + .bss` bytes (50,632 spare), and 3,556 / 32,768 RAMTEXT bytes (29,212 spare). The XIP image is 188,500 / 581,564 bytes. This fresh ELF evidence is from the successful native build on 2026-11-06.
+- The latest linked device ELF after inserts/compressor reports `.pool` = 275,264 bytes, `.data` = 2,968, `.bss` = 44,760, `.ram_text` = 3,556, `.text` = 182,392, and `.noinit` = 1,836. The 196,608-byte stereo FX buffers plus the 69,120-byte graphics canvas account for 265,728 bytes of the pool; remaining pool users account for 9,536 bytes.
+- The older 69,384-byte `.pool` report in `docs/memory-budget.md` is historical. Latest target build used 275,264 / 344,064 pool bytes (68,800 spare; 60,608 after the mandatory 8,192-byte reserve), 47,736 / 98,304 RAM `.data + .bss` bytes (50,568 spare), and 3,556 / 32,768 RAMTEXT bytes (29,212 spare). The XIP image is 188,916 / 581,564 bytes. This fresh ELF evidence is from the successful native build on 2026-11-06.
 
 ### Required next audit actions
 

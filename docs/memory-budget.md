@@ -2,14 +2,14 @@
 
 **Target:** M-VAVE FM1, 1 MiB SPI NOR and 512 KiB internal SRAM  
 **Build:** native fm1-base + Felucca-BSP + one pinned Felucca FM6 core  
-**Branch baseline:** `c174e07c7355d7db28d9d554381feb5689575cfd` (2026-11-06)  
+**Branch baseline:** `870b9dfd9223b52f72aa9d4eaf47cd2bd33fbd88` (2026-11-06)  
 **Audit status:** current target ELF section totals verified by the successful 2026-11-06 native device build; physical-device CPU, xrun and stack high-water validation remain outstanding.
 
 ## 1. Flash is not one 1 MiB application slot
 
 The active Felucca-family linker/loader reserves a **581,564-byte XIP application slot**. The rest of the 1 MiB flash is partitioned for boot/update, VM/configuration, Bluetooth data, user data and device reservations. The app must not treat those other regions as extra firmware capacity.
 
-The latest successful native build reported an application image of **188,500 bytes**, leaving **393,064 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
+The latest successful native build reported an application image of **188,916 bytes**, leaving **392,648 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
 
 The app's persistent Instrument store is separately reserved in the 12-sector `0xF0000..0xFBFFF` pool (48 KiB). Felucca projects, samples, user preset banks, autosave, voice banks, global settings and OTA staging remain outside that allocation. See [REBUILD_AUDIT.md](REBUILD_AUDIT.md); do not move these ranges without re-auditing the pinned BSP.
 
@@ -35,7 +35,7 @@ The linker file is the authority for addresses. The builder separately checks th
 | Measurement | Used | Capacity | Remaining |
 |---|---:|---:|---:|
 | XIP application image | 188,500 B | 581,564 B | 393,064 B |
-| `.data + .bss` | 47,672 B | 98,304 B | 50,632 B |
+| `.data + .bss` | 47,736 B | 98,304 B | 50,568 B |
 | `.pool` | 275,264 B | 344,064 B | 68,800 B |
 | `.pool` after the builder's mandatory 8 KiB reserve | — | — | 60,608 B available above the reserve |
 
@@ -49,14 +49,14 @@ The 2026-11-06 device build emitted the following section sizes directly from `a
 
 | ELF section | Used | Region capacity |
 |---|---:|---:|
-| `.text` (XIP code + const data) | 181,976 B | Included in the 581,564 B XIP image slot |
+| `.text` (XIP code + const data) | 182,392 B | Included in the 581,564 B XIP image slot |
 | `.ram_text` | 3,556 B | 32,768 B |
 | `.data` | 2,968 B | Part of 98,304 B |
-| `.bss` | 44,696 B | Part of 98,304 B |
+| `.bss` | 44,760 B | Part of 98,304 B |
 | `.pool` | 275,264 B | 344,064 B |
 | `.noinit` | 1,836 B | 15,696 B |
 
-The raw ELF section sum is 47,664 B (2,968 + 44,696); the builder's address-based region check reports 47,672 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The application image size is exactly 188,500 B (181,976 + 3,556 + 2,968), before package wrapping.
+The raw ELF section sum is 47,728 B (2,968 + 44,760); the builder's address-based region check reports 47,672 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The application image size is exactly 188,500 B (181,976 + 3,556 + 2,968), before package wrapping.
 
 The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. Generated lookup tables are `const` data and are placed with XIP `.text/.rodata`, not copied into the 96 KiB RAM region. Only one FM6 core is linked; the four patches are data/voice pools, not four copies of the engine.
 
@@ -88,7 +88,7 @@ The latest successful native device build used for this audit is commit c174e07c
 
 | ELF section | Used | Capacity | Spare |
 |---|---:|---:|---:|
-| .text | 181,976 B | XIP slot 581,564 B | 399,588 B before RAMTEXT/data contribution |
+| .text | 181,976 B | XIP slot 581,564 B | 399,172 B before RAMTEXT/data contribution |
 | .ram_text | 3,556 B | 32,768 B | 29,212 B |
 | .data | 2,968 B | data + bss budget 98,304 B | — |
 | .bss | 44,696 B | data + bss budget 98,304 B | — |
