@@ -6,6 +6,18 @@
 
 static uint8_t objects[4][3840];
 static int present[4];
+static uint16_t test_crc16(const uint8_t *p, unsigned n) {
+    uint16_t crc=0xffffu;
+    while(n--) {
+        crc^=(uint16_t)((uint16_t)*p++<<8);
+        for(unsigned b=0;b<8u;b++) {
+            uint16_t shifted=(uint16_t)(crc<<1);
+            if(crc&0x8000u) shifted^=0x1021u;
+            crc=shifted;
+        }
+    }
+    return crc;
+}
 int plat_store_size(uint32_t obj) {
     if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSTRUMENTS3 || !present[obj-OBJ_INSTRUMENTS0]) return -1;
     return 3840;
@@ -31,6 +43,7 @@ static void make_instrument(fm1lab_instrument_t *in) {
         for(unsigned i=126;i<156;i++) v[i]=(uint8_t)(i%90u);
         v[134]=(uint8_t)(p+2u); v[135]=(uint8_t)(p+1u);
         v[136]=1; v[141]=1; v[142]=4; v[143]=6; v[155]=63;
+        in->patches[p].voice[155]=(uint8_t)(20u+p*30u);
         in->patches[p].enabled=(uint8_t)(p&1u);
         in->patches[p].level=(uint8_t)(100u+p);
         for(unsigned m=0;m<4;m++) in->patches[p].macros[m]=(uint8_t)(20u+p*10u+m);
@@ -53,11 +66,30 @@ int main(void) {
         assert(loaded.patches[p].voice[135]==source.patches[p].voice[135]);
         assert(loaded.patches[p].enabled==source.patches[p].enabled);
         assert(loaded.patches[p].level==source.patches[p].level);
+        assert(fm1lab_patch_pan(&loaded,p)==fm1lab_patch_pan(&source,p));
         assert(memcmp(loaded.patches[p].macros,source.patches[p].macros,4)==0);
         for(unsigned i=0;i<156;i++) assert(loaded.patches[p].voice[i]==source.patches[p].voice[i]);
     }
     assert(fm1lab_store_library_load(30,&loaded)==0);
     assert(memcmp(loaded.name,factory.name,11)==0);
+
+    /* A V1 bank has no pan bits. Loading it migrates all patches to center
+     * without changing the 3,840-byte record layout; the next save seals V2. */
+    memcpy(objects[1], objects[0], 3840u);
+    present[1]=1;
+    objects[1][4]=1u;
+    for(unsigned slot=0;slot<8u;slot++)
+        for(unsigned p=0;p<4u;p++) {
+            uint8_t *m=objects[1]+8u+slot*479u+11u+448u+p*5u;
+            m[3]&=0x7Fu;
+        }
+    uint16_t crc=test_crc16(objects[1]+8u,3832u);
+    objects[1][6]=(uint8_t)crc; objects[1][7]=(uint8_t)(crc>>8);
+    assert(fm1lab_store_library_load(8u,&loaded)==0);
+    for(unsigned p=0;p<4u;p++) assert(fm1lab_patch_pan(&loaded,p)==64u);
+    assert(fm1lab_store_library_save(8u,&loaded)==0);
+    assert(objects[1][4]==2u);
+
     objects[3][100]^=1u;
     assert(fm1lab_store_library_load(31,&loaded)<0);
     return 0;
