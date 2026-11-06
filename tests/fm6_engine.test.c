@@ -34,6 +34,17 @@ static void render_phaser_test(uint8_t rate, uint8_t depth, int32_t *destination
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
 
+static int32_t render_master_peak(uint32_t master_gain_q12)
+{
+    static int32_t warmup[256u * 2u];
+    fm6_init();
+    fm6_note_on_mask(60u, 110u, 0x01u);
+    fm6_render(warmup, 256u, master_gain_q12); /* settle the master ramp */
+    memset(output, 0, sizeof output);
+    fm6_render(output, TEST_FRAMES, master_gain_q12);
+    return peak(output, TEST_WORDS);
+}
+
 static int32_t render_stack_peak(uint8_t patch_mask)
 {
     uint8_t voice[156] = {0};
@@ -67,6 +78,15 @@ int main(void) {
     int32_t four_patch_peak = render_stack_peak(0x0Fu);
     assert(single_patch_peak > 0);
     assert(four_patch_peak > single_patch_peak * 2);
+
+    /* The platform passes APP_GAIN as Q12 (0..4096). At a settled
+     * half-scale master setting, output must be approximately half of unity. */
+    int32_t master_unity_peak = render_master_peak(4096u);
+    int32_t master_half_peak = render_master_peak(2048u);
+    assert(master_unity_peak > 0);
+    assert(master_half_peak > 0);
+    assert(master_half_peak * 10 > master_unity_peak * 4);
+    assert(master_half_peak * 10 < master_unity_peak * 6);
 
     /* A zero-level patch must contribute exact silence to dry and every
      * enabled parallel send, not merely suppress new note allocation. */
