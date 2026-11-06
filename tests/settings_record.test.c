@@ -18,12 +18,12 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
                 s->seq_gate[lane][step] > 100u || s->seq_note[lane][step] > 127u)
                 return 0;
     }
-    for (unsigned fx = 0; fx < 3u; ++fx)
+    for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
         if (s->fx_enabled[fx] > 1u || s->fx_mix[fx] > 100u ||
-            s->fx_time[fx] > 100u || s->fx_feedback[fx] > 100u)
+            s->fx_time[fx] > 100u || s->fx_feedback[fx] > 100u || s->fx_depth[fx] > 100u)
             return 0;
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p)
-        for (unsigned fx = 0; fx < 3u; ++fx)
+        for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
             if (s->fx_send[p][fx] > 100u) return 0;
     return 1;
 }
@@ -101,6 +101,43 @@ int main(void)
     copy = imported; assert(settings_import_v2(&copy, &v2) == -1);
     assert(memcmp(&copy, &imported, sizeof copy) == 0);
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2 migration tests passed");
+    /* V3 -> V4 migration keeps the three existing buses and initializes Phaser
+     * disabled with a conservative depth; legacy records are CRC protected. */
+    settings_v3_t v3;
+    memset(&v3, 0, sizeof v3);
+    v3.magic=SET_MAGIC_V3; v3.octave=0; v3.patch=1u; v3.enabled_mask=0x0Fu;
+    v3.performance.tempo_bpm=128u; v3.performance.seq_length=16u;
+    v3.performance.lane_patch[0]=0u; v3.performance.lane_patch[1]=2u;
+    for(unsigned lane=0;lane<2u;++lane) for(unsigned step=0;step<64u;++step) {
+        v3.performance.seq_note[lane][step]=60u;
+        v3.performance.seq_velocity[lane][step]=100u;
+        v3.performance.seq_gate[lane][step]=50u;
+    }
+    for(unsigned fx=0;fx<3u;++fx) {
+        v3.performance.fx_enabled[fx]=1u;
+        v3.performance.fx_mix[fx]=40u;
+        v3.performance.fx_time[fx]=45u;
+        v3.performance.fx_feedback[fx]=30u;
+        for(unsigned p=0;p<FM1LAB_PATCH_COUNT;++p) v3.performance.fx_send[p][fx]=55u;
+    }
+    for(unsigned p=0;p<FM1LAB_PATCH_COUNT;++p) {
+        v3.levels[p]=100u;
+        for(unsigned m=0;m<FM1LAB_MACRO_COUNT;++m) v3.macros[p][m]=50u;
+    }
+    v3.crc=settings_crc16(&v3,offsetof(settings_v3_t,crc));
+    imported=good;
+    assert(settings_v3_valid(&v3));
+    assert(settings_import_v3(&imported,&v3)==0);
+    assert(imported.performance.tempo_bpm==128u);
+    assert(imported.performance.fx_enabled[0]==1u && imported.performance.fx_send[2][2]==55u);
+    assert(imported.performance.fx_enabled[FM6_FX_PHASER]==0u);
+    assert(imported.performance.fx_send[2][FM6_FX_PHASER]==0u);
+    assert(imported.performance.fx_depth[FM6_FX_PHASER]==65u);
+    v3.performance.fx_send[0][0]=101u;
+    copy=imported;
+    assert(settings_import_v3(&copy,&v3)==-1);
+    assert(memcmp(&copy,&imported,sizeof copy)==0);
+
+    puts("FM1-Lab settings record CRC, validation and V1/V2/V3 migration tests passed");
     return 0;
 }
