@@ -354,17 +354,6 @@ static void fm6_rebuild_patch(uint32_t index)
     p->ready = 1;
 }
 
-static int32_t fm6_soft_clip(int64_t x)
-{
-    uint64_t a = x < 0 ? (uint64_t)(-(x + 1)) + 1u : (uint64_t)x;
-    uint32_t index = (uint32_t)(a >> 16);
-    int32_t y;
-    if (index > 256u)
-        index = 256u;
-    y = (int32_t)(((int64_t)TANH_Q15[index] * OUTPUT_LIMIT) >> 15);
-    return x < 0 ? -y : y;
-}
-
 /* Each patch owns a fixed, independent voice pool. Layering four patches can
  * therefore never steal a voice from another patch. */
 static fm1lab_voice_t *fm6_allocate_voice(uint32_t patch)
