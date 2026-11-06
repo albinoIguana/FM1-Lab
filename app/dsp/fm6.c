@@ -674,9 +674,9 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
                 return 0;
         }
     }
-    for (uint32_t fx = 0; fx < 3u; ++fx) {
+    for (uint32_t fx = 0; fx < 4u; ++fx) {
         if (s->fx_enabled[fx] > 1u || s->fx_mix[fx] > 100u ||
-            s->fx_time[fx] > 100u ||
+            s->fx_time[fx] > 100u || s->fx_depth[fx] > 100u ||
             s->fx_feedback[fx] > (fx == 0u ? 70u : 90u))
             return 0;
         for (uint32_t patch = 0; patch < PATCHES; ++patch)
