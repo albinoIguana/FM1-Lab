@@ -67,6 +67,20 @@ int main(void) {
     int32_t four_patch_peak = render_stack_peak(0x0Fu);
     assert(single_patch_peak > 0);
     assert(four_patch_peak > single_patch_peak * 2);
+
+    /* A zero-level patch must contribute exact silence to dry and every
+     * enabled parallel send, not merely suppress new note allocation. */
+    fm6_init();
+    for (unsigned effect = 0; effect < FM6_FX_COUNT; ++effect) {
+        fm6_fx_set_enabled((uint8_t)effect, 1u);
+        fm6_fx_set_mix((uint8_t)effect, 100u);
+        fm6_fx_set_send(0u, (uint8_t)effect, 100u);
+    }
+    fm6_patch_set_level(0u, 0u);
+    fm6_note_on_mask(60u, 110u, 0x01u);
+    memset(output, 0, sizeof output);
+    fm6_render(output, TEST_FRAMES, 4096u);
+    assert(peak(output, TEST_WORDS) == 0);
     fm6_note_on(60u, 100u);
     assert(fm6_active_voices() == FM1LAB_PATCH_COUNT);
     fm6_panic();
