@@ -21,7 +21,7 @@ Status: calibrated mixer, pan-aware stereo sends/returns, global Instrument-bus 
 - Replaced the tanh output clip with linear Q24-to-Q23 conversion and a distinct stereo-linked peak limiter at 7,470,000 Q23 (approximately −1 dBFS), instantaneous attack and approximately 5.8 ms release.
 - Native tests now measure the coherent reference, assert the default output is approximately −12 dBFS, verify no internal FX saturation in the reference feedback case, and exercise the final limiter under full-level stress.
 - Per-patch pan is persisted in bank V2 using reserved bits without expanding the 479-byte record; V1 banks migrate to center. The dry strip uses smoothed constant-voltage balance pan, with hard-left/right/center and persistence tests.
-- Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,360 B, `.ram_text` 3,556 B, `.pool` 275,264 B, `.text` 183,080 B, `.noinit` 1,836 B; app.bin 189,604 B. Pool spare is 68,800 B (60,608 B after the mandatory 8 KiB reserve); RAM `.data + .bss` spare is 50,968 B.
+- Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,360 B, `.ram_text` 3,556 B, `.pool` 275,264 B, `.text` 183,064 B, `.noinit` 1,836 B; app.bin 189,588 B. Pool spare is 68,800 B (60,608 B after the mandatory 8 KiB reserve); RAM `.data + .bss` spare is 50,968 B.
 - Per-patch stereo sends/pan-before-send are implemented and covered by host probes. Master compressor and Amp/EQ/compressor physical controls are implemented. Hardware CPU/xrun/listening qualification remains incomplete.
 
 ## Architecture gate — insert and master state ownership settled

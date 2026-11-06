@@ -2,14 +2,14 @@
 
 **Target:** M-VAVE FM1, 1 MiB SPI NOR and 512 KiB internal SRAM  
 **Build:** native fm1-base + Felucca-BSP + one pinned Felucca FM6 core  
-**Code baseline:** `80f0842659a90dd56b67e92f76cdf8d1598a615f` (2026-11-06)  
+**Code baseline:** `c39f1a98ccb0e2bfc49dc5ea4609374457cefffa` (2026-11-06)  
 **Audit status:** native target ELF section totals verified by CI. Physical-device CPU, xrun, stack high-water and listening qualification remain outstanding.
 
 ## 1. Flash is not one 1 MiB application slot
 
 The active Felucca-family linker/loader reserves a **581,564-byte XIP application slot**. The rest of flash is partitioned for boot/update, VM/configuration, Bluetooth data, user data and device reservations. Those regions are not spare firmware capacity.
 
-The latest successful native device build emitted an application image of **189,604 bytes**, leaving **391,960 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
+The latest successful native device build emitted an application image of **189,588 bytes**, leaving **391,976 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
 
 The Instrument store is separately reserved in the 12-sector `0xF0000..0xFBFFF` pool (48 KiB). Do not move these ranges without re-auditing the pinned BSP; see [REBUILD_AUDIT.md](REBUILD_AUDIT.md).
 
@@ -30,7 +30,7 @@ These regions total 512 KiB and are not interchangeable. The builder separately 
 
 ## 3. Latest successful native target build
 
-CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/42282415707)
+CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/42283303903)
 
 | Measurement | Used | Capacity | Remaining |
 |---|---:|---:|---:|
@@ -43,7 +43,7 @@ CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/
 
 | ELF section | Used | Region capacity |
 |---|---:|---:|
-| `.text` | 183,080 B | Included in XIP image slot |
+| `.text` | 183,064 B | Included in XIP image slot |
 | `.ram_text` | 3,556 B | 32,768 B |
 | `.data` | 2,968 B | Part of 98,304 B |
 | `.bss` | 44,360 B | Part of 98,304 B |
