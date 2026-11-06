@@ -2,7 +2,7 @@
 #define FM1LAB_STORE_LIBRARY_H
 
 #include "fm1lab_instrument.h"
-#include "fm1lab_insert_state.h"
+#include "dsp/fm1lab_insert_state.h"
 
 #define FM1LAB_STORE_BANK_COUNT 4u
 #define FM1LAB_STORE_INSTRUMENTS_PER_BANK 8u

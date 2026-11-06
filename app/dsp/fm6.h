@@ -2,6 +2,7 @@
  * FM1-Lab: four-patch Instrument API. FM6 core provenance is retained in fm6.c. */
 #pragma once
 #include <stdint.h>
+#include "fm1lab_insert_state.h"
 
 #define FM6_SAMPLE_RATE_HZ 44100u /* fm1-base device/main_fm1.c: FS */
 #define FM1LAB_PATCH_COUNT 4u
@@ -30,18 +31,6 @@ typedef struct {
     uint8_t compressor_attack, compressor_release, compressor_makeup;
 } fm6_performance_state_t;
 
-enum {
-    FM6_INSERT_AMP_ENABLED=0, FM6_INSERT_DRIVE, FM6_INSERT_TONE, FM6_INSERT_OUTPUT,
-    FM6_INSERT_EQ_ENABLED,
-    FM6_INSERT_EQ_LOW_FREQUENCY, FM6_INSERT_EQ_LOW_GAIN, FM6_INSERT_EQ_LOW_Q,
-    FM6_INSERT_EQ_MID_FREQUENCY, FM6_INSERT_EQ_MID_GAIN, FM6_INSERT_EQ_MID_Q,
-    FM6_INSERT_EQ_HIGH_FREQUENCY, FM6_INSERT_EQ_HIGH_GAIN, FM6_INSERT_EQ_HIGH_Q,
-    FM6_INSERT_FIELD_COUNT
-};
-enum {
-    FM6_COMP_ENABLED=0, FM6_COMP_THRESHOLD, FM6_COMP_RATIO,
-    FM6_COMP_ATTACK, FM6_COMP_RELEASE, FM6_COMP_MAKEUP, FM6_COMP_FIELD_COUNT
-};
 
 enum {
     FM1LAB_MACRO_BRIGHTNESS = 0,

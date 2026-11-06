@@ -1,5 +1,4 @@
 #include "fm1lab_store_library.h"
-#include "fm1lab_insert_state.h"
 #include "app.h"
 
 #define BANK_BYTES 3840u

@@ -240,7 +240,7 @@ static int64_t fm6_patch_insert_process(uint32_t patch, int64_t input)
     int64_t eq_output = eq_input;
     for (uint32_t band = 0; band < 3u; ++band) {
         int32_t x = fm6_clamp_sample(eq_output);
-        if (p->eq_gain[band] == 12u) {
+        if (p->eq_gain[band] == 12u || !(p->eq_enabled & (uint8_t)(1u << (band+1u)))) {
             p->eq_x2[band] = p->eq_x1[band]; p->eq_x1[band] = x;
             p->eq_y2[band] = p->eq_y1[band]; p->eq_y1[band] = x;
             continue;
@@ -255,7 +255,7 @@ static int64_t fm6_patch_insert_process(uint32_t patch, int64_t input)
         p->eq_y2[band] = p->eq_y1[band]; p->eq_y1[band] = y;
         eq_output = y;
     }
-    return p->eq_enabled ? eq_output : amp;
+    return (p->eq_enabled & 1u) ? eq_output : amp;
 }
 static uint32_t fm6_comp_makeup_q15(uint8_t value)
 {
@@ -598,7 +598,7 @@ void fm6_init(void)
         instrument[i].level = 31u; /* 24.4% linear: safe factory starting level */
         instrument[i].pan = 64u; /* centered; constant-voltage pan preserves the reference level */
         instrument[i].amp_enabled=0u; instrument[i].drive=0u; instrument[i].tone=50u; instrument[i].output=50u;
-        instrument[i].eq_enabled=0u; instrument[i].amp_tone_state=0;
+        instrument[i].eq_enabled=14u; instrument[i].amp_tone_state=0;
         instrument[i].eq_frequency[0]=18u; instrument[i].eq_frequency[1]=50u; instrument[i].eq_frequency[2]=82u;
         for(uint32_t band=0;band<3u;band++){
             instrument[i].eq_gain[band]=12u; instrument[i].eq_q[band]=10u;
@@ -1090,15 +1090,17 @@ void fm6_patch_insert_set(uint32_t patch,uint32_t field,uint8_t value)
     else if(field==FM6_INSERT_DRIVE)p->drive=value>100u?100u:value;
     else if(field==FM6_INSERT_TONE)p->tone=value>100u?100u:value;
     else if(field==FM6_INSERT_OUTPUT)p->output=value>100u?100u:value;
-    else if(field==FM6_INSERT_EQ_ENABLED)p->eq_enabled=value?1u:0u;
+    else if(field==FM6_INSERT_EQ_ENABLED){if(value)p->eq_enabled|=1u;else p->eq_enabled&=(uint8_t)~1u;}
     else {
-        uint32_t band=(field-FM6_INSERT_EQ_LOW_FREQUENCY)/3u;
-        uint32_t param=(field-FM6_INSERT_EQ_LOW_FREQUENCY)%3u;
+        uint32_t offset=field-FM6_INSERT_EQ_LOW_FREQUENCY;
+        uint32_t band=offset/4u;
+        uint32_t param=offset%4u;
         if(band>=3u)return;
         if(param==0u)p->eq_frequency[band]=value>100u?100u:value;
         else if(param==1u)p->eq_gain[band]=value>24u?24u:value;
-        else p->eq_q[band]=value>31u?31u:value;
-        fm6_eq_coeff_update(p,band);
+        else if(param==2u)p->eq_q[band]=value>31u?31u:value;
+        else {uint8_t bit=(uint8_t)(1u<<(band+1u));if(value)p->eq_enabled|=bit;else p->eq_enabled&=(uint8_t)~bit;}
+        if(param<3u)fm6_eq_coeff_update(p,band);
     }
 }
 uint8_t fm6_patch_insert_get(uint32_t patch,uint32_t field)
@@ -1109,11 +1111,12 @@ uint8_t fm6_patch_insert_get(uint32_t patch,uint32_t field)
     if(field==FM6_INSERT_DRIVE)return p->drive;
     if(field==FM6_INSERT_TONE)return p->tone;
     if(field==FM6_INSERT_OUTPUT)return p->output;
-    if(field==FM6_INSERT_EQ_ENABLED)return p->eq_enabled;
-    uint32_t band=(field-FM6_INSERT_EQ_LOW_FREQUENCY)/3u;
-    uint32_t param=(field-FM6_INSERT_EQ_LOW_FREQUENCY)%3u;
+    if(field==FM6_INSERT_EQ_ENABLED)return (uint8_t)(p->eq_enabled&1u);
+    uint32_t offset=field-FM6_INSERT_EQ_LOW_FREQUENCY;
+    uint32_t band=offset/4u;
+    uint32_t param=offset%4u;
     if(band>=3u)return 0u;
-    return param==0u?p->eq_frequency[band]:param==1u?p->eq_gain[band]:p->eq_q[band];
+    return param==0u?p->eq_frequency[band]:param==1u?p->eq_gain[band]:param==2u?p->eq_q[band]:(uint8_t)((p->eq_enabled>>(band+1u))&1u);
 }
 void fm6_master_comp_set(uint32_t field,uint8_t value)
 {
