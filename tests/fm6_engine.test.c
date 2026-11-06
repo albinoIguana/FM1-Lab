@@ -34,11 +34,39 @@ static void render_phaser_test(uint8_t rate, uint8_t depth, int32_t *destination
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
 
+static int32_t render_stack_peak(uint8_t patch_mask)
+{
+    uint8_t voice[156];
+    fm6_init();
+    memcpy(voice, fm6_patch_data(0u), 155u);
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        if (patch && fm6_patch_set_voice(patch, voice) != 0)
+            return -1;
+        fm6_patch_set_level(patch, 31u);
+        fm6_patch_set_enabled(patch, (patch_mask & (1u << patch)) != 0u);
+    }
+    fm6_note_on_mask(60u, 110u, patch_mask);
+    memset(output, 0, sizeof output);
+    fm6_render(output, TEST_FRAMES, 4096u);
+    return peak(output, TEST_WORDS);
+}
+
 int main(void) {
     assert(fm6_patch_count() == FM1LAB_PATCH_COUNT);
     fm6_init();
     assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 1u &&
            fm6_patch_enabled(2) == 1u && fm6_patch_enabled(3) == 1u);
+    /* New factory patches start at <=25% linear amplitude. */
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        assert(fm6_patch_level(patch) == 31u);
+
+    /* A patch's gain must not fall as additional identical patches are
+     * enabled. Four coherent patches should sum, not be normalized back
+     * to the single-patch level. */
+    int32_t single_patch_peak = render_stack_peak(0x01u);
+    int32_t four_patch_peak = render_stack_peak(0x0Fu);
+    assert(single_patch_peak > 0);
+    assert(four_patch_peak > single_patch_peak * 2);
     fm6_note_on(60u, 100u);
     assert(fm6_active_voices() == FM1LAB_PATCH_COUNT);
     fm6_panic();
