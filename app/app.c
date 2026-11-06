@@ -781,7 +781,7 @@ static void input(void)
             set.patch=(uint8_t)next;
             set_dirty=1u;
             app_say("ROUTING PATCH",fm6_patch_name(set.patch));
-        } else if (k == EN_SELECT && page == PAGE_FX_COMPRESSOR) {
+        } else if (k == EN_ALGO && page == PAGE_FX_COMPRESSOR) {
             compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
             app_say("COMP MAKEUP","UPDATED");
         } else if (k == EN_SELECT && page >= PAGE_FX_AMP && page <= PAGE_FX_ROUTING) {
@@ -1410,7 +1410,7 @@ static void draw(void)
     else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
     else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"MASTER AMP  K1 DRIVE  K2 TONE  K3 OUTPUT  K4 BYPASS",C_GRAY);
     else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"MASTER EQ  ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
-    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"MASTER COMP  K1 THRESH  K2 RATIO  K3 ATTACK  K4 RELEASE",C_GRAY);
+    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"K1 THRESH  K2 RATIO  K3 ATTACK  K4 RELEASE  ALGO MAKEUP",C_GRAY);
     else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
