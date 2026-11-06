@@ -81,7 +81,7 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
         for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             instrument->patches[p].macros[m] = 50;
         instrument->patches[p].enabled = 1;
-        instrument->patches[p].level = 127;
+        instrument->patches[p].level = 31; /* 24.4% safe new-Instrument default */
     }
 }
 
@@ -99,7 +99,7 @@ int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
     for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
         instrument->patches[patch].macros[m] = 50;
     instrument->patches[patch].enabled = 1;
-    instrument->patches[patch].level = 127;
+    instrument->patches[patch].level = 31; /* new voice starts at safe level */
     return 0;
 }
 
