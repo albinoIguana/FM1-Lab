@@ -688,6 +688,31 @@ int main(void) {
     assert(fm6_master_insert_get(FM6_INSERT_EQ_MID_GAIN)==24u);
     assert(fm6_master_insert_get(FM6_INSERT_EQ_MID_FREQUENCY)==50u);
 
+    /* The global EQ may share coefficients, but its delay state is per
+     * channel: hard-left stays left and hard-right stays right. */
+    render_master_eq_pan(0u, chunk_a);
+    int32_t left_peak = 0, right_peak = 0;
+    for (unsigned frame = 0u; frame < 32u * TEST_FRAMES; ++frame) {
+        int32_t l = chunk_a[frame * 2u], r = chunk_a[frame * 2u + 1u];
+        if (l < 0) l = -l;
+        if (r < 0) r = -r;
+        if (l > left_peak) left_peak = l;
+        if (r > right_peak) right_peak = r;
+    }
+    assert(left_peak > 0);
+    assert(right_peak == 0);
+    render_master_eq_pan(127u, chunk_a);
+    left_peak = right_peak = 0;
+    for (unsigned frame = 0u; frame < 32u * TEST_FRAMES; ++frame) {
+        int32_t l = chunk_a[frame * 2u], r = chunk_a[frame * 2u + 1u];
+        if (l < 0) l = -l;
+        if (r < 0) r = -r;
+        if (l > left_peak) left_peak = l;
+        if (r > right_peak) right_peak = r;
+    }
+    assert(right_peak > 0);
+    assert(left_peak == 0);
+
     /* Linked master compression reduces sustained four-layer peaks and is
      * fully bypassable; its state is included in performance persistence. */
     int32_t compressor_bypass_peak=render_compressor_peak(0u);
