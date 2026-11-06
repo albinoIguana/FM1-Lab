@@ -59,7 +59,7 @@ The four shared FX buses own independent processor state and independent send le
 
 ## 4. Stereo and routing contract
 
-- Each patch has a smoothed stereo dry-strip pan. The current shared send accumulators are still mono and are not yet panned; stereo per-patch sends and pan-before-send remain an explicit routing task.
+- Each patch has a smoothed stereo dry-strip pan. The same smoothed pan gains are applied to each patch's four sends before accumulation; every shared FX bus has independent left/right input and feedback state. Hard-left/right/center send-isolation tests cover all four buses.
 - Each patch has four independent send controls: Chorus, Phaser, Delay, Reverb.
 - Each send bus has a documented input format, internal headroom, wet-output format, and return gain.
 - FX return summing occurs in a wider accumulator than the final output sample format.
@@ -75,7 +75,7 @@ Separate state into three lifetimes:
 2. **Performance state** — sequencer patterns/assignments, arp settings, tempo and performance controls intended to be saved with the performance/session.
 3. **Device state** — physical master setting, global MIDI/device preferences, diagnostics configuration, and other hardware-specific settings.
 
-Per-patch pan is now Instrument-owned and persists in the fixed-size 479-byte library record using reserved bits; bank header V2 migrates V1 records to centered pan. Per-patch sends, inserts, and future processor state still need an explicit portable serialization boundary. Do not duplicate authoritative values between the settings record and Instrument bank without a documented ownership rule.
+Per-patch pan is Instrument-owned and persists in the fixed-size 479-byte library record using reserved bits; bank header V2 migrates V1 records to centered pan. Per-patch sends currently live in the versioned Performance/settings state (`fx_send[4][4]`), not in the Instrument bank. Inserts and future processor state still need an explicit portable serialization boundary. Do not duplicate authoritative values between the settings record and Instrument bank without a documented ownership rule.
 
 Persistence requirements:
 - Validate a complete candidate before applying any of it.
@@ -133,8 +133,8 @@ The current feature-branch implementation has several behaviors to reconcile bef
 - The active-layer-count normalization has been removed. Each patch now receives the same fixed linear level regardless of how many other patches are active; the coherent-sum test verifies exact 4:1 pre-master scaling.
 - Factory/new-state entry points now agree on level 31/127, including settings defaults, factory capture, Instrument initialization, voice replacement, and empty-bank records. Existing decoded/saved user records retain their stored levels.
 - The `APP_GAIN` caller contract is Q12 amplitude (0..4096). A fixed Q15 −12 dB master trim (8231) now precedes FX routing; the output path uses linear Q24-to-Q23 conversion and a separate −1 dBFS peak limiter with instantaneous attack and bounded release.
-- The current shared FX send accumulator still folds patch samples to mono before the stereo returns. Per-patch dry pan is implemented and smoothed, but pan-before-send and per-patch stereo sends remain outstanding; the Q19 headroom work does not claim that routing requirement complete.
-- FX send accumulators remain wide until the fixed master trim, then enter a Q19 internal FX domain (Q24 input shifted right five bits). The existing int32 delay/comb buffers retain their memory footprint while gaining 32× internal headroom. Test-only saturation counters verify no internal saturation under the four-patch reference/feedback condition.
+- Per-patch sends are now stereo and pan-aware: each patch's smoothed L/R gains are applied before the four shared send accumulators. Chorus, Delay and Reverb now have independent L/R feedback buffers/networks; Phaser receives the panned L/R inputs and retains its stereo LFO offset. The FX returns remain in the Q19 domain and are summed with the stereo dry bus.
+- FX send accumulators remain wide until the fixed master trim, then enter a Q19 internal FX domain (Q24 input shifted right five bits). Independent left/right delay, chorus and comb buffers double the FX-buffer allocation from 98,304 to 196,608 bytes while preserving 32× internal headroom. Test-only saturation counters verify no internal saturation under the four-patch reference/feedback condition.
 - The current Phaser is a four-stage all-pass effect, while Chorus/Delay/Reverb still have simpler existing implementations. Their quality and parameter completeness remain separate work items.
 - Current settings schema is V4. Instrument bank records persist four patch levels/macros/enabled flags; bank header V2 additionally stores 7-bit pan in reserved bits (three bits in DX7 VMEM byte 111 and one unused high bit in each macro byte). The fixed 479-byte record size is unchanged. V1 bank migration defaults pan to 64 (center). The bank record is authoritative after an Instrument is loaded; the settings copy remains a compatibility/runtime mirror for levels/macros. Inserts and sends still need a documented persistence design.
 
@@ -180,8 +180,8 @@ The following findings were confirmed against the current feature-branch source 
 ### Current memory evidence and build target
 
 - The active device target is the native `app/fm1.toml` build, which compiles `app/dsp/fm6.c`. The separate `firmware/fm1lab_audio_engine.c` path is not listed in that target and must not be mistaken for the live DSP implementation or patched as a substitute.
-- The latest linked device ELF reports `.pool` = 171,528 bytes, `.data` = 2,968, `.bss` = 44,108, `.ram_text` = 3,556, `.text` = 167,960, and `.noinit` = 1,836. The known 98,304-byte FX buffers plus the 69,120-byte graphics canvas account for 167,424 bytes of the pool; remaining pool users account for the difference.
-- The older 69,384-byte `.pool` report in `docs/memory-budget.md` is historical. Latest target build used 171,528 / 344,064 pool bytes (172,536 spare), 47,076 / 98,304 RAM `.data + .bss` bytes (51,228 spare), and 3,556 / 32,768 RAMTEXT bytes (29,212 spare). The XIP image is 174,484 / 581,564 bytes. This fresh ELF evidence is from the successful native build on 2026-11-06.
+- The latest linked device ELF after stereo FX buffers reports `.pool` = 269,832 bytes, `.data` = 2,968, `.bss` = 44,108, `.ram_text` = 3,556, `.text` = 169,544, and `.noinit` = 1,836. The 196,608-byte stereo FX buffers plus the 69,120-byte graphics canvas account for 265,728 bytes of the pool; remaining pool users account for 4,104 bytes.
+- The older 69,384-byte `.pool` report in `docs/memory-budget.md` is historical. Latest target build used 269,832 / 344,064 pool bytes (74,232 spare; 66,040 after the mandatory 8,192-byte reserve), 47,076 / 98,304 RAM `.data + .bss` bytes (51,228 spare), and 3,556 / 32,768 RAMTEXT bytes (29,212 spare). The XIP image is 176,068 / 581,564 bytes. This fresh ELF evidence is from the successful native build on 2026-11-06.
 
 ### Required next audit actions
 
@@ -216,5 +216,13 @@ This is a host-calibrated signal reference, not a universal loudness guarantee f
 - The expanded 156-byte voice representation has a non-synthesis sentinel at byte 155; the FM6 core consumes only the first 155 bytes. FM1-Lab uses that sentinel to hold pan (0=left, 64=center, 127=right) without increasing the in-memory Instrument structure.
 - Library bank header V2 stores pan in existing reserved bits: three low bits in DX7 VMEM byte 111 (bits 4–6) and four high bits in the unused MSBs of the four macro metadata bytes. Macro values remain 0–100 in their lower seven bits. The record remains exactly 479 bytes.
 - Bank V1 migration assigns pan 64 to every patch and reseals the bank CRC. The next save persists the V2 representation. Legacy pre-bank Instrument objects also normalize the old byte-155 sentinel to center before migration.
-- The native dry strip uses constant-voltage balance pan: center is unity on both channels to preserve the measured reference level. Pan gains move toward their targets with a per-sample one-pole ramp (64-sample time constant). The current FX send buses remain mono and are not yet pan-aware; stereo per-patch sends are still required.
+- The native dry strip uses constant-voltage balance pan: center is unity on both channels to preserve the measured reference level. Pan gains move toward their targets with a per-sample one-pole ramp (64-sample time constant). The four shared FX buses now receive independent panned L/R send signals; Chorus, Delay and Reverb use independent channel buffers, while Phaser processes independent L/R inputs with its 90-degree LFO offset.
 - The native device build and host regression both pass with this state extension. Pan UI control wiring remains a separate UI integration item.
+
+
+## 16. Pan-aware stereo FX routing — 2026-11-06
+
+- The per-sample send accumulators are now `[effect][channel]`; each patch's current smoothed pan gains are applied to its sample before the patch's send level is accumulated.
+- Chorus has separate left/right ring buffers (with its existing offset taps), Delay has separate left/right feedback buffers, and Reverb has independent left/right comb networks. Phaser receives separate panned left/right send values and retains its stereo LFO offset.
+- FX buffer allocation is now 196,608 bytes, up from 98,304 bytes. The latest successful target ELF reports `.pool` 269,832 / 344,064 bytes, leaving 74,232 bytes (66,040 after the required 8 KiB reserve). `.data + .bss` remains 47,076 / 98,304 bytes; `app.bin` is 176,068 bytes.
+- Host regression probes inspect every effect's pre-FX stereo send accumulator at hard-left, hard-right and center. Native engine checks and the target device build both pass. Hardware CPU/xrun and listening qualification remain outstanding.

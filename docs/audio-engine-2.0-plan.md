@@ -1,6 +1,6 @@
 # FM1-Lab Audio Engine 2.0 implementation plan
 
-Status: Phaser fourth bus, calibrated gain/headroom foundation, and persistent per-patch dry pan are implemented on the feature branch. The binding architecture contract is [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
+Status: Phaser fourth bus, calibrated gain/headroom foundation, persistent per-patch dry pan, and pan-aware stereo sends/returns are implemented on the feature branch. The binding architecture contract is [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
 
 ## Implementation checkpoint — Phaser bus
 
@@ -17,16 +17,16 @@ Status: Phaser fourth bus, calibrated gain/headroom foundation, and persistent p
 - Measured the pinned FM6 core's reference voice at 13,045,204 Q24 for factory level 31; fixed Q15 calibration 10,536 yields 4,194,466 Q24 per reference patch.
 - Four coherent reference patches sum to 16,777,864 Q24 (approximately unity) without active-layer-count normalization.
 - Added the independent Q15 −12 dB master trim (8231) ahead of dry/FX routing.
-- Moved the shared FX buses into a Q19 internal domain (Q24 sends shifted right five bits), preserving existing int32 delay/comb memory while reserving 32× feedback headroom.
+- Moved the shared FX buses into a Q19 internal domain (Q24 sends shifted right five bits), reserving 32× feedback headroom. Pan-aware stereo routing now uses independent left/right delay, chorus and comb buffers.
 - Replaced the tanh output clip with linear Q24-to-Q23 conversion and a distinct stereo-linked peak limiter at 7,470,000 Q23 (approximately −1 dBFS), instantaneous attack and approximately 5.8 ms release.
 - Native tests now measure the coherent reference, assert the default output is approximately −12 dBFS, verify no internal FX saturation in the reference feedback case, and exercise the final limiter under full-level stress.
 - Per-patch pan is persisted in bank V2 using reserved bits without expanding the 479-byte record; V1 banks migrate to center. The dry strip uses smoothed constant-voltage balance pan, with hard-left/right/center and persistence tests.
-- Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,108 B, `.ram_text` 3,556 B, `.pool` 171,528 B, `.text` 167,960 B, `.noinit` 1,836 B; app.bin 174,484 B. Pool spare is 172,536 B; RAM `.data + .bss` spare is 51,228 B.
-- Per-patch stereo sends/pan-before-send, master compressor, pan UI control, and device CPU/xrun qualification are not complete.
+- Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,108 B, `.ram_text` 3,556 B, `.pool` 269,832 B, `.text` 169,544 B, `.noinit` 1,836 B; app.bin 176,068 B. Pool spare is 74,232 B (66,040 B after the mandatory 8 KiB reserve); RAM `.data + .bss` spare is 51,228 B.
+- Per-patch stereo sends/pan-before-send are implemented and covered by host probes. Master compressor, pan UI control, and device CPU/xrun qualification remain incomplete.
 
 ## Architecture gate — before inserts and further DSP
 
-The gain foundation and per-patch dry pan/state migration are now in place, but the architecture contract still gates the next processors. Freeze stereo send/return ownership, instrument/performance/device state boundaries for sends/inserts, memory/stack budget, and remaining saturation boundaries before adding Amp/Drive or EQ. Do not treat the current mono send accumulation or the completed peak limiter as completion of the full mixer or master-dynamics architecture.
+The gain foundation, per-patch dry pan/state migration, and pan-aware stereo send/return path are now in place. Before adding Amp/Drive or EQ, freeze the remaining Instrument/Performance/Device state boundaries for inserts and master dynamics, document the remaining stack budget, and audit saturation boundaries. Do not treat the completed peak limiter as completion of master dynamics.
 
 ## Goals
 
@@ -97,7 +97,7 @@ For each processor and each routing edge:
 
 ## Delivery order
 
-1. Freeze enums, routing topology, parameter semantics, settings version/migration and DSP ownership.
+1. Freeze enums, routing topology, parameter semantics, settings version/migration and DSP ownership. The four stereo send buses and pan-before-send topology are implemented; insert/master persistence ownership remains to be frozen.
 2. Implement the processor APIs and parameter state without UI assumptions.
 3. Implement Phaser and Amp/Drive, then EQ and master Compressor/Limiter.
 4. Refactor Chorus, Delay and Reverb to expose meaningful independent parameters and improve quality.
