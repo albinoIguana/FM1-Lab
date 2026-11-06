@@ -120,6 +120,26 @@ static void render_insert_variant(uint8_t amp, uint8_t eq, int32_t *destination)
     for(unsigned block=0u;block<32u;block++)
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
+/* The shared Instrument EQ must retain independent L/R filter histories.
+ * A hard-panned source must not leak into the opposite channel through the
+ * global post-FX processing chain. */
+static void render_master_eq_pan(uint8_t pan, int32_t *destination)
+{
+    static int32_t warmup[2048u * 2u];
+    fm6_init();
+    for (unsigned patch = 1u; patch < FM1LAB_PATCH_COUNT; ++patch)
+        fm6_patch_set_enabled((uint8_t)patch, 0u);
+    fm6_patch_set_pan(0u, pan);
+    fm6_master_insert_set(FM6_INSERT_EQ_ENABLED, 1u);
+    fm6_master_insert_set(FM6_INSERT_EQ_MID_FREQUENCY, 54u);
+    fm6_master_insert_set(FM6_INSERT_EQ_MID_GAIN, 24u);
+    fm6_master_insert_set(FM6_INSERT_EQ_MID_Q, 18u);
+    fm6_render(warmup, 2048u, 4096u); /* settle pan before measurement */
+    fm6_note_on_mask(60u, 110u, 0x01u);
+    for (unsigned block = 0u; block < 32u; ++block)
+        fm6_render(destination + block * TEST_WORDS, TEST_FRAMES, 4096u);
+}
+
 static int32_t render_compressor_peak(uint8_t enabled)
 {
     static int32_t warmup[2048u*2u];
