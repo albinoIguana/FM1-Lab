@@ -53,6 +53,8 @@ typedef struct {
     uint8_t enabled;
     uint8_t level;
     uint8_t pan;
+    int32_t pan_l_current_q15;
+    int32_t pan_r_current_q15;
     int32_t mod_level;
     int32_t detune[6];
     uint8_t feedback;
@@ -431,6 +433,8 @@ void fm6_init(void)
         instrument[i].enabled = 1u; /* factory instrument starts as a four-layer stack */
         instrument[i].level = 31u; /* 24.4% linear: safe factory starting level */
         instrument[i].pan = 64u; /* centered; constant-voltage pan preserves the reference level */
+        instrument[i].pan_l_current_q15 = 32768;
+        instrument[i].pan_r_current_q15 = 32768;
         fm6_rebuild_patch(i);
     }
 }
@@ -665,8 +669,15 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 if(patch_abs>fm6_test_patch_peak_q24[p]) fm6_test_patch_peak_q24[p]=patch_abs;
 #endif
                 dry+=sample; /* mono diagnostic reference, before pan */
-                dry_l+=(sample*patch_pan_l_q15[p])>>15;
-                dry_r+=(sample*patch_pan_r_q15[p])>>15;
+                int32_t pan_delta_l=patch_pan_l_q15[p]-instrument[p].pan_l_current_q15;
+                int32_t pan_delta_r=patch_pan_r_q15[p]-instrument[p].pan_r_current_q15;
+                int32_t pan_step_l=pan_delta_l/64, pan_step_r=pan_delta_r/64;
+                if(pan_delta_l && !pan_step_l) pan_step_l=pan_delta_l>0?1:-1;
+                if(pan_delta_r && !pan_step_r) pan_step_r=pan_delta_r>0?1:-1;
+                instrument[p].pan_l_current_q15+=pan_step_l;
+                instrument[p].pan_r_current_q15+=pan_step_r;
+                dry_l+=(sample*instrument[p].pan_l_current_q15)>>15;
+                dry_r+=(sample*instrument[p].pan_r_current_q15)>>15;
                 /* FX sends remain mono in this foundation step; stereo per-patch
                  * send routing is a separate memory/state architecture change. */
                 for(uint32_t fx=0;fx<4u;fx++) send_accum[fx]+=sample*fx_send[p][fx]/100;
