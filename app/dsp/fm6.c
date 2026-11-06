@@ -710,8 +710,15 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             uint64_t abs_r = fm6_abs_i64(out_r);
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
             uint32_t target_gain = 32768u;
-            if (peak > FM6_LIMITER_CEILING_Q23)
-                target_gain = (uint32_t)(((uint64_t)FM6_LIMITER_CEILING_Q23 * 32768u) / peak);
+            if (peak > FM6_LIMITER_CEILING_Q23) {
+                /* AC79's PI32V2 runtime has no __udivdi3. Scale the peak
+                 * into Q15 first, then use a native 32-bit divide. The final
+                 * hard ceiling below covers the less-than-one-LSB ratio error. */
+                uint64_t scaled_peak = peak >> 15;
+                uint32_t peak_q15 = scaled_peak > UINT32_MAX ? UINT32_MAX : (uint32_t)scaled_peak;
+                target_gain = scaled_peak > UINT32_MAX ? 1u :
+                    (peak_q15 ? (uint32_t)FM6_LIMITER_CEILING_Q23 / peak_q15 : 0u);
+            }
             if (target_gain < (uint32_t)limiter_gain_q15) {
                 limiter_gain_q15 = (int32_t)target_gain; /* instantaneous attack */
 #ifdef FM6_TEST
