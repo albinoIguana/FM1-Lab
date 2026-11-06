@@ -129,7 +129,9 @@ int main(void) {
     fm6_macro_set(1, FM1LAB_MACRO_BRIGHTNESS, 73u);
     assert(fm6_macro_get(1, FM1LAB_MACRO_BRIGHTNESS) == 73u);
     assert(memcmp(fm6_patch_data(1), voice, 155u) == 0);
-    /* Fill one patch pool while preserving the other patch's live voice. */
+    /* Restore patch 0 after the earlier exact-mute test; panic clears voices,
+     * not the persistent patch level. Fill its pool beside patch 1's live voice. */
+    fm6_patch_set_level(0u, 127u);
     fm6_note_on_mask(48u, 80u, 0x02u);
     for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
         fm6_note_on_mask((uint8_t)(36u + n), 90u, 0x01u);
