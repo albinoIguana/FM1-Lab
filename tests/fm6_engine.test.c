@@ -77,6 +77,7 @@ int main(void) {
     int32_t single_patch_peak = render_stack_peak(0x01u);
     int32_t four_patch_peak = render_stack_peak(0x0Fu);
     assert(single_patch_peak > 0);
+    fprintf(stderr, "gain regression peaks: one=%ld four=%ld\n", (long)single_patch_peak, (long)four_patch_peak);
     assert(four_patch_peak > single_patch_peak * 2);
 
     /* The platform passes APP_GAIN as Q12 (0..4096). At a settled
