@@ -48,12 +48,12 @@ static int32_t render_master_peak(uint32_t master_gain_q12)
 
 static int32_t render_pan_channel_peak(uint8_t pan, unsigned channel)
 {
-    static int32_t warmup[512u * 2u];
+    static int32_t warmup[2048u * 2u];
     fm6_init();
     for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
         fm6_patch_set_enabled((uint8_t)patch,0u);
     fm6_patch_set_pan(0u,pan);
-    fm6_render(warmup,512u,4096u);
+    fm6_render(warmup,2048u,4096u); /* settle master and pan smoothing before measurement */
     fm6_note_on_mask(60u,110u,0x01u);
     memset(output,0,sizeof output);
     fm6_render(output,TEST_FRAMES,4096u);
