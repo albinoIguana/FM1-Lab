@@ -221,6 +221,8 @@ static void inserts_legacy_collapse(fm1lab_insert_state_t *dst,const uint8_t *sr
   if(!p[i][0])amp_all=0;
   if(i && (p[i][4]!=p[0][4]))eq_same=0;
   if(!(p[i][4]&1u))eq_all=0;
+  for(unsigned b=0;b<3u;b++)for(unsigned k=0;k<3u;k++)
+   if(i && p[i][5u+b*3u+k]!=p[0][5u+b*3u+k])eq_same=0;
  }
  dst->drive=(uint8_t)((sum_drive+2u)/4u);
  dst->tone=(uint8_t)((sum_tone+2u)/4u);
