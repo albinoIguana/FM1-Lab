@@ -86,6 +86,32 @@ int main(void) {
     assert(four_dry_peak == single_dry_peak * 4u);
     printf("FM6 gain reference: one-patch=%llu four-patch=%llu\n",
            (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak);
+    assert(four_dry_peak > (uint64_t)(1u << 24) * 98u / 100u);
+    assert(four_dry_peak < (uint64_t)(1u << 24) * 102u / 100u);
+    printf("FM6 calibrated reference: one-patch=%llu four-patch=%llu output=%llu\\n",
+           (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak,
+           (unsigned long long)fm6_test_output_peak());
+
+    /* At the reference level, all four parallel FX buses must retain their
+     * headroom over sustained feedback without any internal Q23 saturation. */
+    fm6_init();
+    uint8_t reference_voice[156] = {0};
+    memcpy(reference_voice, fm6_patch_data(0u), 155u);
+    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        if (patch) assert(fm6_patch_set_voice(patch, reference_voice) == 0);
+        fm6_patch_set_level((uint8_t)patch, 31u);
+        fm6_patch_set_enabled((uint8_t)patch, 1u);
+        for (unsigned effect = 0; effect < FM6_FX_COUNT; ++effect) {
+            fm6_fx_set_enabled((uint8_t)effect, 1u);
+            fm6_fx_set_mix((uint8_t)effect, 100u);
+            fm6_fx_set_feedback((uint8_t)effect, (uint8_t)(effect == 0u ? 70u : 90u));
+            fm6_fx_set_send((uint8_t)patch, (uint8_t)effect, 100u);
+        }
+    }
+    fm6_note_on_mask(60u, 110u, 0x0Fu);
+    for (unsigned block = 0; block < 256u; ++block)
+        fm6_render(output, TEST_FRAMES, 4096u);
+    assert(fm6_test_fx_saturations() == 0u);
     /* The platform passes APP_GAIN as Q12 (0..4096). At a settled
      * half-scale master setting, output must be approximately half of unity. */
     int32_t master_unity_peak = render_master_peak(4096u);
@@ -360,6 +386,8 @@ int main(void) {
     }
     assert(rendered_frames >= 44000u);
     assert(stress_peak > 0u);
+    assert(fm6_test_output_peak() <= 7470000u);
+    assert(fm6_test_limiter_events() > 0u);
     assert(stereo_frames > 0u); /* chorus is actually contributing stereo output */
     assert(fm6_sequencer_step() > 0u);
     fm6_panic();
