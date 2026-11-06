@@ -70,6 +70,7 @@ static void test_non_destructive_macro_render(void)
     voice[84 + 7] = 60;   /* OP2 modulator envelope level 4. */
     voice[137] = 40;
     voice[140] = 20;
+    voice[155] = 64u; /* reserved pan sentinel defaults to center */
     assert(fm1lab_patch_set_voice(&instrument, 0, voice) == 0);
 
     instrument.patches[0].macros[FM1LAB_BRIGHTNESS] = 100;
