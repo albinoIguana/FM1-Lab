@@ -376,7 +376,7 @@ void fm6_init(void)
         instrument[i].macro[2] = 50;
         instrument[i].macro[3] = 50;
         instrument[i].enabled = 1u; /* factory instrument starts as a four-layer stack */
-        instrument[i].level = 127u;
+        instrument[i].level = 31u; /* 24.4% linear: safe factory starting level */
         fm6_rebuild_patch(i);
     }
 }
@@ -515,23 +515,14 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
     for (base = 0; base < frames; base += FM6_N) {
         int64_t patch_mix[PATCHES][FM6_N] = {{0}};
         int32_t patch_gain_q15[PATCHES] = {0};
-        uint32_t active_layers = 0;
         uint32_t p, v, i;
         uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
 
-        {
-            uint8_t patch_has_voice[PATCHES] = {0};
-            for (v = 0; v < VOICES; ++v)
-                if (voices[v].used && voices[v].patch < PATCHES)
-                    patch_has_voice[voices[v].patch] = 1u;
-            for (p = 0; p < PATCHES; ++p)
-                active_layers += patch_has_voice[p] && instrument[p].enabled && instrument[p].level != 0u;
-            if (active_layers) {
-                for (p = 0; p < PATCHES; ++p)
-                    if (patch_has_voice[p] && instrument[p].enabled && instrument[p].level)
-                        patch_gain_q15[p] = (int32_t)((uint32_t)instrument[p].level * 32768u /
-                                                      (127u * active_layers));
-            }
+        /* Patch level is an independent linear-amplitude control. Never
+         * renormalize it when other patches become active or inactive. */
+        for (p = 0; p < PATCHES; ++p) {
+            if (instrument[p].enabled && instrument[p].level)
+                patch_gain_q15[p] = (int32_t)((uint32_t)instrument[p].level * 32768u / 127u);
         }
         for (p = 0; p < PATCHES; p++) {
             patch_lfo_value[p] = fm6_lfo_sample(&patch_lfo[p]);
@@ -803,6 +794,10 @@ void fm6_patch_set_level(uint32_t patch, uint8_t level)
         for (uint32_t i = 0; i < VOICES; ++i)
             if (voices[i].used && voices[i].patch == patch)
                 voices[i].used = 0;
+}
+uint8_t fm6_patch_level(uint32_t patch)
+{
+    return patch < PATCHES ? instrument[patch].level : 0u;
 }
 void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
 {
