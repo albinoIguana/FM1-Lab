@@ -105,6 +105,9 @@ static inline int settings_import_v3(settings_t *dst, const settings_v3_t *src) 
     dst->performance.fx_feedback[3]=20u;
     dst->performance.fx_depth[3]=65u;
     for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p) dst->performance.fx_send[p][3]=0u;
+    dst->performance.compressor_enabled=0u; dst->performance.compressor_threshold=65u;
+    dst->performance.compressor_ratio=40u; dst->performance.compressor_attack=20u;
+    dst->performance.compressor_release=40u; dst->performance.compressor_makeup=0u;
     return 0;
 }
 

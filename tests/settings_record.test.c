@@ -28,6 +28,9 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p)
         for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
             if (s->fx_send[p][fx] > 100u) return 0;
+    if (s->compressor_enabled > 1u || s->compressor_threshold > 100u ||
+        s->compressor_ratio > 100u || s->compressor_attack > 100u ||
+        s->compressor_release > 100u || s->compressor_makeup > 100u) return 0;
     return 1;
 }
 
@@ -138,11 +141,42 @@ int main(void)
     assert(imported.performance.fx_enabled[FM6_FX_PHASER]==0u);
     assert(imported.performance.fx_send[2][FM6_FX_PHASER]==0u);
     assert(imported.performance.fx_depth[FM6_FX_PHASER]==65u);
+    assert(imported.performance.compressor_enabled==0u);
+    assert(imported.performance.compressor_threshold==65u);
+    assert(imported.performance.compressor_ratio==40u);
     v3.performance.fx_send[0][0]=101u;
     copy=imported;
     assert(settings_import_v3(&copy,&v3)==-1);
     assert(memcmp(&copy,&imported,sizeof copy)==0);
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3 migration tests passed");
+    /* V4 is the last pre-compressor settings layout. It must migrate without
+     * losing its four FX buses and must default the new compressor to bypass. */
+    settings_v4_t v4;
+    memset(&v4,0,sizeof v4);
+    v4.magic=SET_MAGIC_V4; v4.octave=1; v4.patch=2u; v4.enabled_mask=0x0fu;
+    v4.performance.tempo_bpm=141u; v4.performance.seq_length=32u;
+    v4.performance.lane_patch[0]=1u; v4.performance.lane_patch[1]=3u;
+    for(unsigned fx=0;fx<4u;fx++){
+        v4.performance.fx_enabled[fx]=1u; v4.performance.fx_mix[fx]=40u;
+        v4.performance.fx_time[fx]=45u; v4.performance.fx_feedback[fx]=30u;
+        v4.performance.fx_depth[fx]=55u;
+        for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++)v4.performance.fx_send[p][fx]=60u;
+    }
+    for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
+        v4.levels[p]=31u;
+        for(unsigned m=0;m<FM1LAB_MACRO_COUNT;m++)v4.macros[p][m]=50u;
+    }
+    v4.crc=settings_crc16(&v4,offsetof(settings_v4_t,crc));
+    assert(settings_v4_valid(&v4));
+    imported=good;
+    assert(settings_import_v4(&imported,&v4)==0);
+    assert(imported.performance.tempo_bpm==141u);
+    assert(imported.performance.fx_enabled[FM6_FX_PHASER]==1u);
+    assert(imported.performance.fx_send[3][FM6_FX_PHASER]==60u);
+    assert(imported.performance.compressor_enabled==0u);
+    assert(imported.performance.compressor_threshold==65u);
+    assert(imported.performance.compressor_ratio==40u);
+
+    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4 migration tests passed");
     return 0;
 }
