@@ -1,4 +1,5 @@
 #include "fm1lab_store_library.h"
+#include "fm1lab_insert_state.h"
 #include "app.h"
 
 #define BANK_BYTES 3840u
@@ -11,6 +12,16 @@
 #define BANK_VERSION 2u
 
 static PLAT_POOL uint8_t bank_work[BANK_BYTES];
+#define INSERTS_MAGIC 0x31534e49u
+#define INSERTS_VERSION 1u
+#define INSERTS_HEADER_BYTES 12u
+#define INSERTS_SNAPSHOT_BYTES 1802u
+#define INSERTS_SNAPSHOT_DATA_BYTES 1800u
+#define INSERTS_TOTAL_BYTES 3616u
+#define INSERTS_STATE_OFFSET 8u
+static PLAT_POOL uint8_t inserts_work[INSERTS_TOTAL_BYTES];
+static PLAT_POOL uint8_t inserts_snapshot_work[INSERTS_SNAPSHOT_BYTES];
+static uint16_t inserts_bank_crc[FM1LAB_STORE_BANK_COUNT];
 
 static void bytes_copy(uint8_t *d, const uint8_t *s, unsigned n)
 { while (n--) *d++ = *s++; }
@@ -168,32 +179,109 @@ static void instrument_encode(uint8_t *r, const fm1lab_instrument_t *in)
         m[4]=(uint8_t)(in->patches[p].level|(in->patches[p].enabled?128u:0u));
     }
 }
-int fm1lab_store_library_load(unsigned index, fm1lab_instrument_t *out)
-{
-    if(index>=32u||!out) return -1;
-    unsigned b=index/8u, slot=index%8u;
-    if(bank_read(b,bank_work)) return -1;
-    instrument_decode(record_at(bank_work,slot),out);
-    return fm1lab_instrument_valid(out)?0:-1;
-}
-int fm1lab_store_library_save(unsigned index, const fm1lab_instrument_t *in)
-{
-    if(index>=32u||!fm1lab_instrument_valid(in)) return -1;
-    unsigned b=index/8u, slot=index%8u;
-    if(bank_read(b,bank_work)) return -1;
-    instrument_encode(record_at(bank_work,slot),in);
-    write16(bank_work+6,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
-    return plat_store_save(OBJ_INSTRUMENTS0+b,bank_work,BANK_BYTES);
-}
 
-int fm1lab_store_library_format_bank(unsigned b, const fm1lab_instrument_t *factory)
-{
-    if(b>=FM1LAB_STORE_BANK_COUNT || !fm1lab_instrument_valid(factory)) return -1;
-    bank_init(bank_work,b);
-    for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)
-        instrument_encode(record_at(bank_work,slot),factory);
-    write16(bank_work+6,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
-    return plat_store_save(OBJ_INSTRUMENTS0+b,bank_work,BANK_BYTES);
+static uint16_t inserts_snapshot_crc(const uint8_t *s){return crc16(s,INSERTS_SNAPSHOT_DATA_BYTES);}
+static int inserts_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_SNAPSHOT_DATA_BYTES)==inserts_snapshot_crc(s);}
+static void inserts_snapshot_seal(uint8_t *s){write16(s+INSERTS_SNAPSHOT_DATA_BYTES,inserts_snapshot_crc(s));}
+static void inserts_header_seal(uint8_t *r){write32(r,INSERTS_MAGIC);write16(r+4,INSERTS_VERSION);write16(r+6,INSERTS_TOTAL_BYTES);write16(r+8,crc16(r,8));write16(r+10,0);}
+static int inserts_record_valid(const uint8_t *r){
+ const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_SNAPSHOT_BYTES;
+ return read32(r)==INSERTS_MAGIC&&read16(r+4)==INSERTS_VERSION&&read16(r+6)==INSERTS_TOTAL_BYTES&&read16(r+8)==crc16(r,8)&&(inserts_snapshot_valid(a)||inserts_snapshot_valid(f));
+}
+static void inserts_snapshot_defaults(uint8_t *s,const uint16_t crc[FM1LAB_STORE_BANK_COUNT]){
+ fm1lab_insert_state_t d;fm1lab_insert_state_init(&d);
+ for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){
+  write16(s+b*2,crc[b]);
+  for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++){
+   unsigned index=b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot;
+   memcpy(s+INSERTS_STATE_OFFSET+index*sizeof(d),&d,sizeof(d));
+  }
+ } inserts_snapshot_seal(s);
+}
+static int inserts_current_bank_crcs(uint16_t crc[FM1LAB_STORE_BANK_COUNT]){
+ for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){if(bank_read(b,bank_work))return -1;crc[b]=read16(bank_work+6);}
+ return 0;
+}
+static void inserts_record_load(uint8_t *r){
+ int n=plat_store_load(OBJ_INSERTS,r,INSERTS_TOTAL_BYTES);
+ if(n!=(int)INSERTS_TOTAL_BYTES||!inserts_record_valid(r))bytes_zero(r,INSERTS_TOTAL_BYTES);
+}
+static void inserts_snapshot_resolve(uint8_t *dst,const uint8_t *r,const uint16_t crc[FM1LAB_STORE_BANK_COUNT]){
+ const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_SNAPSHOT_BYTES;
+ int av=inserts_snapshot_valid(a),fv=inserts_snapshot_valid(f);
+ fm1lab_insert_state_t d;fm1lab_insert_state_init(&d);
+ for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){
+  const uint8_t *src=av&&read16(a+b*2)==crc[b]?a:fv&&read16(f+b*2)==crc[b]?f:0;
+  write16(dst+b*2,crc[b]);
+  if(src)memcpy(dst+INSERTS_STATE_OFFSET+b*FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d),
+    src+INSERTS_STATE_OFFSET+b*FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d),FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d));
+  else for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++){
+   unsigned index=b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot;
+   memcpy(dst+INSERTS_STATE_OFFSET+index*sizeof(d),&d,sizeof(d));
+  }
+ } inserts_snapshot_seal(dst);
+}
+static int inserts_record_prepare(uint8_t *r,const uint16_t crc[FM1LAB_STORE_BANK_COUNT],
+ unsigned bank,unsigned slot,uint16_t new_crc,const fm1lab_insert_state_t *state){
+ uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_SNAPSHOT_BYTES;
+ if(!fm1lab_insert_state_valid(state)||bank>=FM1LAB_STORE_BANK_COUNT||slot>=FM1LAB_STORE_INSTRUMENTS_PER_BANK)return -1;
+ inserts_snapshot_resolve(inserts_snapshot_work,r,crc);
+ memcpy(f,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ memcpy(a,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ memcpy(a+INSERTS_STATE_OFFSET+(bank*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot)*sizeof(*state),state,sizeof(*state));
+ write16(a+bank*2,new_crc);inserts_snapshot_seal(a);inserts_header_seal(r);return 0;
+}
+static int inserts_record_save(void){return plat_store_save(OBJ_INSERTS,inserts_work,INSERTS_TOTAL_BYTES);}
+
+int fm1lab_store_library_load_full(unsigned index,fm1lab_instrument_t *out,fm1lab_insert_state_t *inserts){
+ if(index>=FM1LAB_STORE_INSTRUMENT_COUNT||!out||!inserts)return -1;
+ unsigned b=index/FM1LAB_STORE_INSTRUMENTS_PER_BANK,slot=index%FM1LAB_STORE_INSTRUMENTS_PER_BANK;
+ if(bank_read(b,bank_work))return -1;
+ instrument_decode(record_at(bank_work,slot),out);
+ if(!fm1lab_instrument_valid(out))return -1;
+ inserts_record_load(inserts_work);
+ if(inserts_current_bank_crcs(inserts_bank_crc))return -1;
+ inserts_snapshot_resolve(inserts_snapshot_work,inserts_work,inserts_bank_crc);
+ memcpy(inserts,inserts_snapshot_work+INSERTS_STATE_OFFSET+index*sizeof(*inserts),sizeof(*inserts));
+ return fm1lab_insert_state_valid(inserts)?0:-1;
+}
+int fm1lab_store_library_load(unsigned index,fm1lab_instrument_t *out){
+ fm1lab_insert_state_t ignored;return fm1lab_store_library_load_full(index,out,&ignored);
+}
+int fm1lab_store_library_save_full(unsigned index,const fm1lab_instrument_t *in,const fm1lab_insert_state_t *inserts){
+ if(index>=FM1LAB_STORE_INSTRUMENT_COUNT||!fm1lab_instrument_valid(in)||!fm1lab_insert_state_valid(inserts))return -1;
+ unsigned b=index/FM1LAB_STORE_INSTRUMENTS_PER_BANK,slot=index%FM1LAB_STORE_INSTRUMENTS_PER_BANK;
+ if(inserts_current_bank_crcs(inserts_bank_crc)||bank_read(b,bank_work))return -1;
+ instrument_encode(record_at(bank_work,slot),in);
+ write16(bank_work+6,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
+ inserts_record_load(inserts_work);
+ if(inserts_record_prepare(inserts_work,inserts_bank_crc,b,slot,read16(bank_work+6),inserts))return -1;
+ /* Journal first. A torn two-object save is resolved by matching the active
+  * snapshot's expected bank CRC; the embedded fallback remains authoritative. */
+ if(inserts_record_save())return -1;
+ return plat_store_save(OBJ_INSTRUMENTS0+b,bank_work,BANK_BYTES);
+}
+int fm1lab_store_library_save(unsigned index,const fm1lab_instrument_t *in){
+ fm1lab_insert_state_t state;fm1lab_instrument_t ignored;
+ if(fm1lab_store_library_load_full(index,&ignored,&state))fm1lab_insert_state_init(&state);
+ return fm1lab_store_library_save_full(index,in,&state);
+}
+int fm1lab_store_library_format_bank(unsigned b,const fm1lab_instrument_t *factory){
+ fm1lab_insert_state_t defaults;
+ if(b>=FM1LAB_STORE_BANK_COUNT||!fm1lab_instrument_valid(factory)||inserts_current_bank_crcs(inserts_bank_crc))return -1;
+ bank_init(bank_work,b);
+ for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)instrument_encode(record_at(bank_work,slot),factory);
+ write16(bank_work+6,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
+ fm1lab_insert_state_init(&defaults);inserts_record_load(inserts_work);
+ if(inserts_record_prepare(inserts_work,inserts_bank_crc,b,0u,read16(bank_work+6),&defaults))return -1;
+ inserts_snapshot_resolve(inserts_snapshot_work,inserts_work,inserts_bank_crc);
+ for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)
+  memcpy(inserts_snapshot_work+INSERTS_STATE_OFFSET+(b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot)*sizeof(defaults),&defaults,sizeof(defaults));
+ write16(inserts_snapshot_work+b*2,read16(bank_work+6));inserts_snapshot_seal(inserts_snapshot_work);
+ memcpy(inserts_work+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ inserts_header_seal(inserts_work);
+ if(inserts_record_save())return -1;
+ return plat_store_save(OBJ_INSTRUMENTS0+b,bank_work,BANK_BYTES);
 }
 int fm1lab_store_library_format(const fm1lab_instrument_t *factory)
 {

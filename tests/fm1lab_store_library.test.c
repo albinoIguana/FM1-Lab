@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include <string.h>
 
-static uint8_t objects[4][3840];
-static int present[4];
+static uint8_t objects[5][3840];
+static uint16_t object_len[5];
+static int present[5];
 static uint16_t test_crc16(const uint8_t *p, unsigned n) {
     uint16_t crc=0xffffu;
     while(n--) {
@@ -19,16 +20,16 @@ static uint16_t test_crc16(const uint8_t *p, unsigned n) {
     return crc;
 }
 int plat_store_size(uint32_t obj) {
-    if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSTRUMENTS3 || !present[obj-OBJ_INSTRUMENTS0]) return -1;
-    return 3840;
+    if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || !present[obj-OBJ_INSTRUMENTS0]) return -1;
+    return object_len[obj-OBJ_INSTRUMENTS0];
 }
 int plat_store_load(uint32_t obj, void *dst, uint32_t max) {
-    if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSTRUMENTS3 || !present[obj-OBJ_INSTRUMENTS0] || max<3840) return -1;
-    memcpy(dst,objects[obj-OBJ_INSTRUMENTS0],3840); return 3840;
+    if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || !present[obj-OBJ_INSTRUMENTS0] || max<object_len[obj-OBJ_INSTRUMENTS0]) return -1;
+    memcpy(dst,objects[obj-OBJ_INSTRUMENTS0],object_len[obj-OBJ_INSTRUMENTS0]); return object_len[obj-OBJ_INSTRUMENTS0];
 }
 int plat_store_save(uint32_t obj, const void *src, uint32_t len) {
-    if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSTRUMENTS3 || len!=3840) return -1;
-    memcpy(objects[obj-OBJ_INSTRUMENTS0],src,3840); present[obj-OBJ_INSTRUMENTS0]=1; return 0;
+    if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || len>3840u) return -1;
+    memcpy(objects[obj-OBJ_INSTRUMENTS0],src,len); object_len[obj-OBJ_INSTRUMENTS0]=(uint16_t)len; present[obj-OBJ_INSTRUMENTS0]=1; return 0;
 }
 static void make_instrument(fm1lab_instrument_t *in) {
     fm1lab_instrument_init(in,"TEST QUAD VOICE");
@@ -76,7 +77,7 @@ int main(void) {
     /* A V1 bank has no pan bits. Loading it migrates all patches to center
      * without changing the 3,840-byte record layout; the next save seals V2. */
     memcpy(objects[1], objects[0], 3840u);
-    present[1]=1;
+    present[1]=1; object_len[1]=3840u;
     objects[1][4]=1u;
     objects[1][5]=1u; /* bank identity is covered by the header CRC */
     for(unsigned slot=0;slot<8u;slot++) {
@@ -96,5 +97,15 @@ int main(void) {
 
     objects[3][100]^=1u;
     assert(fm1lab_store_library_load(31,&loaded)<0);
+    fm1lab_insert_state_t inserts, restored;
+    fm1lab_insert_state_init(&inserts);
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+    inserts.patches[2].amp_enabled=1u; inserts.patches[2].drive=73u;
+    inserts.patches[2].tone=29u; inserts.patches[2].output=61u;
+    inserts.patches[2].eq_enabled=1u; inserts.patches[2].eq[1].frequency=67u;
+    inserts.patches[2].eq[1].gain=19u; inserts.patches[2].eq[1].q=23u;
+    assert(fm1lab_store_library_save_full(0u,&source,&inserts)==0);
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+    assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
     return 0;
 }
