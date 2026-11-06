@@ -181,8 +181,8 @@ static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,in
     if (fx_enabled[3]) {
         int32_t in_l=fm6_sat_q23((int64_t)sends[3]+(int64_t)fx_phaser_feedback_l*fx_feedback[3]/100u);
         int32_t in_r=fm6_sat_q23((int64_t)sends[3]+(int64_t)fx_phaser_feedback_r*fx_feedback[3]/100u);
-        phaser_l=fm6_phaser_channel(in_l,fx_phaser_state_l,fx_lfo_phase&0xFFFFu);
-        phaser_r=fm6_phaser_channel(in_r,fx_phaser_state_r,(fx_lfo_phase+16384u)&0xFFFFu);
+        phaser_l=fm6_phaser_channel(in_l,fx_phaser_state_l,(fx_phaser_phase>>16)&0xFFFFu);
+        phaser_r=fm6_phaser_channel(in_r,fx_phaser_state_r,((fx_phaser_phase+0x40000000u)>>16)&0xFFFFu);
         fx_phaser_feedback_l=phaser_l;
         fx_phaser_feedback_r=phaser_r;
     } else {
