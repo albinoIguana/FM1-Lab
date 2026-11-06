@@ -21,8 +21,11 @@ static void test_four_patch_contract(void)
     voice[134] = 0;
     voice[135] = 3;
     voice[105 + 16] = 40;
+    instrument.patches[0].level = 127u;
     assert(fm1lab_patch_set_voice(&instrument, 0, voice) == 0);
+    assert(instrument.patches[0].level == 31u);
     assert(fm1lab_patch_set_voice(&instrument, 3, voice) == 0);
+    assert(instrument.patches[3].level == 31u);
     assert(fm1lab_instrument_valid(&instrument));
     assert(fm1lab_patch_set_voice(&instrument, 4, voice) == -1);
     voice[134] = 32;
