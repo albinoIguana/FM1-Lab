@@ -98,14 +98,14 @@ For each processor and each routing edge:
 
 ## Delivery order
 
-1. Freeze enums, routing topology, parameter semantics, settings version/migration and DSP ownership. The four stereo send buses and pan-before-send topology are implemented; insert/master persistence ownership remains to be frozen.
-2. Implement the processor APIs and parameter state without UI assumptions.
-3. Implement Phaser and Amp/Drive, then EQ and master Compressor/Limiter.
-4. Refactor Chorus, Delay and Reverb to expose meaningful independent parameters and improve quality.
-5. Integrate per-patch pan, inserts, shared sends and master processing into the render path.
-6. Add exhaustive host tests, migration tests, combined stress tests and update the memory report.
-7. Connect physical controls/pages after the DSP contracts stabilize.
-8. Flash and qualify on hardware; do not label the build release-ready before this gate.
+1. Freeze enums, routing topology, parameter semantics, settings version/migration and DSP ownership. Complete for inserts and master compressor.
+2. Implement processor APIs and parameter state. Complete for Amp/Drive, EQ and master compressor.
+3. Integrate per-patch inserts, stereo sends and master processing into the render path. Complete and host-tested.
+4. Connect compact physical controls/pages after DSP interfaces stabilize. Complete for Amp, EQ and compressor.
+5. Continue FX quality refinement, including Reverb diffusion and distinct parameter semantics.
+6. Add combined voice/sequence/arp/FX/insert/compressor stress coverage and keep the memory report aligned with the latest ELF.
+7. Bound UI/MIDI event-drain work and measure worst-case callback and stack costs; connect remaining controls such as pan after their DSP interfaces are verified.
+8. Flash and qualify on hardware; do not label the build release-ready before CPU/xrun and listening gates pass.
 
 ## Explicit non-goals for this milestone
 
