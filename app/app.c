@@ -22,7 +22,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_AMP, PAGE_EQ, PAGE_GLOBAL, PAGE_COMPRESSOR, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u, env_levels;
@@ -39,7 +39,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_PATCH_INSERT, EV_MASTER_COMP };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP };
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -69,12 +69,12 @@ static void instrument_apply_engine(void)
         fm6_patch_set_enabled(p, 1u);
         fm6_patch_set_level(p, part->level);
         fm6_patch_set_pan(p, fm1lab_patch_pan(&current_instrument, p));
-        fm6_patch_insert_reset_state(p);
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             fm6_macro_set(p, m, part->macros[m]);
-        for (uint32_t field=0;field<FM6_INSERT_FIELD_COUNT;++field)
-            fm6_patch_insert_set(p,field,fm1lab_patch_insert_state_get(&current_inserts.patches[p],field));
     }
+    fm6_master_insert_reset_state();
+    for(uint32_t field=0;field<FM6_INSERT_FIELD_COUNT;++field)
+        fm6_master_insert_set(field,fm1lab_insert_state_get(&current_inserts,field));
 }
 
 static void instrument_factory_capture(void)
@@ -177,8 +177,8 @@ static void ui_events_drain(void)
             instrument_apply_engine();
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
-        } else if (type == EV_PATCH_INSERT)
-            fm6_patch_insert_set(a,b,c);
+        } else if (type == EV_MASTER_INSERT)
+            fm6_master_insert_set(a,b);
         else if (type == EV_MASTER_COMP)
             fm6_master_comp_set(a,b);
         else if (type == EV_PATCH_VOICE) {
@@ -208,13 +208,12 @@ static void voice_edit_changed(void)
     voice_dirty = 1u;
 }
 
-static void patch_insert_edit(uint32_t patch,uint32_t field,uint8_t value)
+static void instrument_insert_edit(uint32_t field,uint8_t value)
 {
-    if(patch>=FM1LAB_PATCH_COUNT||field>=FM6_INSERT_FIELD_COUNT)return;
-    fm1lab_patch_insert_state_set(&current_inserts.patches[patch],field,value);
+    if(field>=FM6_INSERT_FIELD_COUNT)return;
+    fm1lab_insert_state_set(&current_inserts,field,value);
     instrument_dirty=1u;set_dirty=1u;
-    ui_event_push(EV_PATCH_INSERT,(uint8_t)patch,(uint8_t)field,
-        fm1lab_patch_insert_state_get(&current_inserts.patches[patch],field));
+    ui_event_push(EV_MASTER_INSERT,(uint8_t)field,fm1lab_insert_state_get(&current_inserts,field),0u);
 }
 static uint8_t compressor_value(uint32_t field)
 {
@@ -637,10 +636,8 @@ static void input(void)
             page = PAGE_HOME;
             app_say("HOME", fm6_patch_name(set.patch));
         } else if (k == B_GLO) {
-            page = page == PAGE_GLOBAL ? PAGE_COMPRESSOR :
-                page == PAGE_COMPRESSOR ? PAGE_HOME : PAGE_GLOBAL;
-            app_say(page==PAGE_COMPRESSOR?"MASTER COMPRESSOR":page==PAGE_GLOBAL?"GLOBAL":"HOME",
-                    page==PAGE_COMPRESSOR?(compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS"):"SETTINGS");
+            page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
+            app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
         } else if (k == B_ENV) {
             if (page == PAGE_ENV) env_levels ^= 1u;
             else page = PAGE_ENV;
@@ -650,17 +647,15 @@ static void input(void)
                 page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
             app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
-            page = page==PAGE_MACRO?PAGE_AMP:page==PAGE_AMP?PAGE_EQ:PAGE_MACRO;
-            app_say(page==PAGE_AMP?"AMP / DRIVE":page==PAGE_EQ?"PARAMETRIC EQ":"MACROS",fm6_patch_name(set.patch));
-        } else if (k == B_EDIT && page == PAGE_AMP) {
-            patch_insert_edit(set.patch,FM6_INSERT_AMP_ENABLED,
-                (uint8_t)!current_inserts.patches[set.patch].amp_enabled);
-            app_say("AMP / DRIVE",current_inserts.patches[set.patch].amp_enabled?"ACTIVE":"BYPASS");
-        } else if (k == B_EDIT && page == PAGE_EQ) {
-            patch_insert_edit(set.patch,FM6_INSERT_EQ_ENABLED,
-                (uint8_t)!(current_inserts.patches[set.patch].eq_enabled&1u));
-            app_say("PATCH EQ",(current_inserts.patches[set.patch].eq_enabled&1u)?"ACTIVE":"BYPASS");
-        } else if (k == B_EDIT && page == PAGE_COMPRESSOR) {
+            page = page==PAGE_MACRO?PAGE_HOME:PAGE_MACRO;
+            app_say(page==PAGE_MACRO?"PATCH MACROS":"HOME",fm6_patch_name(set.patch));
+        } else if (k == B_EDIT && page == PAGE_FX_AMP) {
+            instrument_insert_edit(FM6_INSERT_AMP_ENABLED,(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED));
+            app_say("MASTER AMP / DRIVE",fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED)?"ACTIVE":"BYPASS");
+        } else if (k == B_EDIT && page == PAGE_FX_EQ) {
+            instrument_insert_edit(FM6_INSERT_EQ_ENABLED,(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_EQ_ENABLED));
+            app_say("MASTER EQ",fm1lab_insert_state_get(&current_inserts,FM6_INSERT_EQ_ENABLED)?"ACTIVE":"BYPASS");
+        } else if (k == B_EDIT && page == PAGE_FX_COMPRESSOR) {
             compressor_edit(FM6_COMP_ENABLED,(uint8_t)!compressor_value(FM6_COMP_ENABLED));
             app_say("MASTER COMPRESSOR",compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS");
         } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
@@ -681,9 +676,9 @@ static void input(void)
             set_dirty = 1u;
             app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
         } else if (k == B_FX) {
-            if (page < PAGE_FX_CHORUS || page > PAGE_FX_ROUTING) page = PAGE_FX_CHORUS;
-            else page = page == PAGE_FX_ROUTING ? PAGE_FX_CHORUS : (uint8_t)(page + 1u);
-            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : page == PAGE_FX_PHASER ? "PHASER" : "SEND ROUTING");
+            if (page < PAGE_FX_AMP || page > PAGE_FX_ROUTING) page = PAGE_FX_AMP;
+            else page = page == PAGE_FX_ROUTING ? PAGE_FX_AMP : (uint8_t)(page + 1u);
+            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
         } else if (k == B_PLAY) {
             if (page == PAGE_SEQ) {
                 fm6_sequencer_set_running((uint8_t)!fm6_sequencer_running());
@@ -757,7 +752,7 @@ static void input(void)
                     app_say("BANK", "SELECTED");
                 }
             }
-        } else if (k == EN_ALGO && page == PAGE_EQ) {
+        } else if (k == EN_ALGO && page == PAGE_FX_EQ) {
             int32_t next=((int32_t)eq_ui_band+e)%3;
             if(next<0)next+=3;
             eq_ui_band=(uint8_t)next;
@@ -786,13 +781,13 @@ static void input(void)
             set.patch=(uint8_t)next;
             set_dirty=1u;
             app_say("ROUTING PATCH",fm6_patch_name(set.patch));
-        } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING) {
-            int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
-            next %= 5;
+        } else if (k == EN_SELECT && page >= PAGE_FX_AMP && page <= PAGE_FX_ROUTING) {
+            int32_t next = (int32_t)(page - PAGE_FX_AMP) + e;
+            next %= 8;
             if (next < 0) next += 5;
-            page = (uint8_t)(PAGE_FX_CHORUS + next);
-            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : page == PAGE_FX_PHASER ? "PHASER" : "SEND ROUTING");
-        } else if (k == EN_SELECT && page == PAGE_COMPRESSOR) {
+            page = (uint8_t)(PAGE_FX_AMP + next);
+            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
+        } else if (k == EN_SELECT && page == PAGE_FX_COMPRESSOR) {
             compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
             app_say("COMP MAKEUP","UPDATED");
         } else if (k == EN_SELECT) {
@@ -859,21 +854,21 @@ static void input(void)
                 } else fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,90));
                 set_dirty = 1u;
                 app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):"FX FEEDBACK", "UPDATED");
-            } else if (page == PAGE_AMP) {
+            } else if (page == PAGE_FX_AMP) {
                 static const uint8_t fields[4]={FM6_INSERT_DRIVE,FM6_INSERT_TONE,FM6_INSERT_OUTPUT,FM6_INSERT_AMP_ENABLED};
-                uint8_t field=fields[index],value=fm1lab_patch_insert_state_get(&current_inserts.patches[set.patch],field);
+                uint8_t field=fields[index],value=fm1lab_insert_state_get(&current_inserts,field);
                 if(index==3u)value=(uint8_t)!value;
                 else value=(uint8_t)clamp((int32_t)value+e,0,100);
-                patch_insert_edit(set.patch,field,value);
+                instrument_insert_edit(field,value);
                 app_say(index==0u?"AMP DRIVE":index==1u?"AMP TONE":index==2u?"AMP OUTPUT":"AMP",index==3u?(value?"ON":"BYPASS"):"UPDATED");
-            } else if (page == PAGE_EQ) {
+            } else if (page == PAGE_FX_EQ) {
                 uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+index);
-                uint8_t value=fm1lab_patch_insert_state_get(&current_inserts.patches[set.patch],field);
+                uint8_t value=fm1lab_insert_state_get(&current_inserts,field);
                 if(index==3u)value=(uint8_t)!value;
                 else value=(uint8_t)clamp((int32_t)value+e,0,index==1u?24:index==2u?31:100);
-                patch_insert_edit(set.patch,field,value);
+                instrument_insert_edit(field,value);
                 app_say(index==0u?"EQ FREQUENCY":index==1u?"EQ GAIN":index==2u?"EQ Q":"EQ BAND",index==3u?(value?"ON":"OFF"):"UPDATED");
-            } else if (page == PAGE_COMPRESSOR) {
+            } else if (page == PAGE_FX_COMPRESSOR) {
                 static const uint8_t fields[4]={FM6_COMP_THRESHOLD,FM6_COMP_RATIO,FM6_COMP_ATTACK,FM6_COMP_RELEASE};
                 uint8_t field=fields[index];
                 compressor_edit(field,(uint8_t)clamp((int32_t)compressor_value(field)+e,0,100));
@@ -1074,10 +1069,10 @@ static void draw_operator_map(void)
 static void draw_amp_panel(void)
 {
     static const char *const labels[4]={"DRIVE","TONE","OUTPUT","AMP STATE"};
-    const fm1lab_patch_insert_state_t *v=&current_inserts.patches[set.patch];
-    char t[16];uint16_t accent=patch_color(set.patch);
+    const fm1lab_insert_state_t *v=&current_inserts;
+    char t[16];uint16_t accent=RGB(36,215,232);
     uint8_t values[4]={v->drive,v->tone,v->output,v->amp_enabled};
-    cv_text(6,2,&FONT_XS,fm6_patch_name(set.patch),C_WHITE);
+    cv_text(6,2,&FONT_XS,"MASTER BUS",C_WHITE);
     cv_text(172,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
@@ -1100,8 +1095,8 @@ static void draw_eq_panel(void)
     const fm1lab_patch_insert_state_t *v=&current_inserts.patches[set.patch];
     const fm1lab_eq_band_state_t *b=&v->eq[eq_ui_band];
     uint8_t enabled=(uint8_t)((v->eq_enabled>>(eq_ui_band+1u))&1u);
-    char t[16],qtext[8];uint16_t accent=patch_color(set.patch);
-    cv_text(6,2,&FONT_XS,fm6_patch_name(set.patch),C_WHITE);
+    char t[16],qtext[8];uint16_t accent=RGB(36,215,232);
+    cv_text(6,2,&FONT_XS,"MASTER BUS",C_WHITE);
     cv_text(164,2,&FONT_XS,bands[eq_ui_band],accent);
     cv_text(202,2,&FONT_XS,(v->eq_enabled&1u)?"ON":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
@@ -1322,16 +1317,16 @@ static void draw(void)
         cv_text(x + 8, 6, &FONT_B, ui.msg[1], accent);
     } else {
         const char *title = page == PAGE_MACRO ? "PATCH MACROS" :
-            page == PAGE_AMP ? "PATCH AMP / DRIVE" :
-            page == PAGE_EQ ? "PATCH PARAMETRIC EQ" :
             page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
-            page == PAGE_COMPRESSOR ? "MASTER COMPRESSOR" :
             page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" :
             page == PAGE_ENV ? "OPERATOR ENVELOPE" :
             page == PAGE_LFO ? "LFO" :
             page == PAGE_LFO_MOD ? "LFO MODULATION" :
             page == PAGE_SEQ ? "TWO-LANE SEQUENCER" :
             page == PAGE_ARP ? "ARPEGGIATOR" :
+            page == PAGE_FX_AMP ? "FX / AMP DRIVE" :
+            page == PAGE_FX_EQ ? "FX / PARAMETRIC EQ" :
+            page == PAGE_FX_COMPRESSOR ? "FX / COMPRESSOR" :
             page == PAGE_FX_CHORUS ? "FX / CHORUS" :
             page == PAGE_FX_DELAY ? "FX / DELAY" :
             page == PAGE_FX_REVERB ? "FX / REVERB" :
@@ -1351,9 +1346,9 @@ static void draw(void)
     cv_begin(240, 144, screen_bg());
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
-    else if (page == PAGE_AMP) draw_amp_panel();
-    else if (page == PAGE_EQ) draw_eq_panel();
-    else if (page == PAGE_COMPRESSOR) draw_compressor_panel();
+    else if (page == PAGE_FX_AMP) draw_amp_panel();
+    else if (page == PAGE_FX_EQ) draw_eq_panel();
+    else if (page == PAGE_FX_COMPRESSOR) draw_compressor_panel();
     else if (page == PAGE_OPERATOR_MAP) draw_operator_map();
     else if (page == PAGE_ENV) draw_envelope_panel();
     else if (page == PAGE_LFO) draw_lfo_panel(0);
@@ -1371,7 +1366,7 @@ static void draw(void)
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 60, screen_bg());
-    if (page != PAGE_HOME && page != PAGE_ENV && page != PAGE_AMP && page != PAGE_EQ && page != PAGE_COMPRESSOR && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING)) for (uint32_t k = 0; k < 4u; ++k) {
+    if (page != PAGE_HOME && page != PAGE_ENV && page != PAGE_FX_AMP && page != PAGE_FX_EQ && page != PAGE_FX_COMPRESSOR && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING)) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
         uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
@@ -1413,9 +1408,9 @@ static void draw(void)
     }
     if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-K4 CONTROL PATCH VOLUME   0 = OFF   SELECT KNOB CYCLES PATCH", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
-    else if (page == PAGE_AMP) cv_text(4,43,&FONT_XS,"K1 DRIVE  K2 TONE  K3 OUTPUT  K4 AMP ON / OFF",C_GRAY);
-    else if (page == PAGE_EQ) cv_text(4,43,&FONT_XS,"ALGO: BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
-    else if (page == PAGE_COMPRESSOR) cv_text(4,43,&FONT_XS,"K1 THRESH  K2 RATIO  K3 ATTACK  K4 RELEASE",C_GRAY);
+    else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"MASTER AMP  K1 DRIVE  K2 TONE  K3 OUTPUT  K4 BYPASS",C_GRAY);
+    else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"MASTER EQ  ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
+    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"MASTER COMP  K1 THRESH  K2 RATIO  K3 ATTACK  K4 RELEASE",C_GRAY);
     else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
@@ -1427,10 +1422,10 @@ static void draw(void)
     else cv_text(4, 43, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     {
         char page_text[8] = "";
-        if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING) {
-            /* FX pages are a local five-page group, not global pages 10-12. */
-            int_text((int32_t)(page - PAGE_FX_CHORUS) + 1, t);
-            text_cat(page_text, t); text_cat(page_text, "/5");
+        if (page >= PAGE_FX_AMP && page <= PAGE_FX_ROUTING) {
+            /* The complete FX section is one contiguous eight-page group. */
+            int_text((int32_t)(page - PAGE_FX_AMP) + 1, t);
+            text_cat(page_text, t); text_cat(page_text, "/8");
         } else {
             int_text((int32_t)page + 1, t);
             text_cat(page_text, t); text_cat(page_text, "/");
