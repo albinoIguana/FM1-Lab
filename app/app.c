@@ -15,14 +15,16 @@
 static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
+static fm1lab_insert_state_t current_inserts;
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
 static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_AMP, PAGE_EQ, PAGE_GLOBAL, PAGE_COMPRESSOR, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
+static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u, env_levels;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
@@ -37,7 +39,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_PATCH_INSERT, EV_MASTER_COMP };
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -69,6 +71,8 @@ static void instrument_apply_engine(void)
         fm6_patch_set_pan(p, fm1lab_patch_pan(&current_instrument, p));
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             fm6_macro_set(p, m, part->macros[m]);
+        for (uint32_t field=0;field<FM6_INSERT_FIELD_COUNT;++field)
+            fm6_patch_insert_set(p,field,fm1lab_patch_insert_state_get(&current_inserts.patches[p],field));
     }
 }
 
@@ -86,6 +90,7 @@ static void instrument_factory_capture(void)
 static void instrument_factory_defaults(void)
 {
     current_instrument = factory_instrument;
+    fm1lab_insert_state_init(&current_inserts);
 }
 
 static void instrument_sync_settings(void)
@@ -103,9 +108,11 @@ static void instrument_sync_settings(void)
 static void instrument_load(uint32_t index, int from_audio)
 {
     fm1lab_instrument_t candidate;
-    int loaded = fm1lab_store_library_load(index, &candidate);
-    if (!loaded && fm1lab_instrument_valid(&candidate)) {
+    fm1lab_insert_state_t candidate_inserts;
+    int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
+    if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
         current_instrument = candidate;
+        current_inserts = candidate_inserts;
     } else {
         instrument_factory_defaults();
     }
@@ -125,7 +132,7 @@ static int instrument_save(void)
 {
     if (!instrument_loaded || !fm1lab_instrument_valid(&current_instrument))
         return -1;
-    if (fm1lab_store_library_save(instrument_index, &current_instrument))
+    if (fm1lab_store_library_save_full(instrument_index, &current_instrument, &current_inserts))
         return -1;
     instrument_dirty = 0u;
     return 0;
@@ -169,7 +176,11 @@ static void ui_events_drain(void)
             instrument_apply_engine();
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
-        } else if (type == EV_PATCH_VOICE) {
+        } else if (type == EV_PATCH_INSERT)
+            fm6_patch_insert_set(a,b,c);
+        else if (type == EV_MASTER_COMP)
+            fm6_master_comp_set(a,b);
+        else if (type == EV_PATCH_VOICE) {
             (void)fm6_patch_set_voice(a, voice_update_snapshot);
             fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a));
             voice_update_pending = 0u;
@@ -194,6 +205,37 @@ static void voice_edit_changed(void)
     instrument_dirty = 1u;
     set_dirty = 1u;
     voice_dirty = 1u;
+}
+
+static void patch_insert_edit(uint32_t patch,uint32_t field,uint8_t value)
+{
+    if(patch>=FM1LAB_PATCH_COUNT||field>=FM6_INSERT_FIELD_COUNT)return;
+    fm1lab_patch_insert_state_set(&current_inserts.patches[patch],field,value);
+    instrument_dirty=1u;set_dirty=1u;
+    ui_event_push(EV_PATCH_INSERT,(uint8_t)patch,(uint8_t)field,
+        fm1lab_patch_insert_state_get(&current_inserts.patches[patch],field));
+}
+static uint8_t compressor_value(uint32_t field)
+{
+    if(field==FM6_COMP_ENABLED)return set.performance.compressor_enabled;
+    if(field==FM6_COMP_THRESHOLD)return set.performance.compressor_threshold;
+    if(field==FM6_COMP_RATIO)return set.performance.compressor_ratio;
+    if(field==FM6_COMP_ATTACK)return set.performance.compressor_attack;
+    if(field==FM6_COMP_RELEASE)return set.performance.compressor_release;
+    if(field==FM6_COMP_MAKEUP)return set.performance.compressor_makeup;
+    return 0u;
+}
+static void compressor_edit(uint32_t field,uint8_t value)
+{
+    if(field>=FM6_COMP_FIELD_COUNT)return;
+    if(field==FM6_COMP_ENABLED)set.performance.compressor_enabled=value?1u:0u;
+    else if(field==FM6_COMP_THRESHOLD)set.performance.compressor_threshold=value>100u?100u:value;
+    else if(field==FM6_COMP_RATIO)set.performance.compressor_ratio=value>100u?100u:value;
+    else if(field==FM6_COMP_ATTACK)set.performance.compressor_attack=value>100u?100u:value;
+    else if(field==FM6_COMP_RELEASE)set.performance.compressor_release=value>100u?100u:value;
+    else set.performance.compressor_makeup=value>100u?100u:value;
+    set_dirty=1u;
+    ui_event_push(EV_MASTER_COMP,(uint8_t)field,compressor_value(field),0u);
 }
 
 static void voice_edit_global(fm1lab_global_field_t field, int delta)
