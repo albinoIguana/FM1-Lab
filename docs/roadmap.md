@@ -51,14 +51,21 @@ Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
 
 ## Audio Engine 2.0 — active priority
 
-- [ ] Freeze named effect/parameter enums, signal-flow topology and settings migration contract (see [audio-engine-2.0-plan.md](audio-engine-2.0-plan.md)).
-- [ ] Add four shared send buses: Chorus, Phaser, Delay and Reverb; retain independent per-patch sends.
+Architecture is being frozen before additional DSP work. See [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md) for the binding signal, gain, routing, persistence, smoothing, memory, diagnostics and acceptance-test contract; [audio-engine-2.0-plan.md](audio-engine-2.0-plan.md) tracks processor work.
+
+- [x] Implement four shared send buses: Chorus, Phaser, Delay and Reverb; retain independent per-patch sends (Phaser is implemented; processor quality/refinement remains open).
+- [ ] Freeze mixer signal units, stable patch-level semantics, stereo send/return API, master gain staging and limiter boundary.
+- [ ] Freeze Instrument / Performance / Device state ownership and migrations before adding new persisted parameters.
+- [ ] Audit and budget .pool/.bss/stack, wide accumulators, filter state and FX buffers against device linker regions.
+- [ ] Define parameter smoothing, audio-thread ownership and peak/overload diagnostics.
+- [ ] Implement mixer foundation: stable patch gain (no active-layer-count normalization), per-patch pan, stereo routing and wide headroom accumulators.
+- [ ] Set all new/factory patch levels to 31/127 (24.4% linear amplitude); preserve explicit levels in existing user Instruments and valid saved settings.
+- [ ] Establish −12 dB master trim as the default four-coherent-patch gain-staging reference and a separate approximately −1 dBFS final peak limiter.
+- [ ] Add gain-staging tests for coherent four-patch sum, layer-count invariance, exact mute, FX-return headroom, intermediate clipping, master trim and limiter behavior.
 - [ ] Add per-patch Amp/Drive and 3-band EQ inserts with independent bypass and state.
-- [ ] Add master compressor and independent peak-safety limiter.
-- [ ] Replace generic effect time controls with real processor-specific rate/depth/decay/damping/pre-delay parameters.
-- [ ] Add per-patch pan and headroom-aware mixer routing.
-- [ ] Version and migrate persistent performance state; preserve all existing settings and patterns.
-- [ ] Add processor isolation, bypass, bounds, tail, DC, clipping and combined-stress tests.
+- [ ] Add master compressor and independent peak-safety limiter with gain-reduction/peak diagnostics.
+- [ ] Replace generic effect controls with processor-specific rate/depth/decay/damping/pre-delay parameters and refine reverb diffusion.
+- [ ] Add processor isolation, bypass, bounds, tail, DC, clipping, migration and combined-stress tests.
 - [ ] Re-audit .pool/.bss/stack and validate actual device CPU/xruns before release.
 - [ ] Add swing/ties and external MIDI clock after the audio routing contract stabilizes.
 
