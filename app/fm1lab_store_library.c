@@ -104,7 +104,7 @@ static void bank_init(uint8_t *b, unsigned bank)
         r[6]=(uint8_t)('0'+(s+1u)/10u); r[7]=(uint8_t)('0'+(s+1u)%10u);
         for(unsigned p=0;p<4;p++) {
             uint8_t *m=r+NAME_BYTES+448u+p*PATCH_META_BYTES;
-            m[0]=50; m[1]=50; m[2]=50; m[3]=50; m[4]=127;
+            m[0]=50; m[1]=50; m[2]=50; m[3]=50; m[4]=31; /* blank/new bank records start at safe patch level */
         }
     }
     write16(b+6,crc16(b+BANK_HEADER,BANK_BYTES-BANK_HEADER));
