@@ -1408,9 +1408,9 @@ static void draw(void)
     }
     if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-K4 CONTROL PATCH VOLUME   0 = OFF   SELECT KNOB CYCLES PATCH", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
-    else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"MASTER AMP  K1 DRIVE  K2 TONE  K3 OUTPUT  K4 BYPASS",C_GRAY);
-    else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"MASTER EQ  ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
-    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"K1 THRESH  K2 RATIO  K3 ATTACK  K4 RELEASE  ALGO MAKEUP",C_GRAY);
+    else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"AMP: K1 DRIVE  K2 TONE  K3 OUT  K4 ON/OFF",C_GRAY);
+    else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"EQ: ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
+    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"COMP: K1 THR  K2 RAT  K3 ATK  K4 REL  ALGO MAKEUP",C_GRAY);
     else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
