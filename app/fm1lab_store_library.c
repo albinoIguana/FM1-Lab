@@ -1,7 +1,6 @@
 #include "fm1lab_store_library.h"
 #include "fm1lab_insert_state.h"
 #include "app.h"
-#include <string.h>
 
 #define BANK_BYTES 3840u
 #define BANK_HEADER 8u
@@ -24,8 +23,8 @@ static PLAT_POOL uint8_t inserts_work[INSERTS_TOTAL_BYTES];
 static PLAT_POOL uint8_t inserts_snapshot_work[INSERTS_SNAPSHOT_BYTES];
 static uint16_t inserts_bank_crc[FM1LAB_STORE_BANK_COUNT];
 
-static void bytes_copy(uint8_t *d, const uint8_t *s, unsigned n)
-{ while (n--) *d++ = *s++; }
+static void bytes_copy(void *dst, const void *src, unsigned n)
+{ uint8_t *d=(uint8_t *)dst; const uint8_t *s=(const uint8_t *)src; while (n--) *d++ = *s++; }
 static void bytes_zero(uint8_t *d, unsigned n)
 { while (n--) *d++ = 0; }
 static uint16_t read16(const uint8_t *p)
@@ -204,7 +203,7 @@ static void inserts_snapshot_resolve(uint8_t *dst,const uint8_t *r,const uint16_
  for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){
   const uint8_t *src=av&&read16(a+b*2)==crc[b]?a:fv&&read16(f+b*2)==crc[b]?f:0;
   write16(dst+b*2,crc[b]);
-  if(src)memcpy(dst+INSERTS_STATE_OFFSET+b*FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d),
+  if(src)bytes_copy(dst+INSERTS_STATE_OFFSET+b*FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d),
     src+INSERTS_STATE_OFFSET+b*FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d),FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d));
   else for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++){
    unsigned index=b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot;
