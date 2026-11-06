@@ -190,7 +190,7 @@ static int inserts_record_valid(const uint8_t *r){
  return read32(r)==INSERTS_MAGIC&&read16(r+4)==INSERTS_VERSION&&read16(r+6)==INSERTS_TOTAL_BYTES&&read16(r+8)==crc16(r,8)&&(inserts_snapshot_valid(a)||inserts_snapshot_valid(f));
 }
 static int inserts_current_bank_crcs(uint16_t crc[FM1LAB_STORE_BANK_COUNT]){
- for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){if(bank_read(b,bank_work))return -1;crc[b]=read16(bank_work+6);}
+ for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){if(bank_read(b,bank_work)){crc[b]=0u;continue;}crc[b]=read16(bank_work+6);}
  return 0;
 }
 static void inserts_record_load(uint8_t *r){

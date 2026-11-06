@@ -163,6 +163,7 @@ static const int32_t fm6_eq_cos_q15[101] = {32768,32768,32768,32768,32768,32768,
 static const uint32_t fm6_eq_q_q15[32] = {16384,20084,23783,27483,31182,34882,38582,42281,45981,49681,53380,57080,60779,64479,68179,71878,75578,79277,82977,86677,90376,94076,97775,101475,105175,108874,112574,116274,119973,123673,127372,131072};
 static const uint32_t fm6_eq_a_q15[25] = {16423,17396,18427,19519,20675,21900,23198,24573,26029,27571,29205,30935,32768,34710,36766,38945,41252,43697,46286,49029,51934,55011,58271,61723,65381};
 
+static uint64_t fm6_abs_i64(int64_t value);
 static int32_t fm6_div_q15(int32_t numerator, uint32_t denominator)
 {
     uint32_t magnitude = numerator < 0 ? (uint32_t)(-(int64_t)numerator) : (uint32_t)numerator;
@@ -218,14 +219,17 @@ static int64_t fm6_patch_insert_process(uint32_t patch, int64_t input)
     int32_t raw = fm6_clamp_sample(input);
     uint32_t cutoff = 300u + (uint32_t)p->tone * 197u;
     uint32_t tone_alpha = (cutoff * 32768u) / (cutoff + 7016u);
-    p->amp_tone_state += (int32_t)(((int64_t)(raw - p->amp_tone_state) * tone_alpha) >> 15);
     int64_t amp = input;
     if (p->amp_enabled) {
         uint32_t drive_gain = 32768u + (uint32_t)p->drive * 22938u / 100u;
         amp = (input * drive_gain) >> 15;
         if (p->drive) amp = fm6_amp_soft_clip(amp);
+        int32_t tone_input = fm6_clamp_sample(amp);
+        p->amp_tone_state += (int32_t)((((int64_t)tone_input - p->amp_tone_state) * tone_alpha) >> 15);
         amp = p->amp_tone_state;
         amp = (amp * fm6_amp_output_gain(p->output)) >> 15;
+    } else {
+        p->amp_tone_state += (int32_t)((((int64_t)raw - p->amp_tone_state) * tone_alpha) >> 15);
     }
     int64_t eq_input = amp;
     int64_t eq_output = eq_input;
@@ -277,12 +281,12 @@ static void fm6_master_comp_process(int64_t *left, int64_t *right)
     if ((uint32_t)fm6_comp_envelope > threshold) {
         uint32_t ratio = 1u + (uint32_t)fm6_comp_ratio * 11u / 100u;
         uint32_t compressed = threshold + ((uint32_t)fm6_comp_envelope - threshold) / ratio;
-        uint32_t den = (uint32_t)fm6_comp_envelope >> 8;
-        uint32_t num = (compressed >> 8) * 32768u;
+        uint32_t den = (uint32_t)fm6_comp_envelope >> 15;
+        uint32_t num = (compressed >> 15) * 32768u;
         gain_q15 = den ? num / den : 32768u;
         if (gain_q15 > 32768u) gain_q15 = 32768u;
     }
-    gain_q15 = (gain_q15 * fm6_comp_makeup_q15(fm6_comp_makeup)) >> 15;
+    gain_q15 = (uint32_t)(((uint64_t)gain_q15 * fm6_comp_makeup_q15(fm6_comp_makeup)) >> 15);
     *left = (*left * gain_q15) >> 15;
     *right = (*right * gain_q15) >> 15;
 }
