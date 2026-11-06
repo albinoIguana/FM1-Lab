@@ -207,7 +207,7 @@ static void inserts_snapshot_resolve(uint8_t *dst,const uint8_t *r,const uint16_
     src+INSERTS_STATE_OFFSET+b*FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d),FM1LAB_STORE_INSTRUMENTS_PER_BANK*sizeof(d));
   else for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++){
    unsigned index=b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot;
-   memcpy(dst+INSERTS_STATE_OFFSET+index*sizeof(d),&d,sizeof(d));
+   bytes_copy(dst+INSERTS_STATE_OFFSET+index*sizeof(d),&d,sizeof(d));
   }
  } inserts_snapshot_seal(dst);
 }
@@ -216,9 +216,9 @@ static int inserts_record_prepare(uint8_t *r,const uint16_t crc[FM1LAB_STORE_BAN
  uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_SNAPSHOT_BYTES;
  if(!fm1lab_insert_state_valid(state)||bank>=FM1LAB_STORE_BANK_COUNT||slot>=FM1LAB_STORE_INSTRUMENTS_PER_BANK)return -1;
  inserts_snapshot_resolve(inserts_snapshot_work,r,crc);
- memcpy(f,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
- memcpy(a,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
- memcpy(a+INSERTS_STATE_OFFSET+(bank*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot)*sizeof(*state),state,sizeof(*state));
+ bytes_copy(f,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ bytes_copy(a,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ bytes_copy(a+INSERTS_STATE_OFFSET+(bank*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot)*sizeof(*state),state,sizeof(*state));
  write16(a+bank*2,new_crc);inserts_snapshot_seal(a);inserts_header_seal(r);return 0;
 }
 static int inserts_record_save(void){return plat_store_save(OBJ_INSERTS,inserts_work,INSERTS_TOTAL_BYTES);}
@@ -232,7 +232,7 @@ int fm1lab_store_library_load_full(unsigned index,fm1lab_instrument_t *out,fm1la
  inserts_record_load(inserts_work);
  if(inserts_current_bank_crcs(inserts_bank_crc))return -1;
  inserts_snapshot_resolve(inserts_snapshot_work,inserts_work,inserts_bank_crc);
- memcpy(inserts,inserts_snapshot_work+INSERTS_STATE_OFFSET+index*sizeof(*inserts),sizeof(*inserts));
+ bytes_copy(inserts,inserts_snapshot_work+INSERTS_STATE_OFFSET+index*sizeof(*inserts),sizeof(*inserts));
  return fm1lab_insert_state_valid(inserts)?0:-1;
 }
 int fm1lab_store_library_load(unsigned index,fm1lab_instrument_t *out){
@@ -266,9 +266,9 @@ int fm1lab_store_library_format_bank(unsigned b,const fm1lab_instrument_t *facto
  if(inserts_record_prepare(inserts_work,inserts_bank_crc,b,0u,read16(bank_work+6),&defaults))return -1;
  inserts_snapshot_resolve(inserts_snapshot_work,inserts_work,inserts_bank_crc);
  for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)
-  memcpy(inserts_snapshot_work+INSERTS_STATE_OFFSET+(b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot)*sizeof(defaults),&defaults,sizeof(defaults));
+  bytes_copy(inserts_snapshot_work+INSERTS_STATE_OFFSET+(b*FM1LAB_STORE_INSTRUMENTS_PER_BANK+slot)*sizeof(defaults),&defaults,sizeof(defaults));
  write16(inserts_snapshot_work+b*2,read16(bank_work+6));inserts_snapshot_seal(inserts_snapshot_work);
- memcpy(inserts_work+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ bytes_copy(inserts_work+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
  inserts_header_seal(inserts_work);
  if(inserts_record_save())return -1;
  return plat_store_save(OBJ_INSTRUMENTS0+b,bank_work,BANK_BYTES);
