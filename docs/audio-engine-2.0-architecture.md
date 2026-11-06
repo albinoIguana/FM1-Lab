@@ -158,3 +158,35 @@ These are audit findings, not permission to make a rushed compatibility-breaking
 - Do not substitute a browser mockup for native C firmware/emulator work.
 - Do not claim device-level real-time or audio validation from host tests.
 - Do not add new processors before their state, routing, numeric, memory, and test contracts are settled.
+
+
+## 13. Follow-up source audit — real-time and memory gates
+
+The following findings were confirmed against the current feature-branch source on 2026-11-05. They are additional blockers to the mixer foundation, not permission for a partial DSP rewrite.
+
+### Render-path work and command budgeting
+
+- `app_render()` calls `ui_events_drain()` and `midi_in()` before `fm6_render()`. The event queue is statically bounded to 63 pending entries, but a single drain can apply a full instrument reload (four patch rebuilds) or multiple voice edits in one audio callback. The queue is bounded in memory, not yet budgeted in worst-case callback time.
+- `midi_in()` loops until `plat_midi_in()` reports empty and has no explicit per-callback packet budget in the app wrapper. Its worst-case work therefore depends on the platform queue behavior and needs a documented cap or a proven bounded platform contract.
+- Preserve the single audio-owner model, but establish a maximum number/cost of commands applied per block. Expensive patch preparation should be built on the control side and published as a bounded snapshot/command; do not move storage, UI rendering, or allocation into the callback.
+- The render function currently allocates a 4 × 32 `int64_t` patch-mix array (1,024 bytes) plus a 32-sample `int32_t` voice bus (128 bytes) in nested call scope, before other callees and platform ISR stack use. Measure the linked worst-case stack rather than assuming the documented 24,320-byte user stack is all available to this callback.
+
+### Numeric/API items still unresolved
+
+- `fm6_render()` smooths its `master_q12` argument into `output_gain_q12`, then multiplies samples by that value and shifts right 15. The identifier says Q12 while the arithmetic uses a Q15 denominator. Trace the caller's actual range and units, rename/document the API consistently, and test endpoints before introducing a separate fixed −12 dB trim and limiter.
+- The active FM6 render path has per-patch sample accumulation in `int64_t`, but the four send accumulators are then saturated to Q23 before FX processing; FX delay/comb states also saturate to Q23. Record every such boundary and its intended full-scale meaning. Do not infer headroom solely from the final soft-clipped Q23 output.
+- The patch-level multiplier currently divides each patch contribution by the number of active layers. This is the direct cause of level changing when another patch is enabled/disabled; remove it only alongside the coherent-sum and mute tests in the mixer foundation.
+
+### Current memory evidence and build target
+
+- The active device target is the native `app/fm1.toml` build, which compiles `app/dsp/fm6.c`. The separate `firmware/fm1lab_audio_engine.c` path is not listed in that target and must not be mistaken for the live DSP implementation or patched as a substitute.
+- Current `.pool` declarations in `app/dsp/fm6.c` total 98,304 bytes: 8,192 delay + 2,048 chorus + 2,048/4,096/8,192 comb samples, each 32-bit. The platform graphics canvas documented in the existing memory audit is another 69,120 bytes. These two known allocations alone total at least 167,424 bytes, before any other pool users.
+- Therefore the older 69,384-byte `.pool` report in `docs/memory-budget.md` cannot describe the current source revision. It is historical evidence only until a fresh ELF is built from this exact branch head. Re-run the native device build and section report before allocating new buffers or declaring memory headroom.
+
+### Required next audit actions
+
+1. Trace the platform's `app_render` master argument from its actual call site and document its range, scale, and smoothing expectations.
+2. Inspect the pinned FM6 core's sample format and every conversion into/out of the wrapper; publish a stage-by-stage numeric table.
+3. Bound MIDI and command processing per audio block; measure patch-rebuild worst case and stack use.
+4. Build this exact branch head with the pinned submodules/toolchain and capture current ELF `.text`, `.ram_text`, `.data`, `.bss`, `.pool`, and stack evidence.
+5. Only then finalize accumulator widths, saturation points, fixed master trim, limiter interface, and the mixer API.
