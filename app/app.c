@@ -78,7 +78,7 @@ static void instrument_factory_capture(void)
         const uint8_t *voice = fm6_patch_data(p);
         if (voice) (void)fm1lab_patch_set_voice(&factory_instrument, p, voice);
         factory_instrument.patches[p].enabled = 1u;
-        factory_instrument.patches[p].level = 127u;
+        factory_instrument.patches[p].level = 31u; /* safe factory level */
     }
 }
 
@@ -289,7 +289,7 @@ static void settings_defaults(void)
     set.enabled_mask = 0x0fu; /* all four factory layers active */
     set.ble_off = 0;
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-        set.levels[p] = 127u;
+        set.levels[p] = 31u; /* safe defaults; saved user levels are loaded below */
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             set.macros[p][m] = 50u;
     }
