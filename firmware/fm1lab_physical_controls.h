@@ -6,11 +6,11 @@
 enum fm1lab_encoder {
     FM1LAB_ENCODER_SELECT = 0,    /* panel: SELECT */
     FM1LAB_ENCODER_ALGORITHM = 1, /* panel: ALGORITHM */
-    FM1LAB_ENCODER_KNOB_1 = 2,    /* panel: KNOB 1 */
-    FM1LAB_ENCODER_KNOB_2 = 3,    /* panel: KNOB 2 */
-    FM1LAB_ENCODER_KNOB_3 = 4,    /* panel: KNOB 3 */
-    FM1LAB_ENCODER_KNOB_4 = 5,    /* panel: KNOB 4 */
-    FM1LAB_ENCODER_PRESETS = 6,   /* panel: PRESETS */
+    FM1LAB_ENCODER_PRESETS = 2,   /* panel: PRESETS */
+    FM1LAB_ENCODER_KNOB_1 = 3,    /* panel: KNOB 1 */
+    FM1LAB_ENCODER_KNOB_2 = 4,    /* panel: KNOB 2 */
+    FM1LAB_ENCODER_KNOB_3 = 5,    /* panel: KNOB 3 */
+    FM1LAB_ENCODER_KNOB_4 = 6,    /* panel: KNOB 4 */
     FM1LAB_ENCODER_COUNT = 7
 };
 
