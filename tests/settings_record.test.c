@@ -127,6 +127,8 @@ int main(void)
     v3.crc=settings_crc16(&v3,offsetof(settings_v3_t,crc));
     imported=good;
     assert(settings_v3_valid(&v3));
+    settings_v3_t damaged_v3=v3; damaged_v3.performance.fx_time[1]^=1u;
+    assert(!settings_v3_valid(&damaged_v3));
     assert(settings_import_v3(&imported,&v3)==0);
     assert(imported.performance.tempo_bpm==128u);
     assert(imported.performance.fx_enabled[0]==1u && imported.performance.fx_send[2][2]==55u);
