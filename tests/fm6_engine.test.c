@@ -88,7 +88,7 @@ int main(void) {
            (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak);
     assert(four_dry_peak > (uint64_t)(1u << 24) * 98u / 100u);
     assert(four_dry_peak < (uint64_t)(1u << 24) * 102u / 100u);
-    printf("FM6 calibrated reference: one-patch=%llu four-patch=%llu output=%llu\\n",
+    printf("FM6 calibrated reference: one-patch=%llu four-patch=%llu output=%llu\n",
            (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak,
            (unsigned long long)fm6_test_output_peak());
 
