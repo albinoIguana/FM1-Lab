@@ -74,6 +74,11 @@ uint8_t fm6_fx_get_send(uint8_t patch, uint8_t effect);
 /* Render length must be a multiple of the FM6 core's 32-frame quantum (CTL). */
 /* master_gain_q12 is fm1-base APP_GAIN: Q12 amplitude, 0..4096. */
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12);
+#ifdef FM6_TEST
+/* Test-only pre-clip Q24 probes; never used by the device UI/audio path. */
+uint64_t fm6_test_patch_peak(uint32_t patch);
+uint64_t fm6_test_dry_peak(void);
+#endif
 
 uint32_t fm6_patch_count(void);
 const char *fm6_patch_name(uint32_t patch);
