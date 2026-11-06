@@ -21,6 +21,8 @@ static PLAT_POOL uint8_t bank_work[BANK_BYTES];
 #define INSERTS_SNAPSHOT_BYTES 1806u
 #define INSERTS_TOTAL_BYTES 3624u
 #define INSERTS_STATE_OFFSET 12u
+_Static_assert(sizeof(fm1lab_insert_state_t)==56u, "Insert sidecar state layout changed");
+_Static_assert(INSERTS_TOTAL_BYTES<=3840u, "Insert sidecar exceeds one store sector");
 static PLAT_POOL uint8_t inserts_work[INSERTS_TOTAL_BYTES];
 static PLAT_POOL uint8_t inserts_snapshot_work[INSERTS_SNAPSHOT_BYTES];
 static uint16_t inserts_bank_crc[FM1LAB_STORE_BANK_COUNT];
