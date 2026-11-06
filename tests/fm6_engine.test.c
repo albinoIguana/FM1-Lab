@@ -102,7 +102,8 @@ int main(void) {
     fm6_render(output, TEST_FRAMES, 4096u);
     assert(peak(output, TEST_WORDS) == 0);
     fm6_note_on(60u, 100u);
-    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT);
+    /* Patch 0 remains muted; only the other three factory layers start. */
+    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT - 1u);
     fm6_panic();
     assert(fm6_patch_algorithm(0) < 32u && fm6_patch_name(0)[0]);
     uint8_t voice[156] = {0};
