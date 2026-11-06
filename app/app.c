@@ -617,9 +617,9 @@ static void input(void)
             set_dirty = 1u;
             app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
         } else if (k == B_FX) {
-            if (page < PAGE_FX_CHORUS || page > PAGE_FX_REVERB) page = PAGE_FX_CHORUS;
-            else page = page == PAGE_FX_REVERB ? PAGE_FX_CHORUS : (uint8_t)(page + 1u);
-            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : "REVERB");
+            if (page < PAGE_FX_CHORUS || page > PAGE_FX_PHASER) page = PAGE_FX_CHORUS;
+            else page = page == PAGE_FX_PHASER ? PAGE_FX_CHORUS : (uint8_t)(page + 1u);
+            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : "PHASER");
         } else if (k == B_PLAY) {
             if (page == PAGE_SEQ) {
                 fm6_sequencer_set_running((uint8_t)!fm6_sequencer_running());
