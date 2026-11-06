@@ -34,6 +34,14 @@ static void fm6_zero_bytes(void *dst, uint32_t n)
 #define Q24_ONE (1 << 24)
 #define Q24_DB6 (1 << 24)
 #define OUTPUT_LIMIT 8388607
+/* Calibrated against the pinned FM6 core: the reference factory voice at
+ * patch level 31 peaks at 13,045,204 Q24. 10,536/32,768 maps that measured
+ * contribution to 0.25 Q24 full scale; four coherent patches sum to 1.0. */
+#define FM6_PATCH_CALIBRATION_Q15 10536
+#define FM6_MASTER_TRIM_Q15 8231
+#define FM6_FX_HEADROOM_SHIFT 5u
+#define FM6_FX_HEADROOM_SCALE (1u << FM6_FX_HEADROOM_SHIFT)
+#define FM6_LIMITER_CEILING_Q23 7470000
 #ifndef PLAT_POOL
 #define PLAT_POOL __attribute__((section(".pool")))
 #endif
@@ -70,11 +78,15 @@ static int32_t patch_lfo_delay[PATCHES];
 static uint32_t age_counter;
 static uint32_t overload_shed_count;
 static int32_t output_gain_q12;
+static int32_t limiter_gain_q15;
 static int16_t pitch_bend_16;
 
 #ifdef FM6_TEST
 static uint64_t fm6_test_patch_peak_q24[PATCHES];
 static uint64_t fm6_test_dry_peak_q24;
+static uint32_t fm6_test_fx_saturation_count;
+static uint32_t fm6_test_limiter_events;
+static uint64_t fm6_test_output_peak_q23;
 static uint64_t fm6_test_abs_i64(int64_t value)
 {
     return value < 0 ? (uint64_t)(-(value + 1)) + 1u : (uint64_t)value;
@@ -87,6 +99,9 @@ uint64_t fm6_test_dry_peak(void)
 {
     return fm6_test_dry_peak_q24;
 }
+uint32_t fm6_test_fx_saturations(void) { return fm6_test_fx_saturation_count; }
+uint32_t fm6_test_limiter_events(void) { return fm6_test_limiter_events; }
+uint64_t fm6_test_output_peak(void) { return fm6_test_output_peak_q23; }
 #endif
 
 
@@ -115,7 +130,13 @@ static volatile uint8_t fx_enabled[4], fx_mix[4]={18u,24u,20u,35u},
     fx_depth[4]={50u,50u,50u,65u};
 static volatile uint8_t fx_send[PATCHES][4];
 static uint32_t fx_lfo_phase, fx_phaser_phase;
-static int32_t fm6_sat_q23(int64_t x) { return x>OUTPUT_LIMIT?OUTPUT_LIMIT:x< -OUTPUT_LIMIT?-OUTPUT_LIMIT:(int32_t)x; }
+static int32_t fm6_sat_q23(int64_t x)
+{
+#ifdef FM6_TEST
+    if (x > OUTPUT_LIMIT || x < -OUTPUT_LIMIT) ++fm6_test_fx_saturation_count;
+#endif
+    return x > OUTPUT_LIMIT ? OUTPUT_LIMIT : x < -OUTPUT_LIMIT ? -OUTPUT_LIMIT : (int32_t)x;
+}
 static uint32_t fm6_step_period(void) { return (FM6_SAMPLE_RATE*60u)/((uint32_t)transport_bpm*4u); }
 static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint8_t source);
 static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint8_t source);
@@ -213,10 +234,12 @@ static void fm6_fx_process(int64_t input,const int32_t sends[4],int64_t *left,in
     fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
     fx_phaser_phase+=4870u+(uint32_t)fx_time[3]*3896u;
     int64_t wet_l=input,wet_r=input;
-    if(fx_enabled[0]) { wet_l+=(int64_t)chorus*fx_mix[0]/100; wet_r+=(int64_t)chorus_r*fx_mix[0]/100; }
-    if(fx_enabled[1]) { wet_l+=(int64_t)delay*fx_mix[1]/100; wet_r+=(int64_t)delay*fx_mix[1]/100; }
-    if(fx_enabled[2]) { wet_l+=(int64_t)reverb*fx_mix[2]/100; wet_r+=(int64_t)reverb*fx_mix[2]/100; }
-    if(fx_enabled[3]) { wet_l+=(int64_t)phaser_l*fx_mix[3]/100; wet_r+=(int64_t)phaser_r*fx_mix[3]/100; }
+    /* FX state runs 32x below the Q24 dry bus. This preserves the int32
+     * delay/comb memory footprint while reserving 30 dB for feedback growth. */
+    if(fx_enabled[0]) { wet_l+=(int64_t)chorus*FM6_FX_HEADROOM_SCALE*fx_mix[0]/100; wet_r+=(int64_t)chorus_r*FM6_FX_HEADROOM_SCALE*fx_mix[0]/100; }
+    if(fx_enabled[1]) { wet_l+=(int64_t)delay*FM6_FX_HEADROOM_SCALE*fx_mix[1]/100; wet_r+=(int64_t)delay*FM6_FX_HEADROOM_SCALE*fx_mix[1]/100; }
+    if(fx_enabled[2]) { wet_l+=(int64_t)reverb*FM6_FX_HEADROOM_SCALE*fx_mix[2]/100; wet_r+=(int64_t)reverb*FM6_FX_HEADROOM_SCALE*fx_mix[2]/100; }
+    if(fx_enabled[3]) { wet_l+=(int64_t)phaser_l*FM6_FX_HEADROOM_SCALE*fx_mix[3]/100; wet_r+=(int64_t)phaser_r*FM6_FX_HEADROOM_SCALE*fx_mix[3]/100; }
     *left=wet_l; *right=wet_r;
 }
 
@@ -364,6 +387,12 @@ void fm6_init(void)
     age_counter = 0;
     overload_shed_count = 0u;
     output_gain_q12 = 0;
+    limiter_gain_q15 = 32768;
+#ifdef FM6_TEST
+    fm6_test_fx_saturation_count = 0u;
+    fm6_test_limiter_events = 0u;
+    fm6_test_output_peak_q23 = 0u;
+#endif
     pitch_bend_16 = 0;
     for(uint32_t lane=0;lane<2u;lane++) for(uint32_t step=0;step<64u;step++) {
         seq_pattern[lane][step].enabled=0u; seq_pattern[lane][step].note=0u;
@@ -577,7 +606,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                         x = (int32_t)(((int64_t)x * voice->fade_out) >> 5);
                         --voice->fade_out;
                     }
-                    patch_mix[voice->patch][i] += ((int64_t)x * patch_gain_q15[voice->patch]) >> 15;
+                    patch_mix[voice->patch][i] += (((int64_t)x * patch_gain_q15[voice->patch]) >> 15) * FM6_PATCH_CALIBRATION_Q15 >> 15;
                 }
                 voice->state.dc = dc;
                 if (shedding && !voice->fade_out) {
@@ -634,13 +663,49 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 if(dry_abs>fm6_test_dry_peak_q24) fm6_test_dry_peak_q24=dry_abs;
             }
 #endif
-            int32_t sends[4]={fm6_sat_q23(send_accum[0]),fm6_sat_q23(send_accum[1]),fm6_sat_q23(send_accum[2]),fm6_sat_q23(send_accum[3])};
+            /* Master trim is part of the fixed gain budget, before FX sends
+             * and returns. FX buses then enter their Q19 internal domain. */
+            int64_t trimmed_dry = (dry * FM6_MASTER_TRIM_Q15) >> 15;
+            int32_t sends[4];
+            for (uint32_t fx=0; fx<4u; ++fx) {
+                int64_t trimmed_send = (send_accum[fx] * FM6_MASTER_TRIM_Q15) >> 15;
+                sends[fx] = fm6_sat_q23(trimmed_send >> FM6_FX_HEADROOM_SHIFT);
+            }
             int64_t left=0,right=0;
-            fm6_fx_process(dry,sends,&left,&right);
+            fm6_fx_process(trimmed_dry,sends,&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * Keep the physical MASTER control at unity when it reaches 4096. */
-            stereo[(base+i)*2u]=fm6_soft_clip(((int64_t)left*output_gain_q12)>>12);
-            stereo[(base+i)*2u+1u]=fm6_soft_clip(((int64_t)right*output_gain_q12)>>12);
+            int32_t out_l = fm6_soft_clip(((int64_t)left * output_gain_q12) >> 12);
+            int32_t out_r = fm6_soft_clip(((int64_t)right * output_gain_q12) >> 12);
+            uint64_t abs_l = fm6_test_abs_i64(out_l);
+            uint64_t abs_r = fm6_test_abs_i64(out_r);
+            uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
+            uint32_t target_gain = 32768u;
+            if (peak > FM6_LIMITER_CEILING_Q23)
+                target_gain = (uint32_t)(((uint64_t)FM6_LIMITER_CEILING_Q23 * 32768u) / peak);
+            if (target_gain < (uint32_t)limiter_gain_q15) {
+                limiter_gain_q15 = (int32_t)target_gain; /* instantaneous attack */
+#ifdef FM6_TEST
+                ++fm6_test_limiter_events;
+#endif
+            } else if (limiter_gain_q15 < 32768) {
+                uint32_t release = (uint32_t)(32768 - limiter_gain_q15 + 255) / 256u;
+                limiter_gain_q15 += (int32_t)(release ? release : 1u); /* ~5.8 ms release */
+                if (limiter_gain_q15 > 32768) limiter_gain_q15 = 32768;
+            }
+            out_l = (int32_t)(((int64_t)out_l * limiter_gain_q15) >> 15);
+            out_r = (int32_t)(((int64_t)out_r * limiter_gain_q15) >> 15);
+            if (out_l > FM6_LIMITER_CEILING_Q23) out_l = FM6_LIMITER_CEILING_Q23;
+            if (out_l < -FM6_LIMITER_CEILING_Q23) out_l = -FM6_LIMITER_CEILING_Q23;
+            if (out_r > FM6_LIMITER_CEILING_Q23) out_r = FM6_LIMITER_CEILING_Q23;
+            if (out_r < -FM6_LIMITER_CEILING_Q23) out_r = -FM6_LIMITER_CEILING_Q23;
+#ifdef FM6_TEST
+            abs_l = fm6_test_abs_i64(out_l); abs_r = fm6_test_abs_i64(out_r);
+            peak = abs_l > abs_r ? abs_l : abs_r;
+            if (peak > fm6_test_output_peak_q23) fm6_test_output_peak_q23 = peak;
+#endif
+            stereo[(base+i)*2u] = out_l;
+            stereo[(base+i)*2u+1u] = out_r;
         }
     }
 }
