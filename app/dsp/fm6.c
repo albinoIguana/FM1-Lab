@@ -509,7 +509,7 @@ void fm6_pitch_bend(uint16_t value)
     pitch_bend_16 = (int16_t)(((int32_t)value - 8192) * 32 / 8192);
 }
 
-void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
+void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
     uint32_t base;
     for (base = 0; base < frames; base += FM6_N) {
@@ -571,7 +571,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
         }
 
         for (i = 0; i < count; i++) {
-            int32_t delta=(int32_t)master_q12-output_gain_q12;
+            int32_t delta=(int32_t)master_gain_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
             /* Stop first: a rapid stop/start must release the old lane notes
              * before start resets their gate counters. */
@@ -605,8 +605,10 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_q12)
             int32_t sends[4]={fm6_sat_q23(send_accum[0]),fm6_sat_q23(send_accum[1]),fm6_sat_q23(send_accum[2]),fm6_sat_q23(send_accum[3])};
             int64_t left=0,right=0;
             fm6_fx_process(dry,sends,&left,&right);
-            stereo[(base+i)*2u]=fm6_soft_clip(((int64_t)left*output_gain_q12)>>15);
-            stereo[(base+i)*2u+1u]=fm6_soft_clip(((int64_t)right*output_gain_q12)>>15);
+            /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
+             * Keep the physical MASTER control at unity when it reaches 4096. */
+            stereo[(base+i)*2u]=fm6_soft_clip(((int64_t)left*output_gain_q12)>>12);
+            stereo[(base+i)*2u+1u]=fm6_soft_clip(((int64_t)right*output_gain_q12)>>12);
         }
     }
 }
