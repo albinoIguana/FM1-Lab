@@ -84,7 +84,8 @@ int main(void) {
     /* Four identical patch buses add linearly before the output clipper.
      * This avoids mistaking the old final soft clip for mixer headroom. */
     assert(four_dry_peak == single_dry_peak * 4u);
-    printf("FM6 gain reference: one-patch=%llu four-patch=%llu\n",\n           (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak);\n
+    printf("FM6 gain reference: one-patch=%llu four-patch=%llu\n",
+           (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak);
     /* The platform passes APP_GAIN as Q12 (0..4096). At a settled
      * half-scale master setting, output must be approximately half of unity. */
     int32_t master_unity_peak = render_master_peak(4096u);
