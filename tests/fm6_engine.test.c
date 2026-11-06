@@ -100,6 +100,46 @@ static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
     return fm6_test_patch_peak(0u);
 }
 
+
+static void render_insert_variant(uint8_t amp, uint8_t eq, int32_t *destination)
+{
+    fm6_init();
+    for(unsigned patch=1u;patch<FM1LAB_PATCH_COUNT;patch++)fm6_patch_set_enabled(patch,0u);
+    fm6_patch_set_level(0u,31u);
+    if(amp){
+        fm6_patch_insert_set(0u,FM6_INSERT_AMP_ENABLED,1u);
+        fm6_patch_insert_set(0u,FM6_INSERT_DRIVE,100u);
+        fm6_patch_insert_set(0u,FM6_INSERT_TONE,82u);
+        fm6_patch_insert_set(0u,FM6_INSERT_OUTPUT,50u);
+    }
+    if(eq){
+        fm6_patch_insert_set(0u,FM6_INSERT_EQ_ENABLED,1u);
+        fm6_patch_insert_set(0u,FM6_INSERT_EQ_MID_FREQUENCY,54u);
+        fm6_patch_insert_set(0u,FM6_INSERT_EQ_MID_GAIN,24u);
+        fm6_patch_insert_set(0u,FM6_INSERT_EQ_MID_Q,18u);
+    }
+    fm6_note_on_mask(60u,110u,0x01u);
+    for(unsigned block=0u;block<32u;block++)
+        fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
+}
+static int32_t render_compressor_peak(uint8_t enabled)
+{
+    static int32_t warmup[2048u*2u];
+    fm6_init();
+    for(unsigned patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)fm6_patch_set_level(patch,127u);
+    fm6_master_comp_set(FM6_COMP_ENABLED,enabled);
+    fm6_master_comp_set(FM6_COMP_THRESHOLD,0u);
+    fm6_master_comp_set(FM6_COMP_RATIO,100u);
+    fm6_master_comp_set(FM6_COMP_ATTACK,0u);
+    fm6_master_comp_set(FM6_COMP_RELEASE,20u);
+    fm6_master_comp_set(FM6_COMP_MAKEUP,0u);
+    fm6_note_on_mask(60u,110u,0x0fu);
+    fm6_render(warmup,2048u,4096u);
+    memset(output,0,sizeof output);
+    fm6_render(output,TEST_FRAMES,4096u);
+    return peak(output,TEST_WORDS);
+}
+
 int main(void) {
     assert(fm6_patch_count() == FM1LAB_PATCH_COUNT);
     fm6_init();
@@ -556,6 +596,9 @@ int main(void) {
             saved.seq_gate[lane][step] = (uint8_t)(10u + step % 91u);
         }
     saved.arp_mode = 3u;
+    saved.compressor_enabled=1u; saved.compressor_threshold=42u;
+    saved.compressor_ratio=67u; saved.compressor_attack=15u;
+    saved.compressor_release=75u; saved.compressor_makeup=10u;
     for (unsigned fx = 0; fx < 3u; ++fx) {
         saved.fx_enabled[fx] = 1u;
         saved.fx_mix[fx] = (uint8_t)(30u + fx * 20u);
@@ -574,6 +617,9 @@ int main(void) {
     restored.fx_depth[FM6_FX_PHASER] = 101u;
     assert(!fm6_performance_state_valid(&restored));
     restored.fx_depth[FM6_FX_PHASER] = saved.fx_depth[FM6_FX_PHASER];
+    restored.compressor_makeup=101u;
+    assert(!fm6_performance_state_valid(&restored));
+    restored.compressor_makeup=saved.compressor_makeup;
     restored.tempo_bpm = 29u;
     assert(!fm6_performance_state_valid(&restored));
     assert(fm6_performance_state_set(&restored) == -1);
@@ -583,6 +629,27 @@ int main(void) {
     assert(fm6_sequencer_running() == 1u);
     fm6_sequencer_set_running(0u);
 
-    puts("Felucca FM6 engine: voice pools, dual-lane sequencing, arp scheduling, FX buses/sends and render passed");
+    /* Patch inserts are independent, bypassable, and operate before pan/sends. */
+    render_insert_variant(0u,0u,chunk_a);
+    render_insert_variant(1u,0u,chunk_b);
+    assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)!=0);
+    render_insert_variant(0u,1u,chunk_b);
+    assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)!=0);
+    fm6_init();
+    fm6_patch_insert_set(2u,FM6_INSERT_DRIVE,255u);
+    fm6_patch_insert_set(2u,FM6_INSERT_EQ_MID_GAIN,255u);
+    assert(fm6_patch_insert_get(2u,FM6_INSERT_DRIVE)==100u);
+    assert(fm6_patch_insert_get(2u,FM6_INSERT_EQ_MID_GAIN)==24u);
+    assert(fm6_patch_insert_get(2u,FM6_INSERT_EQ_MID_FREQUENCY)==50u);
+
+    /* Linked master compression reduces sustained four-layer peaks and is
+     * fully bypassable; its state is included in performance persistence. */
+    int32_t compressor_bypass_peak=render_compressor_peak(0u);
+    int32_t compressor_active_peak=render_compressor_peak(1u);
+    assert(compressor_bypass_peak>0);
+    assert(compressor_active_peak>0);
+    assert(compressor_active_peak<compressor_bypass_peak);
+
+    puts("Felucca FM6 engine: voice pools, sequencing, stereo FX, patch Amp/Drive, parametric EQ and master compressor passed");
     return 0;
 }
