@@ -363,7 +363,7 @@ void fm6_init(void)
     fx_phaser_feedback_l=fx_phaser_feedback_r=0;
     for(uint32_t fx=0;fx<4u;fx++) fx_enabled[fx]=0u;
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<4u;fx++) fx_send[p][fx]=fx==3u?0u:100u;
-    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
+    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_mix[3]=35u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_time[3]=35u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
     seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
     seq_start_pending=seq_stop_pending=arp_clear_pending=0u;
     arp_mode=0u; arp_count=0u; arp_index=0u; arp_direction=1u; arp_live=0u;
