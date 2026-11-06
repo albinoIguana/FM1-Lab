@@ -131,12 +131,12 @@ Before calling the mixer foundation complete, tests must demonstrate:
 The current feature-branch implementation has several behaviors to reconcile before more DSP is added:
 
 - fm6_render() currently divides each active patch gain by the active-layer count. This makes patch gain depend on the number of simultaneously active patches and violates the stable-level contract.
-- settings_defaults() currently initializes all four patch levels to 127. Factory Instrument capture also needs to be checked so its source values do not overwrite the safe default.
+- The unsafe 127 default is repeated in settings_defaults(), instrument_factory_capture(), fm1lab_instrument_init(), fm1lab_patch_set_voice(), and the empty-bank record initializer in fm1lab_store_library.c. All factory/new-state entry points must agree on 31/127. Existing decoded/saved user records must retain their stored level; changing the default must not rewrite existing user data.
 - fm6_render() applies incoming master_q12 through a smoothed output_gain_q12, then applies a soft clip. There is not yet a distinct documented −12 dB default master trim and separately specified −1 dBFS peak limiter.
 - The current FX send accumulator folds patch samples into mono sends; the FX processor returns stereo. This is not yet the stereo-capable per-patch routing contract above.
 - The current renderer saturates send inputs and several FX internal states to Q23. Intermediate saturation needs explicit accounting and a wider-headroom design; a clean final output alone is not sufficient.
 - The current Phaser is a four-stage all-pass effect, while Chorus/Delay/Reverb still have simpler existing implementations. Their quality and parameter completeness remain separate work items.
-- Current settings schema is V4, but Instrument-bank metadata and global settings still need a single authoritative ownership map before adding per-patch strip and master processor state.
+- Current settings schema is V4. Instrument bank records already persist four patch levels/macros/enabled flags in their per-patch metadata, while the global settings record also duplicates levels/macros for compatibility and performance state. The bank record is the authoritative source after an Instrument is loaded; the settings copy is a compatibility/runtime mirror. Define explicit ownership before adding pan, inserts, sends, or master processor state. Do not expand the fixed 479-byte bank record or change its packed layout casually.
 
 These are audit findings, not permission to make a rushed compatibility-breaking rewrite. Resolve them in order and keep existing supported migration tests intact.
 
