@@ -130,11 +130,11 @@ Before calling the mixer foundation complete, tests must demonstrate:
 
 The current feature-branch implementation has several behaviors to reconcile before more DSP is added:
 
-- fm6_render() currently divides each active patch gain by the active-layer count. This makes patch gain depend on the number of simultaneously active patches and violates the stable-level contract.
+- The active-layer-count normalization has been removed. Each patch now receives the same fixed linear level regardless of how many other patches are active; the coherent-sum test verifies exact 4:1 pre-master scaling.
 - The unsafe 127 default is repeated in settings_defaults(), instrument_factory_capture(), fm1lab_instrument_init(), fm1lab_patch_set_voice(), and the empty-bank record initializer in fm1lab_store_library.c. All factory/new-state entry points must agree on 31/127. Existing decoded/saved user records must retain their stored level; changing the default must not rewrite existing user data.
-- fm6_render() applies incoming master_q12 through a smoothed output_gain_q12, then applies a soft clip. There is not yet a distinct documented −12 dB default master trim and separately specified −1 dBFS peak limiter.
-- The current FX send accumulator folds patch samples into mono sends; the FX processor returns stereo. This is not yet the stereo-capable per-patch routing contract above.
-- The current renderer saturates send inputs and several FX internal states to Q23. Intermediate saturation needs explicit accounting and a wider-headroom design; a clean final output alone is not sufficient.
+- The `APP_GAIN` caller contract is Q12 amplitude (0..4096). A fixed Q15 −12 dB master trim (8231) now precedes FX routing; the output path uses linear Q24-to-Q23 conversion and a separate −1 dBFS peak limiter with instantaneous attack and bounded release.
+- The current shared FX send accumulator still folds patch samples to mono before the stereo returns. Per-patch stereo sends and pan-before-send remain outstanding; the present Q19 headroom work does not claim that routing requirement complete.
+- FX send accumulators remain wide until the fixed master trim, then enter a Q19 internal FX domain (Q24 input shifted right five bits). The existing int32 delay/comb buffers retain their memory footprint while gaining 32× internal headroom. Test-only saturation counters verify no internal saturation under the four-patch reference/feedback condition.
 - The current Phaser is a four-stage all-pass effect, while Chorus/Delay/Reverb still have simpler existing implementations. Their quality and parameter completeness remain separate work items.
 - Current settings schema is V4. Instrument bank records already persist four patch levels/macros/enabled flags in their per-patch metadata, while the global settings record also duplicates levels/macros for compatibility and performance state. The bank record is the authoritative source after an Instrument is loaded; the settings copy is a compatibility/runtime mirror. Define explicit ownership before adding pan, inserts, sends, or master processor state. Do not expand the fixed 479-byte bank record or change its packed layout casually.
 
@@ -143,7 +143,7 @@ These are audit findings, not permission to make a rushed compatibility-breaking
 ## 11. Implementation sequence
 
 1. **Architecture freeze:** settle signal units, state ownership, routing API, smoothing policy, memory budget, diagnostics, and migration ownership.
-2. **Mixer foundation:** stable patch gain, pan, wide accumulators, stereo sends/returns, master trim, and gain-staging tests.
+2. **Mixer foundation:** stable calibrated patch gain, wide accumulators, Q19 FX-bus headroom, −12 dB master trim, and a separate final limiter are implemented and under host regression. Per-patch pan/stereo sends and the complete routing contract remain outstanding.
 3. **Patch inserts:** per-patch Amp/Drive and three-band EQ with independent state/bypass.
 4. **Master dynamics:** compressor and independent peak limiter, with diagnostics and independent tests.
 5. **FX refinement:** bring Chorus, Phaser, Delay, and Reverb to the shared parameter/routing contract; improve Reverb diffusion and document each processor's limits.
@@ -173,9 +173,9 @@ The following findings were confirmed against the current feature-branch source 
 
 ### Numeric/API items still unresolved
 
-- `fm6_render()` smooths its `master_q12` argument into `output_gain_q12`, then multiplies samples by that value and shifts right 15. The identifier says Q12 while the arithmetic uses a Q15 denominator. Trace the caller's actual range and units, rename/document the API consistently, and test endpoints before introducing a separate fixed −12 dB trim and limiter.
-- The active FM6 render path has per-patch sample accumulation in `int64_t`, but the four send accumulators are then saturated to Q23 before FX processing; FX delay/comb states also saturate to Q23. Record every such boundary and its intended full-scale meaning. Do not infer headroom solely from the final soft-clipped Q23 output.
-- The patch-level multiplier currently divides each patch contribution by the number of active layers. This is the direct cause of level changing when another patch is enabled/disabled; remove it only alongside the coherent-sum and mute tests in the mixer foundation.
+- `fm6_render()` smooths `master_gain_q12` as Q12 amplitude (0..4096), matching `fm1-base` `APP_GAIN(master)`. The output multiply shifts by 12; the fixed −12 dB trim is a separate Q15 stage (8231). The final Q24-to-Q23 conversion shifts by one, before the independent limiter.
+- Per-patch and dry/send accumulators use `int64_t`. After master trim, sends enter the Q19 FX domain (`Q24 >> 5`) before the int32 feedback buffers; this provides 32× headroom without increasing the current 98,304-byte FX-buffer allocation. `fm6_sat_q23()` remains an explicit internal-state boundary and is counted in host tests. The final output is now linear Q24-to-Q23 conversion followed by a distinct peak limiter, not the former tanh soft clip.
+- Patch level no longer divides by active-layer count. A measured Q15 calibration constant of 10,536 maps the pinned core's 13,045,204 Q24 reference peak at level 31 to 4,194,466 Q24 (25% of Q24 full scale); four coherent patches sum to 16,777,864 Q24, within 0.001% of unity.
 
 ### Current memory evidence and build target
 
@@ -190,3 +190,22 @@ The following findings were confirmed against the current feature-branch source 
 3. Bound MIDI and command processing per audio block; measure patch-rebuild worst case and stack use.
 4. Build this exact branch head with the pinned submodules/toolchain and capture current ELF `.text`, `.ram_text`, `.data`, `.bss`, `.pool`, and stack evidence.
 5. Only then finalize accumulator widths, saturation points, fixed master trim, limiter interface, and the mixer API.
+
+
+## 14. Measured gain foundation — 2026-11-06
+
+The following values are implemented in `app/dsp/fm6.c` and covered by native host tests:
+
+| Stage | Contract | Evidence |
+|---|---|---|
+| FM6 reference voice | Factory level 31, reference note 60 | Pinned core produced 13,045,204 Q24 before wrapper calibration |
+| Patch calibration | Q15 multiplier 10,536 | Reference patch peak becomes 4,194,466 Q24 (approximately 0.25 Q24 full scale) |
+| Four-patch dry sum | 64-bit coherent accumulation | Four identical patches measured 16,777,864 Q24 (approximately 1.0 Q24 full scale) |
+| Default master trim | Q15 multiplier 8,231 (−12 dB) | Applied once to dry and send paths, before FX processing |
+| FX internal domain | Q19, Q24 send shifted right 5 bits | 32× internal headroom while retaining the existing int32 delay/comb buffer allocation |
+| Device output conversion | Linear Q24 to signed Q23 | No tanh soft-clip stage in the output path |
+| Final peak limiter | 7,470,000 Q23 (approximately −1.01 dBFS) | Instantaneous attack, approximately 5.8 ms release, shared stereo gain envelope |
+
+The coherent four-patch test asserts a unity pre-trim dry sum and an output peak between 24% and 26% of Q23 full scale at default master gain. A separate four-bus feedback test asserts zero internal FX saturation at the reference patch level. A full-level combined stress test asserts the final output never exceeds the limiter ceiling and that gain reduction is exercised.
+
+This is a host-calibrated signal reference, not a universal loudness guarantee for arbitrary patches, notes, or resonant effect settings. The limiter is a final safety stage; it does not excuse intermediate saturation. The test-only probes are excluded from production builds. Hardware CPU/xrun, clipping behavior, and listening qualification remain outstanding.
