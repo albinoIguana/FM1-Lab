@@ -1,6 +1,6 @@
 # FM1-Lab Audio Engine 2.0 implementation plan
 
-Status: Phaser fourth bus implemented on the feature branch. The binding architecture contract is now [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
+Status: Phaser fourth bus and the calibrated gain/headroom foundation are implemented on the feature branch. The binding architecture contract is [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md); it supersedes any conflicting assumptions in this working plan. Items below are not complete unless explicitly marked.
 
 ## Implementation checkpoint — Phaser bus
 
@@ -12,9 +12,19 @@ Status: Phaser fourth bus implemented on the feature branch. The binding archite
 - Host tests cover audible signal change, stereo spread, per-patch send isolation, combined four-bus stress, state round-trip, depth validation, and render chunk consistency.
 - Wired to a dedicated native PHASER FX page with wet, rate, depth and resonance controls. A separate SEND ROUTING page exposes the four independent per-patch bus sends. Both SELECT and the FX button cycle the four processor pages plus routing. Device CPU/xrun qualification remains outstanding.
 
-## Architecture gate — must precede more DSP
+## Implementation checkpoint — calibrated mixer and master safety
 
-The architecture contract defines the stable patch-gain model, ≤25% factory defaults, −12 dBFS master gain-staging reference, separate approximately −1 dBFS peak-safety limiter, stereo send/return routing, parameter smoothing, state ownership, numeric headroom, memory budget, diagnostics, and acceptance tests. Do not start Amp/Drive, EQ, or master processor implementation until the mixer/state contracts are frozen and the current source gaps are resolved. In particular, remove active-layer-count gain normalization only as part of the tested mixer foundation; do not merely lower the factory level and leave the current dynamic normalization in place.
+- Measured the pinned FM6 core's reference voice at 13,045,204 Q24 for factory level 31; fixed Q15 calibration 10,536 yields 4,194,466 Q24 per reference patch.
+- Four coherent reference patches sum to 16,777,864 Q24 (approximately unity) without active-layer-count normalization.
+- Added the independent Q15 −12 dB master trim (8231) ahead of dry/FX routing.
+- Moved the shared FX buses into a Q19 internal domain (Q24 sends shifted right five bits), preserving existing int32 delay/comb memory while reserving 32× feedback headroom.
+- Replaced the tanh output clip with linear Q24-to-Q23 conversion and a distinct stereo-linked peak limiter at 7,470,000 Q23 (approximately −1 dBFS), instantaneous attack and approximately 5.8 ms release.
+- Native tests now measure the coherent reference, assert the default output is approximately −12 dBFS, verify no internal FX saturation in the reference feedback case, and exercise the final limiter under full-level stress.
+- Per-patch pan/stereo sends, master compressor, and device CPU/xrun qualification are not complete.
+
+## Architecture gate — before inserts and further DSP
+
+The gain foundation is now in place, but the architecture contract still gates the next processors. Freeze per-patch pan and stereo send/return ownership, instrument/performance/device state boundaries, parameter smoothing, memory/stack budget, and remaining saturation boundaries before adding Amp/Drive or EQ. Do not treat the current mono send accumulation or the completed peak limiter as completion of the full mixer or master-dynamics architecture.
 
 ## Goals
 
