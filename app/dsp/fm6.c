@@ -83,6 +83,10 @@ static uint32_t overload_shed_count;
 static int32_t output_gain_q12;
 static int32_t limiter_gain_q15;
 static int16_t pitch_bend_16;
+static uint8_t fm6_comp_enabled, fm6_comp_threshold, fm6_comp_ratio;
+static uint8_t fm6_comp_attack, fm6_comp_release, fm6_comp_makeup;
+static int32_t fm6_comp_envelope;
+
 
 #ifdef FM6_TEST
 static uint64_t fm6_test_patch_peak_q24[PATCHES];
@@ -151,6 +155,136 @@ static void fm6_pan_gains(uint8_t pan, int32_t *left_q15, int32_t *right_q15)
         *left_q15 = (int32_t)((uint32_t)(127u - pan) * 32768u / 63u);
         *right_q15 = 32768;
     }
+}
+
+
+static const int32_t fm6_eq_sin_q15[101] = {93,100,107,115,123,132,141,151,162,174,186,200,214,229,246,263,282,302,324,347,372,398,427,457,490,525,563,603,646,692,742,795,851,912,978,1047,1122,1203,1289,1381,1479,1585,1698,1820,1950,2089,2238,2398,2569,2752,2949,3159,3384,3625,3883,4160,4455,4772,5110,5472,5860,6274,6716,7189,7694,8233,8807,9420,10072,10767,11504,12288,13118,13997,14925,15903,16930,18007,19130,20297,21502,22739,23999,25268,26531,27767,28952,30053,31032,31844,32435,32741,32690,32202,31187,29555,27214,24079,20085,15197,9435};
+static const int32_t fm6_eq_cos_q15[101] = {32768,32768,32768,32768,32768,32768,32768,32768,32768,32768,32767,32767,32767,32767,32767,32767,32767,32767,32766,32766,32766,32766,32765,32765,32764,32764,32763,32762,32762,32761,32760,32758,32757,32755,32753,32751,32749,32746,32743,32739,32735,32730,32724,32717,32710,32701,32691,32680,32667,32652,32635,32615,32593,32567,32537,32503,32464,32419,32367,32308,32240,32162,32072,31970,31852,31717,31562,31385,31182,30949,30682,30377,30028,29628,29172,28650,28055,27377,26604,25725,24726,23594,22312,20863,19232,17399,15347,13060,10523,7725,4659,1327,-2257,-6066,-10054,-14150,-18252,-22225,-25891,-29031,-31380};
+static const uint32_t fm6_eq_q_q15[32] = {16384,20084,23783,27483,31182,34882,38582,42281,45981,49681,53380,57080,60779,64479,68179,71878,75578,79277,82977,86677,90376,94076,97775,101475,105175,108874,112574,116274,119973,123673,127372,131072};
+static const uint32_t fm6_eq_a_q15[25] = {16423,17396,18427,19519,20675,21900,23198,24573,26029,27571,29205,30935,32768,34710,36766,38945,41252,43697,46286,49029,51934,55011,58271,61723,65381};
+
+static int32_t fm6_div_q15(int32_t numerator, uint32_t denominator)
+{
+    uint32_t magnitude = numerator < 0 ? (uint32_t)(-(int64_t)numerator) : (uint32_t)numerator;
+    uint32_t result = denominator ? (magnitude * 32768u) / denominator : 0u;
+    return numerator < 0 ? -(int32_t)result : (int32_t)result;
+}
+static void fm6_eq_coeff_update(fm1lab_patch_t *p, uint32_t band)
+{
+    uint32_t frequency = p->eq_frequency[band] > 100u ? 100u : p->eq_frequency[band];
+    uint32_t gain = p->eq_gain[band] > 24u ? 24u : p->eq_gain[band];
+    uint32_t q = p->eq_q[band] > 31u ? 31u : p->eq_q[band];
+    uint32_t sine = (uint32_t)(fm6_eq_sin_q15[frequency] < 0 ? -fm6_eq_sin_q15[frequency] : fm6_eq_sin_q15[frequency]);
+    int32_t cosine = fm6_eq_cos_q15[frequency];
+    uint32_t alpha = (sine * 32768u) / (2u * fm6_eq_q_q15[q]);
+    uint32_t alpha_a = (alpha * fm6_eq_a_q15[gain]) >> 15;
+    uint32_t alpha_over_a = (alpha << 15) / fm6_eq_a_q15[gain];
+    uint32_t a0 = 32768u + alpha_over_a;
+    int32_t b0 = (int32_t)(32768u + alpha_a);
+    int32_t b1 = -2 * cosine;
+    int32_t b2 = (int32_t)(32768u - alpha_a);
+    int32_t a1 = b1;
+    int32_t a2 = (int32_t)(32768u - alpha_over_a);
+    p->eq_coeff[band][0] = fm6_div_q15(b0, a0);
+    p->eq_coeff[band][1] = fm6_div_q15(b1, a0);
+    p->eq_coeff[band][2] = fm6_div_q15(b2, a0);
+    p->eq_coeff[band][3] = fm6_div_q15(a1, a0);
+    p->eq_coeff[band][4] = fm6_div_q15(a2, a0);
+}
+static int32_t fm6_clamp_sample(int64_t x)
+{
+    return x > INT32_MAX ? INT32_MAX : x < INT32_MIN ? INT32_MIN : (int32_t)x;
+}
+static int64_t fm6_amp_soft_clip(int64_t x)
+{
+    const int64_t knee = 1LL << 23; /* half-scale soft knee in the Q24 patch domain */
+    uint64_t magnitude = x < 0 ? (uint64_t)(-(x + 1)) + 1u : (uint64_t)x;
+    if (magnitude <= (uint64_t)knee) return x;
+    uint64_t excess = magnitude - (uint64_t)knee;
+    uint64_t denominator = (uint64_t)knee + excess;
+    uint32_t ratio_q15 = (uint32_t)(((uint32_t)(knee >> 8) * 32768u) / (uint32_t)(denominator >> 8));
+    uint64_t shaped = (uint64_t)knee + ((excess * ratio_q15) >> 15);
+    if (shaped > (uint64_t)(1LL << 24)) shaped = (uint64_t)(1LL << 24);
+    return x < 0 ? -(int64_t)shaped : (int64_t)shaped;
+}
+static uint32_t fm6_amp_output_gain(uint8_t output)
+{
+    if (output <= 50u) return 8192u + (uint32_t)output * 491u;
+    return 32768u + (uint32_t)(output - 50u) * 655u;
+}
+static int64_t fm6_patch_insert_process(uint32_t patch, int64_t input)
+{
+    fm1lab_patch_t *p = &instrument[patch];
+    int32_t raw = fm6_clamp_sample(input);
+    uint32_t cutoff = 300u + (uint32_t)p->tone * 197u;
+    uint32_t tone_alpha = (cutoff * 32768u) / (cutoff + 7016u);
+    p->amp_tone_state += (int32_t)(((int64_t)(raw - p->amp_tone_state) * tone_alpha) >> 15);
+    int64_t amp = input;
+    if (p->amp_enabled) {
+        uint32_t drive_gain = 32768u + (uint32_t)p->drive * 22938u / 100u;
+        amp = (input * drive_gain) >> 15;
+        if (p->drive) amp = fm6_amp_soft_clip(amp);
+        amp = p->amp_tone_state;
+        amp = (amp * fm6_amp_output_gain(p->output)) >> 15;
+    }
+    int64_t eq_input = amp;
+    int64_t eq_output = eq_input;
+    for (uint32_t band = 0; band < 3u; ++band) {
+        int32_t x = fm6_clamp_sample(eq_output);
+        if (p->eq_gain[band] == 12u) {
+            p->eq_x2[band] = p->eq_x1[band]; p->eq_x1[band] = x;
+            p->eq_y2[band] = p->eq_y1[band]; p->eq_y1[band] = x;
+            continue;
+        }
+        int64_t acc = (int64_t)p->eq_coeff[band][0] * x +
+            (int64_t)p->eq_coeff[band][1] * p->eq_x1[band] +
+            (int64_t)p->eq_coeff[band][2] * p->eq_x2[band] -
+            (int64_t)p->eq_coeff[band][3] * p->eq_y1[band] -
+            (int64_t)p->eq_coeff[band][4] * p->eq_y2[band];
+        int32_t y = fm6_clamp_sample(acc >> 15);
+        p->eq_x2[band] = p->eq_x1[band]; p->eq_x1[band] = x;
+        p->eq_y2[band] = p->eq_y1[band]; p->eq_y1[band] = y;
+        eq_output = y;
+    }
+    return p->eq_enabled ? eq_output : amp;
+}
+static uint32_t fm6_comp_makeup_q15(uint8_t value)
+{
+    static const uint32_t gain[13] = {32768u,34716u,36781u,38968u,41285u,43739u,46341u,
+        49099u,52028u,55146u,58470u,61999u,65536u};
+    uint32_t scaled = (uint32_t)value * 12u;
+    uint32_t index = scaled / 100u, remainder = scaled % 100u;
+    if (index >= 12u) return gain[12];
+    return gain[index] + ((gain[index + 1u] - gain[index]) * remainder) / 100u;
+}
+static void fm6_master_comp_process(int64_t *left, int64_t *right)
+{
+    uint64_t al = fm6_abs_i64(*left), ar = fm6_abs_i64(*right);
+    uint64_t peak = al > ar ? al : ar;
+    int32_t detector = peak > INT32_MAX ? INT32_MAX : (int32_t)peak;
+    uint32_t attack_ms = 1u + (uint32_t)fm6_comp_attack * 49u / 100u;
+    uint32_t release_ms = 20u + (uint32_t)fm6_comp_release * 480u / 100u;
+    uint32_t alpha = (uint32_t)(32768u / (attack_ms * 44u));
+    uint32_t release = (uint32_t)(32768u / (release_ms * 44u));
+    int32_t difference = detector - fm6_comp_envelope;
+    uint32_t coefficient = difference > 0 ? alpha : release;
+    int64_t step = ((int64_t)difference * coefficient) >> 15;
+    if (difference && !step) step = difference > 0 ? 1 : -1;
+    fm6_comp_envelope = fm6_clamp_sample((int64_t)fm6_comp_envelope + step);
+    if (!fm6_comp_enabled) return;
+    uint32_t threshold = 500000u + (uint32_t)fm6_comp_threshold * 154000u;
+    uint32_t gain_q15 = 32768u;
+    if ((uint32_t)fm6_comp_envelope > threshold) {
+        uint32_t ratio = 1u + (uint32_t)fm6_comp_ratio * 11u / 100u;
+        uint32_t compressed = threshold + ((uint32_t)fm6_comp_envelope - threshold) / ratio;
+        uint32_t den = (uint32_t)fm6_comp_envelope >> 8;
+        uint32_t num = (compressed >> 8) * 32768u;
+        gain_q15 = den ? num / den : 32768u;
+        if (gain_q15 > 32768u) gain_q15 = 32768u;
+    }
+    gain_q15 = (gain_q15 * fm6_comp_makeup_q15(fm6_comp_makeup)) >> 15;
+    *left = (*left * gain_q15) >> 15;
+    *right = (*right * gain_q15) >> 15;
 }
 
 static int32_t fm6_sat_q23(int64_t x)
@@ -420,6 +554,8 @@ void fm6_init(void)
     fm6_test_output_peak_q23 = 0u;
 #endif
     pitch_bend_16 = 0;
+    fm6_comp_enabled=0u; fm6_comp_threshold=65u; fm6_comp_ratio=40u;
+    fm6_comp_attack=20u; fm6_comp_release=40u; fm6_comp_makeup=0u; fm6_comp_envelope=0;
     for(uint32_t lane=0;lane<2u;lane++) for(uint32_t step=0;step<64u;step++) {
         seq_pattern[lane][step].enabled=0u; seq_pattern[lane][step].note=0u;
         seq_pattern[lane][step].velocity=0u; seq_pattern[lane][step].gate=0u;
@@ -452,6 +588,15 @@ void fm6_init(void)
         instrument[i].enabled = 1u; /* factory instrument starts as a four-layer stack */
         instrument[i].level = 31u; /* 24.4% linear: safe factory starting level */
         instrument[i].pan = 64u; /* centered; constant-voltage pan preserves the reference level */
+        instrument[i].amp_enabled=0u; instrument[i].drive=0u; instrument[i].tone=50u; instrument[i].output=50u;
+        instrument[i].eq_enabled=0u; instrument[i].amp_tone_state=0;
+        instrument[i].eq_frequency[0]=18u; instrument[i].eq_frequency[1]=50u; instrument[i].eq_frequency[2]=82u;
+        for(uint32_t band=0;band<3u;band++){
+            instrument[i].eq_gain[band]=12u; instrument[i].eq_q[band]=10u;
+            instrument[i].eq_x1[band]=instrument[i].eq_x2[band]=0;
+            instrument[i].eq_y1[band]=instrument[i].eq_y2[band]=0;
+            fm6_eq_coeff_update(&instrument[i],band);
+        }
         instrument[i].pan_l_current_q15 = 32768;
         instrument[i].pan_r_current_q15 = 32768;
         fm6_rebuild_patch(i);
@@ -683,7 +828,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u));
             int64_t dry=0, dry_l=0, dry_r=0, send_accum[4][2]={{0,0},{0,0},{0,0},{0,0}};
             for(uint32_t p=0;p<PATCHES;p++) {
-                int64_t sample=patch_mix[p][i];
+                int64_t sample=fm6_patch_insert_process(p,patch_mix[p][i]);
 #ifdef FM6_TEST
                 uint64_t patch_abs=fm6_test_abs_i64(sample);
                 if(patch_abs>fm6_test_patch_peak_q24[p]) fm6_test_patch_peak_q24[p]=patch_abs;
@@ -733,6 +878,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
             int64_t left=0,right=0;
             fm6_fx_process(trimmed_dry_l,trimmed_dry_r,sends,&left,&right);
+            fm6_master_comp_process(&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * Keep the physical MASTER control at unity when it reaches 4096. */
             /* Q24 mixer -> Q23 device samples is a linear >>1 conversion.
@@ -847,6 +993,9 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         for (uint32_t patch = 0; patch < PATCHES; ++patch)
             if (s->fx_send[patch][fx] > 100u) return 0;
     }
+    if (s->compressor_enabled > 1u || s->compressor_threshold > 100u ||
+        s->compressor_ratio > 100u || s->compressor_attack > 100u ||
+        s->compressor_release > 100u || s->compressor_makeup > 100u) return 0;
     return 1;
 }
 
@@ -865,6 +1014,9 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
         }
     }
     s->arp_mode = arp_mode;
+    s->compressor_enabled=fm6_comp_enabled; s->compressor_threshold=fm6_comp_threshold;
+    s->compressor_ratio=fm6_comp_ratio; s->compressor_attack=fm6_comp_attack;
+    s->compressor_release=fm6_comp_release; s->compressor_makeup=fm6_comp_makeup;
     for (uint32_t fx = 0; fx < 4u; ++fx) {
         s->fx_enabled[fx] = fx_enabled[fx];
         s->fx_mix[fx] = fx_mix[fx];
@@ -901,6 +1053,10 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
         }
     }
     arp_mode = s->arp_mode;
+    fm6_comp_enabled=s->compressor_enabled; fm6_comp_threshold=s->compressor_threshold;
+    fm6_comp_ratio=s->compressor_ratio; fm6_comp_attack=s->compressor_attack;
+    fm6_comp_release=s->compressor_release; fm6_comp_makeup=s->compressor_makeup;
+    fm6_comp_envelope=0;
     arp_count = arp_index = arp_live = 0u;
     arp_direction = 1u;
     arp_clear_pending = 0u;
@@ -914,6 +1070,61 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
             fx_send[patch][fx] = s->fx_send[patch][fx];
     }
     return 0;
+}
+
+
+void fm6_patch_insert_set(uint32_t patch,uint32_t field,uint8_t value)
+{
+    if(patch>=PATCHES||field>=FM6_INSERT_FIELD_COUNT)return;
+    fm1lab_patch_t *p=&instrument[patch];
+    if(field==FM6_INSERT_AMP_ENABLED)p->amp_enabled=value?1u:0u;
+    else if(field==FM6_INSERT_DRIVE)p->drive=value>100u?100u:value;
+    else if(field==FM6_INSERT_TONE)p->tone=value>100u?100u:value;
+    else if(field==FM6_INSERT_OUTPUT)p->output=value>100u?100u:value;
+    else if(field==FM6_INSERT_EQ_ENABLED)p->eq_enabled=value?1u:0u;
+    else {
+        uint32_t band=(field-FM6_INSERT_EQ_LOW_FREQUENCY)/3u;
+        uint32_t param=(field-FM6_INSERT_EQ_LOW_FREQUENCY)%3u;
+        if(band>=3u)return;
+        if(param==0u)p->eq_frequency[band]=value>100u?100u:value;
+        else if(param==1u)p->eq_gain[band]=value>24u?24u:value;
+        else p->eq_q[band]=value>31u?31u:value;
+        fm6_eq_coeff_update(p,band);
+    }
+}
+uint8_t fm6_patch_insert_get(uint32_t patch,uint32_t field)
+{
+    if(patch>=PATCHES||field>=FM6_INSERT_FIELD_COUNT)return 0u;
+    const fm1lab_patch_t *p=&instrument[patch];
+    if(field==FM6_INSERT_AMP_ENABLED)return p->amp_enabled;
+    if(field==FM6_INSERT_DRIVE)return p->drive;
+    if(field==FM6_INSERT_TONE)return p->tone;
+    if(field==FM6_INSERT_OUTPUT)return p->output;
+    if(field==FM6_INSERT_EQ_ENABLED)return p->eq_enabled;
+    uint32_t band=(field-FM6_INSERT_EQ_LOW_FREQUENCY)/3u;
+    uint32_t param=(field-FM6_INSERT_EQ_LOW_FREQUENCY)%3u;
+    if(band>=3u)return 0u;
+    return param==0u?p->eq_frequency[band]:param==1u?p->eq_gain[band]:p->eq_q[band];
+}
+void fm6_master_comp_set(uint32_t field,uint8_t value)
+{
+    if(field>=FM6_COMP_FIELD_COUNT)return;
+    if(field==FM6_COMP_ENABLED)fm6_comp_enabled=value?1u:0u;
+    else if(field==FM6_COMP_THRESHOLD)fm6_comp_threshold=value>100u?100u:value;
+    else if(field==FM6_COMP_RATIO)fm6_comp_ratio=value>100u?100u:value;
+    else if(field==FM6_COMP_ATTACK)fm6_comp_attack=value>100u?100u:value;
+    else if(field==FM6_COMP_RELEASE)fm6_comp_release=value>100u?100u:value;
+    else fm6_comp_makeup=value>100u?100u:value;
+}
+uint8_t fm6_master_comp_get(uint32_t field)
+{
+    if(field>=FM6_COMP_FIELD_COUNT)return 0u;
+    if(field==FM6_COMP_ENABLED)return fm6_comp_enabled;
+    if(field==FM6_COMP_THRESHOLD)return fm6_comp_threshold;
+    if(field==FM6_COMP_RATIO)return fm6_comp_ratio;
+    if(field==FM6_COMP_ATTACK)return fm6_comp_attack;
+    if(field==FM6_COMP_RELEASE)return fm6_comp_release;
+    return fm6_comp_makeup;
 }
 
 uint32_t fm6_patch_count(void) { return PATCHES; }

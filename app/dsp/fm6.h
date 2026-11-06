@@ -26,7 +26,22 @@ typedef struct {
     uint8_t fx_feedback[4];
     uint8_t fx_send[4][4];
     uint8_t fx_depth[4];
+    uint8_t compressor_enabled, compressor_threshold, compressor_ratio;
+    uint8_t compressor_attack, compressor_release, compressor_makeup;
 } fm6_performance_state_t;
+
+enum {
+    FM6_INSERT_AMP_ENABLED=0, FM6_INSERT_DRIVE, FM6_INSERT_TONE, FM6_INSERT_OUTPUT,
+    FM6_INSERT_EQ_ENABLED,
+    FM6_INSERT_EQ_LOW_FREQUENCY, FM6_INSERT_EQ_LOW_GAIN, FM6_INSERT_EQ_LOW_Q,
+    FM6_INSERT_EQ_MID_FREQUENCY, FM6_INSERT_EQ_MID_GAIN, FM6_INSERT_EQ_MID_Q,
+    FM6_INSERT_EQ_HIGH_FREQUENCY, FM6_INSERT_EQ_HIGH_GAIN, FM6_INSERT_EQ_HIGH_Q,
+    FM6_INSERT_FIELD_COUNT
+};
+enum {
+    FM6_COMP_ENABLED=0, FM6_COMP_THRESHOLD, FM6_COMP_RATIO,
+    FM6_COMP_ATTACK, FM6_COMP_RELEASE, FM6_COMP_MAKEUP, FM6_COMP_FIELD_COUNT
+};
 
 enum {
     FM1LAB_MACRO_BRIGHTNESS = 0,
@@ -93,6 +108,10 @@ void fm6_patch_set_level(uint32_t patch, uint8_t level);
 uint8_t fm6_patch_level(uint32_t patch);
 void fm6_patch_set_pan(uint32_t patch, uint8_t pan);
 uint8_t fm6_patch_pan(uint32_t patch);
+void fm6_patch_insert_set(uint32_t patch, uint32_t field, uint8_t value);
+uint8_t fm6_patch_insert_get(uint32_t patch, uint32_t field);
+void fm6_master_comp_set(uint32_t field, uint8_t value);
+uint8_t fm6_master_comp_get(uint32_t field);
 uint8_t fm6_patch_algorithm(uint32_t patch);
 uint8_t fm6_operator_is_carrier(uint32_t patch, uint32_t operator_1_to_6);
 const uint8_t *fm6_patch_data(uint32_t patch);
