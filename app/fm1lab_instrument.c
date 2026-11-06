@@ -82,6 +82,7 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
             instrument->patches[p].macros[m] = 50;
         instrument->patches[p].enabled = 1;
         instrument->patches[p].level = 31; /* 24.4% safe new-Instrument default */
+        instrument->patches[p].voice[155] = 64u; /* centered pan */
     }
 }
 
@@ -96,6 +97,7 @@ int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
         if (voice[i] > 127) return -1;
     if (voice[VOICE_ALGORITHM] > 31 || voice[GLOBAL_FEEDBACK] > 7) return -1;
     copy_bytes(instrument->patches[patch].voice, voice, FM1LAB_PATCH_BYTES);
+    instrument->patches[patch].voice[155] = 64u; /* replacing a voice resets its pan to center */
     for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
         instrument->patches[patch].macros[m] = 50;
     instrument->patches[patch].enabled = 1;
