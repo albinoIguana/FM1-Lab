@@ -10,7 +10,7 @@ Status: calibrated mixer, pan-aware stereo sends/returns, global Instrument-bus 
 - Per-patch Phaser send is independent of Chorus, Delay, and Reverb sends.
 - Performance-state schema expanded to four buses and master compressor state; settings V1/V2/V3/V4 migrations are supported into the current V5 record.
 - Host tests cover audible signal change, stereo spread, per-patch send isolation, combined four-bus stress, state round-trip, depth validation, and render chunk consistency.
-- Wired to a dedicated native PHASER FX page with wet, rate, depth and resonance controls. A separate SEND ROUTING page exposes the four independent per-patch bus sends. Both SELECT and the FX button cycle the four processor pages plus routing. Device CPU/xrun qualification remains outstanding.
+- Wired to dedicated native FX pages. The FX button and SELECT cycle Amp/Drive, parametric EQ, master compressor, Chorus, Delay, Reverb, Phaser and send routing. Device CPU/xrun qualification remains outstanding.
 
 ## Implementation checkpoint — calibrated mixer and master safety
 
@@ -21,7 +21,7 @@ Status: calibrated mixer, pan-aware stereo sends/returns, global Instrument-bus 
 - Replaced the tanh output clip with linear Q24-to-Q23 conversion and a distinct stereo-linked peak limiter at 7,470,000 Q23 (approximately −1 dBFS), instantaneous attack and approximately 5.8 ms release.
 - Native tests now measure the coherent reference, assert the default output is approximately −12 dBFS, verify no internal FX saturation in the reference feedback case, and exercise the final limiter under full-level stress.
 - Per-patch pan is persisted in bank V2 using reserved bits without expanding the 479-byte record; V1 banks migrate to center. The dry strip uses smoothed constant-voltage balance pan, with hard-left/right/center and persistence tests.
-- Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,760 B, `.ram_text` 3,556 B, `.pool` 275,264 B, `.text` 182,392 B, `.noinit` 1,836 B; app.bin 188,916 B. Pool spare is 68,800 B (60,608 B after the mandatory 8 KiB reserve); RAM `.data + .bss` spare is 50,568 B.
+- Latest native device build passes. ELF audit: `.data` 2,968 B, `.bss` 44,360 B, `.ram_text` 3,556 B, `.pool` 275,264 B, `.text` 183,080 B, `.noinit` 1,836 B; app.bin 189,604 B. Pool spare is 68,800 B (60,608 B after the mandatory 8 KiB reserve); RAM `.data + .bss` spare is 50,968 B.
 - Per-patch stereo sends/pan-before-send are implemented and covered by host probes. Master compressor and Amp/EQ/compressor physical controls are implemented. Hardware CPU/xrun/listening qualification remains incomplete.
 
 ## Architecture gate — insert and master state ownership settled
@@ -88,7 +88,7 @@ For each processor and each routing edge:
 - Parameter bounds and invalid-input rejection.
 - Bypass transparency (bit-identical where mathematically possible).
 - Wet/dry behavior, finite bounded output, DC/denormal protection and tail behavior.
-- Per-patch insert isolation and per-patch send isolation.
+- Global insert response across the combined Instrument bus and per-patch send isolation.
 - Repeated enable/disable, parameter changes while sounding, panic and reset.
 - Combined 32-voice + dual sequencer + 16-note arp + all inserts/sends/master dynamics stress.
 - Render chunk equivalence at legal FM6 32-frame quanta.
@@ -99,7 +99,7 @@ For each processor and each routing edge:
 
 1. Freeze enums, routing topology, parameter semantics, settings version/migration and DSP ownership. Complete for inserts and master compressor.
 2. Implement processor APIs and parameter state. Complete for Amp/Drive, EQ and master compressor.
-3. Integrate per-patch inserts, stereo sends and master processing into the render path. Complete and host-tested.
+3. Integrate the global Instrument-bus inserts, stereo sends and master processing into the render path. Complete and host-tested.
 4. Connect compact physical controls/pages after DSP interfaces stabilize. Complete for Amp, EQ and compressor.
 5. Continue FX quality refinement, including Reverb diffusion and distinct parameter semantics.
 6. Add combined voice/sequence/arp/FX/insert/compressor stress coverage and keep the memory report aligned with the latest ELF.
