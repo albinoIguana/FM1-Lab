@@ -36,7 +36,8 @@ static inline int settings_v2_valid(const settings_v2_t *v) {
 
 static inline int settings_v3_valid(const settings_v3_t *v) {
     if (!v || v->magic != SET_MAGIC_V3 || v->octave < -2 || v->octave > 2 ||
-        v->patch >= FM1LAB_PATCH_COUNT || (v->enabled_mask & 0xF0u) || v->ble_off > 1u)
+        v->patch >= FM1LAB_PATCH_COUNT || (v->enabled_mask & 0xF0u) || v->ble_off > 1u ||
+        v->crc != settings_crc16(v, offsetof(settings_v3_t, crc)))
         return 0;
     const fm6_performance_state_v3_t *p = &v->performance;
     if (p->tempo_bpm < 30u || p->tempo_bpm > 300u || p->seq_length < 1u ||
