@@ -11,7 +11,7 @@ static void test_four_patch_contract(void)
     fm1lab_instrument_init(&instrument, "TEST BANK");
     assert(fm1lab_instrument_valid(&instrument));
     assert(instrument.patches[0].enabled == 1);
-    assert(instrument.patches[0].level == 127);
+    assert(instrument.patches[0].level == 31);
     for (unsigned i = 0; i < FM1LAB_PATCH_COUNT; ++i) {
         assert(instrument.patches[i].macros[0] == 50);
         assert(instrument.patches[i].macros[1] == 50);
