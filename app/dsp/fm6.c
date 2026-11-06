@@ -100,7 +100,7 @@ uint64_t fm6_test_dry_peak(void)
     return fm6_test_dry_peak_q24;
 }
 uint32_t fm6_test_fx_saturations(void) { return fm6_test_fx_saturation_count; }
-uint32_t fm6_test_limiter_event_count(void) { return fm6_test_limiter_event_count; }
+uint32_t fm6_test_limiter_events(void) { return fm6_test_limiter_event_count; }
 uint64_t fm6_test_output_peak(void) { return fm6_test_output_peak_q23; }
 #endif
 
