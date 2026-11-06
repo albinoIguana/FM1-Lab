@@ -698,12 +698,18 @@ static void input(void)
             fm6_sequencer_set_lane(seq_ui_lane, (uint8_t)patch);
             set_dirty = 1u;
             app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
+        } else if (k == EN_ALGO && page == PAGE_FX_ROUTING) {
+            int32_t next=((int32_t)set.patch+e)%4;
+            if(next<0) next+=4;
+            set.patch=(uint8_t)next;
+            set_dirty=1u;
+            app_say("ROUTING PATCH",fm6_patch_name(set.patch));
         } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING) {
             int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
             next %= 5;
             if (next < 0) next += 5;
             page = (uint8_t)(PAGE_FX_CHORUS + next);
-            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : "PHASER");
+            app_say("EFFECT", page == PAGE_FX_CHORUS ? "CHORUS" : page == PAGE_FX_DELAY ? "DELAY" : page == PAGE_FX_REVERB ? "REVERB" : page == PAGE_FX_PHASER ? "PHASER" : "SEND ROUTING");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
@@ -1228,7 +1234,8 @@ static void draw(void)
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
     else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"K1 ENABLE  K2 NOTE  K3 VELOCITY  K4 GATE",C_GRAY);
     else if (page == PAGE_ARP) cv_text(4,43,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
-    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
+    else if (page == PAGE_FX_ROUTING) cv_text(4,43,&FONT_XS,"ALGO PATCH   K1-4 SET CHORUS / DELAY / REVERB / PHASER SEND",C_GRAY);
+    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
     else cv_text(4, 43, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     {
         char page_text[8] = "";
