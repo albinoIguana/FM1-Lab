@@ -34,7 +34,7 @@ CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/
 
 | Measurement | Used | Capacity | Remaining |
 |---|---:|---:|---:|
-| XIP application image | 189,604 B | 581,564 B | 391,960 B |
+| XIP application image | 189,588 B | 581,564 B | 391,976 B |
 | `.data + .bss` (builder region check) | 47,336 B | 98,304 B | 50,968 B |
 | `.pool` | 275,264 B | 344,064 B | 68,800 B |
 | `.pool` after mandatory 8 KiB reserve | — | — | 60,608 B |
@@ -49,9 +49,9 @@ CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/
 | `.bss` | 44,360 B | Part of 98,304 B |
 | `.pool` | 275,264 B | 344,064 B |
 | `.noinit` | 1,836 B | 15,696 B |
-| `app.bin` | 189,604 B | 581,564 B |
+| `app.bin` | 189,588 B | 581,564 B |
 
-The raw `.data + .bss` section sum is 47,328 B (2,968 + 44,360); the builder's address-based region check reports 47,336 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The image size is exactly 189,604 B (183,080 + 3,556 + 2,968), before package wrapping.
+The raw `.data + .bss` section sum is 47,328 B (2,968 + 44,360); the builder's address-based region check reports 47,336 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The image size is exactly 189,588 B (183,064 + 3,556 + 2,968), before package wrapping.
 
 The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. The core's `fm6_note_t` is 244 bytes; 32 live note records account for 7,808 bytes within `.bss`, before the FM1-Lab voice wrappers, four patch records, LFO state and platform globals. Only one FM6 core is linked.
 
