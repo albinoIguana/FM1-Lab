@@ -85,7 +85,7 @@ static int16_t pitch_bend_16;
 static uint64_t fm6_test_patch_peak_q24[PATCHES];
 static uint64_t fm6_test_dry_peak_q24;
 static uint32_t fm6_test_fx_saturation_count;
-static uint32_t fm6_test_limiter_events;
+static uint32_t fm6_test_limiter_event_count;
 static uint64_t fm6_test_output_peak_q23;
 static uint64_t fm6_test_abs_i64(int64_t value)
 {
@@ -100,7 +100,7 @@ uint64_t fm6_test_dry_peak(void)
     return fm6_test_dry_peak_q24;
 }
 uint32_t fm6_test_fx_saturations(void) { return fm6_test_fx_saturation_count; }
-uint32_t fm6_test_limiter_events(void) { return fm6_test_limiter_events; }
+uint32_t fm6_test_limiter_event_count(void) { return fm6_test_limiter_event_count; }
 uint64_t fm6_test_output_peak(void) { return fm6_test_output_peak_q23; }
 #endif
 
@@ -390,7 +390,7 @@ void fm6_init(void)
     limiter_gain_q15 = 32768;
 #ifdef FM6_TEST
     fm6_test_fx_saturation_count = 0u;
-    fm6_test_limiter_events = 0u;
+    fm6_test_limiter_event_count = 0u;
     fm6_test_output_peak_q23 = 0u;
 #endif
     pitch_bend_16 = 0;
@@ -677,8 +677,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
              * Keep the physical MASTER control at unity when it reaches 4096. */
             int32_t out_l = fm6_soft_clip(((int64_t)left * output_gain_q12) >> 12);
             int32_t out_r = fm6_soft_clip(((int64_t)right * output_gain_q12) >> 12);
-            uint64_t abs_l = fm6_test_abs_i64(out_l);
-            uint64_t abs_r = fm6_test_abs_i64(out_r);
+            uint64_t abs_l = out_l < 0 ? (uint64_t)(-(int64_t)out_l) : (uint64_t)out_l;
+            uint64_t abs_r = out_r < 0 ? (uint64_t)(-(int64_t)out_r) : (uint64_t)out_r;
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
             uint32_t target_gain = 32768u;
             if (peak > FM6_LIMITER_CEILING_Q23)
@@ -686,7 +686,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             if (target_gain < (uint32_t)limiter_gain_q15) {
                 limiter_gain_q15 = (int32_t)target_gain; /* instantaneous attack */
 #ifdef FM6_TEST
-                ++fm6_test_limiter_events;
+                ++fm6_test_limiter_event_count;
 #endif
             } else if (limiter_gain_q15 < 32768) {
                 uint32_t release = (uint32_t)(32768 - limiter_gain_q15 + 255) / 256u;
@@ -700,7 +700,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             if (out_r > FM6_LIMITER_CEILING_Q23) out_r = FM6_LIMITER_CEILING_Q23;
             if (out_r < -FM6_LIMITER_CEILING_Q23) out_r = -FM6_LIMITER_CEILING_Q23;
 #ifdef FM6_TEST
-            abs_l = fm6_test_abs_i64(out_l); abs_r = fm6_test_abs_i64(out_r);
+            abs_l = out_l < 0 ? (uint64_t)(-(int64_t)out_l) : (uint64_t)out_l;
+            abs_r = out_r < 0 ? (uint64_t)(-(int64_t)out_r) : (uint64_t)out_r;
             peak = abs_l > abs_r ? abs_l : abs_r;
             if (peak > fm6_test_output_peak_q23) fm6_test_output_peak_q23 = peak;
 #endif
