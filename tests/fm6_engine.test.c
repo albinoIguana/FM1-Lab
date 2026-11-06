@@ -38,7 +38,7 @@ static int32_t render_master_peak(uint32_t master_gain_q12)
 {
     static int32_t warmup[256u * 2u];
     fm6_init();
-    fm6_patch_set_level(0u, 1u); /* keep the clip curve in its linear region */
+    fm6_patch_set_level(0u, 31u); /* calibrated factory level remains in the linear region */
     fm6_note_on_mask(60u, 110u, 0x01u);
     fm6_render(warmup, 256u, master_gain_q12); /* settle the master ramp */
     memset(output, 0, sizeof output);
