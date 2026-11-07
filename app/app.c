@@ -866,7 +866,11 @@ static void input(void)
                 else if(index==2u) {
                     if(fx==FM6_FX_PHASER) fm6_fx_set_depth(fx,(uint8_t)clamp((int32_t)fm6_fx_depth(fx)+e,0,100));
                     else fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,fx==0u?70:90));
-                } else fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,90));
+                } else if (fx == FM6_FX_PHASER) {
+                    fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,90));
+                } else {
+                    fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
+                }
                 set_dirty = 1u;
                 app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):"FX FEEDBACK", "UPDATED");
             } else if (page == PAGE_FX_AMP) {
