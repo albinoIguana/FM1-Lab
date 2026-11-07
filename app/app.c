@@ -927,12 +927,7 @@ static void input(void)
                 set_dirty = 1;
                 app_say("MACRO", "UPDATED");
             } else if (page == PAGE_HOME) {
-                /* Each patch strip is also a direct patch select; the same
-                 * encoder continues to trim that patch's level. */
-                if (set.patch != index) {
-                    set.patch = (uint8_t)index;
-                    set_dirty = 1u;
-                }
+                /* HOME K1-K4 are volume-only; SELECT is the sole patch selector. */
                 int32_t value = (int32_t)set.levels[index] + e;
                 if (value < 0) value = 0;
                 if (value > 127) value = 127;
