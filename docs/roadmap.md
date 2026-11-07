@@ -1,99 +1,82 @@
-# FM1-Lab implementation roadmap
+# FM1-Lab finish line
 
-Status reviewed 2026-11-04 against the agreed physical FM1 firmware target.
+Status reviewed 2026-11-07 against the active branch
+`feature/native-instrument-macro-workflow`.
 
-## Architecture boundaries
+This document replaces the earlier build-up checklist. It separates implemented product behavior from the small number of release blockers. The goal is a playable four-layer FM instrument that is ready for a deliberate UI-design pass — not a new synthesis engine.
 
-- [x] Add an InstrumentSession application service between the data model and M-VAVE engine; centralize topology-aware rendering and serialize mutable-track writes.
-- [x] Extract HOME patch-grid rendering into a pure, independently tested view module.
-- [ ] Extract patch-editor and reusable control rendering into independent UI modules before expanding the screen set.
+## Product definition (frozen)
 
-## Two-track sequencer foundation
+FM1-Lab is a four-layer FM instrument built around the existing Felucca six-operator FM6 engine and the fm1-base device platform.
 
-- [x] Define exactly two user-facing lanes on independent 64-step timelines.
-- [x] Align active lengths to native 16-step increments (16/32/48/64), shared tempo (30–300 BPM), and shared swing (0–50).
-- [x] Align step fields to native note, velocity, gate, tie and alternate-tuning data; remove unsupported per-track division/swing and slide controls.
-- [x] Add the combined two-lane SEQ screen, patch assignment, and 24-row piano-roll editing surface.
-- [x] Add a native C adapter for two explicit normal DX7 tracks, including tempo, shared swing, loop length, note/gate/tie/alternate-tuning edits, lane selection and transport.
-- [x] Add a runtime-only native playback mask so the two bound lanes play while the other six project tracks remain stored and untouched; unbind restores all eight.
-- [x] Wire the physical two-lane device screen to the adapter, with a central exit hook that stops transport and restores all eight project tracks.
-- [ ] Verify project-load rebinding, clock/transport and save/load behavior on the device.
+- One Instrument contains four independent six-operator patches.
+- Each patch has its own voice, level, pan, enable-by-zero-level behavior, and four non-destructive sound macros.
+- The shared audio path provides stereo FX sends/returns, Instrument-wide Amp/Drive and three-band parametric EQ, stereo-linked master compression, and a final safety limiter.
+- Performance features are a two-lane 64-step sequencer and a held-note arpeggiator.
+- The physical FM1 panel is the primary interface. The browser emulator is a development and UI-review aid.
+- Do not replace the FM6 engine, add another synthesis engine, add a sampler, or broaden the feature set during the finish pass.
 
-## Browser-side foundation
+## Implemented and covered by native tests
 
-- [x] Use M-VAVE's official FM1 source and SDK as the synthesis foundation.
-- [x] Pin the official source as a Git submodule.
-- [x] Define one Instrument as exactly four independent six-operator DX7 patches.
-- [x] Store each voice in M-VAVE's expanded 156-byte DX7 format.
-- [x] Implement non-destructive Brightness, Body, Motion and Dirt macro transforms.
-- [x] Derive carrier roles from M-VAVE's actual DX7 algorithm routing table.
-- [x] Add browser-side operator editing for oscillator mode, coarse/fine, output and four-stage envelopes.
-- [x] Connect the browser workshop to M-VAVE's official simulator and audio worklet.
-- [x] Verify the browser engine build and required WASM exports in GitHub Actions.
+- [x] Four-patch Instrument model and native FM6 voice integration.
+- [x] Four independent patch voice pools and layer gain/mute.
+- [x] Algorithm-aware Brightness, Body, Motion and Edge macro transformations.
+- [x] Operator envelope, oscillator and global LFO editing APIs.
+- [x] Two-lane sequencer, lane-to-patch assignment, transport and step editing.
+- [x] Held-note arpeggiator.
+- [x] Four stereo FX buses with per-patch send controls.
+- [x] Instrument-wide Amp/Drive and three-band parametric EQ.
+- [x] Stereo-linked master compressor and final peak limiter.
+- [x] Versioned Instrument storage, CRC validation, legacy migration paths and separate versioned master-insert state.
+- [x] Versioned performance settings for sequencer patterns, tempo, lane assignment, arp mode, FX controls/sends and compressor settings.
+- [x] Native regression coverage for voice allocation, sequencer timing, arp output, stereo FX, send isolation, master inserts, linked compression, limiter bounds and render chunk determinism.
+- [x] Device firmware build workflow passes.
+- [x] Native browser-emulator build and bundle verification pass. Latest emulator build: [run 42335794967](https://github.com/albinoIguana/FM1-Lab/actions/runs/42335794967). Its downloadable artifact is attached to that run; the generated files are also published under `native-emulator/` on this feature branch.
 
-## Native firmware core — started
+## Finish pass — no new feature scope
 
-- [x] Add a C Instrument data contract: exactly four native 156-byte voices.
-- [x] Add per-patch macro values, enabled/mute state and level state to the native model.
-- [x] Add native carrier-mask lookup derived from the official M-VAVE algorithm routing table.
-- [x] Add non-destructive native macro rendering and host-side C unit tests.
-- [x] Define and test a CRC-protected 400-byte metadata block for eight named Instruments (32 patches) in the unused tail of each 4 KiB voice-bank sector.
-- [x] Add a native library adapter that loads/saves four consecutive DX7 voices as one Instrument and carries its name, macro values, enabled state and level.
-- [x] Add a live Instrument runtime for PRESETS selection, four patch selection, enable/mute, level and macro editing, with unsaved-edit protection and no flash I/O in the render accessor.
-- [x] Add a native six-operator voice-editing API with verified OP1–OP6 byte mapping, bounded envelope/output/mode/ratio/detune fields, global algorithm/feedback/LFO fields, and topology-aware carrier/depth queries.
-- [x] Expose directed operator-to-operator routing edges from the official algorithm table and display the current patch's modulation paths in the hardware editor.
-- [x] Add the first native six-operator patch-editor screen, editing the selected Instrument patch directly; expose algorithm-aware carrier/modulator roles and depth, envelope rates/levels, oscillator output/ratio/detune, global feedback/LFO, patch selection and Instrument save.
-- [ ] Add a true operator connection graph, undo/compare, and patch audition/voice-engine integration; the current topology strip reports roles/depth but does not yet draw every routing edge.
-- [x] Save the four voice records and metadata together through one version-2 bank transaction, preserving the other seven Instruments in that bank.
-- [x] Integrate the Felucca FM6 core with the fm1-base device app's live key/MIDI audio path.
-- [x] Connect patch enable and level state to the shared FM6 voice allocator / layer gain
-- [ ] Route the four-patch FM1-Lab audio through the FX processing controlled by the native FX page; verify reverb/delay sends and shared returns affect the custom instrument.
+### P0: make the current instrument trustworthy
 
-## Audio Engine 2.0 — active priority
+- [ ] Run the complete native test workflow against the current branch head after the emulator publication commit.
+- [ ] Verify the actual device package contents, linker XIP/RAM report, and storage object map.
+- [ ] Add or complete host tests for the physical-control-to-page mapping and the high-risk save/load/navigation paths.
+- [ ] Audit the UI event queue for overflow behavior, stale edits, and audio-thread ownership.
+- [ ] Verify first-boot factory initialization, Instrument switching, dirty-edit save behavior, and settings restore.
+- [ ] Confirm every visible control changes the parameter named on screen; remove any inert or misleading label.
 
-Architecture is being frozen before additional DSP work. See [audio-engine-2.0-architecture.md](audio-engine-2.0-architecture.md) for the binding signal, gain, routing, persistence, smoothing, memory, diagnostics and acceptance-test contract; [audio-engine-2.0-plan.md](audio-engine-2.0-plan.md) tracks processor work.
+### P1: UI design handoff
 
-- [x] Implement four shared send buses: Chorus, Phaser, Delay and Reverb; retain independent per-patch sends (Phaser is implemented; processor quality/refinement remains open).
-- [ ] Freeze mixer signal units, stable patch-level semantics, stereo send/return API, master gain staging and limiter boundary.
-- [ ] Freeze Instrument / Performance / Device state ownership and migrations before adding new persisted parameters.
-- [ ] Audit and budget .pool/.bss/stack, wide accumulators, filter state and FX buffers against device linker regions.
-- [ ] Define parameter smoothing, audio-thread ownership and peak/overload diagnostics.
-- [ ] Implement mixer foundation: stable patch gain (no active-layer-count normalization), per-patch pan, stereo routing and wide headroom accumulators.
-- [ ] Set all new/factory patch levels to 31/127 (24.4% linear amplitude); preserve explicit levels in existing user Instruments and valid saved settings.
-- [ ] Establish −12 dB master trim as the default four-coherent-patch gain-staging reference and a separate approximately −1 dBFS final peak limiter.
-- [ ] Add gain-staging tests for coherent four-patch sum, layer-count invariance, exact mute, FX-return headroom, intermediate clipping, master trim and limiter behavior.
-- [ ] Add per-patch Amp/Drive and 3-band EQ inserts with independent bypass and state.
-- [ ] Add master compressor and independent peak-safety limiter with gain-reduction/peak diagnostics.
-- [ ] Replace generic effect controls with processor-specific rate/depth/decay/damping/pre-delay parameters and refine reverb diffusion.
-- [ ] Add processor isolation, bypass, bounds, tail, DC, clipping, migration and combined-stress tests.
-- [ ] Re-audit .pool/.bss/stack and validate actual device CPU/xruns before release.
-- [ ] Add swing/ties and external MIDI clock after the audio routing contract stabilizes.
+- [ ] Produce a page-by-page control matrix: physical button/encoder → action → displayed feedback → persistence owner.
+- [ ] Review every 240×240 screen in the emulator at native size; check clipping, hierarchy, labels, page numbering and selected-patch identity.
+- [ ] Lock a consistent page shell and 2×2 panel geometry before visual redesign.
+- [ ] Make HOME, macro, operator, ENV/LFO, sequencer and FX pages internally consistent.
+- [ ] Verify navigation is predictable and reversible; HOME always returns to the Instrument overview.
+- [ ] Mark the design handoff complete only when the user can start visual UI design without having to redesign the underlying interaction model.
 
-## Device storage and controls
+### P2: physical FM1 validation (cannot be completed in CI)
 
-- [x] Add a version-2 bank format and metadata read/write API to the existing four-bank DX7 voice library; preserve version-1 bank reads and stage/recovery flow.
-- [ ] Verify version-1 to version-2 upgrade, metadata persistence, and interrupted-write recovery on the device flash implementation.
-- [x] Map 32 named four-patch Instruments across four existing DX7 banks (8 Instruments / 32 patches per bank); preserve existing project slots and unrelated bank entries.
-- [x] Verify and name the printed panel controls (MASTER, SELECT, ALGORITHM, KNOB 1–4, PRESETS) against upstream scan indices.
-- [x] Replace numeric native screen encoder references with named physical-control constants in the simulator source build.
-- [ ] Map PRESETS to the new four-patch Instrument selector and KNOB 1–4 to patch slots in the redesigned HOME screen.
-- [ ] Implement the HOME Instrument screen with four patch tiles, names, active state and selection.
-- [x] Add a dedicated four-macro performance page; show the selected patch algorithm and live carrier/modulator roles, with four physical macro knobs and a visible neutral midpoint. Macro rendering is topology-aware in the native voice model.
-- [ ] Complete the deep six-operator editor and immediate FX controls on-device.
-- [ ] Add Instrument rename, duplicate, save/load and import/export behavior.
+- [ ] Flash and boot on an actual FM1 using a recoverable update path.
+- [ ] Verify keybed velocity/aftertouch, USB/TRS/BLE MIDI, note-off/panic and patch switching.
+- [ ] Listen to all four layers, pan, macros, FX, EQ, compressor, sequencer and arp.
+- [ ] Measure device CPU load and xrun/dropout behavior under the documented 32-voice / two-lane / arp / all-FX stress case.
+- [ ] Verify version-1 bank migration, version-2 writes, power-loss recovery and settings persistence on real flash.
+- [ ] Only call the firmware flash-ready after these checks pass.
 
-## Firmware build and hardware validation
+## Interface contract
 
-- [x] Add a reproducible Windows entrypoint that stages the FM1-Lab C modules and patches into the pinned native app tree before invoking the SDK firmware-only build.
-- [ ] Integrate the Instrument model with device note allocation, mixer routing and HOME UI in the native device build.
-- [ ] Build with the pinned fm1-base/Felucca-BSP JieLi toolchain through the Native FM1 build workflow.
-- [ ] Produce and inspect the fm1-base device package without touching the live/main branch.
-- [ ] Test patch isolation, macro limits, mute/level, save/load integrity, MIDI and rollback on actual FM1 hardware.
-- [ ] Only call the firmware flashable after the device build and hardware checks pass.
+- HOME: SELECT chooses one of four patches; K1–K4 control patch 1–4 volume independently; zero means off.
+- SEL: toggles the selected patch's four-macro page.
+- EDIT/SCL: opens the operator-role/editor view.
+- ENV and LFO: open their dedicated operator envelope and LFO pages.
+- FX: advances through the eight FX pages; SELECT cycles within that section.
+- On master Amp/Drive, EQ and compressor pages, B_EDIT toggles bypass. EQ ALGO chooses LOW/MID/HIGH band. Compressor ALGO controls makeup.
+- SEQ: opens the two-lane sequencer; PLAY starts/stops it.
+- ARP: opens/cycles arp modes; held keybed notes are the input.
+- SAVE: persists the current Instrument and performance settings.
 
-## Guardrails
+## Release guardrails
 
-- Browser simulation is a development and audition aid, not the deliverable.
-- Do not overwrite the existing 16 project slots or legacy DX7 banks without a compatibility plan.
-- Keep all work on `feat/m-vave-native-instrument` until the user explicitly approves a merge.
-- A passing browser/WASM build is not evidence of a flashable device firmware image.
+- Keep all work on `feature/native-instrument-macro-workflow`; do not modify `main` or merge without explicit approval.
+- No new synthesis engine or feature expansion during the finish pass.
+- A passing host test or emulator build is not evidence of physical hardware audio performance.
+- Be explicit about what is verified in CI, what is verified in the emulator, and what still requires a physical FM1.
