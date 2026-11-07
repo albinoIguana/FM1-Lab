@@ -1454,19 +1454,19 @@ static void draw(void)
             cv_text(x + 6, 33, &FONT_XS, "K1-K4 EDIT", ink);
         } else cv_text(x + 6, 27, &FONT_XS, "-", C_GRAY);
     }
-    if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-K4 CONTROL PATCH VOLUME   0 = OFF   SELECT KNOB CYCLES PATCH", C_GRAY);
+    if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-4 VOL 0=OFF   SELECT PATCH", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
-    else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"AMP: K1 DRIVE  K2 TONE  K3 OUT  K4 ON/OFF",C_GRAY);
-    else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"EQ: ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
-    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"COMP: K1 THR  K2 RAT  K3 ATK  K4 REL  ALGO MAKEUP",C_GRAY);
-    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "SELECT OP  ALGO ALG  PRESET FINE/DET", C_GRAY);
-    else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
-    else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
-    else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
-    else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"PRESET LANE  SELECT STEP  K1-4 EDIT",C_GRAY);
+    else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"K1 DRIVE K2 TONE K3 OUT K4 AMP",C_GRAY);
+    else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"ALGO BAND K1 F K2 G K3 Q K4 ON",C_GRAY);
+    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"K1 THR K2 RAT K3 ATK K4 REL ALGO MK",C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "SELECT OP  ALGO ALG  PRESET F/D", C_GRAY);
+    else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO OP   ENV RATES / LEVELS", C_GRAY);
+    else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "K1 WAVE K2 SPEED K3 PMD K4 AMD", C_GRAY);
+    else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "K1 DELAY K2 P-SENS K3/4 SYNC", C_GRAY);
+    else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"PRESET LANE  SELECT STEP  K1-4",C_GRAY);
     else if (page == PAGE_ARP) cv_text(4,43,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
-    else if (page == PAGE_FX_ROUTING) cv_text(4,43,&FONT_XS,"ALGO PATCH   K1-4 SET CHORUS / DELAY / REVERB / PHASER SEND",C_GRAY);
-    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
+    else if (page == PAGE_FX_ROUTING) cv_text(4,43,&FONT_XS,"ALGO PATCH  K1-4 SEND",C_GRAY);
+    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) cv_text(4,43,&FONT_XS,"EDIT BYPASS  SELECT / FX NEXT",C_GRAY);
     else cv_text(4, 43, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     {
         char page_text[8] = "";
