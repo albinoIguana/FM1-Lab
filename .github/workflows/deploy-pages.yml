@@ -28,8 +28,13 @@ jobs:
           node-version: 22
       - name: Apply FM1-Lab extensions to M-VAVE simulator
         run: |
-          git -C vendor/m-vave-fm1 apply --check ../../patches/m-vave-instrument-api.patch
-          git -C vendor/m-vave-fm1 apply ../../patches/m-vave-instrument-api.patch
+          node scripts/patch-m-vave-simulator-api.mjs
+          node scripts/patch-m-vave-two-track-sequencer.mjs
+          node scripts/patch-m-vave-instrument-home.mjs
+          node scripts/patch-m-vave-instrument-sequencer-screen.mjs
+          node scripts/patch-m-vave-native-patch-editor.mjs
+          node scripts/patch-m-vave-instrument-macros.mjs
+          node scripts/patch-m-vave-audio-mixer.mjs
       - name: Test Instrument and macro behavior
         run: npm test
       - name: Build official M-VAVE browser engine
