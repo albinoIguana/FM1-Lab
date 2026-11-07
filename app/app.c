@@ -442,7 +442,6 @@ void app_init(void)
             }
         }
         performance_publish();
-        fm6_performance_state_get(&set.performance);
     }
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
         int size = plat_store_size(OBJ_INSTRUMENTS0 + bank);
