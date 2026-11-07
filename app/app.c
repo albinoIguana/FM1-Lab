@@ -43,7 +43,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
 enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN };
 static fm6_performance_state_t performance_update_snapshot;
-static volatile uint8_t performance_update_pending;
+static volatile uint8_t performance_update_pending, performance_update_dirty;
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -66,7 +66,7 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 
 static void performance_publish(void)
 {
-    if (performance_update_pending) return;
+    if (performance_update_pending) { performance_update_dirty=1u; return; }
     set.performance.tempo_bpm = transport_ui_bpm;
     set.performance.arp_mode = arp_ui_mode;
     for (uint32_t lane=0; lane<2u; ++lane) {
@@ -79,6 +79,7 @@ static void performance_publish(void)
         }
     }
     performance_update_snapshot = set.performance;
+    performance_update_dirty = 0u;
     performance_update_pending = 1u;
     ui_event_push(EV_PERFORMANCE_APPLY,0u,0u,0u);
 }
@@ -180,6 +181,7 @@ static void ui_events_drain(void)
         voice_update_pending = 0u;
         voice_dirty = 0u;
         performance_update_pending = 0u;
+        performance_update_dirty = 0u;
         (void)fm6_performance_state_set(&set.performance);
         return;
     }
@@ -1511,6 +1513,7 @@ void app_frame(void)
     static uint32_t last_pct, lit_until, last_ble, last_midi;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     input();
+    if (performance_update_dirty && !performance_update_pending) performance_publish();
     speak();
     for (i = 0; i < NE; i++)                 /* an encoder's light goes out */
         if (ui.turned_at[i] && now - ui.turned_at[i] < 400u && now > lit_until)
