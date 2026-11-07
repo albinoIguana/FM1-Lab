@@ -1395,7 +1395,7 @@ static void draw_fx_routing_panel(void)
 static void draw(void)
 {
     char t[24];
-    char bank_label[] = "BANK 1 / INST 01";
+    char bank_label[FM1LAB_INSTRUMENT_NAME_BYTES + 1u];
     int32_t note = voice_note;
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
     uint16_t accent = patch_color(set.patch);
@@ -1421,10 +1421,18 @@ static void draw(void)
             page == PAGE_FX_REVERB ? "FX / REVERB" :
             page == PAGE_FX_PHASER ? "FX / PHASER" : page == PAGE_FX_ROUTING ? "FX / SEND ROUTING" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
-        bank_label[5] = (char)('1' + instrument_index / 8u);
-        bank_label[14] = (char)('0' + ((instrument_index % 8u + 1u) / 10u));
-        bank_label[15] = (char)('0' + ((instrument_index % 8u + 1u) % 10u));
+        for (uint32_t n = 0; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n) {
+            char ch = current_instrument.name[n];
+            bank_label[n] = (ch >= 32 && ch <= 126) ? ch : ' ';
+        }
+        bank_label[FM1LAB_INSTRUMENT_NAME_BYTES] = 0;
         cv_text(10, 18, &FONT_XS, bank_label, accent);
+        cv_text(178, 18, &FONT_XS, "B", C_GRAY);
+        int_text((int32_t)(instrument_index / 8u) + 1, t);
+        cv_text(188, 18, &FONT_XS, t, accent);
+        cv_text(198, 18, &FONT_XS, "I", C_GRAY);
+        int_text((int32_t)(instrument_index % 8u) + 1, t);
+        cv_text(208, 18, &FONT_XS, t, accent);
         if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
         if (note >= 0) {
             note_name(note, t);
@@ -1485,21 +1493,11 @@ static void draw(void)
     else if (page == PAGE_SEQ) cv_text(4,51,&FONT_XS,"PRESET LANE  SELECT STEP  K1-4",C_GRAY);
     else if (page == PAGE_ARP) cv_text(4,51,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
     else if (page == PAGE_FX_ROUTING) cv_text(4,51,&FONT_XS,"ALGO PATCH  K1-4 SEND",C_GRAY);
-    else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) cv_text(4,51,&FONT_XS,"EDIT BYPASS  SELECT / FX NEXT",C_GRAY);
+    else if (page >= PAGE_FX_AMP && page <= PAGE_FX_PHASER)
+        cv_text(4,51,&FONT_XS,"EDIT: TOGGLE ACTIVE / BYPASS   SELECT OR FX: NEXT",C_GRAY);
+    else if (page == PAGE_FX_ROUTING)
+        cv_text(4,51,&FONT_XS,"ALGO: PATCH   K1-K4: SEND LEVEL",C_GRAY);
     else cv_text(4, 51, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
-    {
-        char page_text[8] = "";
-        if (page >= PAGE_FX_AMP && page <= PAGE_FX_ROUTING) {
-            /* The complete FX section is one contiguous eight-page group. */
-            int_text((int32_t)(page - PAGE_FX_AMP) + 1, t);
-            text_cat(page_text, t); text_cat(page_text, "/8");
-        } else {
-            int_text((int32_t)page + 1, t);
-            text_cat(page_text, t); text_cat(page_text, "/");
-            int_text((int32_t)PAGE_COUNT, t); text_cat(page_text, t);
-        }
-        cv_text(218, 51, &FONT_XS, page_text, C_GRAY);
-    }
     cv_blit(0, 180);
 }
 
