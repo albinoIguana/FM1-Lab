@@ -26,6 +26,8 @@ static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
+/* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
+static uint8_t patch_focus;
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
@@ -683,7 +685,8 @@ static void input(void)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
         else if (k == B_HOME) {
             page = PAGE_HOME;
-            app_say("HOME", patch_display_name(set.patch));
+            patch_focus = 0u;
+            app_say("INSTRUMENT", "ALL FOUR PATCHES");
         } else if (k == B_GLO) {
             page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
@@ -833,6 +836,7 @@ static void input(void)
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
             set.patch = (uint8_t)next;
+            if (page == PAGE_HOME) patch_focus = 1u;
             set_dirty = 1;
             app_say("PATCH", patch_display_name(set.patch));
         } else if (k == EN_PRESET && page == PAGE_SEQ) {
@@ -846,7 +850,13 @@ static void input(void)
             operator_detune_mode = (uint8_t)mode;
             app_say("OPERATOR PITCH", operator_detune_mode ? "DETUNE" : "FINE");
         } else if (k == EN_PRESET) {
-            if (instrument_apply_pending) {
+            if (page == PAGE_HOME && patch_focus) {
+                int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
+                if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
+                set.patch = (uint8_t)next;
+                set_dirty = 1u;
+                app_say("PATCH", patch_display_name(set.patch));
+            } else if (instrument_apply_pending) {
                 app_say("INSTRUMENT", "LOADING");
             } else {
                 /* PRESET must never appear inert: preserve edits before
@@ -967,8 +977,9 @@ static void input(void)
                 set_dirty = 1;
                 app_say("MACRO", "UPDATED");
             } else if (page == PAGE_HOME) {
-                /* Each layer encoder selects its matching patch and adjusts
-                 * that layer's level; zero remains the layer mute. */
+                /* Selecting a layer enters patch focus; this encoder also
+                 * continues to adjust that layer's level. */
+                patch_focus = 1u;
                 set.patch = (uint8_t)index;
                 int32_t value = (int32_t)set.levels[index] + e;
                 if (value < 0) value = 0;
@@ -1184,7 +1195,8 @@ static void draw_home_panel(void)
         int32_t y = 7 + (int32_t)(p >> 1u) * 85;
         uint16_t accent = patch_color(p);
         int enabled = set.levels[p] != 0u;
-        rounded_panel(x, y, 116, 85, 3, panel_fill(), p == set.patch ? accent : C_LINE);
+        rounded_panel(x, y, 116, 85, 3, panel_fill(),
+                      (!patch_focus || p == set.patch) ? accent : C_LINE);
         cv_rect(x + 5, y + 7, 2, 70, accent);
         int_text((int32_t)p + 1, t);
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
