@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Charles Vestal */
-/* FM1-Lab native foundation bring-up app: every control on the screen as it arrives, by the name the app knows it by (plat.h B_*, EN_*,
- * the keys), and a few of them doing something: the keys play a voice and go out over USB-MIDI (MIDI in plays it
- * too), OCT- / OCT+ set the octave, PRESET the wave, MASTER the volume, SAVE stores the settings; the keys are
- * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
+/* FM1-Lab's four-layer FM instrument interface for the native FM1 platform.
+ * Physical controls navigate patch, operator, envelope, LFO, sequencer, arp and
+ * master-FX pages. Keybed and incoming MIDI feed the FM6 engine; the audio
+ * interrupt owns synthesis state while UI edits are published through events.
+ * Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
 #include "fm1lab_settings_record.h"
@@ -39,7 +40,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
-static volatile int32_t voice_note = -1;     /* last MIDI/key note shown in the header */
+static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
 enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP };
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
@@ -1024,7 +1025,7 @@ static void draw_home_panel(void)
         cv_rect(x + 59, y + 45, 43, 5, C_LINE);
         cv_rect(x + 59, y + 45, (int32_t)set.levels[p] * 43 / 127, 5, accent);
     }
-    cv_text(5, 138, &FONT_XS, "K1-K4: LAYER VOLUME   0 = OFF   SEL: SHAPE", C_GRAY);
+    cv_text(5, 138, &FONT_XS, "K1-K4: LAYER VOLUME   0 = OFF   SEL: MACROS", C_GRAY);
 }
 
 static void draw_macro_panel(void)
