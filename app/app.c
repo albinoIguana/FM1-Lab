@@ -773,21 +773,9 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
-        } else if (k == EN_ALGO && page == PAGE_HOME) {
-            if (instrument_apply_pending) {
-                app_say("INSTRUMENT", "LOADING");
-            } else if (instrument_dirty && instrument_save() != 0) {
-                app_say("SAVE FAILED", "BANK NOT CHANGED");
-            } else {
-                int32_t bank = ((int32_t)(instrument_index / 8u) + e) % 4;
-                if (bank < 0) bank += 4;
-                uint32_t next = (uint32_t)bank * 8u + instrument_index % 8u;
-                if (next != instrument_index) {
-                    instrument_load(next, 1);
-                    app_say("BANK", "SELECTED");
-                }
-            }
-        } else if (k == EN_ALGO && page == PAGE_OPERATOR_MAP) {
+        } else if (k == EN_ALGO && (page == PAGE_HOME || page == PAGE_OPERATOR_MAP)) {
+            /* ALGO edits the selected patch's actual FM algorithm. PRESET
+             * owns Instrument selection; the two controls stay independent. */
             voice_edit_global(FM1LAB_GLOBAL_ALGORITHM, e);
             uint8_t algorithm = 0u;
             (void)fm1lab_voice_global_get(current_instrument.patches[set.patch].voice,
@@ -864,12 +852,12 @@ static void input(void)
                     app_say("SAVE FAILED", "PRESET NOT CHANGED");
                     continue;
                 }
-                int32_t slot = ((int32_t)(instrument_index % 8u) + e) % 8;
-                if (slot < 0) slot += 8;
-                uint32_t next = (instrument_index / 8u) * 8u + (uint32_t)slot;
-                if (next != instrument_index) {
-                    instrument_load(next, 1);
-                    app_say("INSTRUMENT", "SELECTED");
+                int32_t next = ((int32_t)instrument_index + e) % (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
+                if (next < 0) next += (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
+                if ((uint32_t)next != instrument_index) {
+                    instrument_load((uint32_t)next, 1);
+                    int_text(next + 1, t);
+                    app_say("INSTRUMENT", t);
                 }
             }
         } else if (k >= EN_K1 && k <= EN_K4) {
@@ -1421,11 +1409,22 @@ static void draw(void)
             page == PAGE_FX_REVERB ? "FX / REVERB" :
             page == PAGE_FX_PHASER ? "FX / PHASER" : page == PAGE_FX_ROUTING ? "FX / SEND ROUTING" : "INSTRUMENT";
         cv_text(10, 5, &FONT_B, title, C_WHITE);
-        for (uint32_t n = 0; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n) {
-            char ch = current_instrument.name[n];
-            bank_label[n] = (ch >= 32 && ch <= 126) ? ch : ' ';
+        int generic_name = current_instrument.name[0]=='I' &&
+            current_instrument.name[1]=='N' && current_instrument.name[2]=='S' &&
+            current_instrument.name[3]=='T' && current_instrument.name[4]=='R' &&
+            current_instrument.name[5]==' ';
+        if (generic_name) {
+            bank_label[0]='I'; bank_label[1]='N'; bank_label[2]='S';
+            bank_label[3]='T'; bank_label[4]='R'; bank_label[5]=' ';
+            int_text((int32_t)instrument_index + 1, bank_label + 6);
+            text_cat(bank_label, "/32");
+        } else {
+            for (uint32_t n = 0; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n) {
+                char ch = current_instrument.name[n];
+                bank_label[n] = (ch >= 32 && ch <= 126) ? ch : ' ';
+            }
+            bank_label[FM1LAB_INSTRUMENT_NAME_BYTES] = 0;
         }
-        bank_label[FM1LAB_INSTRUMENT_NAME_BYTES] = 0;
         cv_text(10, 18, &FONT_XS, bank_label, accent);
         cv_text(178, 18, &FONT_XS, "B", C_GRAY);
         int_text((int32_t)(instrument_index / 8u) + 1, t);
@@ -1481,7 +1480,7 @@ static void draw(void)
             cv_text(x+6,26,&FONT_XS,t,ink);
         }
     }
-    if (page == PAGE_HOME) cv_text(4, 42, &FONT_XS, "K1-4 VOL 0=OFF   SELECT PATCH", C_GRAY);
+    if (page == PAGE_HOME) cv_text(4, 42, &FONT_XS, "ALGO FM ALG  PRESET INST  SELECT PATCH", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 42, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
     else if (page == PAGE_FX_AMP) cv_text(4,42,&FONT_XS,"K1 DRIVE K2 TONE K3 OUT K4 AMP",C_GRAY);
     else if (page == PAGE_FX_EQ) cv_text(4,42,&FONT_XS,"ALGO BAND K1 F K2 G K3 Q K4 ON",C_GRAY);
