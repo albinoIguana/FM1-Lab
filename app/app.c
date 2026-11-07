@@ -734,20 +734,8 @@ static void input(void)
             }
         } else if (k == B_SAVE) {
             int instrument_result = instrument_save();
-            uint8_t comp_enabled=set.performance.compressor_enabled;
-            uint8_t comp_threshold=set.performance.compressor_threshold;
-            uint8_t comp_ratio=set.performance.compressor_ratio;
-            uint8_t comp_attack=set.performance.compressor_attack;
-            uint8_t comp_release=set.performance.compressor_release;
-            uint8_t comp_makeup=set.performance.compressor_makeup;
-            fm6_performance_state_get(&set.performance);
-            /* Preserve UI edits that may still be queued for the audio thread. */
-            set.performance.compressor_enabled=comp_enabled;
-            set.performance.compressor_threshold=comp_threshold;
-            set.performance.compressor_ratio=comp_ratio;
-            set.performance.compressor_attack=comp_attack;
-            set.performance.compressor_release=comp_release;
-            set.performance.compressor_makeup=comp_makeup;
+            /* set.performance is the UI-owned source of truth; queued audio
+             * updates must not be read back over edits that have not rendered yet. */
             settings_seal(&set);
             int settings_result = plat_store_save(OBJ_SETTINGS, &set, sizeof set);
             if (instrument_result == 0 && settings_result == 0) {
