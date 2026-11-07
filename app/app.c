@@ -1499,9 +1499,35 @@ static void draw_fx_routing_panel(void)
     }
 }
 
+/* Page counters are local to the active page family, not the full enum.
+ * Keep each family contiguous so adding/removing a page updates the total. */
+static void page_counter(uint8_t current, char *out, uint32_t out_size)
+{
+    uint32_t index = 1u, total = 1u;
+    if (current >= PAGE_FX_AMP && current <= PAGE_FX_ROUTING) {
+        index = (uint32_t)(current - PAGE_FX_AMP) + 1u;
+        total = (uint32_t)(PAGE_FX_ROUTING - PAGE_FX_AMP) + 1u;
+    } else if (current >= PAGE_OPERATOR_MAP && current <= PAGE_LFO_MOD) {
+        index = (uint32_t)(current - PAGE_OPERATOR_MAP) + 1u;
+        total = (uint32_t)(PAGE_LFO_MOD - PAGE_OPERATOR_MAP) + 1u;
+    } else if (current >= PAGE_SEQ && current <= PAGE_ARP) {
+        index = (uint32_t)(current - PAGE_SEQ) + 1u;
+        total = (uint32_t)(PAGE_ARP - PAGE_SEQ) + 1u;
+    } else if (current <= PAGE_GLOBAL) {
+        index = (uint32_t)current + 1u;
+        total = (uint32_t)PAGE_GLOBAL + 1u;
+    }
+    int_text((int32_t)index, out);
+    text_cat(out, "/");
+    char total_text[8];
+    int_text((int32_t)total, total_text);
+    text_cat(out, total_text);
+    (void)out_size;
+}
+
 static void draw(void)
 {
-    char t[24], pagebuf[8];
+    char t[24], pagebuf[16];
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
     uint16_t accent = patch_color(set.patch);
     cv_begin(240, 37, screen_bg());
@@ -1548,10 +1574,7 @@ static void draw(void)
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 19, screen_bg());
-    int_text((int32_t)page + 1, t);
-    text_cat(t, "/");
-    int_text(PAGE_COUNT, pagebuf);
-    text_cat(t, pagebuf);
+    page_counter(page, t, sizeof(t));
     cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, C_GRAY);
     cv_blit(0, 221);
 }
