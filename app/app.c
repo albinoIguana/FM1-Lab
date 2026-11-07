@@ -1045,6 +1045,16 @@ static void rounded_panel(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r,
     cv_rect(x + 3, y + 2, w - 6, 1, RGB(31, 47, 59));
     cv_rect(x + 2, y + h - 2, w - 4, 1, RGB(5, 9, 14));
 }
+static void instrument_card(int32_t x, int32_t y, int32_t w, int32_t h,
+                            uint16_t fill, uint16_t border, uint16_t accent)
+{
+    rounded_panel(x, y, w, h, 3, fill, border);
+    /* A narrow color rail gives every editor the same instrument-panel identity
+     * without spending scarce pixels on extra labels or decorative chrome. */
+    cv_rect(x + 3, y + 6, 2, h - 12, accent);
+    cv_rect(x + 7, y + 2, w - 14, 1, RGB(31, 47, 59));
+}
+
 static uint16_t patch_color(uint32_t p)
 {
     static const uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
