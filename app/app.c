@@ -764,7 +764,8 @@ static void input(void)
             uint8_t algorithm = 0u;
             (void)fm1lab_voice_global_get(current_instrument.patches[set.patch].voice,
                 FM1LAB_GLOBAL_ALGORITHM, &algorithm);
-            app_say("FM ALGORITHM", fm6_patch_name(set.patch));
+            int_text(algorithm, t);
+            app_say("FM ALGORITHM", t);
         } else if (k == EN_SELECT && page == PAGE_OPERATOR_MAP) {
             int32_t next = ((int32_t)env_operator - 1 + e) % 6;
             if (next < 0) next += 6;
@@ -911,7 +912,7 @@ static void input(void)
                 voice_edit_operator(index == 3u && operator_detune_mode ?
                     FM1LAB_OP_DETUNE : fields[index], e);
                 app_say(index == 0u ? "OPERATOR OUTPUT" : index == 1u ? "OSCILLATOR MODE" :
-                    index == 2u ? "COARSE FREQUENCY" : "FINE FREQUENCY", "UPDATED");
+                    index == 2u ? "COARSE FREQUENCY" : operator_detune_mode ? "OPERATOR DETUNE" : "FINE FREQUENCY", "UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
                 app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
