@@ -1051,31 +1051,95 @@ static uint16_t patch_color(uint32_t p)
 static uint16_t panel_fill(void) { return RGB(17,29,39); }
 static uint16_t screen_bg(void) { return RGB(8,13,19); }
 
+static int algorithm_preview_active(void)
+{
+    return page == PAGE_HOME && plat_ms() < ui.msg_until &&
+        ui.msg[0][0]=='F' && ui.msg[0][1]=='M' && ui.msg[0][2]==' ' &&
+        ui.msg[0][3]=='A' && ui.msg[0][4]=='L';
+}
+
+/* M-VAVE-style six-operator topology preview. Connections come from the
+ * selected voice's actual algorithm routing table; carrier nodes are filled. */
+static void draw_algorithm_diagram(void)
+{
+    static const int16_t nx[6]={20,102,184,20,102,184};
+    static const int16_t ny[6]={39,39,39,99,99,99};
+    const uint8_t *voice=current_instrument.patches[set.patch].voice;
+    uint8_t algorithm=1u;
+    uint16_t accent=patch_color(set.patch);
+    char t[12];
+    (void)fm1lab_voice_global_get(voice,FM1LAB_GLOBAL_ALGORITHM,&algorithm);
+    cv_text(7,5,&FONT_XS,"OPERATOR ROUTING",C_GRAY);
+    cv_text(178,5,&FONT_XS,"ALG",C_GRAY);
+    int_text(algorithm,t); cv_text(205,5,&FONT_XS,t,accent);
+
+    /* Draw modulation links behind the operator blocks. */
+    for (unsigned source=1;source<=6u;++source) {
+        for (unsigned target=1;target<=6u;++target) {
+            if (source==target ||
+                fm1lab_voice_operator_modulates(voice,source,target)<=0) continue;
+            unsigned si=source-1u, ti=target-1u;
+            int32_t sx=nx[si]+18, sy=ny[si]+13;
+            int32_t tx=nx[ti]+18, ty=ny[ti]+13;
+            uint16_t ink=RGB(88,112,132);
+            if (sy==ty) {
+                int32_t left=sx<tx?sx+18:sx-18;
+                int32_t right=sx<tx?tx-18:tx+18;
+                cv_rect(left,sy-1,right-left+1,2,ink);
+                cv_rect(tx+(sx<tx?-19:17),ty-3,2,6,accent);
+            } else {
+                int32_t start=sy<ty?sy+13:sy-13;
+                int32_t end=sy<ty?ty-13:ty+13;
+                int32_t mid=(sx+tx)/2;
+                cv_rect(sx-1,start-1,2,(end-start)+2,ink);
+                cv_rect(sx<tx?sx:tx, start<end?start:end, (sx<tx?tx-sx:sx-tx)+1,2,ink);
+                cv_rect(mid-1,start<end?start:end,2,(end-start)+2,ink);
+            }
+        }
+    }
+    for (unsigned op=1;op<=6u;++op) {
+        unsigned i=op-1u;
+        int carrier=fm1lab_voice_operator_is_carrier(voice,op)>0;
+        uint16_t edge=carrier?accent:C_LINE;
+        uint16_t fill=carrier?RGB(28,57,67):panel_fill();
+        rounded_panel(nx[i],ny[i],36,26,3,fill,edge);
+        cv_text(nx[i]+7,ny[i]+7,&FONT_B,op==1?"OP1":op==2?"OP2":op==3?"OP3":op==4?"OP4":op==5?"OP5":"OP6",
+            carrier?accent:C_WHITE);
+        cv_rect(nx[i]+3,ny[i]+22,30,1,carrier?accent:C_DIM);
+    }
+    cv_text(8,135,&FONT_XS,"CARRIER",accent);
+    cv_text(75,135,&FONT_XS,"MODULATOR",C_GRAY);
+    cv_text(166,135,&FONT_XS,"ALGO KNOB",C_GRAY);
+}
+
 static void draw_home_panel(void)
 {
     char t[24];
-    cv_text(5, 1, &FONT_XS, "FOUR-PART INSTRUMENT", C_GRAY);
+    if (algorithm_preview_active()) {
+        draw_algorithm_diagram();
+        return;
+    }
     for (uint32_t p = 0; p < 4u; ++p) {
-        int32_t x = 4 + (int32_t)(p & 1u) * 118;
-        int32_t y = 4 + (int32_t)(p >> 1u) * 68;
+        int32_t x = 2 + (int32_t)(p & 1u) * 120;
+        int32_t y = 2 + (int32_t)(p >> 1u) * 72;
         uint16_t accent = patch_color(p);
         int enabled = set.levels[p] != 0u;
-        rounded_panel(x, y, 112, 62, 3, panel_fill(), p == set.patch ? accent : C_LINE);
-        cv_rect(x + 5, y + 7, 2, 47, accent);
+        rounded_panel(x, y, 116, 68, 3, panel_fill(), p == set.patch ? accent : C_LINE);
+        cv_rect(x + 5, y + 7, 2, 53, accent);
         int_text((int32_t)p + 1, t);
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
         cv_text(x + 28, y + 5, &FONT_XS, enabled ? "LAYER ACTIVE" : "LAYER MUTED",
                 enabled ? RGB(75,235,135) : C_GRAY);
-        cv_text(x + 12, y + 19, &FONT_B, fm6_patch_name(p), C_WHITE);
-        cv_text(x + 12, y + 38, &FONT_XS, "ALG", C_GRAY);
+        cv_text(x + 12, y + 20, &FONT_B, fm6_patch_name(p), C_WHITE);
+        cv_text(x + 12, y + 41, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
-        cv_text(x + 34, y + 38, &FONT_XS, t, accent);
-        cv_text(x + 59, y + 38, &FONT_XS, "LEVEL", C_GRAY);
+        cv_text(x + 34, y + 41, &FONT_XS, t, accent);
+        cv_text(x + 59, y + 41, &FONT_XS, "LEVEL", C_GRAY);
         int_text(set.levels[p], t);
-        cv_text(x + 91, y + 38, &FONT_XS, t, C_WHITE);
-        cv_rect(x + 12, y + 50, 91, 5, RGB(31, 43, 55));
-        cv_rect(x + 12, y + 50, (int32_t)set.levels[p] * 91 / 127, 5, accent);
-        if (p == set.patch) cv_rect(x + 12, y + 57, 91, 1, accent);
+        cv_text(x + 91, y + 41, &FONT_XS, t, C_WHITE);
+        cv_rect(x + 12, y + 55, 96, 5, RGB(31, 43, 55));
+        cv_rect(x + 12, y + 55, (int32_t)set.levels[p] * 96 / 127, 5, accent);
+        if (p == set.patch) cv_rect(x + 12, y + 63, 96, 1, accent);
     }
 }
 static void draw_macro_panel(void)
@@ -1428,12 +1492,9 @@ static void draw(void)
             bank_label[FM1LAB_INSTRUMENT_NAME_BYTES] = 0;
         }
         cv_text(10, 18, &FONT_XS, bank_label, accent);
-        cv_text(178, 18, &FONT_XS, "B", C_GRAY);
-        int_text((int32_t)(instrument_index / 8u) + 1, t);
-        cv_text(188, 18, &FONT_XS, t, accent);
-        cv_text(198, 18, &FONT_XS, "I", C_GRAY);
-        int_text((int32_t)(instrument_index % 8u) + 1, t);
-        cv_text(208, 18, &FONT_XS, t, accent);
+        int_text((int32_t)instrument_index + 1, t);
+        cv_text(196, 18, &FONT_XS, t, accent);
+        cv_text(208, 18, &FONT_XS, "/32", C_GRAY);
         if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
         if (note >= 0) {
             note_name(note, t);
@@ -1496,8 +1557,6 @@ static void draw(void)
     else if (page == PAGE_FX_ROUTING) cv_text(4,42,&FONT_XS,"ALGO: PATCH   K1-K4: SEND LEVEL",C_GRAY);
     else if (page >= PAGE_FX_AMP && page <= PAGE_FX_PHASER)
         cv_text(4,42,&FONT_XS,"EDIT: TOGGLE ACTIVE / BYPASS   SELECT OR FX: NEXT",C_GRAY);
-    else if (page == PAGE_FX_ROUTING)
-        cv_text(4,42,&FONT_XS,"ALGO: PATCH   K1-K4: SEND LEVEL",C_GRAY);
     else cv_text(4, 42, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
     cv_blit(0, 180);
 }
