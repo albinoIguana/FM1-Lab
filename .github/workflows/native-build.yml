@@ -31,6 +31,16 @@ jobs:
       build: |
         set -euo pipefail
         git submodule update --init --recursive base upstream/felucca
+        python3 - <<'PY'
+        from pathlib import Path
+        p = Path("base/device/gfx.c")
+        source = p.read_text()
+        old = "#define APP_CANVAS_PX (240u * 144u)"
+        new = "#define APP_CANVAS_PX (240u * 180u)"
+        if old not in source:
+            raise SystemExit("Expected 240x144 graphics canvas definition was not found")
+        p.write_text(source.replace(old, new, 1))
+        PY
         bash tests/test-fm6-engine.sh
         sh build.sh
         # Emit the real ELF section sizes. The linker has separate RAM,
