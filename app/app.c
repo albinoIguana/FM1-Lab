@@ -13,6 +13,7 @@
 #include "fm1lab_store_library.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
+#include <string.h>
 
 static settings_t set;
 static uint8_t set_dirty;
@@ -32,6 +33,9 @@ static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_mode;
+
+static const char *patch_display_name(uint32_t patch);
+static uint16_t panel_fill(void);
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
