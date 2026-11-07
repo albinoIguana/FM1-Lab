@@ -64,6 +64,49 @@ FM1-Lab is a four-layer FM instrument built around the existing Felucca six-oper
 
 ## Interface contract
 
+### Physical buttons
+
+| Button | Action |
+|---|---|
+| HOME | Return to the four-layer overview |
+| SEL | Toggle the selected patch's macro page / HOME |
+| EDIT/SCL | Open the operator editor; from the operator editor, return to macros |
+| ENV | Open operator envelope; press again to switch rates / levels |
+| LFO | Toggle oscillator and modulation pages |
+| GLO | Toggle global settings / HOME |
+| FX | Advance through the eight master/effect pages |
+| SEQ | Open the two-lane sequencer |
+| PLAY | Start/stop when the sequencer page is open |
+| ARP | Open the arpeggiator and cycle OFF / UP / DOWN / UP-DOWN |
+| SAVE | Save Instrument, inserts and performance settings |
+| OCT- / OCT+ | Transpose the keybed |
+| REC | Bluetooth action when that platform feature is built |
+
+### Encoders
+
+| Encoder | Context | Action |
+|---|---|---|
+| SELECT | HOME and instrument pages | Select one of four patches |
+| SELECT | FX pages | Cycle the eight FX pages |
+| SELECT | Operator editor | Select OP1–OP6 |
+| SELECT | Sequencer | Select one of 64 steps |
+| ALGO | HOME | Select bank |
+| ALGO | Operator editor | Select FM algorithm 1–32 |
+| ALGO | EQ / ENV | Select EQ band / envelope operator |
+| ALGO | Sequencer | Assign lane patch |
+| ALGO | Compressor | Adjust makeup |
+| ALGO | FX routing | Select patch whose sends are edited |
+| PRESETS | Sequencer | Select lane A/B |
+| PRESETS | Operator editor | Toggle K4 between fine frequency / detune |
+| PRESETS | Other pages | Select Instrument slot within current bank |
+| K1–K4 | HOME | Patch 1–4 level; zero is OFF |
+| K1–K4 | Macro | Brightness / Body / Motion / Edge |
+| K1–K4 | Operator | Output / mode / coarse / fine-or-detune |
+| K1–K4 | ENV / LFO | Four parameters shown on the page |
+| K1–K4 | Sequencer | Step enable / note / velocity / gate |
+| K1–K2 | ARP | Tempo / mode |
+| K1–K4 | FX pages | Effect parameters documented below |
+
 - HOME: SELECT chooses one of four patches; K1–K4 control patch 1–4 volume independently; zero means off.
 - SEL: toggles the selected patch's four-macro page.
 - EDIT/SCL: opens the operator editor. SELECT chooses OP1–OP6, ALGO edits the patch algorithm, PRESETS toggles the K4 pitch field between fine frequency and detune; K1 output, K2 ratio/fixed mode, K3 coarse frequency and K4 fine/detune are live voice edits. The carrier/modulator roles update from the selected algorithm.
