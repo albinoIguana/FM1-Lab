@@ -887,7 +887,7 @@ static void input(void)
                     fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
                 }
                 set_dirty = 1u;
-                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS DEPTH":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):"FX FEEDBACK", "UPDATED");
+                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS RATE":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):(fx==FM6_FX_PHASER?"PHASER RESONANCE":"PATCH SEND"), "UPDATED");
             } else if (page == PAGE_FX_AMP) {
                 static const uint8_t fields[4]={FM6_INSERT_DRIVE,FM6_INSERT_TONE,FM6_INSERT_OUTPUT,FM6_INSERT_AMP_ENABLED};
                 uint8_t field=fields[index],value=fm1lab_insert_state_get(&current_inserts,field);
@@ -1456,7 +1456,7 @@ static void draw(void)
     else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"AMP: K1 DRIVE  K2 TONE  K3 OUT  K4 ON/OFF",C_GRAY);
     else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"EQ: ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
     else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"COMP: K1 THR  K2 RAT  K3 ATK  K4 REL  ALGO MAKEUP",C_GRAY);
-    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "SEL OP  ALGO ALG  PRESET FINE/DET", C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "SELECT OP  ALGO ALG  PRESET FINE/DET", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
