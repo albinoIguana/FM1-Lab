@@ -46,7 +46,7 @@ jobs:
           mkdir -p _site/src _site/m-vave _site/native-emulator
           cp index.html _site/index.html
           cp .nojekyll _site/.nojekyll
-          cp src/* _site/src/
+          cp -R src/. _site/src/
           cp vendor/m-vave-fm1/sdk/Simulator.js _site/m-vave/Simulator.js
           cp vendor/m-vave-fm1/build/web/simulator.wasm _site/m-vave/simulator.wasm
           test -s native-emulator/index.html
