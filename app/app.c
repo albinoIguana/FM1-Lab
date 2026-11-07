@@ -848,8 +848,11 @@ static void input(void)
             uint32_t index = (uint32_t)k - EN_K1;
             if (page == PAGE_SEQ) {
                 uint8_t lane=seq_ui_lane, step=seq_ui_step;
-                if(index==0u) seq_ui_enabled[lane][step]^=1u;
-                else if(index==1u) seq_ui_note[lane][step]=(uint8_t)clamp((int32_t)seq_ui_note[lane][step]+e,0,127);
+                if(index==0u) {
+                    /* Each encoder detent toggles once; multi-detent reads
+                     * must preserve even/odd parity instead of toggling once. */
+                    if (e % 2 != 0) seq_ui_enabled[lane][step]^=1u;
+                } else if(index==1u) seq_ui_note[lane][step]=(uint8_t)clamp((int32_t)seq_ui_note[lane][step]+e,0,127);
                 else if(index==2u) seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
                 else seq_ui_gate[lane][step]=(uint8_t)clamp((int32_t)seq_ui_gate[lane][step]+e,10,100);
                 fm6_sequencer_set_step(lane,step,seq_ui_enabled[lane][step],seq_ui_note[lane][step],seq_ui_velocity[lane][step],seq_ui_gate[lane][step]);
