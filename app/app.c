@@ -1455,62 +1455,34 @@ static void draw_fx_routing_panel(void)
 static void draw(void)
 {
     char t[24];
-    char bank_label[FM1LAB_INSTRUMENT_NAME_BYTES + 1u];
     int32_t note = voice_note;
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
     uint16_t accent = patch_color(set.patch);
     cv_begin(240, 37, screen_bg());
-    cv_rect(0, 34, 240, 3, accent);
-    if (now < ui.msg_until) {
-        int32_t x = cv_text(10, 6, &FONT_B, ui.msg[0], C_WHITE);
-        cv_text(x + 8, 6, &FONT_B, ui.msg[1], accent);
-    } else {
-        const char *title = page == PAGE_MACRO ? "PATCH MACROS" :
-            page == PAGE_GLOBAL ? "GLOBAL SETTINGS" :
-            page == PAGE_OPERATOR_MAP ? "OPERATOR MAP" :
-            page == PAGE_ENV ? "OPERATOR ENVELOPE" :
-            page == PAGE_LFO ? "LFO" :
-            page == PAGE_LFO_MOD ? "LFO MODULATION" :
-            page == PAGE_SEQ ? "TWO-LANE SEQUENCER" :
-            page == PAGE_ARP ? "ARPEGGIATOR" :
-            page == PAGE_FX_AMP ? "FX / AMP DRIVE" :
-            page == PAGE_FX_EQ ? "FX / PARAMETRIC EQ" :
-            page == PAGE_FX_COMPRESSOR ? "FX / COMPRESSOR" :
-            page == PAGE_FX_CHORUS ? "FX / CHORUS" :
-            page == PAGE_FX_DELAY ? "FX / DELAY" :
-            page == PAGE_FX_REVERB ? "FX / REVERB" :
-            page == PAGE_FX_PHASER ? "FX / PHASER" : page == PAGE_FX_ROUTING ? "FX / SEND ROUTING" : "INSTRUMENT";
-        cv_text(10, page == PAGE_HOME ? 3 : 5,
-                page == PAGE_HOME ? &FONT_XS : &FONT_B, title, C_WHITE);
-        int generic_name = current_instrument.name[0]=='I' &&
-            current_instrument.name[1]=='N' && current_instrument.name[2]=='S' &&
-            current_instrument.name[3]=='T' && current_instrument.name[4]=='R' &&
-            current_instrument.name[5]==' ';
-        if (generic_name) {
-            bank_label[0]='I'; bank_label[1]='N'; bank_label[2]='S';
-            bank_label[3]='T'; bank_label[4]='R'; bank_label[5]=' ';
-            bank_label[6]=(char)('0'+((instrument_index+1u)/10u));
-            bank_label[7]=(char)('0'+((instrument_index+1u)%10u));
-            bank_label[8]='/'; bank_label[9]='3'; bank_label[10]='2';
-            bank_label[11]=0;
-        } else {
-            for (uint32_t n = 0; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n) {
-                char ch = current_instrument.name[n];
-                bank_label[n] = (ch >= 32 && ch <= 126) ? ch : ' ';
-            }
-            bank_label[FM1LAB_INSTRUMENT_NAME_BYTES] = 0;
-        }
-        cv_text(10, page == PAGE_HOME ? 13 : 18,
-                page == PAGE_HOME ? &FONT_B : &FONT_XS, bank_label, accent);
-        int_text((int32_t)instrument_index + 1, t);
-        text_cat(t, "/32");
-        cv_text(190, 18, &FONT_XS, t, accent);
-        if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
-        if (note >= 0) {
-            note_name(note, t);
-            cv_text(220 - text_w(&FONT_B, t), 7, &FONT_B, t, C_WHITE);
-        } else cv_text(220, 10, &FONT_XS, "FM1", C_GRAY);
+
+    /* Global status strip: tempo, physical battery gauge, and active arp. */
+    int_text(transport_ui_bpm, t);
+    text_cat(t, " BPM");
+    cv_text(4, 1, &FONT_XS, t, C_GRAY);
+
+    int battery = plat_battery(); /* 0..3 battery bars, 4 USB powered, -1 unknown */
+    cv_rect(183, 2, 23, 7, C_GRAY);
+    cv_rect(206, 4, 2, 3, C_GRAY);
+    if (battery >= 0) {
+        uint32_t bars = battery > 3 ? 4u : (uint32_t)battery;
+        if (bars) cv_rect(185, 4, (int32_t)(bars * 5u), 3,
+                          battery >= 3 ? RGB(75,235,135) : accent);
     }
+    if (arp_ui_mode) cv_text(216, 1, &FONT_XS, "ARP", RGB(75,235,135));
+
+    /* The second line is reserved for the instrument name, on every page. */
+    for (uint32_t n = 0; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n) {
+        char ch = current_instrument.name[n];
+        t[n] = (ch >= 32 && ch <= 126) ? ch : ' ';
+    }
+    t[FM1LAB_INSTRUMENT_NAME_BYTES < sizeof t ? FM1LAB_INSTRUMENT_NAME_BYTES : sizeof t - 1u] = 0;
+    cv_text(8, 15, &FONT_B, t, C_WHITE);
+    cv_rect(0, 34, 240, 3, accent);
     cv_blit(0, 0);
     cv_begin(240, 180, screen_bg());
     if (page == PAGE_HOME) draw_home_panel();
