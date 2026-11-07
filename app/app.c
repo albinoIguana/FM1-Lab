@@ -27,7 +27,7 @@ enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 static uint8_t eq_ui_band = 1u;
-static uint8_t env_operator = 1u, env_levels;
+static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
@@ -244,12 +244,14 @@ static void voice_edit_global(fm1lab_global_field_t field, int delta)
 {
     uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint8_t value;
-    unsigned maximum = field == FM1LAB_GLOBAL_LFO_WAVE ? 5u :
+    unsigned maximum = field == FM1LAB_GLOBAL_ALGORITHM ? 32u :
+        field == FM1LAB_GLOBAL_LFO_WAVE ? 5u :
         field == FM1LAB_GLOBAL_PITCH_SENS ? 7u :
         (field == FM1LAB_GLOBAL_LFO_SYNC || field == FM1LAB_GLOBAL_OSC_SYNC) ? 1u : 99u;
+    unsigned minimum = field == FM1LAB_GLOBAL_ALGORITHM ? 1u : 0u;
     if (!delta || fm1lab_voice_global_get(voice, field, &value)) return;
     int next = (int)value + delta;
-    if (next < 0) next = 0;
+    if (next < (int)minimum) next = (int)minimum;
     if ((unsigned)next > maximum) next = (int)maximum;
     if ((uint8_t)next != value &&
         !fm1lab_voice_global_set(voice, field, (unsigned)next))
@@ -758,6 +760,12 @@ static void input(void)
                 }
             }
         } else if (k == EN_ALGO && page == PAGE_OPERATOR_MAP) {
+            voice_edit_global(FM1LAB_GLOBAL_ALGORITHM, e);
+            uint8_t algorithm = 0u;
+            (void)fm1lab_voice_global_get(current_instrument.patches[set.patch].voice,
+                FM1LAB_GLOBAL_ALGORITHM, &algorithm);
+            app_say("FM ALGORITHM", fm6_patch_name(set.patch));
+        } else if (k == EN_SELECT && page == PAGE_OPERATOR_MAP) {
             int32_t next = ((int32_t)env_operator - 1 + e) % 6;
             if (next < 0) next += 6;
             env_operator = (uint8_t)(next + 1);
@@ -812,6 +820,9 @@ static void input(void)
              * switch Instruments while editing a pattern. */
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
             app_say("SEQUENCER LANE", seq_ui_lane ? "B" : "A");
+        } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
+            operator_detune_mode ^= 1u;
+            app_say("OPERATOR PITCH", operator_detune_mode ? "DETUNE" : "FINE");
         } else if (k == EN_PRESET) {
             if (instrument_apply_pending) {
                 app_say("INSTRUMENT", "LOADING");
@@ -897,7 +908,8 @@ static void input(void)
                 static const fm1lab_operator_field_t fields[4] = {
                     FM1LAB_OP_OUTPUT, FM1LAB_OP_MODE, FM1LAB_OP_COARSE, FM1LAB_OP_FINE
                 };
-                voice_edit_operator(fields[index], e);
+                voice_edit_operator(index == 3u && operator_detune_mode ?
+                    FM1LAB_OP_DETUNE : fields[index], e);
                 app_say(index == 0u ? "OPERATOR OUTPUT" : index == 1u ? "OSCILLATOR MODE" :
                     index == 2u ? "COARSE FREQUENCY" : "FINE FREQUENCY", "UPDATED");
             } else if (page == PAGE_ENV) {
@@ -1063,22 +1075,26 @@ static void draw_operator_map(void)
     const fm1lab_operator_field_t fields[4] = {
         FM1LAB_OP_OUTPUT, FM1LAB_OP_MODE, FM1LAB_OP_COARSE, FM1LAB_OP_FINE
     };
-    const uint8_t maxima[4] = {99u, 1u, 31u, 99u};
+    uint8_t maxima[4] = {99u, 1u, 31u, operator_detune_mode ? 14u : 99u};
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
-    uint8_t values[4] = {0u, 0u, 0u, 0u};
+    uint8_t values[4] = {0u, 0u, 0u, 0u}, algorithm = 1u;
     char t[16];
     uint16_t accent = patch_color(set.patch);
     int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
+    (void)fm1lab_voice_global_get(voice, FM1LAB_GLOBAL_ALGORITHM, &algorithm);
     cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
-    cv_text(112, 2, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
-    cv_text(190, 2, &FONT_XS, "OP", C_GRAY);
-    int_text(env_operator, t); cv_text(216, 2, &FONT_XS, t, accent);
+    cv_text(91, 2, &FONT_XS, "ALG", C_GRAY);
+    int_text(algorithm, t); cv_text(113, 2, &FONT_XS, t, accent);
+    cv_text(145, 2, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
+    cv_text(202, 2, &FONT_XS, "OP", C_GRAY);
+    int_text(env_operator, t); cv_text(226, 2, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = 4 + (int32_t)(i >> 1u) * 68;
         (void)fm1lab_voice_operator_get(voice, env_operator, fields[i], &values[i]);
         rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
-        cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_WHITE);
+        cv_text(x + 9, y + 8, &FONT_XS,
+            i == 3u && operator_detune_mode ? "DETUNE" : labels[i], C_WHITE);
         if (i == 1u) {
             cv_text(x + 9, y + 27, &FONT_B, values[i] ? "FIXED" : "RATIO", accent);
         } else {
@@ -1436,7 +1452,7 @@ static void draw(void)
     else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"AMP: K1 DRIVE  K2 TONE  K3 OUT  K4 ON/OFF",C_GRAY);
     else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"EQ: ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
     else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"COMP: K1 THR  K2 RAT  K3 ATK  K4 REL  ALGO MAKEUP",C_GRAY);
-    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   K1 OUTPUT  K2 MODE  K3 COARSE  K4 FINE", C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "SELECT OP  ALGO SETS ALGORITHM  PRESET: FINE / DETUNE", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
