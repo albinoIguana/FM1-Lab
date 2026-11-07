@@ -805,6 +805,13 @@ static void input(void)
             set.patch = (uint8_t)next;
             set_dirty = 1;
             app_say("PATCH", fm6_patch_name(set.patch));
+        } else if (k == EN_PRESET && page == PAGE_SEQ) {
+            /* PRESET selects the visible sequencer lane here; it must not
+             * switch Instruments while editing a pattern. */
+            int32_t lane = ((int32_t)seq_ui_lane + e) % 2;
+            if (lane < 0) lane += 2;
+            seq_ui_lane = (uint8_t)lane;
+            app_say("SEQUENCER LANE", seq_ui_lane ? "B" : "A");
         } else if (k == EN_PRESET) {
             if (instrument_apply_pending) {
                 app_say("INSTRUMENT", "LOADING");
@@ -1434,7 +1441,7 @@ static void draw(void)
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
-    else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"K1 ENABLE  K2 NOTE  K3 VELOCITY  K4 GATE",C_GRAY);
+    else if (page == PAGE_SEQ) cv_text(4,43,&FONT_XS,"PRESET LANE  SELECT STEP  K1-4 EDIT",C_GRAY);
     else if (page == PAGE_ARP) cv_text(4,43,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
     else if (page == PAGE_FX_ROUTING) cv_text(4,43,&FONT_XS,"ALGO PATCH   K1-4 SET CHORUS / DELAY / REVERB / PHASER SEND",C_GRAY);
     else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) cv_text(4,43,&FONT_XS,"EDIT BYPASS   SELECT / FX CHANGE EFFECT",C_GRAY);
