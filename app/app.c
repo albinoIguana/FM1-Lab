@@ -1204,8 +1204,8 @@ static void draw_macro_panel(void)
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
     cv_text(204, 2, &FONT_XS, t, accent);
     for (uint32_t m = 0; m < 4u; ++m) {
-        int32_t x = 4 + (int32_t)(m & 1u) * 118;
-        int32_t y = 18 + (int32_t)(m >> 1u) * 64;
+        int32_t x = panel_grid_x(m);
+        int32_t y = panel_grid_y(m, UI_GRID_TOP, UI_GRID_ROW_STEP);
         uint32_t value = set.macros[set.patch][m];
         uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
         rounded_panel(x, y, 112, 56, 3, panel_fill(), border);
@@ -1461,7 +1461,7 @@ static void draw_fx_panel(uint8_t fx)
     for(uint32_t k=0;k<4u;++k) {
         int32_t x=panel_grid_x(k);
         int32_t y=panel_grid_y(k,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
+        panel_grid_card(k, UI_GRID_TOP, UI_GRID_ROW_STEP, accent);
         cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u||fx==3u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?(fx==FM6_FX_PHASER?"K3 DEPTH":"K3 FEEDBACK"):fx==FM6_FX_PHASER?"K4 RESONANCE":"K4 PATCH SEND",C_GRAY);
         int_text(values[k],t);
         cv_text(x+7,y+23,&FONT_B,t,accent);
