@@ -1,0 +1,20 @@
+# FM1-Lab native foundation. Pinned fm1-base and felucca-bsp platform.
+name = "fm1lab"
+id_prefix = "FM-1_97"
+usb_manufacturer = "FM1-Lab"
+usb_product = "FM1-Lab"
+licence = "GPL-3.0-only"
+credits = "FM1-Lab native app on fm1-base; Felucca FM6 core, 32-Instrument four-bank storage, DX7 ENV/LFO editors, two-lane sequencer, held-note arpeggiator, and parallel chorus/delay/reverb sends."
+unity_opt = "z"
+ble = true
+ble_stack = "own"
+ble_central = true
+ble_pairing = false
+usb_audio_in = true
+usb_audio_out = false
+o2 = ["dsp/fm6.c", "fm1lab_instrument.c", "fm1lab_voice_editor.c", "fm1lab_store_library.c"]
+include = ["dsp"]
+gen = [
+  "../upstream/felucca/tools/gen_tables.py {gen}/felucca_tables.h",
+  "../upstream/felucca/tools/gen_fm6_patches.py {gen}/felucca_fm6.h"
+]

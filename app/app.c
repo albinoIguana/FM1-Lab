@@ -66,6 +66,7 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 
 static void performance_publish(void)
 {
+    if (performance_update_pending) { performance_update_dirty=1u; return; }
     set.performance.tempo_bpm = transport_ui_bpm;
     set.performance.arp_mode = arp_ui_mode;
     for (uint32_t lane=0; lane<2u; ++lane) {
@@ -77,7 +78,6 @@ static void performance_publish(void)
             set.performance.seq_gate[lane][step] = seq_ui_gate[lane][step];
         }
     }
-    if (performance_update_pending) { performance_update_dirty=1u; return; }
     performance_update_snapshot = set.performance;
     performance_update_dirty = 0u;
     performance_update_pending = 1u;
@@ -170,6 +170,7 @@ static void ui_events_drain(void)
         ui_event_tail = ui_event_head;
         ui_event_overflow = 0;
         fm6_panic();
+        fm6_sequencer_set_running(0u);
         if (instrument_loaded) instrument_apply_engine();
         else for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
             fm6_patch_set_enabled(p, 1u);
@@ -734,20 +735,8 @@ static void input(void)
             }
         } else if (k == B_SAVE) {
             int instrument_result = instrument_save();
-            uint8_t comp_enabled=set.performance.compressor_enabled;
-            uint8_t comp_threshold=set.performance.compressor_threshold;
-            uint8_t comp_ratio=set.performance.compressor_ratio;
-            uint8_t comp_attack=set.performance.compressor_attack;
-            uint8_t comp_release=set.performance.compressor_release;
-            uint8_t comp_makeup=set.performance.compressor_makeup;
-            fm6_performance_state_get(&set.performance);
-            /* Preserve UI edits that may still be queued for the audio thread. */
-            set.performance.compressor_enabled=comp_enabled;
-            set.performance.compressor_threshold=comp_threshold;
-            set.performance.compressor_ratio=comp_ratio;
-            set.performance.compressor_attack=comp_attack;
-            set.performance.compressor_release=comp_release;
-            set.performance.compressor_makeup=comp_makeup;
+            /* set.performance is the UI-owned source of truth; queued audio
+             * updates must not be read back over edits that have not rendered yet. */
             settings_seal(&set);
             int settings_result = plat_store_save(OBJ_SETTINGS, &set, sizeof set);
             if (instrument_result == 0 && settings_result == 0) {
@@ -1046,14 +1035,26 @@ static void outline(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t color)
 
 static void rounded_panel(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t fill, uint16_t border)
 {
-    for (int32_t row = 0; row < h; ++row) {
-        int32_t inset = row < r ? r - row - 1 : row >= h - r ? row - (h - r) : 0;
-        int32_t span = w - 2 * inset;
-        if (span <= 0) continue;
-        cv_rect(x + inset, y + row, span, 1, border);
-        if (span > 2) cv_rect(x + inset + 1, y + row, span - 2, 1, fill);
-    }
+    /* FM1's display is a tiny instrument panel, not a miniature phone UI:
+     * clipped corners, a quiet inset, and one precise highlight line. */
+    (void)r;
+    cv_rect(x + 2, y, w - 4, h, border);
+    cv_rect(x, y + 2, 1, h - 4, border);
+    cv_rect(x + w - 1, y + 2, 1, h - 4, border);
+    cv_rect(x + 1, y + 1, w - 2, h - 2, fill);
+    cv_rect(x + 3, y + 2, w - 6, 1, RGB(31, 47, 59));
+    cv_rect(x + 2, y + h - 2, w - 4, 1, RGB(5, 9, 14));
 }
+static void instrument_card(int32_t x, int32_t y, int32_t w, int32_t h,
+                            uint16_t fill, uint16_t border, uint16_t accent)
+{
+    rounded_panel(x, y, w, h, 3, fill, border);
+    /* A narrow color rail gives every editor the same instrument-panel identity
+     * without spending scarce pixels on extra labels or decorative chrome. */
+    cv_rect(x + 3, y + 6, 2, h - 12, accent);
+    cv_rect(x + 7, y + 2, w - 14, 1, RGB(31, 47, 59));
+}
+
 static uint16_t patch_color(uint32_t p)
 {
     static const uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
@@ -1065,27 +1066,30 @@ static uint16_t screen_bg(void) { return RGB(8,13,19); }
 static void draw_home_panel(void)
 {
     char t[24];
+    cv_text(5, 1, &FONT_XS, "FOUR-PART INSTRUMENT", C_GRAY);
     for (uint32_t p = 0; p < 4u; ++p) {
         int32_t x = 4 + (int32_t)(p & 1u) * 118;
         int32_t y = 4 + (int32_t)(p >> 1u) * 68;
         uint16_t accent = patch_color(p);
         int enabled = set.levels[p] != 0u;
-        rounded_panel(x, y, 112, 62, 7, panel_fill(), p == set.patch ? accent : C_LINE);
-        cv_rect(x + 5, y + 8, 3, 46, accent);
-        cv_text(x + 13, y + 7, &FONT_XS, fm6_patch_name(p), C_WHITE);
-        cv_text(x + 13, y + 24, &FONT_XS, enabled ? "ON" : "OFF",
-                enabled ? RGB(75,235,135) : RGB(255,82,101));
-        cv_text(x + 48, y + 24, &FONT_XS, "ALG", C_GRAY);
+        rounded_panel(x, y, 112, 62, 3, panel_fill(), p == set.patch ? accent : C_LINE);
+        cv_rect(x + 5, y + 7, 2, 47, accent);
+        int_text((int32_t)p + 1, t);
+        cv_text(x + 12, y + 5, &FONT_XS, t, accent);
+        cv_text(x + 28, y + 5, &FONT_XS, enabled ? "LAYER ACTIVE" : "LAYER MUTED",
+                enabled ? RGB(75,235,135) : C_GRAY);
+        cv_text(x + 12, y + 19, &FONT_B, fm6_patch_name(p), C_WHITE);
+        cv_text(x + 12, y + 38, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
-        cv_text(x + 78, y + 24, &FONT_XS, t, C_WHITE);
-        cv_text(x + 13, y + 42, &FONT_XS, "VOL", C_GRAY);
+        cv_text(x + 34, y + 38, &FONT_XS, t, accent);
+        cv_text(x + 59, y + 38, &FONT_XS, "LEVEL", C_GRAY);
         int_text(set.levels[p], t);
-        cv_text(x + 38, y + 42, &FONT_XS, t, accent);
-        cv_rect(x + 59, y + 45, 43, 5, C_LINE);
-        cv_rect(x + 59, y + 45, (int32_t)set.levels[p] * 43 / 127, 5, accent);
+        cv_text(x + 91, y + 38, &FONT_XS, t, C_WHITE);
+        cv_rect(x + 12, y + 50, 91, 5, RGB(31, 43, 55));
+        cv_rect(x + 12, y + 50, (int32_t)set.levels[p] * 91 / 127, 5, accent);
+        if (p == set.patch) cv_rect(x + 12, y + 57, 91, 1, accent);
     }
 }
-
 static void draw_macro_panel(void)
 {
     static const char *const names[4] = {"BRIGHTNESS", "BODY", "MOTION", "EDGE"};
@@ -1094,7 +1098,7 @@ static void draw_macro_panel(void)
     uint16_t accent = patch_color(set.patch);
     char t[24];
     cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
-    cv_text(164, 2, &FONT_XS, "ALGO", C_GRAY);
+    cv_text(164, 2, &FONT_XS, "ALG", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
     cv_text(204, 2, &FONT_XS, t, accent);
     for (uint32_t m = 0; m < 4u; ++m) {
@@ -1102,18 +1106,17 @@ static void draw_macro_panel(void)
         int32_t y = 18 + (int32_t)(m >> 1u) * 64;
         uint32_t value = set.macros[set.patch][m];
         uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
-        rounded_panel(x, y, 112, 56, 7, panel_fill(), border);
-        cv_text(x + 9, y + 8, &FONT_XS, names[m], C_WHITE);
+        rounded_panel(x, y, 112, 56, 3, panel_fill(), border);
+        cv_rect(x + 6, y + 7, 2, 41, accent);
+        cv_text(x + 13, y + 7, &FONT_XS, names[m], C_WHITE);
         int_text((int32_t)value, t);
-        cv_text(x + 91, y + 7, &FONT_XS, t, accent);
-        cv_rect(x + 9, y + 31, 94, 7, C_LINE);
-        cv_rect(x + 9, y + 31, (int32_t)value * 94 / 100, 7, accent);
-        cv_rect(x + 55, y + 28, 2, 13, C_WHITE);
-        cv_rect(x + 8 + (int32_t)value * 94 / 100, y + 28, 3, 13, C_WHITE);
-        cv_text(x + 9, y + 49, &FONT_XS, hints[m], C_GRAY);
+        cv_text(x + 82, y + 5, &FONT_B, t, accent);
+        cv_rect(x + 13, y + 29, 91, 5, RGB(31, 43, 55));
+        cv_rect(x + 13, y + 29, (int32_t)value * 91 / 100, 5, accent);
+        cv_rect(x + 13 + (int32_t)value * 91 / 100, y + 26, 2, 11, C_WHITE);
+        cv_text(x + 13, y + 43, &FONT_XS, hints[m], C_GRAY);
     }
 }
-
 /* Four operator quadrants; roles come from the selected algorithm's actual data. */
 static void draw_operator_map(void)
 {
@@ -1139,7 +1142,7 @@ static void draw_operator_map(void)
         int32_t y = 18 + (int32_t)(i >> 1u) * 64;
         (void)fm1lab_voice_operator_get(voice, env_operator,
             i == 3u && operator_detune_mode ? FM1LAB_OP_DETUNE : fields[i], &values[i]);
-        rounded_panel(x, y, 112, 56, 7, panel_fill(), accent);
+        instrument_card(x, y, 112, 56, panel_fill(), accent, accent);
         cv_text(x + 9, y + 8, &FONT_XS,
             i == 3u && operator_detune_mode ? "DETUNE" : labels[i], C_WHITE);
         if (i == 1u) {
@@ -1164,7 +1167,7 @@ static void draw_amp_panel(void)
     cv_text(172,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
-        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        instrument_card(x,y,112,48,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
         if(i==3u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",accent);
         else {int_text(values[i],t);cv_text(x+7,y+23,&FONT_B,t,accent);cv_rect(x+48,y+29,55,5,C_LINE);cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);}
@@ -1189,7 +1192,7 @@ static void draw_eq_panel(void)
     cv_text(202,2,&FONT_XS,(v->eq_enabled&1u)?"ON":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
-        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        instrument_card(x,y,112,48,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,i==0u?"FREQUENCY":i==1u?"GAIN":i==2u?"Q":"BAND",C_GRAY);
         if(i==0u){int_text((int32_t)eq_frequency_hz(b->frequency),t);text_cat(t,"Hz");}
         else if(i==1u){int_text((int32_t)b->gain-12,t);text_cat(t,"dB");}
@@ -1213,7 +1216,7 @@ static void draw_compressor_panel(void)
         compressor_value(FM6_COMP_ENABLED)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
-        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        instrument_card(x,y,112,48,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
         if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
         else if(i==2u){uint32_t ms=1u+(uint32_t)values[i]*49u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
@@ -1236,7 +1239,7 @@ static void draw_global_panel(uint32_t pct)
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = 4 + (int32_t)(i >> 1u) * 68;
-        rounded_panel(x, y, 112, 62, 7, panel_fill(), colors[i]);
+        instrument_card(x, y, 112, 62, panel_fill(), colors[i], colors[i]);
         cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_GRAY);
         if (i == 0) {
             int_text((int32_t)pct, t); text_cat(t, "%");
@@ -1275,7 +1278,7 @@ static void draw_envelope_panel(void)
         uint8_t value = 0;
         (void)fm1lab_voice_operator_get(voice, env_operator,
             (fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + i), &value);
-        rounded_panel(x, y, 112, 52, 7, panel_fill(), accent);
+        instrument_card(x, y, 112, 52, panel_fill(), accent, accent);
         cv_text(x + 9, y + 8, &FONT_XS, env_levels ? levels[i] : rates[i], C_WHITE);
         int_text(value, t); cv_text(x + 88, y + 8, &FONT_XS, t, accent);
         cv_rect(x + 9, y + 24, 94, 6, C_LINE);
@@ -1306,7 +1309,7 @@ static void draw_lfo_panel(uint32_t modulation)
         int32_t y = 18 + (int32_t)(i >> 1u) * 64;
         uint8_t value = 0;
         (void)fm1lab_voice_global_get(voice, fields[modulation][i], &value);
-        rounded_panel(x, y, 112, 56, 7, panel_fill(), accent);
+        instrument_card(x, y, 112, 56, panel_fill(), accent, accent);
         cv_text(x + 9, y + 8, &FONT_XS, labels[modulation][i], C_WHITE);
         if (!modulation && i == 0u) {
             cv_text(x + 9, y + 26, &FONT_B, waves[value % 6u], accent);
@@ -1340,9 +1343,9 @@ static void draw_arp_panel(void)
 {
     char t[16];
     const char *mode=arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN";
-    rounded_panel(4,4,112,62,7,panel_fill(),RGB(36,215,232));
+    instrument_card(4,4,112,62,panel_fill(),RGB(36,215,232),RGB(36,215,232));
     cv_text(13,13,&FONT_XS,"ARPEGGIATOR",C_GRAY); cv_text(13,34,&FONT_B,mode,RGB(36,215,232));
-    rounded_panel(122,4,112,62,7,panel_fill(),RGB(227,75,210));
+    instrument_card(122,4,112,62,panel_fill(),RGB(227,75,210),RGB(227,75,210));
     cv_text(131,13,&FONT_XS,"CLOCK",C_GRAY); int_text(transport_ui_bpm,t); cv_text(131,34,&FONT_B,t,RGB(227,75,210));
     cv_text(6,82,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_WHITE);
     cv_text(6,101,&FONT_XS,"K1 TEMPO   K2 MODE",C_GRAY);
@@ -1359,7 +1362,7 @@ static void draw_fx_panel(uint8_t fx)
     for(uint32_t k=0;k<4u;++k) {
         int32_t x=4+(int32_t)(k&1u)*118;
         int32_t y=18+(int32_t)(k>>1u)*54;
-        rounded_panel(x,y,112,48,6,panel_fill(),accent);
+        instrument_card(x,y,112,48,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u||fx==3u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?(fx==FM6_FX_PHASER?"K3 DEPTH":"K3 FEEDBACK"):fx==FM6_FX_PHASER?"K4 RESONANCE":"K4 PATCH SEND",C_GRAY);
         int_text(values[k],t);
         cv_text(x+7,y+23,&FONT_B,t,accent);
@@ -1380,7 +1383,7 @@ static void draw_fx_routing_panel(void)
         int32_t x=4+(int32_t)(fx&1u)*118;
         int32_t y=18+(int32_t)(fx>>1u)*54;
         uint16_t color=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
-        rounded_panel(x,y,112,48,6,panel_fill(),color);
+        instrument_card(x,y,112,48,panel_fill(),color,color);
         cv_text(x+7,y+6,&FONT_XS,names[fx],C_GRAY);
         int_text(value,t);
         cv_text(x+7,y+23,&FONT_B,t,color);

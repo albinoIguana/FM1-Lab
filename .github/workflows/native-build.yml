@@ -1,0 +1,65 @@
+name: Native FM1 build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "firmware/**"
+      - "tests/**"
+      - "docs/**"
+      - "base"
+      - "upstream/felucca"
+      - ".gitmodules"
+      - "build.sh"
+      - ".github/workflows/native-build.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      sdk: true
+      build: |
+        set -euo pipefail
+        git submodule update --init --recursive base upstream/felucca
+        bash tests/test-fm6-engine.sh
+        sh build.sh
+        # Emit the real ELF section sizes. The linker has separate RAM,
+        # RAMTEXT and POOL regions; a single "RAM used" number is misleading.
+        python3 - <<'PY'
+        import struct
+        from pathlib import Path
+
+        elf = Path("app/build/fm1lab.elf")
+        image = Path("app/build/fm1lab.bin")
+        data = elf.read_bytes()
+        if data[:4] != bytes([127]) + b"ELF" or data[4] != 1 or data[5] != 1:
+            raise SystemExit("memory audit: expected a little-endian ELF32 image")
+        shoff = struct.unpack_from("<I", data, 32)[0]
+        shentsize, shnum, shstrndx = struct.unpack_from("<HHH", data, 46)
+        sections = [struct.unpack_from("<IIIIIIIIII", data, shoff + i * shentsize)
+                    for i in range(shnum)]
+        names_hdr = sections[shstrndx]
+        names = data[names_hdr[4]:names_hdr[4] + names_hdr[5]]
+        wanted = {".text", ".ram_text", ".data", ".bss", ".pool", ".noinit"}
+        print("MEMORY AUDIT (linker ELF sections; bytes)")
+        for section in sections:
+            end = names.find(bytes([0]), section[0])
+            name = names[section[0]:end].decode("ascii", "replace")
+            if name in wanted:
+                print(f"  {name:10s} {section[5]:8d}")
+        if image.exists():
+            print(f"  {'app.bin':10s} {image.stat().st_size:8d} / 581564 XIP-slot bytes")
+        print("  limits: RAM .data+.bss 98304; RAMTEXT 32768; POOL 344064 (8192 minimum spare)")
+        PY
+        python3 base/tools/build.py app --host
+      packages: app/build/fm1lab.fwsc
