@@ -562,7 +562,7 @@ static void speak(void)
         text_cat(t, APP_NAME ". OCTAVE ");
         text_cat(t, o);
         text_cat(t, ". WAVE ");
-        text_cat(t, fm6_patch_name(set.patch));
+        text_cat(t, patch_display_name(set.patch));
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
             static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
             static const char HEX[] = "0123456789ABCDEF";
@@ -1120,6 +1120,21 @@ static void draw_algorithm_diagram(void)
     cv_text(166,126,&FONT_XS,"ALGO KNOB",C_GRAY);
 }
 
+static const char *patch_display_name(uint32_t patch)
+{
+    const char *name = fm6_patch_name(patch);
+    static char fallback[FM1LAB_PATCH_COUNT][12];
+    if (name && strcmp(name, "factory") != 0 && strcmp(name, "FACTORY") != 0 &&
+        strcmp(name, "Factory") != 0 && name[0])
+        return name;
+    if (patch >= FM1LAB_PATCH_COUNT) patch = 0u;
+    fallback[patch][0] = 'P'; fallback[patch][1] = 'A';
+    fallback[patch][2] = 'T'; fallback[patch][3] = 'C';
+    fallback[patch][4] = 'H'; fallback[patch][5] = ' ';
+    int_text((int32_t)patch + 1, fallback[patch] + 6);
+    return fallback[patch];
+}
+
 static void draw_home_panel(void)
 {
     char t[24];
@@ -1138,7 +1153,7 @@ static void draw_home_panel(void)
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
         cv_text(x + 28, y + 5, &FONT_XS, enabled ? "LAYER ACTIVE" : "LAYER MUTED",
                 enabled ? RGB(75,235,135) : C_GRAY);
-        cv_text(x + 12, y + 23, &FONT_B, fm6_patch_name(p), C_WHITE);
+        cv_text(x + 12, y + 23, &FONT_B, patch_display_name(p), C_WHITE);
         cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
         cv_text(x + 34, y + 49, &FONT_XS, t, accent);
@@ -1388,7 +1403,7 @@ static void draw_sequencer_panel(void)
 {
     char t[16]; uint8_t lane=seq_ui_lane, step=seq_ui_step;
     cv_text(6,2,&FONT_XS,lane?"LANE B":"LANE A",patch_color(seq_ui_patch[lane]));
-    cv_text(130,2,&FONT_XS,fm6_patch_name(seq_ui_patch[lane]),C_WHITE);
+    cv_text(130,2,&FONT_XS,patch_display_name(seq_ui_patch[lane]),C_WHITE);
     for(uint32_t i=0;i<16u;i++) {
         int32_t x=5+(int32_t)(i%8u)*29, y=12+(int32_t)(i/8u)*49;
         uint8_t s=(uint8_t)((step/16u)*16u+i);
@@ -1480,7 +1495,7 @@ static void draw(void)
         t[n] = (ch >= 32 && ch <= 126) ? ch : ' ';
     }
     t[FM1LAB_INSTRUMENT_NAME_BYTES < sizeof t ? FM1LAB_INSTRUMENT_NAME_BYTES : sizeof t - 1u] = 0;
-    cv_text(8, 15, &FONT_B, t, C_WHITE);
+    cv_text(8, 15, &FONT_B, patch_display_name(set.patch), C_WHITE);
     cv_rect(0, 34, 240, 3, accent);
     cv_blit(0, 0);
     cv_begin(240, 180, screen_bg());
