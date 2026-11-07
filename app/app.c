@@ -1415,7 +1415,7 @@ static void draw(void)
      * Their main panels do not otherwise show all four live knob mappings. */
     if (page == PAGE_MACRO || page == PAGE_SEQ) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
-        uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
+        uint16_t ink = accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
         cv_text(x + 6, 10, &FONT_XS, k == 0 ? "K1" : k == 1 ? "K2" : k == 2 ? "K3" : "K4", ink);
         if (page == PAGE_MACRO) {
