@@ -2,7 +2,7 @@ name: Native FM1 browser emulator
 
 on:
   push:
-    branches: [feature/native-instrument-macro-workflow]
+    branches: [main]
     paths:
       - "app/**"
       - "tests/fm6_engine.test.c"
@@ -47,7 +47,6 @@ jobs:
         run: python3 base/tools/build.py app --web
 
       - name: Verify emulator bundle
-        id: verify
         run: |
           test -s app/build/emu/index.html
           test -s app/build/emu/app.wasm
@@ -55,7 +54,6 @@ jobs:
           echo "Native FM1 emulator bundle:"
           du -h app/build/emu/*
 
-      # Always preserve a downloadable build even if branch publishing is unavailable.
       - name: Upload emulator bundle
         uses: actions/upload-artifact@v4
         with:
@@ -64,10 +62,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish browser preview on the feature branch
-        id: publish
+      - name: Publish browser preview on main
         run: |
-          git fetch origin "$GITHUB_REF_NAME"
+          git fetch origin main
           remote_sha="$(git rev-parse FETCH_HEAD)"
           if ! git diff --quiet "$GITHUB_SHA" "$remote_sha" -- app firmware base upstream/felucca .gitmodules; then
             echo "Firmware sources changed during this build; a newer run must publish the emulator."
@@ -80,22 +77,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js
           if ! git diff --cached --quiet; then
-            git commit -m "build: publish native emulator browser preview"
-            pushed=0
-            for attempt in 1 2 3; do
-              echo "Publishing preview (attempt ${attempt}/3)"
-              if git push origin HEAD:${GITHUB_REF_NAME}; then
-                pushed=1
-                break
-              fi
-              sleep $((attempt * 5))
-            done
-            if [ "$pushed" -ne 1 ]; then
-              echo "::warning::Preview bundle uploaded as an Actions artifact, but branch publishing failed after 3 attempts."
-              echo "preview_published=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
+            git commit -m "build: publish native FM1 emulator"
+            git push origin HEAD:main
           fi
-          echo "preview_published=true" >> "$GITHUB_OUTPUT"
-          echo "preview_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "Preview source commit: $(git rev-parse HEAD)"
