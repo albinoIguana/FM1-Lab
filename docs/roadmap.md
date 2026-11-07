@@ -31,7 +31,7 @@ FM1-Lab is a four-layer FM instrument built around the existing Felucca six-oper
 - [x] Versioned performance settings for sequencer patterns, tempo, lane assignment, arp mode, FX controls/sends and compressor settings.
 - [x] Native regression coverage for voice allocation, sequencer timing, arp output, stereo FX, send isolation, master inserts, linked compression, limiter bounds and render chunk determinism.
 - [x] Device firmware build workflow passes.
-- [x] Native browser-emulator build and bundle verification pass. Latest verified emulator build (includes the FX-feedback-label correction at `d47cca20`): [run 42359181688](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359181688). Latest native regression checks: [run 42359289280](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359289280), passed at `df51b705`. Latest device package build: [run 42359289423](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359289423), passed at `df51b705`. Its downloadable artifact is attached to that run; the generated files are also published under `native-emulator/` on this feature branch.
+- [x] Native browser-emulator build and bundle verification pass. Latest verified emulator build: [run 42360183444](https://github.com/albinoIguana/FM1-Lab/actions/runs/42360183444). Latest native regression checks: [run 42360183470](https://github.com/albinoIguana/FM1-Lab/actions/runs/42360183470), passed at `57ae14b2`. Latest device package build: [run 42360183743](https://github.com/albinoIguana/FM1-Lab/actions/runs/42360183743), passed at `57ae14b2`. All three workflows pass on the same source revision. Its downloadable artifact is attached to that run; the generated files are also published under `native-emulator/` on this feature branch.
 
 ## Latest device build audit
 
@@ -39,18 +39,22 @@ The latest passing native FM1 package build reports:
 
 | Resource | Used | Limit |
 |---|---:|---:|
-| XIP image | 190,148 B | 581,564 B |
+| XIP image | 189,124 B | 581,564 B |
 | RAM data + BSS | 47,336 B | 98,304 B |
 | RAM text | 3,556 B | 32,768 B |
 | Audio/object pool | 275,264 B | 344,064 B |
 
-The `.ram_text` audit reports 1,123 instructions and no calls. The firmware package is `app/build/fm1lab.fwsc`; SHA-256: `199fa9860716992f10f01388d03be49bb4821c710f5a4a436021447dda50fc6e`. The CI artifact ZIP checksum was independently verified after download. These are package/build checks, not physical-device playback tests.
+The `.ram_text` audit reports 1,123 instructions and no calls. The firmware package is `app/build/fm1lab.fwsc`; SHA-256: `580fb5d5a1af36dc8a5d6fd109cbd8b238eaeb83f72b9d364ccdcfe12a0d6176`. The CI artifact ZIP checksum was independently verified after download. These are package/build checks, not physical-device playback tests.
+
+### Emulator runtime smoke check
+
+The latest WebAssembly emulator boots, draws the 240×240 framebuffer and navigates HOME, MACRO, GLOBAL, OPERATOR, ENV, both LFO pages, both sequencer lanes, ARP and all eight FX pages. A held F3 key produces non-zero stereo output across all four enabled patches, with silence before note-on and a release tail after note-off. The generated proof-of-life render is 2.99 seconds at 44.1 kHz. This verifies the emulator audio path, not the physical FM1 output stage.
 ## Finish pass — no new feature scope
 
 ### P0: make the current instrument trustworthy
 
-- [ ] Run the complete native test workflow against the current branch head after the emulator publication commit.
-- [ ] Verify the actual device package contents, linker XIP/RAM report, and storage object map.
+- [x] Run the complete native test workflow against the current branch head after the emulator publication commit.
+- [x] Verify the device package contents, linker XIP/RAM report and artifact checksum.\n- [ ] Finish the storage object map audit.
 - [ ] Add or complete host tests for the physical-control-to-page mapping and the high-risk save/load/navigation paths.
 - [ ] Audit the UI event queue for overflow behavior, stale edits, and audio-thread ownership.
 - [ ] Verify first-boot factory initialization, Instrument switching, dirty-edit save behavior, and settings restore.
@@ -58,10 +62,10 @@ The `.ram_text` audit reports 1,123 instructions and no calls. The firmware pack
 
 ### P1: UI design handoff
 
-- [ ] Produce a page-by-page control matrix: physical button/encoder → action → displayed feedback → persistence owner.
-- [ ] Review every 240×240 screen in the emulator at native size; check clipping, hierarchy, labels, page numbering and selected-patch identity.
-- [ ] Lock a consistent page shell and 2×2 panel geometry before visual redesign.
-- [ ] Make HOME, macro, operator, ENV/LFO, sequencer and FX pages internally consistent.
+- [x] Produce a page-by-page control matrix: physical button/encoder → action → displayed feedback → persistence owner.
+- [x] Review every 240×240 screen in the emulator at native size; check clipping, hierarchy, labels, page numbering and selected-patch identity.
+- [x] Lock a consistent page shell and 2×2 panel geometry before visual redesign.
+- [x] Make HOME, macro, operator, ENV/LFO, sequencer and FX pages internally consistent.
 - [ ] Verify navigation is predictable and reversible; HOME always returns to the Instrument overview.
 - [ ] Mark the design handoff complete only when the user can start visual UI design without having to redesign the underlying interaction model.
 
