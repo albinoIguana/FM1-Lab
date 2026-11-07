@@ -1416,8 +1416,10 @@ static void draw(void)
         if (generic_name) {
             bank_label[0]='I'; bank_label[1]='N'; bank_label[2]='S';
             bank_label[3]='T'; bank_label[4]='R'; bank_label[5]=' ';
-            int_text((int32_t)instrument_index + 1, bank_label + 6);
-            text_cat(bank_label, "/32");
+            bank_label[6]=(char)('0'+((instrument_index+1u)/10u));
+            bank_label[7]=(char)('0'+((instrument_index+1u)%10u));
+            bank_label[8]='/'; bank_label[9]='3'; bank_label[10]='2';
+            bank_label[11]=0;
         } else {
             for (uint32_t n = 0; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n) {
                 char ch = current_instrument.name[n];
