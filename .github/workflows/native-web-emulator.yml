@@ -44,6 +44,19 @@ jobs:
           version: "latest"
           actions-cache-folder: "emsdk-cache"
 
+      - name: Expand graphics canvas for 164px content panel
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("base/device/gfx.c")
+          s = p.read_text()
+          old = "#define APP_CANVAS_PX (240u * 144u)"
+          new = "#define APP_CANVAS_PX (240u * 164u)"
+          if old not in s:
+              raise SystemExit("Expected 240x144 graphics canvas definition was not found")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Build native FM1 browser emulator
         run: python3 base/tools/build.py app --web
 
