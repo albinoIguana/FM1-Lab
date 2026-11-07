@@ -70,6 +70,7 @@ FM1-Lab is a four-layer FM instrument built around the existing Felucca six-oper
 - ENV and LFO: open their dedicated operator envelope and LFO pages.
 - FX: advances through the eight FX pages; SELECT cycles within that section.
 - On master Amp/Drive, EQ and compressor pages, B_EDIT toggles bypass. EQ ALGO chooses LOW/MID/HIGH band. Compressor ALGO controls makeup.
+- FX pages: K1 controls wet mix; K2 controls chorus/phaser rate, delay time or reverb decay; K3 controls feedback except phaser depth; K4 controls the selected patch's send except phaser resonance. B_EDIT toggles the selected effect. The dedicated SEND ROUTING page edits the four sends for the patch selected with ALGO.
 - SEQ: opens the two-lane sequencer; PRESETS selects lane A/B, ALGO assigns that lane's patch, SELECT chooses the step, K1–K4 edit enable/note/velocity/gate, and PLAY starts/stops it.
 - ARP: opens/cycles arp modes; held keybed notes are the input.
 - SAVE: persists the current Instrument and performance settings.
