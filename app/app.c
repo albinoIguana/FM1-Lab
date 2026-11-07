@@ -13,7 +13,6 @@
 #include "fm1lab_store_library.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
-#include <string.h>
 
 static settings_t set;
 static uint8_t set_dirty;
@@ -1148,12 +1147,22 @@ static void draw_algorithm_diagram(void)
     cv_text(166,126,&FONT_XS,"ALGO KNOB",C_GRAY);
 }
 
+static int patch_name_is_factory(const char *name)
+{
+    if (!name) return 0;
+    return (name[0]=='f' && name[1]=='a' && name[2]=='c' && name[3]=='t' &&
+            name[4]=='o' && name[5]=='r' && name[6]=='y' && name[7]=='\\0') ||
+           (name[0]=='F' && name[1]=='A' && name[2]=='C' && name[3]=='T' &&
+            name[4]=='O' && name[5]=='R' && name[6]=='Y' && name[7]=='\\0') ||
+           (name[0]=='F' && name[1]=='a' && name[2]=='c' && name[3]=='t' &&
+            name[4]=='o' && name[5]=='r' && name[6]=='y' && name[7]=='\\0');
+}
+
 static const char *patch_display_name(uint32_t patch)
 {
     const char *name = fm6_patch_name(patch);
     static char fallback[FM1LAB_PATCH_COUNT][12];
-    if (name && strcmp(name, "factory") != 0 && strcmp(name, "FACTORY") != 0 &&
-        strcmp(name, "Factory") != 0 && name[0])
+    if (name && name[0] && !patch_name_is_factory(name))
         return name;
     if (patch >= FM1LAB_PATCH_COUNT) patch = 0u;
     fallback[patch][0] = 'P'; fallback[patch][1] = 'A';
