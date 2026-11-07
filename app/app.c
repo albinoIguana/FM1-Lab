@@ -1035,13 +1035,15 @@ static void outline(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t color)
 
 static void rounded_panel(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t fill, uint16_t border)
 {
-    for (int32_t row = 0; row < h; ++row) {
-        int32_t inset = row < r ? r - row - 1 : row >= h - r ? row - (h - r) : 0;
-        int32_t span = w - 2 * inset;
-        if (span <= 0) continue;
-        cv_rect(x + inset, y + row, span, 1, border);
-        if (span > 2) cv_rect(x + inset + 1, y + row, span - 2, 1, fill);
-    }
+    /* FM1's display is a tiny instrument panel, not a miniature phone UI:
+     * clipped corners, a quiet inset, and one precise highlight line. */
+    (void)r;
+    cv_rect(x + 2, y, w - 4, h, border);
+    cv_rect(x, y + 2, 1, h - 4, border);
+    cv_rect(x + w - 1, y + 2, 1, h - 4, border);
+    cv_rect(x + 1, y + 1, w - 2, h - 2, fill);
+    cv_rect(x + 3, y + 2, w - 6, 1, RGB(31, 47, 59));
+    cv_rect(x + 2, y + h - 2, w - 4, 1, RGB(5, 9, 14));
 }
 static uint16_t patch_color(uint32_t p)
 {
@@ -1054,27 +1056,30 @@ static uint16_t screen_bg(void) { return RGB(8,13,19); }
 static void draw_home_panel(void)
 {
     char t[24];
+    cv_text(5, 1, &FONT_XS, "FOUR-PART INSTRUMENT", C_GRAY);
     for (uint32_t p = 0; p < 4u; ++p) {
         int32_t x = 4 + (int32_t)(p & 1u) * 118;
         int32_t y = 4 + (int32_t)(p >> 1u) * 68;
         uint16_t accent = patch_color(p);
         int enabled = set.levels[p] != 0u;
-        rounded_panel(x, y, 112, 62, 7, panel_fill(), p == set.patch ? accent : C_LINE);
-        cv_rect(x + 5, y + 8, 3, 46, accent);
-        cv_text(x + 13, y + 7, &FONT_XS, fm6_patch_name(p), C_WHITE);
-        cv_text(x + 13, y + 24, &FONT_XS, enabled ? "ON" : "OFF",
-                enabled ? RGB(75,235,135) : RGB(255,82,101));
-        cv_text(x + 48, y + 24, &FONT_XS, "ALG", C_GRAY);
+        rounded_panel(x, y, 112, 62, 3, panel_fill(), p == set.patch ? accent : C_LINE);
+        cv_rect(x + 5, y + 7, 2, 47, accent);
+        int_text((int32_t)p + 1, t);
+        cv_text(x + 12, y + 5, &FONT_XS, t, accent);
+        cv_text(x + 28, y + 5, &FONT_XS, enabled ? "LAYER ACTIVE" : "LAYER MUTED",
+                enabled ? RGB(75,235,135) : C_GRAY);
+        cv_text(x + 12, y + 19, &FONT_B, fm6_patch_name(p), C_WHITE);
+        cv_text(x + 12, y + 38, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
-        cv_text(x + 78, y + 24, &FONT_XS, t, C_WHITE);
-        cv_text(x + 13, y + 42, &FONT_XS, "VOL", C_GRAY);
+        cv_text(x + 34, y + 38, &FONT_XS, t, accent);
+        cv_text(x + 59, y + 38, &FONT_XS, "LEVEL", C_GRAY);
         int_text(set.levels[p], t);
-        cv_text(x + 38, y + 42, &FONT_XS, t, accent);
-        cv_rect(x + 59, y + 45, 43, 5, C_LINE);
-        cv_rect(x + 59, y + 45, (int32_t)set.levels[p] * 43 / 127, 5, accent);
+        cv_text(x + 91, y + 38, &FONT_XS, t, C_WHITE);
+        cv_rect(x + 12, y + 50, 91, 5, RGB(31, 43, 55));
+        cv_rect(x + 12, y + 50, (int32_t)set.levels[p] * 91 / 127, 5, accent);
+        if (p == set.patch) cv_rect(x + 12, y + 57, 91, 1, accent);
     }
 }
-
 static void draw_macro_panel(void)
 {
     static const char *const names[4] = {"BRIGHTNESS", "BODY", "MOTION", "EDGE"};
@@ -1083,7 +1088,7 @@ static void draw_macro_panel(void)
     uint16_t accent = patch_color(set.patch);
     char t[24];
     cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
-    cv_text(164, 2, &FONT_XS, "ALGO", C_GRAY);
+    cv_text(164, 2, &FONT_XS, "ALG", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
     cv_text(204, 2, &FONT_XS, t, accent);
     for (uint32_t m = 0; m < 4u; ++m) {
@@ -1091,18 +1096,17 @@ static void draw_macro_panel(void)
         int32_t y = 18 + (int32_t)(m >> 1u) * 64;
         uint32_t value = set.macros[set.patch][m];
         uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
-        rounded_panel(x, y, 112, 56, 7, panel_fill(), border);
-        cv_text(x + 9, y + 8, &FONT_XS, names[m], C_WHITE);
+        rounded_panel(x, y, 112, 56, 3, panel_fill(), border);
+        cv_rect(x + 6, y + 7, 2, 41, accent);
+        cv_text(x + 13, y + 7, &FONT_XS, names[m], C_WHITE);
         int_text((int32_t)value, t);
-        cv_text(x + 91, y + 7, &FONT_XS, t, accent);
-        cv_rect(x + 9, y + 31, 94, 7, C_LINE);
-        cv_rect(x + 9, y + 31, (int32_t)value * 94 / 100, 7, accent);
-        cv_rect(x + 55, y + 28, 2, 13, C_WHITE);
-        cv_rect(x + 8 + (int32_t)value * 94 / 100, y + 28, 3, 13, C_WHITE);
-        cv_text(x + 9, y + 49, &FONT_XS, hints[m], C_GRAY);
+        cv_text(x + 82, y + 5, &FONT_B, t, accent);
+        cv_rect(x + 13, y + 29, 91, 5, RGB(31, 43, 55));
+        cv_rect(x + 13, y + 29, (int32_t)value * 91 / 100, 5, accent);
+        cv_rect(x + 13 + (int32_t)value * 91 / 100, y + 26, 2, 11, C_WHITE);
+        cv_text(x + 13, y + 43, &FONT_XS, hints[m], C_GRAY);
     }
 }
-
 /* Four operator quadrants; roles come from the selected algorithm's actual data. */
 static void draw_operator_map(void)
 {
