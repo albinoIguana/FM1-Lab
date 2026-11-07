@@ -31,8 +31,20 @@ FM1-Lab is a four-layer FM instrument built around the existing Felucca six-oper
 - [x] Versioned performance settings for sequencer patterns, tempo, lane assignment, arp mode, FX controls/sends and compressor settings.
 - [x] Native regression coverage for voice allocation, sequencer timing, arp output, stereo FX, send isolation, master inserts, linked compression, limiter bounds and render chunk determinism.
 - [x] Device firmware build workflow passes.
-- [x] Native browser-emulator build and bundle verification pass. Latest verified emulator build before the FX-feedback-label correction: [run 42359181688](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359181688). The FX-feedback-label correction is source-committed at `d47cca20`; its native engine checks and device build are running. Its downloadable artifact is attached to that run; the generated files are also published under `native-emulator/` on this feature branch.
+- [x] Native browser-emulator build and bundle verification pass. Latest verified emulator build (includes the FX-feedback-label correction at `d47cca20`): [run 42359181688](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359181688). Latest native regression checks: [run 42359289280](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359289280), passed at `df51b705`. Latest device package build: [run 42359289423](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359289423), passed at `df51b705`. Its downloadable artifact is attached to that run; the generated files are also published under `native-emulator/` on this feature branch.
 
+## Latest device build audit
+
+The latest passing native FM1 package build reports:
+
+| Resource | Used | Limit |
+|---|---:|---:|
+| XIP image | 190,148 B | 581,564 B |
+| RAM data + BSS | 47,336 B | 98,304 B |
+| RAM text | 3,556 B | 32,768 B |
+| Audio/object pool | 275,264 B | 344,064 B |
+
+The `.ram_text` audit reports 1,123 instructions and no calls. The firmware package is `app/build/fm1lab.fwsc`; SHA-256: `199fa9860716992f10f01388d03be49bb4821c710f5a4a436021447dda50fc6e`. The CI artifact ZIP checksum was independently verified after download. These are package/build checks, not physical-device playback tests.
 ## Finish pass — no new feature scope
 
 ### P0: make the current instrument trustworthy
