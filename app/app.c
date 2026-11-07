@@ -1489,12 +1489,7 @@ static void draw(void)
     }
     if (arp_ui_mode) cv_text(216, 1, &FONT_XS, "ARP", RGB(75,235,135));
 
-    /* The second line is reserved for the instrument name, on every page. */
-    for (uint32_t n = 0; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n) {
-        char ch = current_instrument.name[n];
-        t[n] = (ch >= 32 && ch <= 126) ? ch : ' ';
-    }
-    t[FM1LAB_INSTRUMENT_NAME_BYTES < sizeof t ? FM1LAB_INSTRUMENT_NAME_BYTES : sizeof t - 1u] = 0;
+    /* The second line identifies the selected instrument patch. */
     cv_text(8, 15, &FONT_B, patch_display_name(set.patch), C_WHITE);
     cv_rect(0, 34, 240, 3, accent);
     cv_blit(0, 0);
