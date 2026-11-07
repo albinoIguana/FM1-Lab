@@ -54,10 +54,11 @@ The latest WebAssembly emulator boots, draws the 240×240 framebuffer and naviga
 ### P0: make the current instrument trustworthy
 
 - [x] Run the complete native test workflow against the current branch head after the emulator publication commit.
-- [x] Verify the device package contents, linker XIP/RAM report and artifact checksum.\n- [ ] Finish the storage object map audit.
+- [x] Verify the device package contents, linker XIP/RAM report and artifact checksum.\n- [x] Audit the storage object map: settings/panel/BLE occupy EA000/EC000/EE000; four 3,840-byte bank records plus the 936-byte insert journal are pooled in F0000–FBFFF. Bank records are 8-byte headers plus eight 479-byte Instrument slots; the sidecar uses CRC-sealed active/fallback snapshots and bank CRC/generation matching.
+- [x] Prevent boot-time factory formatting of present-but-invalid or unexpected-size Instrument objects; malformed user banks are preserved and reported instead of silently overwritten (commit `5e3f3760`).
 - [ ] Add or complete host tests for the physical-control-to-page mapping and the high-risk save/load/navigation paths.
-- [ ] Audit the UI event queue for overflow behavior, stale edits, and audio-thread ownership.
-- [ ] Verify first-boot factory initialization, Instrument switching, dirty-edit save behavior, and settings restore.
+- [ ] Complete the UI event queue audit and route FX/sequencer/arp/tempo control writes through the audio-owner queue. The current audit found those setters are still called directly from the UI loop while the render path consumes the same state. Also test overflow recovery and stale voice snapshots.
+- [ ] Verify first-boot factory initialization, Instrument switching, dirty-edit save behavior, and settings restore with a host-level `app_init` harness; storage codec tests already cover bank CRC, legacy sidecar migration, and journal-first power-loss recovery.
 - [ ] Confirm every visible control changes the parameter named on screen; remove any inert or misleading label.
 
 ### P1: UI design handoff
@@ -77,6 +78,10 @@ The latest WebAssembly emulator boots, draws the 240×240 framebuffer and naviga
 - [ ] Measure device CPU load and xrun/dropout behavior under the documented 32-voice / two-lane / arp / all-FX stress case.
 - [ ] Verify version-1 bank migration, version-2 writes, power-loss recovery and settings persistence on real flash.
 - [ ] Only call the firmware flash-ready after these checks pass.
+
+## UI design pass (next after the P0 reliability fixes)
+
+The current 240×240 pages are a functional control/layout scaffold, not final visual design. Once the audio-owner queue and host save/load tests are closed, begin the dedicated UI pass: define the visual system, improve hierarchy and state visibility, refine encoder interaction feedback, and iterate against the native-size emulator screenshots. Keep the tiny display and physical controls as the design constraints; do not add new features.
 
 ## Interface contract
 
