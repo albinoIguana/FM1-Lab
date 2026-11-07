@@ -1092,7 +1092,8 @@ static void draw_operator_map(void)
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = 4 + (int32_t)(i >> 1u) * 68;
-        (void)fm1lab_voice_operator_get(voice, env_operator, fields[i], &values[i]);
+        (void)fm1lab_voice_operator_get(voice, env_operator,
+            i == 3u && operator_detune_mode ? FM1LAB_OP_DETUNE : fields[i], &values[i]);
         rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
         cv_text(x + 9, y + 8, &FONT_XS,
             i == 3u && operator_detune_mode ? "DETUNE" : labels[i], C_WHITE);
