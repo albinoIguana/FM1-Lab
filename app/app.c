@@ -1063,7 +1063,7 @@ static int algorithm_preview_active(void)
 static void draw_algorithm_diagram(void)
 {
     static const int16_t nx[6]={20,102,184,20,102,184};
-    static const int16_t ny[6]={39,39,39,99,99,99};
+    static const int16_t ny[6]={39,39,39,89,89,89};
     const uint8_t *voice=current_instrument.patches[set.patch].voice;
     uint8_t algorithm=1u;
     uint16_t accent=patch_color(set.patch);
@@ -1083,17 +1083,25 @@ static void draw_algorithm_diagram(void)
             int32_t tx=nx[ti]+18, ty=ny[ti]+13;
             uint16_t ink=RGB(88,112,132);
             if (sy==ty) {
-                int32_t left=sx<tx?sx+18:sx-18;
-                int32_t right=sx<tx?tx-18:tx+18;
+                int32_t source_edge=sx<tx?sx+18:sx-18;
+                int32_t target_edge=sx<tx?tx-18:tx+18;
+                int32_t left=source_edge<target_edge?source_edge:target_edge;
+                int32_t right=source_edge<target_edge?target_edge:source_edge;
                 cv_rect(left,sy-1,right-left+1,2,ink);
-                cv_rect(tx+(sx<tx?-19:17),ty-3,2,6,accent);
+                cv_rect(target_edge-2,ty-3,2,6,accent);
             } else {
-                int32_t start=sy<ty?sy+13:sy-13;
-                int32_t end=sy<ty?ty-13:ty+13;
-                int32_t mid=(sx+tx)/2;
-                cv_rect(sx-1,start-1,2,(end-start)+2,ink);
-                cv_rect(sx<tx?sx:tx, start<end?start:end, (sx<tx?tx-sx:sx-tx)+1,2,ink);
-                cv_rect(mid-1,start<end?start:end,2,(end-start)+2,ink);
+                int32_t source_edge=sy<ty?sy+13:sy-13;
+                int32_t target_edge=sy<ty?ty-13:ty+13;
+                int32_t mid_y=(source_edge+target_edge)/2;
+                int32_t left=sx<tx?sx:tx, right=sx<tx?tx:sx;
+                int32_t top=source_edge<mid_y?source_edge:mid_y;
+                int32_t bottom=source_edge<mid_y?mid_y:source_edge;
+                cv_rect(sx-1,top,2,bottom-top+1,ink);
+                cv_rect(left,mid_y-1,right-left+1,2,ink);
+                top=target_edge<mid_y?target_edge:mid_y;
+                bottom=target_edge<mid_y?mid_y:target_edge;
+                cv_rect(tx-1,top,2,bottom-top+1,ink);
+                cv_rect(tx-3,target_edge-2,6,2,accent);
             }
         }
     }
@@ -1107,9 +1115,9 @@ static void draw_algorithm_diagram(void)
             carrier?accent:C_WHITE);
         cv_rect(nx[i]+3,ny[i]+22,30,1,carrier?accent:C_DIM);
     }
-    cv_text(8,135,&FONT_XS,"CARRIER",accent);
-    cv_text(75,135,&FONT_XS,"MODULATOR",C_GRAY);
-    cv_text(166,135,&FONT_XS,"ALGO KNOB",C_GRAY);
+    cv_text(8,126,&FONT_XS,"CARRIER",accent);
+    cv_text(75,126,&FONT_XS,"MODULATOR",C_GRAY);
+    cv_text(166,126,&FONT_XS,"ALGO KNOB",C_GRAY);
 }
 
 static void draw_home_panel(void)
@@ -1493,8 +1501,8 @@ static void draw(void)
         }
         cv_text(10, 18, &FONT_XS, bank_label, accent);
         int_text((int32_t)instrument_index + 1, t);
-        cv_text(196, 18, &FONT_XS, t, accent);
-        cv_text(208, 18, &FONT_XS, "/32", C_GRAY);
+        text_cat(t, "/32");
+        cv_text(190, 18, &FONT_XS, t, accent);
         if (FM1B_BLE) cv_text(184, 10, &FONT_XS, "BLE", plat_ble_connected() ? accent : C_DIM);
         if (note >= 0) {
             note_name(note, t);
