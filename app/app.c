@@ -10,7 +10,7 @@
 #include "fm1lab_instrument.h"
 #include "fm1lab_voice_editor.h"
 #include "fm1lab_store_library.h"
-#include "fm1lab_physical_controls.h"
+#include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
 
 static settings_t set;
