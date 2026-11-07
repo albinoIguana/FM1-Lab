@@ -10,6 +10,7 @@
 #include "fm1lab_instrument.h"
 #include "fm1lab_voice_editor.h"
 #include "fm1lab_store_library.h"
+#include "fm1lab_physical_controls.h"
 #include <stddef.h>
 
 static settings_t set;
@@ -808,9 +809,7 @@ static void input(void)
         } else if (k == EN_PRESET && page == PAGE_SEQ) {
             /* PRESET selects the visible sequencer lane here; it must not
              * switch Instruments while editing a pattern. */
-            int32_t lane = ((int32_t)seq_ui_lane + e) % 2;
-            if (lane < 0) lane += 2;
-            seq_ui_lane = (uint8_t)lane;
+            seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
             app_say("SEQUENCER LANE", seq_ui_lane ? "B" : "A");
         } else if (k == EN_PRESET) {
             if (instrument_apply_pending) {
