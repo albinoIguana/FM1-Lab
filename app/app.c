@@ -170,6 +170,7 @@ static void ui_events_drain(void)
         ui_event_tail = ui_event_head;
         ui_event_overflow = 0;
         fm6_panic();
+        fm6_sequencer_set_running(0u);
         if (instrument_loaded) instrument_apply_engine();
         else for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
             fm6_patch_set_enabled(p, 1u);
