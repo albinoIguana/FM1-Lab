@@ -1455,7 +1455,6 @@ static void draw_fx_routing_panel(void)
 static void draw(void)
 {
     char t[24];
-    int32_t note = voice_note;
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
     uint16_t accent = patch_color(set.patch);
     cv_begin(240, 37, screen_bg());
