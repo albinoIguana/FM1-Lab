@@ -1454,7 +1454,7 @@ static void draw_fx_routing_panel(void)
 
 static void draw(void)
 {
-    char t[24];
+    char t[24], pagebuf[8];
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
     uint16_t accent = patch_color(set.patch);
     cv_begin(240, 37, screen_bg());
@@ -1508,8 +1508,8 @@ static void draw(void)
     cv_begin(240, 19, screen_bg());
     int_text((int32_t)page + 1, t);
     text_cat(t, "/");
-    int_text(PAGE_COUNT, bank_label);
-    text_cat(t, bank_label);
+    int_text(PAGE_COUNT, pagebuf);
+    text_cat(t, pagebuf);
     cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, C_GRAY);
     cv_blit(0, 221);
 }
