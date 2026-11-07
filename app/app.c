@@ -259,9 +259,12 @@ static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
     uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint8_t value;
     if (!delta || fm1lab_voice_operator_get(voice, env_operator, field, &value)) return;
+    unsigned maximum = field == FM1LAB_OP_MODE ? 1u :
+        field == FM1LAB_OP_COARSE ? 31u :
+        field == FM1LAB_OP_DETUNE ? 14u : 99u;
     int next = (int)value + delta;
     if (next < 0) next = 0;
-    if (next > 99) next = 99;
+    if ((unsigned)next > maximum) next = (int)maximum;
     if ((uint8_t)next != value &&
         !fm1lab_voice_operator_set(voice, env_operator, field, (unsigned)next))
         voice_edit_changed();
@@ -752,6 +755,12 @@ static void input(void)
                     app_say("BANK", "SELECTED");
                 }
             }
+        } else if (k == EN_ALGO && page == PAGE_OPERATOR_MAP) {
+            int32_t next = ((int32_t)env_operator - 1 + e) % 6;
+            if (next < 0) next += 6;
+            env_operator = (uint8_t)(next + 1);
+            app_say("OPERATOR", fm1lab_voice_operator_is_carrier(
+                current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
         } else if (k == EN_ALGO && page == PAGE_FX_EQ) {
             int32_t next=((int32_t)eq_ui_band+e)%3;
             if(next<0)next+=3;
@@ -873,6 +882,13 @@ static void input(void)
                 uint8_t field=fields[index];
                 compressor_edit(field,(uint8_t)clamp((int32_t)compressor_value(field)+e,0,100));
                 app_say(index==0u?"COMP THRESHOLD":index==1u?"COMP RATIO":index==2u?"COMP ATTACK":"COMP RELEASE","UPDATED");
+            } else if (page == PAGE_OPERATOR_MAP) {
+                static const fm1lab_operator_field_t fields[4] = {
+                    FM1LAB_OP_OUTPUT, FM1LAB_OP_MODE, FM1LAB_OP_COARSE, FM1LAB_OP_FINE
+                };
+                voice_edit_operator(fields[index], e);
+                app_say(index == 0u ? "OPERATOR OUTPUT" : index == 1u ? "OSCILLATOR MODE" :
+                    index == 2u ? "COARSE FREQUENCY" : "FINE FREQUENCY", "UPDATED");
             } else if (page == PAGE_ENV) {
                 voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
                 app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
@@ -1037,32 +1053,35 @@ static void draw_macro_panel(void)
 /* Four operator quadrants; roles come from the selected algorithm's actual data. */
 static void draw_operator_map(void)
 {
-    char t[24];
+    static const char *const labels[4] = {"OUTPUT", "MODE", "COARSE", "FINE"};
+    const fm1lab_operator_field_t fields[4] = {
+        FM1LAB_OP_OUTPUT, FM1LAB_OP_MODE, FM1LAB_OP_COARSE, FM1LAB_OP_FINE
+    };
+    const uint8_t maxima[4] = {99u, 1u, 31u, 99u};
+    const uint8_t *voice = current_instrument.patches[set.patch].voice;
+    uint8_t values[4] = {0u, 0u, 0u, 0u};
+    char t[16];
     uint16_t accent = patch_color(set.patch);
+    int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
     cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
-    cv_text(154, 2, &FONT_XS, "ALGO", C_GRAY);
-    int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
-    cv_text(204, 2, &FONT_XS, t, accent);
-    for (uint32_t pair = 0; pair < 3u; ++pair) {
-        int32_t x = 4 + (int32_t)(pair & 1u) * 118;
-        int32_t y = 4 + (int32_t)(pair >> 1u) * 68;
-        uint32_t op_a = pair * 2u + 1u, op_b = op_a + 1u;
-        int ca = fm6_operator_is_carrier(set.patch, op_a);
-        int cb = fm6_operator_is_carrier(set.patch, op_b);
+    cv_text(112, 2, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
+    cv_text(190, 2, &FONT_XS, "OP", C_GRAY);
+    int_text(env_operator, t); cv_text(216, 2, &FONT_XS, t, accent);
+    for (uint32_t i = 0; i < 4u; ++i) {
+        int32_t x = 4 + (int32_t)(i & 1u) * 118;
+        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        (void)fm1lab_voice_operator_get(voice, env_operator, fields[i], &values[i]);
         rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
-        cv_text(x + 9, y + 8, &FONT_XS, "OPERATOR PAIR", C_GRAY);
-        cv_text(x + 9, y + 25, &FONT_B, "OP", C_WHITE);
-        int_text((int32_t)op_a, t); cv_text(x + 27, y + 25, &FONT_B, t, accent);
-        cv_text(x + 57, y + 25, &FONT_B, "OP", C_WHITE);
-        int_text((int32_t)op_b, t); cv_text(x + 75, y + 25, &FONT_B, t, accent);
-        cv_text(x + 9, y + 45, &FONT_XS, ca ? "CARRIER" : "MODULATOR", ca ? accent : C_GRAY);
-        cv_text(x + 65, y + 45, &FONT_XS, cb ? "CARRIER" : "MODULATOR", cb ? accent : C_GRAY);
+        cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_WHITE);
+        if (i == 1u) {
+            cv_text(x + 9, y + 27, &FONT_B, values[i] ? "FIXED" : "RATIO", accent);
+        } else {
+            int_text(values[i], t);
+            cv_text(x + 9, y + 27, &FONT_B, t, accent);
+            cv_rect(x + 9, y + 46, 94, 5, C_LINE);
+            cv_rect(x + 9, y + 46, (int32_t)values[i] * 94 / maxima[i], 5, accent);
+        }
     }
-    rounded_panel(122, 72, 112, 62, 7, panel_fill(), C_LINE);
-    cv_text(131, 81, &FONT_XS, "ALGORITHM", C_GRAY);
-    int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
-    cv_text(131, 99, &FONT_B, t, accent);
-    cv_text(131, 119, &FONT_XS, "ROLES FROM ENGINE", C_GRAY);
 }
 
 
@@ -1411,7 +1430,7 @@ static void draw(void)
     else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"AMP: K1 DRIVE  K2 TONE  K3 OUT  K4 ON/OFF",C_GRAY);
     else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"EQ: ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
     else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"COMP: K1 THR  K2 RAT  K3 ATK  K4 REL  ALGO MAKEUP",C_GRAY);
-    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "EDIT / OPERATOR ROLES", C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   K1 OUTPUT  K2 MODE  K3 COARSE  K4 FINE", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
