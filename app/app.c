@@ -1043,7 +1043,6 @@ static void draw_home_panel(void)
         cv_rect(x + 59, y + 45, 43, 5, C_LINE);
         cv_rect(x + 59, y + 45, (int32_t)set.levels[p] * 43 / 127, 5, accent);
     }
-    cv_text(5, 138, &FONT_XS, "K1-K4: LAYER VOLUME   0 = OFF   SEL: MACROS", C_GRAY);
 }
 
 static void draw_macro_panel(void)
@@ -1295,7 +1294,6 @@ static void draw_sequencer_panel(void)
         cv_rect(x+4,y+23,17,(int32_t)seq_ui_velocity[lane][s]*12/127, color);
     }
     cv_text(6,116, &FONT_XS, fm6_sequencer_running()?"TRANSPORT RUNNING":"TRANSPORT STOPPED",fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
-    cv_text(6,132,&FONT_XS,"PLAY START / STOP   SELECT STEP",C_GRAY);
 }
 static void draw_arp_panel(void)
 {
@@ -1307,7 +1305,6 @@ static void draw_arp_panel(void)
     cv_text(131,13,&FONT_XS,"CLOCK",C_GRAY); int_text(transport_ui_bpm,t); cv_text(131,34,&FONT_B,t,RGB(227,75,210));
     cv_text(6,82,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_WHITE);
     cv_text(6,101,&FONT_XS,"K1 TEMPO   K2 MODE",C_GRAY);
-    cv_text(6,120,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_GRAY);
 }
 static void draw_fx_panel(uint8_t fx)
 {
