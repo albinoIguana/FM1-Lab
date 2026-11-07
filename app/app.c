@@ -420,8 +420,18 @@ void app_init(void)
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
         int size = plat_store_size(OBJ_INSTRUMENTS0 + bank);
         fm1lab_instrument_t probe;
-        if (size == 3840 && !fm1lab_store_library_load(bank * 8u, &probe))
+        /* Only a genuinely absent object may be initialized automatically.
+         * A present but malformed bank is user data: leave it untouched so a
+         * CRC/read failure cannot silently factory-reset eight Instruments. */
+        if (size < 0) {
+            (void)fm1lab_store_library_format_bank(bank, &factory_instrument);
             continue;
+        }
+        if (size == 3840) {
+            if (fm1lab_store_library_load(bank * 8u, &probe) != 0)
+                app_say("BANK ERROR", "DATA PRESERVED");
+            continue;
+        }
         if (bank < 3u && size == (int)sizeof(fm1lab_instrument_t)) {
             fm1lab_instrument_t legacy;
             if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &legacy, sizeof legacy) ==
@@ -434,7 +444,9 @@ void app_init(void)
                 continue;
             }
         }
-        (void)fm1lab_store_library_format_bank(bank, &factory_instrument);
+        /* Unexpected non-empty object sizes are not blank storage. Preserve
+         * them for recovery rather than replacing them with factory data. */
+        app_say("BANK ERROR", "DATA PRESERVED");
     }
     instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
