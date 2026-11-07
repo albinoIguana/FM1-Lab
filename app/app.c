@@ -964,7 +964,9 @@ static void input(void)
                 set_dirty = 1;
                 app_say("MACRO", "UPDATED");
             } else if (page == PAGE_HOME) {
-                /* HOME K1-K4 are volume-only; SELECT is the sole patch selector. */
+                /* Each layer encoder selects its matching patch and adjusts
+                 * that layer's level; zero remains the layer mute. */
+                set.patch = (uint8_t)index;
                 int32_t value = (int32_t)set.levels[index] + e;
                 if (value < 0) value = 0;
                 if (value > 127) value = 127;
@@ -973,7 +975,7 @@ static void input(void)
                 instrument_dirty = 1u;
                 ui_event_push(EV_PATCH_LEVEL, (uint8_t)index, (uint8_t)value, 0);
                 set_dirty = 1;
-                app_say("PATCH LEVEL", "UPDATED");
+                app_say("PATCH", patch_display_name(index));
             } else {
                 int_text(ui.turns[k], t);
                 app_say(ENC_NAME[k], t);
