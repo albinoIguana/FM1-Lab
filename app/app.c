@@ -1058,10 +1058,10 @@ static void draw_macro_panel(void)
     cv_text(204, 2, &FONT_XS, t, accent);
     for (uint32_t m = 0; m < 4u; ++m) {
         int32_t x = 4 + (int32_t)(m & 1u) * 118;
-        int32_t y = 4 + (int32_t)(m >> 1u) * 68;
+        int32_t y = 18 + (int32_t)(m >> 1u) * 64;
         uint32_t value = set.macros[set.patch][m];
         uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
-        rounded_panel(x, y, 112, 62, 7, panel_fill(), border);
+        rounded_panel(x, y, 112, 56, 7, panel_fill(), border);
         cv_text(x + 9, y + 8, &FONT_XS, names[m], C_WHITE);
         int_text((int32_t)value, t);
         cv_text(x + 91, y + 7, &FONT_XS, t, accent);
@@ -1095,10 +1095,10 @@ static void draw_operator_map(void)
     int_text(env_operator, t); cv_text(226, 2, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
-        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        int32_t y = 18 + (int32_t)(i >> 1u) * 64;
         (void)fm1lab_voice_operator_get(voice, env_operator,
             i == 3u && operator_detune_mode ? FM1LAB_OP_DETUNE : fields[i], &values[i]);
-        rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
+        rounded_panel(x, y, 112, 56, 7, panel_fill(), accent);
         cv_text(x + 9, y + 8, &FONT_XS,
             i == 3u && operator_detune_mode ? "DETUNE" : labels[i], C_WHITE);
         if (i == 1u) {
@@ -1230,16 +1230,16 @@ static void draw_envelope_panel(void)
     cv_text(6, 19, &FONT_XS, carrier ? "CARRIER ENVELOPE" : "MODULATOR ENVELOPE", carrier ? accent : C_GRAY);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
-        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        int32_t y = 28 + (int32_t)(i >> 1u) * 56;
         uint8_t value = 0;
         (void)fm1lab_voice_operator_get(voice, env_operator,
             (fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + i), &value);
-        rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
+        rounded_panel(x, y, 112, 52, 7, panel_fill(), accent);
         cv_text(x + 9, y + 8, &FONT_XS, env_levels ? levels[i] : rates[i], C_WHITE);
         int_text(value, t); cv_text(x + 88, y + 8, &FONT_XS, t, accent);
-        cv_rect(x + 9, y + 32, 94, 7, C_LINE);
-        cv_rect(x + 9, y + 32, (int32_t)value * 94 / 99, 7, accent);
-        cv_text(x + 9, y + 48, &FONT_XS, env_levels ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
+        cv_rect(x + 9, y + 24, 94, 6, C_LINE);
+        cv_rect(x + 9, y + 24, (int32_t)value * 94 / 99, 6, accent);
+        cv_text(x + 9, y + 39, &FONT_XS, env_levels ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
     }
 }
 
@@ -1262,10 +1262,10 @@ static void draw_lfo_panel(uint32_t modulation)
     cv_text(172, 2, &FONT_XS, modulation ? "PAGE 2/2" : "PAGE 1/2", accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
-        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        int32_t y = 18 + (int32_t)(i >> 1u) * 64;
         uint8_t value = 0;
         (void)fm1lab_voice_global_get(voice, fields[modulation][i], &value);
-        rounded_panel(x, y, 112, 62, 7, panel_fill(), accent);
+        rounded_panel(x, y, 112, 56, 7, panel_fill(), accent);
         cv_text(x + 9, y + 8, &FONT_XS, labels[modulation][i], C_WHITE);
         if (!modulation && i == 0u) {
             cv_text(x + 9, y + 26, &FONT_B, waves[value % 6u], accent);
