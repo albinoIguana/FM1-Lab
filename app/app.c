@@ -1411,45 +1411,23 @@ static void draw(void)
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 60, screen_bg());
-    if (page != PAGE_HOME && page != PAGE_ENV && page != PAGE_FX_AMP && page != PAGE_FX_EQ && page != PAGE_FX_COMPRESSOR && !(page >= PAGE_FX_CHORUS && page <= PAGE_FX_ROUTING)) for (uint32_t k = 0; k < 4u; ++k) {
+    /* Only MACRO and SEQ need the extra K1-K4 association strip.
+     * Their main panels do not otherwise show all four live knob mappings. */
+    if (page == PAGE_MACRO || page == PAGE_SEQ) for (uint32_t k = 0; k < 4u; ++k) {
         int32_t x = 4 + (int32_t)k * 58;
         uint16_t ink = page == PAGE_HOME ? patch_color(k) : accent;
         rounded_panel(x, 5, 54, 39, 6, panel_fill(), C_LINE);
         cv_text(x + 6, 10, &FONT_XS, k == 0 ? "K1" : k == 1 ? "K2" : k == 2 ? "K3" : "K4", ink);
-        if (page == PAGE_HOME) {
-            cv_text(x + 6, 23, &FONT_XS, k == 0 ? "P1 VOL" : k == 1 ? "P2 VOL" :
-                    k == 2 ? "P3 VOL" : "P4 VOL", C_WHITE);
-            int_text(set.levels[k], t); cv_text(x + 6, 33, &FONT_XS, t, ink);
-        } else if (page == PAGE_MACRO) {
+        if (page == PAGE_MACRO) {
             static const char *const short_names[4] = {"BRIGHT", "BODY", "MOTION", "EDGE"};
             cv_text(x + 6, 23, &FONT_XS, short_names[k], C_WHITE);
             int_text(set.macros[set.patch][k], t); cv_text(x + 6, 33, &FONT_XS, t, ink);
-        } else if (page == PAGE_ENV) {
-            cv_text(x + 6, 23, &FONT_XS, env_levels ? "LEVEL" : "RATE", C_WHITE);
-            uint8_t value = 0;
-            (void)fm1lab_voice_operator_get(current_instrument.patches[set.patch].voice,
-                env_operator, (fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + k), &value);
-            int_text(value, t); cv_text(x + 6, 33, &FONT_XS, t, ink);
         } else if (page == PAGE_SEQ) {
             static const char *const seq_names[4]={"STEP","NOTE","VELOCITY","GATE"};
             cv_text(x+6,23,&FONT_XS,seq_names[k],C_WHITE);
             int_text(k==0?seq_ui_enabled[seq_ui_lane][seq_ui_step]:k==1?seq_ui_note[seq_ui_lane][seq_ui_step]:k==2?seq_ui_velocity[seq_ui_lane][seq_ui_step]:seq_ui_gate[seq_ui_lane][seq_ui_step],t);
             cv_text(x+6,33,&FONT_XS,t,ink);
-        } else if (page == PAGE_ARP) {
-            cv_text(x+6,23,&FONT_XS,k==0?"TEMPO":k==1?"MODE":"-",C_WHITE);
-            if(k==0u) int_text(transport_ui_bpm,t);
-            else if(k==1u) {
-                const char *mode=arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP/DN";
-                cv_text(x+6,33,&FONT_XS,mode,ink);
-            }
-            if(k==0u) cv_text(x+6,33,&FONT_XS,t,ink);
-        } else if (page == PAGE_LFO || page == PAGE_LFO_MOD) {
-            static const char *const lfo_names[2][4] = {
-                {"WAVE", "SPEED", "PMD", "AMD"}, {"DELAY", "P SENS", "LFO SYNC", "OSC SYNC"}
-            };
-            cv_text(x + 6, 23, &FONT_XS, lfo_names[page == PAGE_LFO_MOD][k], C_WHITE);
-            cv_text(x + 6, 33, &FONT_XS, "K1-K4 EDIT", ink);
-        } else cv_text(x + 6, 27, &FONT_XS, "-", C_GRAY);
+        }
     }
     if (page == PAGE_HOME) cv_text(4, 43, &FONT_XS, "K1-4 VOL 0=OFF   SELECT PATCH", C_GRAY);
     else if (page == PAGE_MACRO) cv_text(4, 43, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
