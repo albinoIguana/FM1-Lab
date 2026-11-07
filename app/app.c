@@ -41,7 +41,9 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN };
+static fm6_performance_state_t performance_update_snapshot;
+static volatile uint8_t performance_update_pending;
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
 static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
@@ -60,6 +62,25 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
     ui_events[head].b = b;
     ui_events[head].c = c;
     ui_event_head = next;
+}
+
+static void performance_publish(void)
+{
+    if (performance_update_pending) return;
+    set.performance.tempo_bpm = transport_ui_bpm;
+    set.performance.arp_mode = arp_ui_mode;
+    for (uint32_t lane=0; lane<2u; ++lane) {
+        set.performance.lane_patch[lane] = seq_ui_patch[lane];
+        for (uint32_t step=0; step<64u; ++step) {
+            set.performance.seq_enabled[lane][step] = seq_ui_enabled[lane][step];
+            set.performance.seq_note[lane][step] = seq_ui_note[lane][step];
+            set.performance.seq_velocity[lane][step] = seq_ui_velocity[lane][step];
+            set.performance.seq_gate[lane][step] = seq_ui_gate[lane][step];
+        }
+    }
+    performance_update_snapshot = set.performance;
+    performance_update_pending = 1u;
+    ui_event_push(EV_PERFORMANCE_APPLY,0u,0u,0u);
 }
 
 static void instrument_apply_engine(void)
@@ -158,6 +179,8 @@ static void ui_events_drain(void)
         instrument_apply_pending = 0u;
         voice_update_pending = 0u;
         voice_dirty = 0u;
+        performance_update_pending = 0u;
+        (void)fm6_performance_state_set(&set.performance);
         return;
     }
     while ((tail = ui_event_tail) != ui_event_head) {
@@ -183,6 +206,11 @@ static void ui_events_drain(void)
             fm6_master_insert_set(a,b);
         else if (type == EV_MASTER_COMP)
             fm6_master_comp_set(a,b);
+        else if (type == EV_PERFORMANCE_APPLY) {
+            (void)fm6_performance_state_set(&performance_update_snapshot);
+            performance_update_pending = 0u;
+        } else if (type == EV_SEQ_RUN)
+            fm6_sequencer_set_running(a);
         else if (type == EV_PATCH_VOICE) {
             (void)fm6_patch_set_voice(a, voice_update_snapshot);
             fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a));
@@ -408,13 +436,10 @@ void app_init(void)
                 seq_ui_velocity[lane][step] = 100u;
                 seq_ui_gate[lane][step] = 50u;
                 seq_ui_enabled[lane][step] = (uint8_t)((step < 16u) && (step % 4u == (lane ? 2u : 0u)));
-                fm6_sequencer_set_step((uint8_t)lane, (uint8_t)step,
-                    seq_ui_enabled[lane][step], seq_ui_note[lane][step],
-                    seq_ui_velocity[lane][step], seq_ui_gate[lane][step]);
+                /* Performance state is applied below from one coherent snapshot. */
             }
-            fm6_sequencer_set_lane((uint8_t)lane, seq_ui_patch[lane]);
         }
-        fm6_set_tempo(transport_ui_bpm);
+        performance_publish();
         fm6_performance_state_get(&set.performance);
     }
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
@@ -679,9 +704,10 @@ static void input(void)
             app_say("MASTER COMPRESSOR",compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS");
         } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
             uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
-            fm6_fx_set_enabled(fx,(uint8_t)!fm6_fx_enabled(fx));
+            set.performance.fx_enabled[fx]=(uint8_t)!set.performance.fx_enabled[fx];
+            performance_publish();
             set_dirty = 1u;
-            app_say("FX",fm6_fx_enabled(fx)?"ON":"BYPASS");
+            app_say("FX",set.performance.fx_enabled[fx]?"ON":"BYPASS");
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", fm6_patch_name(set.patch));
@@ -691,7 +717,7 @@ static void input(void)
         } else if (k == B_ARP) {
             page = PAGE_ARP;
             arp_ui_mode = (uint8_t)((arp_ui_mode + 1u) % 4u);
-            fm6_arpeggiator_set_mode(arp_ui_mode);
+            performance_publish();
             set_dirty = 1u;
             app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
         } else if (k == B_FX) {
@@ -700,7 +726,7 @@ static void input(void)
             app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
         } else if (k == B_PLAY) {
             if (page == PAGE_SEQ) {
-                fm6_sequencer_set_running((uint8_t)!fm6_sequencer_running());
+                ui_event_push(EV_SEQ_RUN,(uint8_t)!fm6_sequencer_running(),0u,0u);
                 app_say("SEQUENCER", fm6_sequencer_running() ? "PLAYING" : "STOPPED");
             } else {
                 app_say("PLAY", "SELECT SEQUENCER");
@@ -804,7 +830,7 @@ static void input(void)
             int32_t patch = ((int32_t)seq_ui_patch[seq_ui_lane] + e) % 4;
             if (patch < 0) patch += 4;
             seq_ui_patch[seq_ui_lane] = (uint8_t)patch;
-            fm6_sequencer_set_lane(seq_ui_lane, (uint8_t)patch);
+            performance_publish();
             set_dirty = 1u;
             app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
         } else if (k == EN_ALGO && page == PAGE_FX_ROUTING) {
@@ -867,40 +893,42 @@ static void input(void)
                 } else if(index==1u) seq_ui_note[lane][step]=(uint8_t)clamp((int32_t)seq_ui_note[lane][step]+e,0,127);
                 else if(index==2u) seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
                 else seq_ui_gate[lane][step]=(uint8_t)clamp((int32_t)seq_ui_gate[lane][step]+e,10,100);
-                fm6_sequencer_set_step(lane,step,seq_ui_enabled[lane][step],seq_ui_note[lane][step],seq_ui_velocity[lane][step],seq_ui_gate[lane][step]);
+                performance_publish();
                 set_dirty = 1u;
                 app_say("SEQUENCER STEP", "UPDATED");
             } else if (page == PAGE_ARP) {
                 if(index==0u) {
                     transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
-                    fm6_set_tempo(transport_ui_bpm);
+                    performance_publish();
                     set_dirty = 1u;
                     app_say("TEMPO", "UPDATED");
                 } else if(index==1u) {
                     int32_t mode=((int32_t)arp_ui_mode+e)%4;
                     if(mode<0) mode+=4;
                     arp_ui_mode=(uint8_t)mode;
-                    fm6_arpeggiator_set_mode(arp_ui_mode);
+                    performance_publish();
                     set_dirty = 1u;
                     app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN");
                 }
             } else if (page == PAGE_FX_ROUTING) {
                 uint8_t fx=(uint8_t)index;
-                fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
+                set.performance.fx_send[set.patch][fx]=(uint8_t)clamp((int32_t)set.performance.fx_send[set.patch][fx]+e,0,100);
+                performance_publish();
                 set_dirty=1u;
                 app_say("PATCH FX SEND",fx==0u?"CHORUS":fx==1u?"DELAY":fx==2u?"REVERB":"PHASER");
             } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
                 uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
-                if(index==0u) fm6_fx_set_mix(fx,(uint8_t)clamp((int32_t)fm6_fx_mix(fx)+e,0,100));
-                else if(index==1u) fm6_fx_set_time(fx,(uint8_t)clamp((int32_t)fm6_fx_time(fx)+e,0,100));
+                if(index==0u) set.performance.fx_mix[fx]=(uint8_t)clamp((int32_t)set.performance.fx_mix[fx]+e,0,100);
+                else if(index==1u) set.performance.fx_time[fx]=(uint8_t)clamp((int32_t)set.performance.fx_time[fx]+e,0,100);
                 else if(index==2u) {
-                    if(fx==FM6_FX_PHASER) fm6_fx_set_depth(fx,(uint8_t)clamp((int32_t)fm6_fx_depth(fx)+e,0,100));
-                    else fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,fx==0u?70:90));
+                    if(fx==FM6_FX_PHASER) set.performance.fx_depth[fx]=(uint8_t)clamp((int32_t)set.performance.fx_depth[fx]+e,0,100);
+                    else set.performance.fx_feedback[fx]=(uint8_t)clamp((int32_t)set.performance.fx_feedback[fx]+e,0,fx==0u?70:90);
                 } else if (fx == FM6_FX_PHASER) {
-                    fm6_fx_set_feedback(fx,(uint8_t)clamp((int32_t)fm6_fx_feedback(fx)+e,0,90));
+                    set.performance.fx_feedback[fx]=(uint8_t)clamp((int32_t)set.performance.fx_feedback[fx]+e,0,90);
                 } else {
-                    fm6_fx_set_send(set.patch,fx,(uint8_t)clamp((int32_t)fm6_fx_get_send(set.patch,fx)+e,0,100));
+                    set.performance.fx_send[set.patch][fx]=(uint8_t)clamp((int32_t)set.performance.fx_send[set.patch][fx]+e,0,100);
                 }
+                performance_publish();
                 set_dirty = 1u;
                 app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS RATE":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):(fx==FM6_FX_PHASER?"PHASER RESONANCE":"PATCH SEND"), "UPDATED");
             } else if (page == PAGE_FX_AMP) {
