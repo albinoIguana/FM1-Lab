@@ -1527,7 +1527,7 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
 
 static void draw(void)
 {
-    char t[24], pagebuf[16];
+    char t[24];
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
     uint16_t accent = patch_color(set.patch);
     cv_begin(240, 37, screen_bg());
