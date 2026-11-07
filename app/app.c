@@ -680,7 +680,7 @@ static void input(void)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
         else if (k == B_HOME) {
             page = PAGE_HOME;
-            app_say("HOME", fm6_patch_name(set.patch));
+            app_say("HOME", patch_display_name(set.patch));
         } else if (k == B_GLO) {
             page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
@@ -694,7 +694,7 @@ static void input(void)
             app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
             page = page==PAGE_MACRO?PAGE_HOME:PAGE_MACRO;
-            app_say(page==PAGE_MACRO?"PATCH MACROS":"HOME",fm6_patch_name(set.patch));
+            app_say(page==PAGE_MACRO?"PATCH MACROS":"HOME",patch_display_name(set.patch));
         } else if (k == B_EDIT && page == PAGE_FX_AMP) {
             instrument_insert_edit(FM6_INSERT_AMP_ENABLED,(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED));
             app_say("MASTER AMP / DRIVE",fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED)?"ACTIVE":"BYPASS");
@@ -712,7 +712,7 @@ static void input(void)
             app_say("FX",set.performance.fx_enabled[fx]?"ON":"BYPASS");
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
-            app_say("OPERATOR ROLES", fm6_patch_name(set.patch));
+            app_say("OPERATOR ROLES", patch_display_name(set.patch));
         } else if (k == B_SEQ) {
             page = PAGE_SEQ;
             app_say("SEQUENCER", fm6_sequencer_running() ? "RUNNING" : "TWO LANES");
@@ -816,7 +816,7 @@ static void input(void)
             if(next<0) next+=4;
             set.patch=(uint8_t)next;
             set_dirty=1u;
-            app_say("ROUTING PATCH",fm6_patch_name(set.patch));
+            app_say("ROUTING PATCH",patch_display_name(set.patch));
         } else if (k == EN_ALGO && page == PAGE_FX_COMPRESSOR) {
             compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
             app_say("COMP MAKEUP","UPDATED");
@@ -831,7 +831,7 @@ static void input(void)
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
             set.patch = (uint8_t)next;
             set_dirty = 1;
-            app_say("PATCH", fm6_patch_name(set.patch));
+            app_say("PATCH", patch_display_name(set.patch));
         } else if (k == EN_PRESET && page == PAGE_SEQ) {
             /* PRESET selects the visible sequencer lane here; it must not
              * switch Instruments while editing a pattern. */
@@ -1045,6 +1045,28 @@ static void instrument_card(int32_t x, int32_t y, int32_t w, int32_t h,
     cv_rect(x + 7, y + 2, w - 14, 1, RGB(31, 47, 59));
 }
 
+/* Shared 2-column panel layout. Individual pages supply content; these
+ * helpers own the common card grid so spacing and sizing stay consistent. */
+enum { UI_GRID_X = 4, UI_GRID_COL_STEP = 118, UI_GRID_TOP = 18,
+       UI_GRID_ROW_STEP = 64, UI_GRID_CARD_W = 112, UI_GRID_CARD_H = 56 };
+
+static int32_t panel_grid_x(uint32_t index)
+{
+    return UI_GRID_X + (int32_t)(index & 1u) * UI_GRID_COL_STEP;
+}
+
+static int32_t panel_grid_y(uint32_t index, int32_t top, int32_t row_step)
+{
+    return top + (int32_t)(index >> 1u) * row_step;
+}
+
+static void panel_grid_card(uint32_t index, int32_t top, int32_t row_step,
+                            uint16_t accent)
+{
+    instrument_card(panel_grid_x(index), panel_grid_y(index, top, row_step),
+                    UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), accent, accent);
+}
+
 static uint16_t patch_color(uint32_t p)
 {
     static const uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
@@ -1174,7 +1196,6 @@ static void draw_macro_panel(void)
     uint32_t now = plat_ms();
     uint16_t accent = patch_color(set.patch);
     char t[24];
-    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(164, 2, &FONT_XS, "ALG", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
     cv_text(204, 2, &FONT_XS, t, accent);
@@ -1208,15 +1229,14 @@ static void draw_operator_map(void)
     uint16_t accent = patch_color(set.patch);
     int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
     (void)fm1lab_voice_global_get(voice, FM1LAB_GLOBAL_ALGORITHM, &algorithm);
-    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(91, 2, &FONT_XS, "ALG", C_GRAY);
     int_text(algorithm, t); cv_text(113, 2, &FONT_XS, t, accent);
     cv_text(145, 2, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
     cv_text(202, 2, &FONT_XS, "OP", C_GRAY);
     int_text(env_operator, t); cv_text(226, 2, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
-        int32_t x = 4 + (int32_t)(i & 1u) * 118;
-        int32_t y = 18 + (int32_t)(i >> 1u) * 64;
+        int32_t x = panel_grid_x(i);
+        int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
         (void)fm1lab_voice_operator_get(voice, env_operator,
             i == 3u && operator_detune_mode ? FM1LAB_OP_DETUNE : fields[i], &values[i]);
         instrument_card(x, y, 112, 56, panel_fill(), accent, accent);
@@ -1243,8 +1263,8 @@ static void draw_amp_panel(void)
     cv_text(6,2,&FONT_XS,"MASTER BUS",C_WHITE);
     cv_text(172,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
-        int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
-        instrument_card(x,y,112,48,panel_fill(),accent,accent);
+        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
         if(i==3u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",accent);
         else {int_text(values[i],t);cv_text(x+7,y+23,&FONT_B,t,accent);cv_rect(x+48,y+29,55,5,C_LINE);cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);}
@@ -1268,8 +1288,8 @@ static void draw_eq_panel(void)
     cv_text(164,2,&FONT_XS,bands[eq_ui_band],accent);
     cv_text(202,2,&FONT_XS,(v->eq_enabled&1u)?"ON":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
-        int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
-        instrument_card(x,y,112,48,panel_fill(),accent,accent);
+        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,i==0u?"FREQUENCY":i==1u?"GAIN":i==2u?"Q":"BAND",C_GRAY);
         if(i==0u){int_text((int32_t)eq_frequency_hz(b->frequency),t);text_cat(t,"Hz");}
         else if(i==1u){int_text((int32_t)b->gain-12,t);text_cat(t,"dB");}
@@ -1292,8 +1312,8 @@ static void draw_compressor_panel(void)
     cv_text(164,2,&FONT_XS,compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS",
         compressor_value(FM6_COMP_ENABLED)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
-        int32_t x=4+(int32_t)(i&1u)*118,y=18+(int32_t)(i>>1u)*54;
-        instrument_card(x,y,112,48,panel_fill(),accent,accent);
+        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
         if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
         else if(i==2u){uint32_t ms=1u+(uint32_t)values[i]*49u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
@@ -1314,8 +1334,8 @@ static void draw_global_panel(uint32_t pct)
     const char *labels[4] = {"MASTER", "OCTAVE", "BLUETOOTH", "MIDI IN"};
     uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
     for (uint32_t i = 0; i < 4u; ++i) {
-        int32_t x = 4 + (int32_t)(i & 1u) * 118;
-        int32_t y = 4 + (int32_t)(i >> 1u) * 68;
+        int32_t x = panel_grid_x(i);
+        int32_t y = panel_grid_y(i, 4, 68);
         instrument_card(x, y, 112, 62, panel_fill(), colors[i], colors[i]);
         cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_GRAY);
         if (i == 0) {
@@ -1345,7 +1365,6 @@ static void draw_envelope_panel(void)
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
     uint16_t accent = patch_color(set.patch);
-    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(140, 2, &FONT_XS, "OPERATOR", C_GRAY);
     int_text(env_operator, t); cv_text(204, 2, &FONT_XS, t, accent);
     cv_text(6, 19, &FONT_XS, carrier ? "CARRIER ENVELOPE" : "MODULATOR ENVELOPE", carrier ? accent : C_GRAY);
@@ -1379,11 +1398,10 @@ static void draw_lfo_panel(uint32_t modulation)
     char t[20];
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint16_t accent = patch_color(set.patch);
-    cv_text(6, 2, &FONT_XS, fm6_patch_name(set.patch), C_WHITE);
     cv_text(164, 2, &FONT_XS, modulation ? "MODULATION" : "OSCILLATOR", accent);
     for (uint32_t i = 0; i < 4u; ++i) {
-        int32_t x = 4 + (int32_t)(i & 1u) * 118;
-        int32_t y = 18 + (int32_t)(i >> 1u) * 64;
+        int32_t x = panel_grid_x(i);
+        int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
         uint8_t value = 0;
         (void)fm1lab_voice_global_get(voice, fields[modulation][i], &value);
         instrument_card(x, y, 112, 56, panel_fill(), accent, accent);
@@ -1437,9 +1455,9 @@ static void draw_fx_panel(uint8_t fx)
     cv_text(6,2,&FONT_XS,names[fx],C_WHITE);
     cv_text(154,2,&FONT_XS,fm6_fx_enabled(fx)?"ACTIVE":"BYPASS",fm6_fx_enabled(fx)?RGB(75,235,135):RGB(255,82,101));
     for(uint32_t k=0;k<4u;++k) {
-        int32_t x=4+(int32_t)(k&1u)*118;
-        int32_t y=18+(int32_t)(k>>1u)*54;
-        instrument_card(x,y,112,48,panel_fill(),accent,accent);
+        int32_t x=panel_grid_x(k);
+        int32_t y=panel_grid_y(k,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
         cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u||fx==3u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?(fx==FM6_FX_PHASER?"K3 DEPTH":"K3 FEEDBACK"):fx==FM6_FX_PHASER?"K4 RESONANCE":"K4 PATCH SEND",C_GRAY);
         int_text(values[k],t);
         cv_text(x+7,y+23,&FONT_B,t,accent);
@@ -1453,7 +1471,6 @@ static void draw_fx_routing_panel(void)
     static const char *const names[FM6_FX_COUNT]={"CHORUS SEND","DELAY SEND","REVERB SEND","PHASER SEND"};
     char t[16];
     uint16_t accent=patch_color(set.patch);
-    cv_text(6,2,&FONT_XS,fm6_patch_name(set.patch),C_WHITE);
     cv_text(154,2,&FONT_XS,"SEND ROUTING",accent);
     for(uint32_t fx=0;fx<FM6_FX_COUNT;++fx) {
         uint8_t value=fm6_fx_get_send(set.patch,(uint8_t)fx);
