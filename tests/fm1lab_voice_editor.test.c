@@ -15,6 +15,14 @@ int main(void)
     assert(fm1lab_voice_operator_set(voice, 3, FM1LAB_OP_MODE, 2) == -1);
     assert(fm1lab_voice_operator_set(voice, 0, FM1LAB_OP_OUTPUT, 10) == -1);
     assert(fm1lab_voice_operator_get(voice, 7, FM1LAB_OP_OUTPUT, &value) == -1);
+    /* UI encoder bounds must match the packed DX7 field ranges. */
+    assert(fm1lab_voice_operator_set(voice, 2, FM1LAB_OP_COARSE, 32) == -1);
+    assert(fm1lab_voice_operator_set(voice, 2, FM1LAB_OP_DETUNE, 14) == 0);
+    assert(fm1lab_voice_operator_set(voice, 2, FM1LAB_OP_DETUNE, 15) == -1);
+    assert(fm1lab_voice_operator_set(voice, 2, FM1LAB_OP_FINE, 99) == 0);
+    assert(fm1lab_voice_operator_set(voice, 2, FM1LAB_OP_FINE, 100) == -1);
+    assert(fm1lab_voice_operator_set(voice, 2, FM1LAB_OP_RATE_4, 99) == 0);
+    assert(fm1lab_voice_operator_set(voice, 2, FM1LAB_OP_RATE_4, 100) == -1);
 
     assert(fm1lab_voice_global_set(voice, FM1LAB_GLOBAL_ALGORITHM, 32) == 0);
     assert(voice[134] == 31);
