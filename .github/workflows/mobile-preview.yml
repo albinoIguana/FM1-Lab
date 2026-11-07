@@ -1,0 +1,51 @@
+name: FM1-Lab mobile browser preview
+
+on:
+  push:
+    branches: [feature/native-instrument-macro-workflow]
+    paths:
+      - "native-emulator/**"
+      - ".github/workflows/mobile-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: fm1-mobile-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out preview bundle
+        uses: actions/checkout@v4
+        with:
+          ref: feature/native-instrument-macro-workflow
+
+      - name: Assemble mobile preview
+        run: |
+          mkdir -p _site/native-emulator
+          cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js _site/native-emulator/
+          cat > _site/native-emulator/README.txt <<'EOF'
+          FM1-Lab native FM1 browser preview.
+          Open index.html through the GitHub Pages URL in a modern browser.
+          EOF
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy mobile preview
+        id: deployment
+        uses: actions/deploy-pages@v4
