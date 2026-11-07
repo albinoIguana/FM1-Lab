@@ -5,6 +5,7 @@ on:
     branches: [feature/native-instrument-macro-workflow]
     paths:
       - "app/**"
+      - "tests/fm6_engine.test.c"
       - "firmware/**"
       - "base"
       - "upstream/felucca"
