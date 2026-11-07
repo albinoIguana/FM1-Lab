@@ -36,14 +36,23 @@ jobs:
         run: bash scripts/build-m-vave-simulator.sh
       - name: Verify official engine API
         run: node scripts/check-m-vave-api.mjs vendor/m-vave-fm1/build/web/simulator.wasm
-      - name: Assemble the FM1-Lab workshop
+      - name: Assemble the FM1-Lab workshop and native hardware emulator
         run: |
-          mkdir -p _site/src _site/m-vave
+          mkdir -p _site/src _site/m-vave _site/native-emulator
           cp index.html _site/index.html
           cp .nojekyll _site/.nojekyll
           cp src/* _site/src/
           cp vendor/m-vave-fm1/sdk/Simulator.js _site/m-vave/Simulator.js
           cp vendor/m-vave-fm1/build/web/simulator.wasm _site/m-vave/simulator.wasm
+          test -s native-emulator/index.html
+          test -s native-emulator/app.wasm
+          test -s native-emulator/worklet.js
+          cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js _site/native-emulator/
+      - name: Verify published native emulator payload
+        run: |
+          test -s _site/native-emulator/index.html
+          test -s _site/native-emulator/app.wasm
+          test -s _site/native-emulator/worklet.js
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact
