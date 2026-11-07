@@ -822,7 +822,9 @@ static void input(void)
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
             app_say("SEQUENCER LANE", seq_ui_lane ? "B" : "A");
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
-            operator_detune_mode ^= 1u;
+            int32_t mode = ((int32_t)operator_detune_mode + e) % 2;
+            if (mode < 0) mode += 2;
+            operator_detune_mode = (uint8_t)mode;
             app_say("OPERATOR PITCH", operator_detune_mode ? "DETUNE" : "FINE");
         } else if (k == EN_PRESET) {
             if (instrument_apply_pending) {
@@ -1454,7 +1456,7 @@ static void draw(void)
     else if (page == PAGE_FX_AMP) cv_text(4,43,&FONT_XS,"AMP: K1 DRIVE  K2 TONE  K3 OUT  K4 ON/OFF",C_GRAY);
     else if (page == PAGE_FX_EQ) cv_text(4,43,&FONT_XS,"EQ: ALGO BAND  K1 FREQ  K2 GAIN  K3 Q  K4 BAND",C_GRAY);
     else if (page == PAGE_FX_COMPRESSOR) cv_text(4,43,&FONT_XS,"COMP: K1 THR  K2 RAT  K3 ATK  K4 REL  ALGO MAKEUP",C_GRAY);
-    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "SELECT OP  ALGO SETS ALGORITHM  PRESET: FINE / DETUNE", C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 43, &FONT_XS, "SEL OP  ALGO ALG  PRESET FINE/DET", C_GRAY);
     else if (page == PAGE_ENV) cv_text(4, 43, &FONT_XS, "ALGO SELECTS OP   ENV TOGGLES RATES / LEVELS", C_GRAY);
     else if (page == PAGE_LFO) cv_text(4, 43, &FONT_XS, "B LFO OPENS MODULATION PAGE", C_GRAY);
     else if (page == PAGE_LFO_MOD) cv_text(4, 43, &FONT_XS, "B LFO RETURNS TO OSCILLATOR PAGE", C_GRAY);
