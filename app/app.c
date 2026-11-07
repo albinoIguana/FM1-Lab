@@ -1129,25 +1129,25 @@ static void draw_home_panel(void)
     }
     for (uint32_t p = 0; p < 4u; ++p) {
         int32_t x = 2 + (int32_t)(p & 1u) * 120;
-        int32_t y = 2 + (int32_t)(p >> 1u) * 72;
+        int32_t y = 2 + (int32_t)(p >> 1u) * 80;
         uint16_t accent = patch_color(p);
         int enabled = set.levels[p] != 0u;
-        rounded_panel(x, y, 116, 68, 3, panel_fill(), p == set.patch ? accent : C_LINE);
-        cv_rect(x + 5, y + 7, 2, 53, accent);
+        rounded_panel(x, y, 116, 80, 3, panel_fill(), p == set.patch ? accent : C_LINE);
+        cv_rect(x + 5, y + 7, 2, 65, accent);
         int_text((int32_t)p + 1, t);
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
         cv_text(x + 28, y + 5, &FONT_XS, enabled ? "LAYER ACTIVE" : "LAYER MUTED",
                 enabled ? RGB(75,235,135) : C_GRAY);
-        cv_text(x + 12, y + 20, &FONT_B, fm6_patch_name(p), C_WHITE);
-        cv_text(x + 12, y + 41, &FONT_XS, "ALG", C_GRAY);
+        cv_text(x + 12, y + 23, &FONT_B, fm6_patch_name(p), C_WHITE);
+        cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
-        cv_text(x + 34, y + 41, &FONT_XS, t, accent);
-        cv_text(x + 59, y + 41, &FONT_XS, "LEVEL", C_GRAY);
+        cv_text(x + 34, y + 49, &FONT_XS, t, accent);
+        cv_text(x + 59, y + 49, &FONT_XS, "LEVEL", C_GRAY);
         int_text(set.levels[p], t);
-        cv_text(x + 91, y + 41, &FONT_XS, t, C_WHITE);
-        cv_rect(x + 12, y + 55, 96, 5, RGB(31, 43, 55));
-        cv_rect(x + 12, y + 55, (int32_t)set.levels[p] * 96 / 127, 5, accent);
-        if (p == set.patch) cv_rect(x + 12, y + 63, 96, 1, accent);
+        cv_text(x + 91, y + 49, &FONT_XS, t, C_WHITE);
+        cv_rect(x + 12, y + 64, 96, 5, RGB(31, 43, 55));
+        cv_rect(x + 12, y + 64, (int32_t)set.levels[p] * 96 / 127, 5, accent);
+        if (p == set.patch) cv_rect(x + 12, y + 75, 96, 1, accent);
     }
 }
 static void draw_macro_panel(void)
@@ -1510,7 +1510,7 @@ static void draw(void)
         } else cv_text(220, 10, &FONT_XS, "FM1", C_GRAY);
     }
     cv_blit(0, 0);
-    cv_begin(240, 144, screen_bg());
+    cv_begin(240, 164, screen_bg());
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
     else if (page == PAGE_FX_AMP) draw_amp_panel();
@@ -1532,7 +1532,7 @@ static void draw(void)
 
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
-    cv_begin(240, 60, screen_bg());
+    cv_begin(240, 40, screen_bg());
     /* Only MACRO and SEQ need the extra K1-K4 association strip.
      * Their main panels do not otherwise show all four live knob mappings. */
     if (page == PAGE_MACRO || page == PAGE_SEQ) for (uint32_t k = 0; k < 4u; ++k) {
@@ -1551,22 +1551,22 @@ static void draw(void)
             cv_text(x+6,26,&FONT_XS,t,ink);
         }
     }
-    if (page == PAGE_HOME) cv_text(4, 42, &FONT_XS, "ALGO FM ALG  PRESET INST  SELECT PATCH", C_GRAY);
-    else if (page == PAGE_MACRO) cv_text(4, 42, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
-    else if (page == PAGE_FX_AMP) cv_text(4,42,&FONT_XS,"K1 DRIVE K2 TONE K3 OUT K4 AMP",C_GRAY);
-    else if (page == PAGE_FX_EQ) cv_text(4,42,&FONT_XS,"ALGO BAND K1 F K2 G K3 Q K4 ON",C_GRAY);
-    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,42,&FONT_XS,"K1 THR K2 RAT K3 ATK K4 REL ALGO MK",C_GRAY);
-    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 42, &FONT_XS, "SELECT OP  ALGO ALG  PRESET F/D", C_GRAY);
-    else if (page == PAGE_ENV) cv_text(4, 42, &FONT_XS, "ALGO OP   ENV RATES / LEVELS", C_GRAY);
-    else if (page == PAGE_LFO) cv_text(4, 42, &FONT_XS, "K1 WAVE K2 SPEED K3 PMD K4 AMD", C_GRAY);
-    else if (page == PAGE_LFO_MOD) cv_text(4, 42, &FONT_XS, "K1 DELAY K2 P-SENS K3/4 SYNC", C_GRAY);
-    else if (page == PAGE_SEQ) cv_text(4,42,&FONT_XS,"PRESET LANE  SELECT STEP  K1-4",C_GRAY);
-    else if (page == PAGE_ARP) cv_text(4,42,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
-    else if (page == PAGE_FX_ROUTING) cv_text(4,42,&FONT_XS,"ALGO: PATCH   K1-K4: SEND LEVEL",C_GRAY);
+    if (page == PAGE_HOME) cv_text(4, 28, &FONT_XS, "ALGO FM ALG  PRESET INST  SELECT PATCH", C_GRAY);
+    else if (page == PAGE_MACRO) cv_text(4, 28, &FONT_XS, "K1-K4 SHAPE SOUND", C_GRAY);
+    else if (page == PAGE_FX_AMP) cv_text(4,28,&FONT_XS,"K1 DRIVE K2 TONE K3 OUT K4 AMP",C_GRAY);
+    else if (page == PAGE_FX_EQ) cv_text(4,28,&FONT_XS,"ALGO BAND K1 F K2 G K3 Q K4 ON",C_GRAY);
+    else if (page == PAGE_FX_COMPRESSOR) cv_text(4,28,&FONT_XS,"K1 THR K2 RAT K3 ATK K4 REL ALGO MK",C_GRAY);
+    else if (page == PAGE_OPERATOR_MAP) cv_text(4, 28, &FONT_XS, "SELECT OP  ALGO ALG  PRESET F/D", C_GRAY);
+    else if (page == PAGE_ENV) cv_text(4, 28, &FONT_XS, "ALGO OP   ENV RATES / LEVELS", C_GRAY);
+    else if (page == PAGE_LFO) cv_text(4, 28, &FONT_XS, "K1 WAVE K2 SPEED K3 PMD K4 AMD", C_GRAY);
+    else if (page == PAGE_LFO_MOD) cv_text(4, 28, &FONT_XS, "K1 DELAY K2 P-SENS K3/4 SYNC", C_GRAY);
+    else if (page == PAGE_SEQ) cv_text(4,28,&FONT_XS,"PRESET LANE  SELECT STEP  K1-4",C_GRAY);
+    else if (page == PAGE_ARP) cv_text(4,28,&FONT_XS,"HOLD KEYS  K1 TEMPO  K2 MODE",C_GRAY);
+    else if (page == PAGE_FX_ROUTING) cv_text(4,28,&FONT_XS,"ALGO: PATCH   K1-K4: SEND LEVEL",C_GRAY);
     else if (page >= PAGE_FX_AMP && page <= PAGE_FX_PHASER)
-        cv_text(4,42,&FONT_XS,"EDIT: TOGGLE ACTIVE / BYPASS   SELECT OR FX: NEXT",C_GRAY);
+        cv_text(4,28,&FONT_XS,"EDIT: TOGGLE ACTIVE / BYPASS   SELECT OR FX: NEXT",C_GRAY);
     else cv_text(4, 42, &FONT_XS, "GLO / GLOBAL SETTINGS", C_GRAY);
-    cv_blit(0, 180);
+    cv_blit(0, 200);
 }
 
 void app_ui_init(void)
