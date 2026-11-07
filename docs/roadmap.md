@@ -66,7 +66,7 @@ FM1-Lab is a four-layer FM instrument built around the existing Felucca six-oper
 
 - HOME: SELECT chooses one of four patches; K1–K4 control patch 1–4 volume independently; zero means off.
 - SEL: toggles the selected patch's four-macro page.
-- EDIT/SCL: opens the operator-role/editor view.
+- EDIT/SCL: opens the operator editor. SELECT chooses OP1–OP6, ALGO edits the patch algorithm, PRESETS toggles the K4 pitch field between fine frequency and detune; K1 output, K2 ratio/fixed mode, K3 coarse frequency and K4 fine/detune are live voice edits. The carrier/modulator roles update from the selected algorithm.
 - ENV and LFO: open their dedicated operator envelope and LFO pages.
 - FX: advances through the eight FX pages; SELECT cycles within that section.
 - On master Amp/Drive, EQ and compressor pages, B_EDIT toggles bypass. EQ ALGO chooses LOW/MID/HIGH band. Compressor ALGO controls makeup.
