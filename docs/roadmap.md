@@ -31,7 +31,7 @@ FM1-Lab is a four-layer FM instrument built around the existing Felucca six-oper
 - [x] Versioned performance settings for sequencer patterns, tempo, lane assignment, arp mode, FX controls/sends and compressor settings.
 - [x] Native regression coverage for voice allocation, sequencer timing, arp output, stereo FX, send isolation, master inserts, linked compression, limiter bounds and render chunk determinism.
 - [x] Device firmware build workflow passes.
-- [x] Native browser-emulator build and bundle verification pass. Latest emulator build: [run 42335794967](https://github.com/albinoIguana/FM1-Lab/actions/runs/42335794967). Its downloadable artifact is attached to that run; the generated files are also published under `native-emulator/` on this feature branch.
+- [x] Native browser-emulator build and bundle verification pass. Latest verified emulator build before the FX-feedback-label correction: [run 42359181688](https://github.com/albinoIguana/FM1-Lab/actions/runs/42359181688). The FX-feedback-label correction is source-committed at `d47cca20`; its native engine checks and device build are running. Its downloadable artifact is attached to that run; the generated files are also published under `native-emulator/` on this feature branch.
 
 ## Finish pass — no new feature scope
 
