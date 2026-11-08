@@ -192,6 +192,80 @@ static void fm1lab_make_evolving_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_
     for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[texture])?names[texture][i]:' ');
 }
 
+/* PELAGIC: long-form, layered pad family derived from the supplied four-op
+ * recipe. Algorithm 15 routes the active modulators into one stable carrier.
+ * The fourth recipe role is placed on OP6 because the DX feedback loop is
+ * global and belongs to the engine's feedback operator. */
+static void fm1lab_make_pelagic_voice(uint8_t voice[FM1LAB_PATCH_BYTES],uint8_t layer)
+{
+    static const char *const names[4]={"LOW TIDE","SLOW BLOOM","CHROME VEIL","HIGH MIST"};
+    static const uint8_t op_level[4][4]={
+        {99u,78u,84u,65u},{99u,86u,78u,58u},
+        {99u,70u,91u,74u},{99u,65u,68u,72u}
+    };
+    static const uint8_t op_coarse[4]={1u,1u,5u,11u};
+    static const uint8_t op_fine[4]={0u,41u,0u,0u};
+    static const uint8_t op_detune[4]={7u,8u,10u,3u};
+    static const uint8_t attack[4]={12u,15u,18u,21u};
+    static const uint8_t lfo_speed[4]={17u,14u,20u,12u};
+    static const uint8_t lfo_depth[4]={38u,31u,43u,48u};
+    /* OP1 is the carrier; OP2/3/4 are the recipe's harmonic modulators.
+     * OP6 carries the noisy upper partial and the DX feedback loop. */
+    const uint8_t mapped[4]={0u,1u,2u,5u};
+    for(uint32_t op=0;op<6u;op++) {
+        uint8_t *v=voice+(5u-op)*21u;
+        v[0]=(uint8_t)(attack[layer&3u]+op*2u);
+        v[1]=(uint8_t)(op==0u?22u:27u+op*2u);
+        v[2]=(uint8_t)(op==0u?35u:39u+op*2u);
+        v[3]=(uint8_t)(op==0u?17u:23u+op);
+        v[4]=99u;
+        v[5]=(uint8_t)(op==0u?91u:op==5u?66u:74u);
+        v[6]=(uint8_t)(op==0u?82u:op==5u?31u:op==2u?52u:61u);
+        v[7]=0u;
+        v[10]=(uint8_t)(op==0u?5u:op==5u?0u:3u);
+        v[15]=(uint8_t)(op==0u?1u:3u);
+        v[16]=0u;
+        v[18]=1u; v[19]=0u; v[20]=7u;
+    }
+    for(uint32_t role=0;role<4u;role++) {
+        uint8_t *v=voice+(5u-mapped[role])*21u;
+        v[16]=op_level[ layer&3u ][role];
+        v[18]=op_coarse[role];
+        v[19]=op_fine[role];
+        v[20]=op_detune[role];
+    }
+    /* One carrier, four parallel/stacked modulation paths, OP6 feedback. */
+    voice[134]=15u;
+    voice[135]=7u;
+    voice[136]=1u;
+    /* Slow, gently moving pitch and amplitude LFO: the note should breathe,
+     * not wobble like a conventional vibrato patch. */
+    voice[137]=lfo_speed[layer&3u];
+    voice[138]=(uint8_t)(layer==2u?34u:layer==3u?42u:45u);
+    voice[139]=(uint8_t)(layer==1u?5u:layer==2u?8u:3u);
+    voice[140]=lfo_depth[layer&3u];
+    voice[141]=0u;
+    voice[142]=0u;
+    voice[143]=(uint8_t)(layer==2u?4u:3u);
+    voice[144]=24u;
+    for(uint32_t i=0;i<10u;i++)
+        voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[layer&3u])?names[layer&3u][i]:' ');
+}
+static void fm1lab_seed_pelagic(fm1lab_instrument_t *out)
+{
+    static const uint8_t levels[4]={25u,20u,16u,12u};
+    fm1lab_instrument_init(out,"PELAGIC");
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        fm1lab_factory_voice_build(voice,12u);
+        fm1lab_make_pelagic_voice(voice,(uint8_t)p);
+        (void)fm1lab_patch_set_voice(out,p,voice);
+        out->patches[p].level=levels[p];
+        out->patches[p].enabled=1u;
+        out->patches[p].voice[155]=64u;
+    }
+}
+
 /* Four dark FM creatures. Each patch is a purpose-built six-operator voice:
  * low throat, grinding growl, sharp teeth, and a slow spectral howl. */
 static void fm1lab_make_beast_voice_v1(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t beast, uint8_t role)
@@ -516,7 +590,17 @@ static void fm1lab_seed_factory_library(void)
         fm1lab_instrument_t existing, seed;
         fm1lab_insert_state_t inserts;
         if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0) continue;
-        if(index>=16u && index<20u) {
+        if(index==24u) {
+            fm1lab_instrument_t previous;
+            fm1lab_seed_instrument(index,&previous);
+            fm1lab_seed_pelagic(&seed);
+            /* Install the new layered pad in the next factory slot, while
+             * preserving any Instrument that has been renamed or edited. */
+            if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
+               fm1lab_strncmp(existing.name,seed.name,FM1LAB_INSTRUMENT_NAME_BYTES)==0) continue;
+            if(!fm1lab_is_untouched_factory(&existing) &&
+               memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
+        } else if(index>=16u && index<20u) {
             fm1lab_instrument_t previous;
             fm1lab_seed_beast_v1(index,&previous);
             fm1lab_seed_beast(index,&seed);
