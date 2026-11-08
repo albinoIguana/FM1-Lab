@@ -682,7 +682,7 @@ static void instrument_load(uint32_t index, int from_audio)
         instrument_apply_snapshot=current_instrument;
         inserts_apply_snapshot=current_inserts;
         instrument_apply_pending = 1u;
-        ui_event_push(EV_INSTRUMENT_LOAD, seq_ui_lane, 0, 0);
+        ui_event_push(EV_INSTRUMENT_LOAD, seq_ui_lane, (uint8_t)(from_audio == 2 ? 0u : 1u), 0);
     } else {
         instrument_apply_engine();
     }
@@ -777,10 +777,8 @@ static void ui_events_drain(void)
             fm6_patch_set_level(a, b);
         else if (type == EV_INSTRUMENT_LOAD) {
             /* Replace only this track's four-patch bank; preserve the other
-             * Instrument and any notes it currently has sounding. */
-            /* Track focus changes replace only that lane's four patches.
-             * The post-mix insert chain is shared by both sequencer lanes;
-             * swapping it here causes a gain jump and resets its filter state. */
+             * Instrument, its sounding notes, and the shared post-mix chain
+             * when this event is a track-focus change. */
             instrument_apply_engine_bank(a,&instrument_apply_snapshot,&inserts_apply_snapshot,c);
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
@@ -2359,7 +2357,7 @@ static void draw_sequencer_panel(void)
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
                       seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
     cv_text(6,145,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
-            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY)));
+            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
     cv_text(88,158,&FONT_XS,"K1 STEP   K2 CLEAR",C_GRAY);
     cv_text(88,171,&FONT_XS,"K3 VELOCITY   K4 GATE",C_GRAY);
 }
@@ -2728,8 +2726,10 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         index = current == PAGE_LFO ? 1u : 2u;
         total = 2u;
     } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS) {
-        index = current == PAGE_SEQ ? 1u : 2u;
-        total = 2u;
+        /* The sequencer and its options are separate destinations. The
+         * main two-lane pattern view is a single page, regardless of loop length. */
+        index = 1u;
+        total = 1u;
     } else if (current == PAGE_ENV) {
         index = env_levels ? 2u : 1u;
         total = 2u;
