@@ -1159,8 +1159,8 @@ static void instrument_card(int32_t x, int32_t y, int32_t w, int32_t h,
 
 /* Shared 2-column panel layout. Individual pages supply content; these
  * helpers own the common card grid so spacing and sizing stay consistent. */
-enum { UI_GRID_X = 4, UI_GRID_COL_STEP = 118, UI_GRID_TOP = 18,
-       UI_GRID_ROW_STEP = 64, UI_GRID_CARD_W = 112, UI_GRID_CARD_H = 56 };
+enum { UI_GRID_X = 2, UI_GRID_COL_STEP = 120, UI_GRID_TOP = 7,
+       UI_GRID_ROW_STEP = 85, UI_GRID_CARD_W = 116, UI_GRID_CARD_H = 85 };
 
 static int32_t panel_grid_x(uint32_t index)
 {
@@ -1337,8 +1337,8 @@ static void draw_home_panel(void)
 }
 static void draw_macro_panel(void)
 {
-    static const char *const names[4] = {"BRIGHTNESS", "BODY", "MOTION", "EDGE"};
-    static const char *const hints[4] = {"FM DEPTH", "RATIO / ENV", "LFO / DEPTH", "FEEDBACK"};
+    static const char *const names[4] = {"K1 BRIGHT", "K2 BODY", "K3 MOTION", "K4 EDGE"};
+    static const char *const hints[4] = {"MODULATION INDEX", "MOD RATIO / ENV", "LFO SPEED / DEPTH", "DETUNE / FEEDBACK"};
     uint32_t now = plat_ms();
     uint16_t accent = patch_color(set.patch);
     char t[24];
@@ -1350,15 +1350,14 @@ static void draw_macro_panel(void)
         int32_t y = panel_grid_y(m, UI_GRID_TOP, UI_GRID_ROW_STEP);
         uint32_t value = set.macros[set.patch][m];
         uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
-        rounded_panel(x, y, 112, 56, 3, panel_fill(), border);
-        cv_rect(x + 6, y + 7, 2, 41, accent);
-        cv_text(x + 13, y + 7, &FONT_XS, names[m], C_WHITE);
+        instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), border, accent);
+        cv_text(x + 9, y + 9, &FONT_XS, names[m], C_WHITE);
         int_text((int32_t)value, t);
-        cv_text(x + 82, y + 5, &FONT_B, t, accent);
-        cv_rect(x + 13, y + 29, 91, 5, RGB(31, 43, 55));
-        cv_rect(x + 13, y + 29, (int32_t)value * 91 / 100, 5, accent);
-        cv_rect(x + 13 + (int32_t)value * 91 / 100, y + 26, 2, 11, C_WHITE);
-        cv_text(x + 13, y + 43, &FONT_XS, hints[m], C_GRAY);
+        cv_text(x + 88, y + 7, &FONT_B, t, accent);
+        cv_rect(x + 9, y + 42, 98, 6, RGB(31, 43, 55));
+        cv_rect(x + 9, y + 42, (int32_t)value * 98 / 100, 6, accent);
+        cv_rect(x + 9 + (int32_t)value * 98 / 100, y + 39, 2, 12, C_WHITE);
+        cv_text(x + 9, y + 64, &FONT_XS, hints[m], C_GRAY);
     }
 }
 /* Four operator quadrants; roles come from the selected algorithm's actual data. */
@@ -1473,24 +1472,24 @@ static void draw_global_panel(uint32_t pct)
     uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
-        int32_t y = panel_grid_y(i, 4, 68);
-        instrument_card(x, y, 112, 62, panel_fill(), colors[i], colors[i]);
+        int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
+        instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), colors[i], colors[i]);
         cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_GRAY);
         if (i == 0) {
             int_text((int32_t)pct, t); text_cat(t, "%");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
-            cv_text(x + 9, y + 47, &FONT_XS, "OUTPUT LEVEL", C_GRAY);
+            cv_text(x + 9, y + 67, &FONT_XS, "OUTPUT LEVEL", C_GRAY);
         } else if (i == 1) {
             octave_text(t);
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
-            cv_text(x + 9, y + 47, &FONT_XS, "TRANSPOSE", C_GRAY);
+            cv_text(x + 9, y + 67, &FONT_XS, "TRANSPOSE", C_GRAY);
         } else if (i == 2) {
             cv_text(x + 9, y + 27, &FONT_B, set.ble_off ? "OFF" : "ON", colors[i]);
-            cv_text(x + 9, y + 47, &FONT_XS, plat_ble_connected() ? "CONNECTED" : "WAITING", C_GRAY);
+            cv_text(x + 9, y + 67, &FONT_XS, plat_ble_connected() ? "CONNECTED" : "WAITING", C_GRAY);
         } else {
             int_text((int32_t)midi_count, t);
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
-            cv_text(x + 9, y + 47, &FONT_XS, "MESSAGES RECEIVED", C_GRAY);
+            cv_text(x + 9, y + 67, &FONT_XS, "MESSAGES RECEIVED", C_GRAY);
         }
     }
 }
@@ -1508,16 +1507,16 @@ static void draw_envelope_panel(void)
     cv_text(6, 19, &FONT_XS, carrier ? "CARRIER ENVELOPE" : "MODULATOR ENVELOPE", carrier ? accent : C_GRAY);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
-        int32_t y = panel_grid_y(i, 28, 56);
+        int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
         uint8_t value = 0;
         (void)fm1lab_voice_operator_get(voice, env_operator,
             (fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + i), &value);
-        instrument_card(x, y, UI_GRID_CARD_W, 56, panel_fill(), accent, accent);
-        cv_text(x + 9, y + 8, &FONT_XS, env_levels ? levels[i] : rates[i], C_WHITE);
-        int_text(value, t); cv_text(x + 88, y + 8, &FONT_XS, t, accent);
-        cv_rect(x + 9, y + 24, 94, 6, C_LINE);
-        cv_rect(x + 9, y + 24, (int32_t)value * 94 / 99, 6, accent);
-        cv_text(x + 9, y + 39, &FONT_XS, env_levels ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
+        instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), accent, accent);
+        cv_text(x + 9, y + 10, &FONT_XS, env_levels ? levels[i] : rates[i], C_WHITE);
+        int_text(value, t); cv_text(x + 88, y + 10, &FONT_XS, t, accent);
+        cv_rect(x + 9, y + 39, 98, 6, C_LINE);
+        cv_rect(x + 9, y + 39, (int32_t)value * 98 / 99, 6, accent);
+        cv_text(x + 9, y + 64, &FONT_XS, env_levels ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
     }
 }
 
@@ -1542,7 +1541,7 @@ static void draw_lfo_panel(uint32_t modulation)
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
         uint8_t value = 0;
         (void)fm1lab_voice_global_get(voice, fields[modulation][i], &value);
-        instrument_card(x, y, 112, 56, panel_fill(), accent, accent);
+        instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), accent, accent);
         cv_text(x + 9, y + 8, &FONT_XS, labels[modulation][i], C_WHITE);
         if (!modulation && i == 0u) {
             cv_text(x + 9, y + 26, &FONT_B, waves[value % 6u], accent);
@@ -1576,12 +1575,14 @@ static void draw_arp_panel(void)
 {
     char t[16];
     const char *mode=arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN";
-    instrument_card(4,4,112,62,panel_fill(),RGB(36,215,232),RGB(36,215,232));
-    cv_text(13,13,&FONT_XS,"ARPEGGIATOR",C_GRAY); cv_text(13,34,&FONT_B,mode,RGB(36,215,232));
-    instrument_card(122,4,112,62,panel_fill(),RGB(227,75,210),RGB(227,75,210));
-    cv_text(131,13,&FONT_XS,"CLOCK",C_GRAY); int_text(transport_ui_bpm,t); cv_text(131,34,&FONT_B,t,RGB(227,75,210));
-    cv_text(6,82,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_WHITE);
-    cv_text(6,101,&FONT_XS,"K1 TEMPO   K2 MODE",C_GRAY);
+    instrument_card(2,7,116,85,panel_fill(),RGB(36,215,232),RGB(36,215,232));
+    cv_text(11,17,&FONT_XS,"ARPEGGIATOR",C_GRAY); cv_text(11,42,&FONT_B,mode,RGB(36,215,232));
+    cv_text(11,70,&FONT_XS,"PLAY MODE",C_GRAY);
+    instrument_card(122,7,116,85,panel_fill(),RGB(227,75,210),RGB(227,75,210));
+    cv_text(131,17,&FONT_XS,"CLOCK",C_GRAY); int_text(transport_ui_bpm,t); cv_text(131,42,&FONT_B,t,RGB(227,75,210));
+    cv_text(131,70,&FONT_XS,"BPM",C_GRAY);
+    cv_text(6,111,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_WHITE);
+    cv_text(6,130,&FONT_XS,"K1 TEMPO   K2 MODE",C_GRAY);
 }
 static void draw_fx_panel(uint8_t fx)
 {
