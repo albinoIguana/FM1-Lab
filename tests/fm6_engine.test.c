@@ -345,6 +345,9 @@ int main(void) {
         for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
             fm6_note_on_mask((uint8_t)(40u + patch * 12u + n), 100u,
                              (uint8_t)(1u << patch));
+        if(fm6_active_voices_patch(patch)!=FM1LAB_VOICE_LIMIT)
+            fprintf(stderr,"FM6 pool diagnostic: patch=%u active=%u total=%u\n",
+                    patch,fm6_active_voices_patch(patch),fm6_active_voices());
         assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
     }
     assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
