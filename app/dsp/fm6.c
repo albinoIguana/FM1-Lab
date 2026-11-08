@@ -430,7 +430,7 @@ static void fm6_arpeggiator_step(void)
         if(note>127u)note=127u;
         velocity=arp_velocities[note_index];
         velocity=(uint8_t)((uint32_t)velocity*gain/127u);
-        /* Accent is visual-only; gain controls note velocity. */
+        /* Gain controls velocity; accent boosts all four macros for the gate. */
         if(velocity) {
             arp_live_note=note;
             fm6_note_start_tuned_mask(note,velocity,0x0fu,0,3u);
