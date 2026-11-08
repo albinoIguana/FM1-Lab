@@ -186,7 +186,7 @@ static void fm1lab_make_evolving_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_
 
 /* Four dark FM creatures. Each patch is a purpose-built six-operator voice:
  * low throat, grinding growl, sharp teeth, and a slow spectral howl. */
-static void fm1lab_make_beast_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t beast, uint8_t role)
+static void fm1lab_make_beast_voice_v1(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t beast, uint8_t role)
 {
     static const uint8_t algorithms[4][4] = {
         {15u, 16u, 20u, 24u}, {17u, 15u, 21u, 23u},
@@ -237,6 +237,101 @@ static void fm1lab_make_beast_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t b
         for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
     }
 }
+/* V2 creature voices: push the DX-style engine itself into an inharmonic,
+ * vocal range. Operator output levels are intentionally high on modulators;
+ * fractional fine ratios, detune and the pitch EG supply the bite and larynx
+ * movement. No master distortion is required to create the core character. */
+static void fm1lab_make_beast_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t beast, uint8_t role)
+{
+    static const uint8_t algorithms[4][4] = {
+        {15u,16u,20u,24u}, {17u,15u,21u,23u},
+        {16u,18u,20u,24u}, {15u,17u,22u,24u}
+    };
+    static const uint8_t coarse[4][6] = {
+        {1u,2u,3u,5u,7u,1u}, {1u,3u,2u,6u,9u,1u},
+        {1u,2u,4u,7u,11u,1u}, {1u,3u,5u,8u,13u,1u}
+    };
+    static const uint8_t fine[4][6] = {
+        {0u,17u,31u,47u,63u,11u}, {0u,23u,41u,13u,57u,29u},
+        {0u,11u,37u,59u,19u,43u}, {0u,29u,53u,7u,67u,35u}
+    };
+    static const uint8_t pitch_start[4][4] = {
+        {82u,34u,50u,50u}, {96u,18u,50u,50u},
+        {99u,8u,50u,50u}, {74u,42u,50u,50u}
+    };
+    static const uint8_t pitch_rate[4][4] = {
+        {99u,94u,76u,62u}, {99u,99u,82u,68u},
+        {99u,99u,90u,72u}, {90u,78u,64u,52u}
+    };
+    const uint8_t alg=algorithms[beast&3u][role&3u];
+    const uint8_t carriers=fm1lab_carrier_mask(alg);
+    for(uint32_t op=0;op<6u;op++) {
+        uint8_t *v=voice+(5u-op)*21u;
+        const uint8_t carrier=(uint8_t)((carriers>>op)&1u);
+        const uint8_t spread=(uint8_t)((op*5u+beast*3u+role*2u)%17u);
+        /* Hard attack, then a deliberately uneven vocal-formant collapse. */
+        v[0]=(uint8_t)(carrier?94u+spread/3u:99u);
+        v[1]=(uint8_t)(role==0u?76u+spread:role==1u?94u:role==2u?99u:56u+spread);
+        v[2]=(uint8_t)(role==3u?44u+spread:role==2u?82u+spread:66u+spread);
+        v[3]=(uint8_t)(role==3u?70u:88u+spread/2u);
+        v[4]=99u;
+        v[5]=(uint8_t)(carrier?94u:role==3u?82u:72u);
+        v[6]=(uint8_t)(carrier?78u:role==0u?58u:role==1u?24u:role==2u?12u:44u);
+        v[7]=0u;
+        /* More output from modulators = much higher FM index. */
+        v[16]=(uint8_t)(carrier?88u+spread/2u:role==0u?91u+spread/2u:role==1u?99u:role==2u?97u:88u+spread/2u);
+        v[18]=coarse[beast&3u][op];
+        v[19]=fine[beast&3u][op];
+        v[20]=(uint8_t)(role==1u?10u+(op%5u):role==2u?12u-(op%3u):8u+(op%5u));
+        /* Keep carrier levels healthy while modulator envelopes bite quickly. */
+        v[10]=(uint8_t)(carrier?5u:role==1u?0u:role==2u?2u:8u);
+        v[15]=(uint8_t)(carrier?1u:role==2u?1u:3u);
+    }
+    voice[134]=alg;
+    voice[135]=(uint8_t)(role==3u?5u:role==0u?7u:7u);
+    voice[136]=1u;
+    /* DX pitch EG: a fast initial pitch excursion that falls into the note. */
+    for(uint32_t i=0;i<4u;i++) {
+        voice[126u+i]=pitch_rate[role&3u][i];
+        voice[130u+i]=pitch_start[role&3u][i];
+    }
+    /* Controlled instability, strongest on GROWL and TEETH. */
+    voice[137]=(uint8_t)(role==0u?42u:role==1u?68u:role==2u?58u:31u);
+    voice[138]=(uint8_t)(role==3u?14u:role==0u?2u:0u);
+    voice[139]=(uint8_t)(role==1u?24u:role==2u?31u:role==3u?18u:12u);
+    voice[140]=(uint8_t)(role==1u?22u:role==2u?18u:role==3u?30u:10u);
+    voice[141]=1u;
+    voice[142]=4u;
+    voice[143]=(uint8_t)(role==3u?5u:role==2u?4u:3u);
+    voice[144]=24u;
+    {
+        static const char *const names[4]={"THROAT","GROWL","TEETH","HOWL"};
+        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
+    }
+}
+static void fm1lab_seed_beast_v1(uint32_t index,fm1lab_instrument_t *out)
+{
+    const fm1lab_beast_instrument_t *beast;
+    /* Legacy comparison image lets the updater replace only untouched V1 beasts. */
+    static const fm1lab_beast_instrument_t legacy[4]={
+        {"HOUND",{3u,5u,14u,12u},{28u,24u,20u,16u}},
+        {"RAVAGE",{14u,11u,15u,5u},{27u,23u,18u,14u}},
+        {"ABYSS",{13u,12u,14u,4u},{28u,22u,17u,13u}},
+        {"WRAITH",{5u,12u,10u,14u},{25u,21u,16u,12u}}
+    };
+    beast=&legacy[(index-16u)&3u];
+    fm1lab_instrument_init(out,beast->name);
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        fm1lab_factory_voice_build(voice,beast->source[p]);
+        fm1lab_make_beast_voice_v1(voice,(uint8_t)((index-16u)&3u),(uint8_t)p);
+        (void)fm1lab_patch_set_voice(out,p,voice);
+        out->patches[p].level=beast->level[p];
+        out->patches[p].enabled=1u;
+        out->patches[p].voice[155]=(uint8_t)(p==0u?48u:p==1u?64u:p==2u?80u:72u);
+    }
+}
+
 typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_beast_instrument_t;
 static const fm1lab_beast_instrument_t fm1lab_beasts[4]={
     {"HOUND",{3u,5u,14u,12u},{22u,16u,11u,9u}},
@@ -319,7 +414,7 @@ static void fm1lab_seed_factory_library(void)
         if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0) continue;
         if(index>=16u && index<20u) {
             fm1lab_instrument_t previous;
-            fm1lab_seed_instrument(index,&previous);
+            fm1lab_seed_beast_v1(index,&previous);
             if(!fm1lab_is_untouched_factory(&existing) &&
                memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
             fm1lab_seed_beast(index,&seed);
