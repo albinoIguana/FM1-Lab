@@ -498,6 +498,7 @@ void app_init(void)
     settings_v2_t old_v2;
     settings_v3_t old_v3;
     settings_v4_t old_v4;
+    settings_v5_t old_v5;
     int performance_loaded = 0;
     int loaded;
     fm6_init();
@@ -507,7 +508,10 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v4, sizeof old_v4) == (int)sizeof old_v4 &&
+        if (plat_store_load(OBJ_SETTINGS, &old_v5, sizeof old_v5) == (int)sizeof old_v5 &&
+            settings_import_v5(&set, &old_v5) == 0) {
+            set_dirty = 1u; /* migrate previous current record; initialize arp controls */
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v4, sizeof old_v4) == (int)sizeof old_v4 &&
             settings_import_v4(&set, &old_v4) == 0) {
             set_dirty = 1u; /* migrate v4 settings; compressor starts bypassed */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v3, sizeof old_v3) == (int)sizeof old_v3 &&
