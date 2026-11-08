@@ -977,7 +977,7 @@ static void input(void)
             continue;
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
-        if(seq_clear_prompt && !((page==PAGE_SEQ || page==PAGE_SEQ_PIANO) && k==EN_K2)) {
+        if(seq_clear_prompt && !(page==PAGE_SEQ && k==EN_K2)) {
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
         ui.redraw = 1;
@@ -1113,6 +1113,10 @@ static void input(void)
                     if(next<0)next+=64;
                     seq_ui_step=(uint8_t)next;
                     seq_clear_prompt=0u;
+                } else if(index==1u && page==PAGE_SEQ_PIANO) {
+                    seq_ui_note[lane][step]=(uint8_t)clamp((int32_t)seq_ui_note[lane][step]+e,0,127);
+                    performance_publish();set_dirty=1u;
+                    app_say("NOTE PITCH","UPDATED");
                 } else if(index==1u) {
                     if(!seq_clear_prompt) {
                         seq_clear_prompt=1u;
@@ -2150,7 +2154,7 @@ static void draw(void)
     else if (page == PAGE_FX_ROUTING) draw_fx_routing_panel();
     else draw_global_panel(pct);
     if(ui.delete_until && (int32_t)(ui.delete_until-plat_ms())>0)draw_delete_overlay();
-    if((page==PAGE_SEQ || page==PAGE_SEQ_PIANO) && seq_clear_prompt)draw_seq_clear_prompt();
+    if(page==PAGE_SEQ && seq_clear_prompt)draw_seq_clear_prompt();
     cv_blit(0, 41);
 
     /* Compact control strip. HOME and ENV already show these values in
