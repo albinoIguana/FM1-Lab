@@ -1,0 +1,70 @@
+name: Deploy native FM1 emulator
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the latest native emulator
+        uses: actions/checkout@v4
+
+      - name: Find the most recent successful full-site artifact
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id="$(gh run list --workflow deploy-pages.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "No successful full-site Pages artifact is available." >&2
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download the existing full-site artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.previous.outputs.run_id }}
+          path: previous-pages
+
+      - name: Replace only the native FM1 emulator
+        run: |
+          test -s previous-pages/artifact.tar
+          mkdir -p _site
+          tar -xf previous-pages/artifact.tar -C _site
+          mkdir -p _site/native-emulator
+          cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js _site/native-emulator/
+          test -s _site/index.html
+          test -s _site/m-vave/simulator.wasm
+          test -s _site/native-emulator/index.html
+          test -s _site/native-emulator/app.wasm
+          test -s _site/native-emulator/worklet.js
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the updated Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
