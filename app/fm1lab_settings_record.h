@@ -8,7 +8,8 @@
 #define SET_MAGIC_V2 0x4C314D47u
 #define SET_MAGIC_V3 0x4C314D48u
 #define SET_MAGIC_V4 0x4C314D49u
-#define SET_MAGIC 0x4C314D4Au
+#define SET_MAGIC_V5 0x4C314D4Au
+#define SET_MAGIC SET_MAGIC_V5
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off, rsv[1]; } settings_v1_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; } settings_v2_t;
 typedef struct {
@@ -45,6 +46,17 @@ static inline int settings_v2_valid(const settings_v2_t *v) {
     return 1;
 }
 
+static inline void settings_arp_defaults(settings_t *dst) {
+    dst->performance.arp_division=3u;dst->performance.arp_gate=75u;
+    dst->performance.arp_octaves=1u;dst->performance.arp_length=16u;
+    dst->performance.arp_output=0u;dst->performance.arp_random=0u;
+    dst->performance.arp_macro_dest=0u;dst->performance.arp_depth=50u;
+    for(uint32_t step=0;step<16u;step++){
+        dst->performance.arp_step_gain[step]=127u;
+        dst->performance.arp_step_accent[step]=0u;
+        dst->performance.arp_step_macro[step]=50u;
+    }
+}
 static inline int settings_v3_valid(const settings_v3_t *v) {
     if (!v || v->magic != SET_MAGIC_V3 || v->octave < -2 || v->octave > 2 ||
         v->patch >= FM1LAB_PATCH_COUNT || (v->enabled_mask & 0xF0u) || v->ble_off > 1u ||
@@ -108,6 +120,7 @@ static inline int settings_import_v3(settings_t *dst, const settings_v3_t *src) 
     dst->performance.compressor_enabled=0u; dst->performance.compressor_threshold=65u;
     dst->performance.compressor_ratio=40u; dst->performance.compressor_attack=20u;
     dst->performance.compressor_release=40u; dst->performance.compressor_makeup=0u;
+    settings_arp_defaults(dst);
     return 0;
 }
 
@@ -164,6 +177,7 @@ static inline int settings_import_v4(settings_t *dst,const settings_v4_t *src) {
     dst->performance.compressor_enabled=0u;dst->performance.compressor_threshold=65u;
     dst->performance.compressor_ratio=40u;dst->performance.compressor_attack=20u;
     dst->performance.compressor_release=40u;dst->performance.compressor_makeup=0u;
+    settings_arp_defaults(dst);
     return 0;
 }
 
