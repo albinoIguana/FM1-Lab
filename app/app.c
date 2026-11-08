@@ -697,7 +697,7 @@ static int instrument_save_to(uint32_t index)
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)
         seq_ui_instrument_name[seq_ui_lane][n]=current_instrument.name[n];
-    seq_ui_instrument_name[seq_ui_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
+    seq_ui_instrument_name[seq_ui_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
     return 0;
 }
 static int instrument_save(void) { return instrument_save_to(instrument_index); }
@@ -2027,11 +2027,11 @@ static int patch_name_is_factory(const char *name)
 {
     if (!name) return 0;
     return (name[0]=='f' && name[1]=='a' && name[2]=='c' && name[3]=='t' &&
-            name[4]=='o' && name[5]=='r' && name[6]=='y' && name[7]=='\\0') ||
+            name[4]=='o' && name[5]=='r' && name[6]=='y' && name[7]=='\0') ||
            (name[0]=='F' && name[1]=='A' && name[2]=='C' && name[3]=='T' &&
-            name[4]=='O' && name[5]=='R' && name[6]=='Y' && name[7]=='\\0') ||
+            name[4]=='O' && name[5]=='R' && name[6]=='Y' && name[7]=='\0') ||
            (name[0]=='F' && name[1]=='a' && name[2]=='c' && name[3]=='t' &&
-            name[4]=='o' && name[5]=='r' && name[6]=='y' && name[7]=='\\0');
+            name[4]=='o' && name[5]=='r' && name[6]=='y' && name[7]=='\0');
 }
 
 static const char *instrument_display_name(void)
