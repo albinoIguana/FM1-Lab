@@ -2162,11 +2162,22 @@ static const char *instrument_display_name(void)
 
 static const char *patch_display_name(uint32_t patch)
 {
-    const char *name = fm6_patch_name(patch);
+    static char display[FM1LAB_PATCH_COUNT][FM1LAB_PATCH_NAME_BYTES + 1u];
     static char fallback[FM1LAB_PATCH_COUNT][12];
-    if (name && name[0] && !patch_name_is_factory(name))
-        return name;
     if (patch >= FM1LAB_PATCH_COUNT) patch = 0u;
+    /* Read the selected Instrument's serialized patch name, not the FM6
+     * runtime voice. The latter can briefly refer to the previous lane or
+     * previous Instrument while the UI has already changed focus. */
+    const uint8_t *raw = current_instrument.patches[patch].voice + 145u;
+    uint32_t n = FM1LAB_PATCH_NAME_BYTES;
+    while (n && (raw[n-1u] == ' ' || raw[n-1u] == '\\0')) --n;
+    if (n) {
+        for (uint32_t i=0u;i<n;i++)
+            display[patch][i] = (raw[i] >= 32u && raw[i] <= 126u) ? (char)raw[i] : ' ';
+        while (n && display[patch][n-1u] == ' ') --n;
+        display[patch][n] = '\\0';
+        if (n && !patch_name_is_factory(display[patch])) return display[patch];
+    }
     fallback[patch][0] = 'P'; fallback[patch][1] = 'A';
     fallback[patch][2] = 'T'; fallback[patch][3] = 'C';
     fallback[patch][4] = 'H'; fallback[patch][5] = ' ';
@@ -2877,9 +2888,6 @@ static void draw(void)
     if(seq_record_armed)cv_text(205,16,&FONT_XS,"REC",RGB(255,80,90));
     if (page == PAGE_HOME) {
         cv_text(151, 17, &FONT_XS, seq_ui_lane ? "T2" : "T1", patch_color(seq_ui_patch[seq_ui_lane]));
-        int_text((int32_t)instrument_index + 1, t);
-        text_cat(t, "/32");
-        cv_text(198, 17, &FONT_XS, t, C_GRAY);
     }
     cv_rect(0, 34, 240, 3, accent);
     cv_blit(0, 0);
@@ -2914,6 +2922,11 @@ static void draw(void)
     /* Compact control strip. HOME and ENV already show these values in
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 19, screen_bg());
+    if (page == PAGE_HOME) {
+        int_text((int32_t)instrument_index + 1, t);
+        text_cat(t, "/32");
+        cv_text(6, 4, &FONT_XS, t, C_GRAY);
+    }
     page_counter(page, t, sizeof(t));
     cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, accent);
     cv_blit(0, 221);
