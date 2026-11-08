@@ -408,7 +408,8 @@ int main(void) {
     fm6_note_on(60u,100u); fm6_note_on(64u,100u); fm6_note_on(67u,100u);
     assert(fm6_active_voices()==0u);
     int32_t arp_peak=0;
-    for(unsigned block=0;block<48u;block++) {
+    /* Default 1/8 division is 11,025 samples at 120 BPM. */
+    for(unsigned block=0;block<96u;block++) {
         memset(output,0,sizeof output); fm6_render(output,128u,4096u);
         int32_t p=peak(output,TEST_WORDS); if(p>arp_peak) arp_peak=p;
     }
