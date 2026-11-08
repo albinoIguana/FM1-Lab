@@ -8,7 +8,7 @@
 #define FM1LAB_PATCH_COUNT 4u
 #define FM6_ENGINE_PATCH_COUNT 8u /* two independent four-patch sequencer instruments */
 #define FM1LAB_MACRO_COUNT 4u
-#define FM1LAB_VOICE_LIMIT 8u /* voices per patch; four independent pools */
+#define FM1LAB_VOICE_LIMIT 8u /* voices per patch; eight independent pools */
 enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUNT };
 
 /* Persistent musical/effect controls. Transport playback state and delay buffers
