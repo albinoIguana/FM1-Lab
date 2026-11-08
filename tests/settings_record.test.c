@@ -7,6 +7,7 @@
 _Static_assert(offsetof(settings_v3_t, performance) == 28u, "legacy v3 settings prefix changed");
 _Static_assert(sizeof(fm6_performance_state_v3_t) == 542u, "legacy v3 performance layout changed");
 _Static_assert(sizeof(settings_v5_t) == 592u, "legacy v5 settings layout changed");
+_Static_assert(sizeof(settings_v6_t) == sizeof(settings_t), "legacy v6 settings layout changed");
 
 /* The record codec delegates performance-state validation to FM6. Keep this
  * unit test focused on the settings envelope and migration boundary. */
@@ -20,7 +21,7 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
         return 0;
     for(unsigned step=0;step<16u;step++)
-        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_macro[step]>100u)return 0;
+        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_gate[step]<10u||s->arp_step_gate[step]>100u)return 0;
     for (unsigned lane = 0; lane < 2u; ++lane) {
         if (s->lane_patch[lane] >= FM1LAB_PATCH_COUNT) return 0;
         for (unsigned step = 0; step < 64u; ++step)
@@ -59,7 +60,7 @@ static void make_valid(settings_t *s)
     for(unsigned step=0;step<16u;step++){
         s->performance.arp_step_gain[step]=127u;
         s->performance.arp_step_accent[step]=0u;
-        s->performance.arp_step_macro[step]=50u;
+        s->performance.arp_step_gate[step]=100u;
     }
     s->performance.lane_patch[0] = 1u;
     s->performance.lane_patch[1] = 3u;
@@ -194,7 +195,7 @@ int main(void)
     assert(imported.performance.compressor_ratio==40u);
     assert(imported.performance.arp_division==3u&&imported.performance.arp_gate==75u);
     assert(imported.performance.arp_octaves==1u&&imported.performance.arp_length==16u);
-    assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_macro[15]==50u);
+    assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_gate[15]==100u);
 
     /* V5 was the prior current record (including compressor controls).
      * Upgrade it losslessly and initialize the newly introduced arp fields. */
@@ -227,10 +228,26 @@ int main(void)
     assert(imported.performance.tempo_bpm==133u&&imported.performance.arp_mode==4u);
     assert(imported.performance.compressor_enabled==1u&&imported.performance.compressor_ratio==61u);
     assert(imported.performance.arp_division==3u&&imported.performance.arp_gate==75u);
-    assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_macro[15]==50u);
+    assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_gate[15]==100u);
+    /* V6's per-step macro lane is retired; imported steps start at full gate. */
+    settings_v6_t v6;
+    memset(&v6,0,sizeof v6);
+    v6.magic=SET_MAGIC_V6;v6.octave=good.octave;v6.patch=good.patch;
+    v6.enabled_mask=good.enabled_mask;v6.ble_off=good.ble_off;
+    memcpy(v6.macros,good.macros,sizeof v6.macros);
+    memcpy(v6.levels,good.levels,sizeof v6.levels);
+    v6.performance=good.performance;
+    for(unsigned step=0;step<16u;step++)v6.performance.arp_step_gate[step]=(uint8_t)(step*6u);
+    v6.crc=settings_crc16(&v6,offsetof(settings_v6_t,crc));
+    assert(settings_v6_valid(&v6));
+    imported=good;
+    assert(settings_import_v6(&imported,&v6)==0);
+    assert(imported.performance.tempo_bpm==good.performance.tempo_bpm);
+    for(unsigned step=0;step<16u;step++)assert(imported.performance.arp_step_gate[step]==100u);
+
     settings_v5_t bad_v5=v5;bad_v5.performance.tempo_bpm=29u;
     assert(!settings_v5_valid(&bad_v5));
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5 migration tests passed");
+    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6 migration tests passed");
     return 0;
 }
