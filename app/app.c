@@ -653,7 +653,7 @@ void app_init(void)
         app_say("BANK ERROR", "DATA PRESERVED");
     }
     set.patch = seq_ui_patch[seq_ui_lane];
-    patch_focus = 1u;
+    patch_focus = 0u;
     instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         fm6_patch_set_enabled(p, 1u);
@@ -852,7 +852,7 @@ static void input(void)
         else if (k == B_HOME) {
             page = PAGE_HOME;
             set.patch = seq_ui_patch[seq_ui_lane];
-            patch_focus = 1u;
+            patch_focus = 0u;
             app_say("INSTRUMENT", seq_ui_lane ? "TRACK 2 PATCH" : "TRACK 1 PATCH");
         } else if (k == B_GLO) {
             page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
@@ -866,7 +866,7 @@ static void input(void)
                 page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
             app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
-            if (page == PAGE_SEQ) {
+            if (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS) {
                 page = PAGE_SEQ_PIANO;
                 seq_clear_prompt=0u;seq_clear_turn=0;
                 app_say("PIANO ROLL",seq_ui_lane?"TRACK 2":"TRACK 1");
@@ -1121,11 +1121,11 @@ static void input(void)
                     if(!seq_clear_prompt) {
                         seq_clear_prompt=1u;
                         seq_clear_turn=0;
-                        app_say("CLEAR STEP?","TURN K2 TO CONFIRM");
+                        app_say("CLEAR STEP?","TURN K2 FURTHER TO CONFIRM");
                     } else {
                         int32_t movement=e<0?-e:e;
                         seq_clear_turn=(int16_t)(seq_clear_turn+movement);
-                        if(seq_clear_turn>=2) {
+                        if(seq_clear_turn>=4) {
                             seq_ui_enabled[lane][step]=0u;
                             seq_ui_note[lane][step]=60u;
                             seq_ui_velocity[lane][step]=100u;
