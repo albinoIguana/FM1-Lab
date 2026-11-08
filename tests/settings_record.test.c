@@ -12,7 +12,11 @@ _Static_assert(sizeof(fm6_performance_state_v3_t) == 542u, "legacy v3 performanc
 int fm6_performance_state_valid(const fm6_performance_state_t *s)
 {
     if (!s || s->tempo_bpm < 30u || s->tempo_bpm > 300u ||
-        s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 3u)
+        s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 4u ||
+        s->arp_division>5u || s->arp_gate<10u || s->arp_gate>100u ||
+        s->arp_octaves<1u || s->arp_octaves>4u ||
+        (s->arp_length!=8u&&s->arp_length!=16u) || s->arp_output>2u ||
+        s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
         return 0;
     for (unsigned lane = 0; lane < 2u; ++lane) {
         if (s->lane_patch[lane] >= FM1LAB_PATCH_COUNT) return 0;
@@ -45,6 +49,15 @@ static void make_valid(settings_t *s)
     }
     s->performance.tempo_bpm = 123u;
     s->performance.seq_length = 64u;
+    s->performance.arp_division=3u;s->performance.arp_gate=75u;
+    s->performance.arp_octaves=1u;s->performance.arp_length=16u;
+    s->performance.arp_output=0u;s->performance.arp_random=0u;
+    s->performance.arp_macro_dest=0u;s->performance.arp_depth=50u;
+    for(unsigned step=0;step<16u;step++){
+        s->performance.arp_step_gain[step]=127u;
+        s->performance.arp_step_accent[step]=0u;
+        s->performance.arp_step_macro[step]=50u;
+    }
     s->performance.lane_patch[0] = 1u;
     s->performance.lane_patch[1] = 3u;
     for (unsigned lane = 0; lane < 2u; ++lane)
@@ -176,7 +189,10 @@ int main(void)
     assert(imported.performance.compressor_enabled==0u);
     assert(imported.performance.compressor_threshold==65u);
     assert(imported.performance.compressor_ratio==40u);
+    assert(imported.performance.arp_division==3u&&imported.performance.arp_gate==75u);
+    assert(imported.performance.arp_octaves==1u&&imported.performance.arp_length==16u);
+    assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_macro[15]==50u);
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4 migration tests passed");
+    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5 migration tests passed");
     return 0;
 }
