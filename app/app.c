@@ -2418,8 +2418,7 @@ static void draw_sequencer_piano_panel(void)
     cv_text(144,153,&FONT_XS,"GATE",C_GRAY);
     int_text(seq_ui_gate[lane][seq_ui_step],value);
     cv_text(177,153,&FONT_B,value,C_WHITE);
-    cv_text(12,166,&FONT_XS,"K1 STEP   K2 PITCH   K3 LENGTH",C_GRAY);
-    cv_text(12,177,&FONT_XS,"K4 VELOCITY   EDIT DELETE",C_GRAY);
+    cv_text(8,166,&FONT_XS,"K1 STEP K2 PITCH K3 LEN K4 VEL EDIT DEL",C_GRAY);
 }
 
 static void draw_save_panel(void)
