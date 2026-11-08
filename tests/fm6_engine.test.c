@@ -723,6 +723,9 @@ int main(void) {
     fm6_render(output,8u,4096u); /* second step: gain full */
     fm6_render(output,128u,4096u);
     int32_t amp_open_peak=peak(output,TEST_WORDS);
+    printf("FM6 amp arp peaks: muted=%ld open=%ld voices=%u active=%u step=%u\\n",
+           (long)amp_muted_peak,(long)amp_open_peak,(unsigned)fm6_active_voices(),
+           (unsigned)fm6_arpeggiator_active(),(unsigned)fm6_arpeggiator_playing_step());
     assert(amp_open_peak>0&&amp_open_peak>amp_muted_peak*4);
     fm6_note_off(60u);
     fm6_arpeggiator_set_mode(0u);
