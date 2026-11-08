@@ -2071,6 +2071,8 @@ void app_frame(void)
         last_arp_redraw = now;
         ui.redraw = 1;
     }
+    if(ui.delete_until && (int32_t)(ui.delete_until-now)>0 &&
+       (uint32_t)(now-last_arp_redraw)>=70u){last_arp_redraw=now;ui.redraw=1u;}
     if(ui.delete_until && (int32_t)(now-ui.delete_until)>=0){ui.delete_until=0u;ui.redraw=1u;}
     if (pct != last_pct || (uint32_t)(plat_ble_connected() | plat_ble_device() << 1) != last_ble ||
         (ui.msg_until && now >= ui.msg_until)) {
