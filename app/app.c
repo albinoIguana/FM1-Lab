@@ -1674,8 +1674,8 @@ static void draw_operator_map(void)
     cv_text(91, 0, &FONT_XS, "ALG", C_GRAY);
     int_text(algorithm, t); cv_text(113, 0, &FONT_XS, t, accent);
     cv_text(145, 0, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
-    cv_text(202, 0, &FONT_XS, "OP", C_GRAY);
-    int_text(env_operator, t); cv_text(226, 0, &FONT_XS, t, accent);
+    int_text(env_operator, t); text_cat(t, "/6");
+    cv_text(202, 0, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
