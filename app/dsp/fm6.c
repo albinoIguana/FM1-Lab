@@ -135,6 +135,7 @@ typedef struct { uint8_t enabled, note, velocity, gate; } fm6_step_t;
 static volatile fm6_step_t seq_pattern[2][64];
 static volatile uint8_t seq_lane_patch[2] = {0,1}, seq_length=16u, seq_position, seq_running;
 static volatile uint8_t seq_start_pending, seq_stop_pending, arp_clear_pending;
+static volatile uint8_t seq_play_position, arp_play_position;
 static uint8_t seq_live_note[2], seq_live_patch[2];
 static uint32_t seq_gate_left[2];
 static volatile uint32_t transport_bpm=120u;
@@ -341,6 +342,7 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
 static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint8_t source);
 static void fm6_transport_step(void)
 {
+    seq_play_position=seq_position;
     for(uint32_t lane=0;lane<2u;lane++) {
         if(seq_gate_left[lane]) { fm6_note_off_source(seq_live_note[lane],(uint8_t)(1u<<seq_live_patch[lane]),(uint8_t)(lane+1u)); seq_gate_left[lane]=0u; }
         if(seq_running) {
@@ -363,6 +365,7 @@ static void fm6_transport_step(void)
             if(arp_index>=arp_count) { arp_index=arp_count>1u?(uint8_t)(arp_count-2u):0u; arp_direction=0u; }
             else if(!arp_direction && arp_index==0u) arp_direction=1u;
         }
+        arp_play_position=arp_index;
         arp_live_note=arp_notes[arp_index]; fm6_note_start_tuned_mask(arp_live_note,arp_velocities[arp_index],0x0fu,0,3u); arp_live=1u;
         if(arp_mode==3u) { if(arp_direction) ++arp_index; else if(arp_index) --arp_index; }
         else ++arp_index;
@@ -645,9 +648,9 @@ void fm6_init(void)
     for(uint32_t fx=0;fx<4u;fx++) fx_enabled[fx]=0u;
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<4u;fx++) fx_send[p][fx]=fx==3u?0u:100u;
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_mix[3]=35u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_time[3]=35u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
-    seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_running=0u;
+    seq_lane_patch[0]=0u; seq_lane_patch[1]=1u; seq_length=16u; seq_position=0u; seq_play_position=0u; seq_running=0u;
     seq_start_pending=seq_stop_pending=arp_clear_pending=0u;
-    arp_mode=0u; arp_count=0u; arp_index=0u; arp_direction=1u; arp_live=0u;
+    arp_mode=0u; arp_count=0u; arp_index=0u; arp_play_position=0u; arp_direction=1u; arp_live=0u;
     transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
     fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=fx_phaser_phase=0u;
     for (i = 0; i < PATCHES; i++) {
@@ -1010,7 +1013,10 @@ void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t no
     seq_pattern[lane][step].enabled=enabled!=0u;
 }
 uint8_t fm6_sequencer_step(void) { return seq_position; }
+uint8_t fm6_sequencer_playing_step(void) { return seq_play_position; }
 uint8_t fm6_sequencer_running(void) { return seq_running; }
+uint8_t fm6_arpeggiator_playing_step(void) { return arp_play_position; }
+uint8_t fm6_arpeggiator_active(void) { return (uint8_t)(arp_mode && arp_count && arp_live); }
 void fm6_arpeggiator_set_mode(uint8_t mode) {
     if(mode>3u) mode=3u;
     /* Enabling starts with an empty held-note set naturally (keys played
