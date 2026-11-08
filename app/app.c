@@ -1308,28 +1308,6 @@ static const char *patch_display_name(uint32_t patch)
     return fallback[patch];
 }
 
-/* The Instrument owns the four patches; show its stored name in the global
- * header. Empty factory slots get a useful slot label rather than a blank. */
-static void instrument_display_name(char out[FM1LAB_INSTRUMENT_NAME_BYTES + 1u])
-{
-    uint32_t n = 0u;
-    for (uint32_t i = 0u; i < FM1LAB_INSTRUMENT_NAME_BYTES &&
-         n < FM1LAB_INSTRUMENT_NAME_BYTES; ++i) {
-        char ch = current_instrument.name[i];
-        if (!ch) break;
-        out[n++] = ch;
-    }
-    while (n && out[n - 1u] == ' ') --n;
-    if (!n) {
-        const char fallback[] = "INSTRUMENT";
-        while (fallback[n] && n < FM1LAB_INSTRUMENT_NAME_BYTES)
-            out[n] = fallback[n], ++n;
-    }
-    if (n > 17u) n = 17u;
-    while (n && out[n - 1u] == ' ') --n;
-    out[n] = 0;
-}
-
 static void draw_home_panel(void)
 {
     char t[24];
@@ -1692,6 +1670,58 @@ static void draw_fx_routing_panel(void)
     }
 }
 
+/* The top identity line is the current page title, not the instrument's
+ * generic FACTORY storage name. Page accents carry through to the footer. */
+static const char *page_title(uint8_t current)
+{
+    switch (current) {
+    case PAGE_HOME: return "HOME";
+    case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
+    case PAGE_GLOBAL: return "GLOBAL";
+    case PAGE_OPERATOR_MAP: return "OPERATOR MAP";
+    case PAGE_ENV: return "ENVELOPE";
+    case PAGE_LFO: return "LFO";
+    case PAGE_LFO_MOD: return "LFO MODULATION";
+    case PAGE_SEQ: return "SEQUENCER";
+    case PAGE_ARP: return "ARPEGGIATOR";
+    case PAGE_FX_AMP: return "AMP / DRIVE";
+    case PAGE_FX_EQ: return "PARAMETRIC EQ";
+    case PAGE_FX_COMPRESSOR: return "COMPRESSOR";
+    case PAGE_FX_CHORUS: return "CHORUS";
+    case PAGE_FX_DELAY: return "DELAY";
+    case PAGE_FX_REVERB: return "REVERB";
+    case PAGE_FX_PHASER: return "PHASER";
+    case PAGE_FX_ROUTING: return "PATCH SENDS";
+    case PAGE_INSTRUMENT_MACRO: return "INSTRUMENT MACROS";
+    default: return "FM1-LAB";
+    }
+}
+
+static uint16_t page_accent(uint8_t current)
+{
+    switch (current) {
+    case PAGE_HOME: return patch_color(set.patch);
+    case PAGE_MACRO: return patch_color(set.patch);
+    case PAGE_INSTRUMENT_MACRO: return RGB(150,120,255);
+    case PAGE_GLOBAL: return RGB(85,190,255);
+    case PAGE_OPERATOR_MAP: return RGB(36,215,232);
+    case PAGE_ENV: return RGB(255,170,75);
+    case PAGE_LFO: return RGB(75,220,150);
+    case PAGE_LFO_MOD: return RGB(75,190,180);
+    case PAGE_SEQ: return RGB(242,212,59);
+    case PAGE_ARP: return RGB(227,75,210);
+    case PAGE_FX_AMP: return RGB(255,140,70);
+    case PAGE_FX_EQ: return RGB(85,190,255);
+    case PAGE_FX_COMPRESSOR: return RGB(255,170,75);
+    case PAGE_FX_CHORUS: return RGB(36,215,232);
+    case PAGE_FX_DELAY: return RGB(85,160,255);
+    case PAGE_FX_REVERB: return RGB(150,120,255);
+    case PAGE_FX_PHASER: return RGB(227,75,210);
+    case PAGE_FX_ROUTING: return patch_color(set.patch);
+    default: return C_GRAY;
+    }
+}
+
 /* Page counters are local to the active page family, not the full enum.
  * Keep each family contiguous so adding/removing a page updates the total. */
 static void page_counter(uint8_t current, char *out, uint32_t out_size)
@@ -1722,7 +1752,7 @@ static void draw(void)
 {
     char t[24];
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
-    uint16_t accent = page == PAGE_INSTRUMENT_MACRO ? RGB(150,120,255) : patch_color(set.patch);
+    uint16_t accent = page_accent(page);
     cv_begin(240, 37, screen_bg());
 
     /* Global status strip: tempo, physical battery gauge, and active arp. */
@@ -1740,13 +1770,13 @@ static void draw(void)
     }
     if (arp_ui_mode) cv_text(216, 1, &FONT_XS, "ARP", RGB(75,235,135));
 
-    /* The Instrument name is distinct from the four patch names below. */
-    char instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES + 1u];
-    instrument_display_name(instrument_name);
-    cv_text(8, 15, &FONT_B, instrument_name, C_WHITE);
-    int_text((int32_t)instrument_index + 1, t);
-    text_cat(t, "/32");
-    cv_text(198, 17, &FONT_XS, t, C_GRAY);
+    /* Page identity replaces the generic FACTORY instrument label. */
+    cv_text(8, 15, &FONT_B, page_title(page), accent);
+    if (page == PAGE_HOME) {
+        int_text((int32_t)instrument_index + 1, t);
+        text_cat(t, "/32");
+        cv_text(198, 17, &FONT_XS, t, C_GRAY);
+    }
     cv_rect(0, 34, 240, 3, accent);
     cv_blit(0, 0);
     cv_begin(240, 180, screen_bg());
@@ -1774,7 +1804,7 @@ static void draw(void)
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 19, screen_bg());
     page_counter(page, t, sizeof(t));
-    cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, C_GRAY);
+    cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, accent);
     cv_blit(0, 221);
 }
 
