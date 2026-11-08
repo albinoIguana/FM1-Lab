@@ -148,6 +148,7 @@ static volatile uint8_t arp_step_position;
 static uint32_t arp_random_state=0x6D2B79F5u, arp_phase, arp_gate_left;
 static int32_t arp_amp_gain_q15=32768, arp_amp_target_q15=32768;
 static int32_t arp_macro_offset;
+static uint8_t arp_macro_applied_dest;
 static uint8_t arp_live_note, arp_live;
 static void fm6_rebuild_patch(uint32_t index);
 static int32_t fx_delay[FM6_DELAY_SIZE] PLAT_POOL, fx_delay_r[FM6_DELAY_SIZE] PLAT_POOL;
@@ -381,8 +382,8 @@ static uint32_t fm6_arp_random(void)
 }
 static void fm6_arp_macro_apply(int32_t offset)
 {
-    if(offset==arp_macro_offset)return;
-    arp_macro_offset=offset;
+    if(offset==arp_macro_offset&&arp_macro_applied_dest==arp_macro_dest)return;
+    arp_macro_offset=offset;arp_macro_applied_dest=arp_macro_dest;
     for(uint32_t p=0;p<PATCHES;p++)fm6_rebuild_patch(p);
 }
 static void fm6_arpeggiator_step(void)
@@ -723,7 +724,7 @@ void fm6_init(void)
     seq_start_pending=seq_stop_pending=arp_clear_pending=0u;
     arp_mode=0u; arp_count=0u; arp_index=0u; arp_play_position=0u; arp_direction=1u; arp_live=0u;
     arp_division=3u;arp_gate=75u;arp_octaves=1u;arp_length=16u;arp_output=0u;arp_random=0u;arp_macro_dest=0u;arp_depth=50u;
-    arp_step_position=0u;arp_phase=0u;arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;arp_macro_offset=0;
+    arp_step_position=0u;arp_phase=0u;arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;arp_macro_offset=0;arp_macro_applied_dest=0u;
     transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
     fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=fx_phaser_phase=0u;
     for (i = 0; i < PATCHES; i++) {
