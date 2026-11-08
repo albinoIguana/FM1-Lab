@@ -149,6 +149,7 @@ static uint32_t arp_random_state=0x6D2B79F5u, arp_phase, arp_gate_left;
 static int32_t arp_amp_gain_q15=32768, arp_amp_target_q15=32768;
 static int32_t arp_macro_offset;
 static uint8_t arp_live_note, arp_live;
+static void fm6_rebuild_patch(uint32_t index);
 static int32_t fx_delay[FM6_DELAY_SIZE] PLAT_POOL, fx_delay_r[FM6_DELAY_SIZE] PLAT_POOL;
 static int32_t fx_chorus[FM6_CHORUS_SIZE] PLAT_POOL, fx_chorus_r[FM6_CHORUS_SIZE] PLAT_POOL;
 static int32_t fx_comb_a[2048] PLAT_POOL, fx_comb_a_r[2048] PLAT_POOL;
@@ -408,6 +409,7 @@ static void fm6_arpeggiator_step(void)
         arp_gate_left=(uint32_t)((uint64_t)fm6_arp_step_period()*(arp_gate<10u?10u:arp_gate>100u?100u:arp_gate)/100u);
         if(!arp_gate_left)arp_gate_left=1u;
     } else {
+        arp_amp_target_q15=32768;
         if(arp_mode==1u) arp_index=(uint8_t)(arp_index%count);
         else if(arp_mode==2u) arp_index=(uint8_t)(count-1u-(arp_index%count));
         else if(arp_mode==4u) arp_index=(uint8_t)(fm6_arp_random()%count);
@@ -418,7 +420,6 @@ static void fm6_arpeggiator_step(void)
         if(arp_random && arp_mode!=4u && (fm6_arp_random()%100u)<arp_random)
             index=fm6_arp_random()%count;
         else index=arp_index;
-        if(arp_mode==2u) index=(count-1u-index);
         uint32_t octave=index/arp_count, note_index=index%arp_count;
         note=(uint8_t)((uint32_t)arp_notes[note_index]+octave*12u);
         if(note>127u)note=127u;
@@ -962,7 +963,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
             if(arp_clear_pending) {
                 if(arp_live) fm6_note_off_source(arp_live_note,0x0fu,3u);
-                arp_live=0u; arp_count=0u; arp_index=0u; arp_clear_pending=0u;
+                arp_live=0u; arp_count=0u; arp_index=0u; arp_gate_left=0u;
+                arp_amp_target_q15=32768;fm6_arp_macro_apply(0);arp_clear_pending=0u;
             }
             transport_phase+=(uint32_t)transport_bpm*4u;
             if(transport_phase>=FM6_SAMPLE_RATE*60u) { transport_phase-=FM6_SAMPLE_RATE*60u; fm6_transport_step(); }
