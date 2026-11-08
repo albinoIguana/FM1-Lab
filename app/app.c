@@ -779,21 +779,6 @@ static void input(void)
         } else if (k == B_SEL) {
             page = page==PAGE_MACRO?PAGE_HOME:PAGE_MACRO;
             app_say(page==PAGE_MACRO?"PATCH MACROS":"HOME",patch_display_name(set.patch));
-        } else if (k == B_EDIT && page == PAGE_FX_AMP) {
-            instrument_insert_edit(FM6_INSERT_AMP_ENABLED,(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED));
-            app_say("MASTER AMP / DRIVE",fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED)?"ACTIVE":"BYPASS");
-        } else if (k == B_EDIT && page == PAGE_FX_EQ) {
-            instrument_insert_edit(FM6_INSERT_EQ_ENABLED,(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_EQ_ENABLED));
-            app_say("MASTER EQ",fm1lab_insert_state_get(&current_inserts,FM6_INSERT_EQ_ENABLED)?"ACTIVE":"BYPASS");
-        } else if (k == B_EDIT && page == PAGE_FX_COMPRESSOR) {
-            compressor_edit(FM6_COMP_ENABLED,(uint8_t)!compressor_value(FM6_COMP_ENABLED));
-            app_say("MASTER COMPRESSOR",compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS");
-        } else if (k == B_EDIT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
-            uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
-            set.performance.fx_enabled[fx]=(uint8_t)!set.performance.fx_enabled[fx];
-            performance_publish();
-            set_dirty = 1u;
-            app_say("FX",set.performance.fx_enabled[fx]?"ON":"BYPASS");
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", patch_display_name(set.patch));
@@ -873,10 +858,10 @@ static void input(void)
             app_say("OPERATOR", fm1lab_voice_operator_is_carrier(
                 current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
         } else if (k == EN_ALGO && page == PAGE_FX_EQ) {
-            int32_t next=((int32_t)eq_ui_band+e)%3;
-            if(next<0)next+=3;
-            eq_ui_band=(uint8_t)next;
-            app_say("EQ BAND",eq_ui_band==0u?"LOW":eq_ui_band==1u?"MID":"HIGH");
+            uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+2u);
+            uint8_t value=fm1lab_insert_state_get(&current_inserts,field);
+            instrument_insert_edit(field,(uint8_t)clamp((int32_t)value+e,0,31));
+            app_say("EQ Q","UPDATED");
         } else if (k == EN_ALGO && page == PAGE_ENV) {
             int32_t next = ((int32_t)env_operator - 1 + e) % 6;
             if (next < 0) next += 6;
@@ -995,38 +980,65 @@ static void input(void)
                 app_say("PATCH FX SEND",fx==0u?"CHORUS":fx==1u?"DELAY":fx==2u?"REVERB":"PHASER");
             } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
                 uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
-                if(index==0u) set.performance.fx_mix[fx]=(uint8_t)clamp((int32_t)set.performance.fx_mix[fx]+e,0,100);
-                else if(index==1u) set.performance.fx_time[fx]=(uint8_t)clamp((int32_t)set.performance.fx_time[fx]+e,0,100);
-                else if(index==2u) {
-                    if(fx==FM6_FX_PHASER) set.performance.fx_depth[fx]=(uint8_t)clamp((int32_t)set.performance.fx_depth[fx]+e,0,100);
-                    else set.performance.fx_feedback[fx]=(uint8_t)clamp((int32_t)set.performance.fx_feedback[fx]+e,0,fx==0u?70:90);
-                } else if (fx == FM6_FX_PHASER) {
-                    set.performance.fx_feedback[fx]=(uint8_t)clamp((int32_t)set.performance.fx_feedback[fx]+e,0,90);
+                if(index==0u) {
+                    set.performance.fx_enabled[fx]=(uint8_t)!set.performance.fx_enabled[fx];
+                    app_say("FX BYPASS",set.performance.fx_enabled[fx]?"ON":"OFF");
+                } else if(index==1u && fx==FM6_FX_REVERB) {
+                    uint8_t type=set.performance.fx_depth[2];
+                    if(type>2u)type=1u;
+                    int32_t next=((int32_t)type+e)%3;
+                    if(next<0)next+=3;
+                    set.performance.fx_depth[2]=(uint8_t)next;
+                    app_say("REVERB TYPE",next==0?"ROOM":next==1?"HALL":"PLATE");
+                } else if(index==1u) {
+                    set.performance.fx_time[fx]=(uint8_t)clamp((int32_t)set.performance.fx_time[fx]+e,0,100);
+                    app_say(fx==FM6_FX_CHORUS?"CHORUS RATE":fx==FM6_FX_DELAY?"DELAY TIME":"PHASER RATE","UPDATED");
+                } else if(index==2u) {
+                    set.performance.fx_mix[fx]=(uint8_t)clamp((int32_t)set.performance.fx_mix[fx]+e,0,100);
+                    app_say("FX WET","UPDATED");
                 } else {
-                    set.performance.fx_send[set.patch][fx]=(uint8_t)clamp((int32_t)set.performance.fx_send[set.patch][fx]+e,0,100);
+                    set.performance.fx_feedback[fx]=(uint8_t)clamp((int32_t)set.performance.fx_feedback[fx]+e,0,fx==FM6_FX_CHORUS?70:90);
+                    app_say(fx==FM6_FX_REVERB?"REVERB DECAY":fx==FM6_FX_PHASER?"PHASER RESONANCE":"FX FEEDBACK","UPDATED");
                 }
                 performance_publish();
-                set_dirty = 1u;
-                app_say(index==0u?"FX WET":index==1u?(fx==0u?"CHORUS RATE":fx==1u?"DELAY TIME":fx==2u?"REVERB DECAY":"PHASER RATE"):index==2u?(fx==FM6_FX_PHASER?"PHASER DEPTH":"FX FEEDBACK"):(fx==FM6_FX_PHASER?"PHASER RESONANCE":"PATCH SEND"), "UPDATED");
+                set_dirty=1u;
             } else if (page == PAGE_FX_AMP) {
-                static const uint8_t fields[4]={FM6_INSERT_DRIVE,FM6_INSERT_TONE,FM6_INSERT_OUTPUT,FM6_INSERT_AMP_ENABLED};
-                uint8_t field=fields[index],value=fm1lab_insert_state_get(&current_inserts,field);
-                if(index==3u)value=(uint8_t)!value;
-                else value=(uint8_t)clamp((int32_t)value+e,0,100);
-                instrument_insert_edit(field,value);
-                app_say(index==0u?"AMP DRIVE":index==1u?"AMP TONE":index==2u?"AMP OUTPUT":"AMP",index==3u?(value?"ON":"BYPASS"):"UPDATED");
+                if(index==0u) {
+                    uint8_t value=(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED);
+                    instrument_insert_edit(FM6_INSERT_AMP_ENABLED,value);
+                    app_say("AMP BYPASS",value?"ON":"OFF");
+                } else {
+                    static const uint8_t fields[3]={FM6_INSERT_DRIVE,FM6_INSERT_TONE,FM6_INSERT_OUTPUT};
+                    uint8_t field=fields[index-1u];
+                    instrument_insert_edit(field,(uint8_t)clamp((int32_t)fm1lab_insert_state_get(&current_inserts,field)+e,0,100));
+                    app_say(index==1u?"AMP DRIVE":index==2u?"AMP TONE":"AMP OUTPUT","UPDATED");
+                }
             } else if (page == PAGE_FX_EQ) {
-                uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+index);
-                uint8_t value=fm1lab_insert_state_get(&current_inserts,field);
-                if(index==3u)value=(uint8_t)!value;
-                else value=(uint8_t)clamp((int32_t)value+e,0,index==1u?24:index==2u?31:100);
-                instrument_insert_edit(field,value);
-                app_say(index==0u?"EQ FREQUENCY":index==1u?"EQ GAIN":index==2u?"EQ Q":"EQ BAND",index==3u?(value?"ON":"OFF"):"UPDATED");
+                if(index==0u) {
+                    uint8_t value=(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_EQ_ENABLED);
+                    instrument_insert_edit(FM6_INSERT_EQ_ENABLED,value);
+                    app_say("EQ BYPASS",value?"ON":"OFF");
+                } else if(index==1u) {
+                    int32_t next=((int32_t)eq_ui_band+e)%3;if(next<0)next+=3;
+                    eq_ui_band=(uint8_t)next;
+                    app_say("EQ BAND",eq_ui_band==0u?"LOW":eq_ui_band==1u?"MID":"HIGH");
+                } else {
+                    uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+(index==2u?0u:1u));
+                    uint8_t value=fm1lab_insert_state_get(&current_inserts,field);
+                    instrument_insert_edit(field,(uint8_t)clamp((int32_t)value+e,0,index==2u?100:24));
+                    app_say(index==2u?"EQ FREQUENCY":"EQ GAIN","UPDATED");
+                }
             } else if (page == PAGE_FX_COMPRESSOR) {
-                static const uint8_t fields[4]={FM6_COMP_THRESHOLD,FM6_COMP_RATIO,FM6_COMP_ATTACK,FM6_COMP_RELEASE};
-                uint8_t field=fields[index];
-                compressor_edit(field,(uint8_t)clamp((int32_t)compressor_value(field)+e,0,100));
-                app_say(index==0u?"COMP THRESHOLD":index==1u?"COMP RATIO":index==2u?"COMP ATTACK":"COMP RELEASE","UPDATED");
+                if(index==0u) {
+                    uint8_t value=(uint8_t)!compressor_value(FM6_COMP_ENABLED);
+                    compressor_edit(FM6_COMP_ENABLED,value);
+                    app_say("COMP BYPASS",value?"ON":"OFF");
+                } else {
+                    static const uint8_t fields[3]={FM6_COMP_RATIO,FM6_COMP_THRESHOLD,FM6_COMP_ATTACK};
+                    uint8_t field=fields[index-1u];
+                    compressor_edit(field,(uint8_t)clamp((int32_t)compressor_value(field)+e,0,100));
+                    app_say(index==1u?"COMP RATIO":index==2u?"COMP THRESHOLD":"COMP ATTACK","UPDATED");
+                }
             } else if (page == PAGE_OPERATOR_MAP) {
                 static const fm1lab_operator_field_t fields[4] = {
                     FM1LAB_OP_OUTPUT, FM1LAB_OP_MODE, FM1LAB_OP_COARSE, FM1LAB_OP_FINE
