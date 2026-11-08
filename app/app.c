@@ -354,6 +354,98 @@ static void fm1lab_seed_beast(uint32_t index,fm1lab_instrument_t *out)
     }
 }
 
+/* Four industrial instruments in bank 2: hard transients, grinding FM,
+ * metallic shards and unstable warning-tone drones. Each patch uses all six
+ * operators; the selected algorithms provide multi-stage modulation paths. */
+typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_industrial_t;
+static const fm1lab_industrial_t fm1lab_industrials[4]={
+    {"IRONWORK",{14u,3u,15u,12u},{22u,17u,12u,9u}},
+    {"PRESSURE",{3u,14u,5u,13u},{23u,18u,12u,9u}},
+    {"SHRAPNEL",{14u,9u,15u,10u},{21u,16u,12u,9u}},
+    {"SIREN",{12u,5u,14u,1u},{22u,17u,13u,10u}}
+};
+static void fm1lab_make_industrial_voice(uint8_t voice[FM1LAB_PATCH_BYTES],uint8_t family,uint8_t role)
+{
+    static const uint8_t algorithms[4][4]={
+        {15u,20u,17u,24u},{17u,15u,20u,23u},
+        {20u,17u,15u,24u},{24u,20u,17u,15u}
+    };
+    static const uint8_t coarse[4][6]={
+        {1u,2u,3u,5u,7u,11u},{1u,3u,4u,6u,9u,13u},
+        {1u,2u,5u,7u,11u,15u},{1u,2u,3u,4u,7u,9u}
+    };
+    static const uint8_t fine[4][6]={
+        {0u,17u,41u,63u,29u,77u},{0u,31u,59u,13u,47u,83u},
+        {0u,23u,53u,71u,37u,89u},{0u,11u,43u,67u,19u,57u}
+    };
+    static const char *const names[4]={"IMPACT","GRIND","SHARD","DRONE"};
+    uint8_t alg=algorithms[family&3u][role&3u];
+    uint8_t carriers=fm1lab_carrier_mask(alg);
+    for(uint32_t op=0;op<6u;op++) {
+        uint8_t *v=voice+(5u-op)*21u;
+        uint8_t carrier=(uint8_t)((carriers>>op)&1u);
+        uint8_t spread=(uint8_t)((op*7u+family*5u+role*3u)%19u);
+        /* Percussive envelopes on IMPACT/SHARD; GRIND and DRONE sustain. */
+        v[0]=(uint8_t)(role==3u?(carrier?28u:18u):99u);
+        v[1]=(uint8_t)(role==0u?92u:role==1u?84u:role==2u?99u:48u+spread);
+        v[2]=(uint8_t)(role==3u?64u+spread:role==1u?76u+spread:58u+spread);
+        v[3]=(uint8_t)(role==3u?72u:role==1u?86u:44u+spread);
+        v[4]=99u;
+        v[5]=(uint8_t)(carrier?94u:role==3u?78u:69u);
+        v[6]=(uint8_t)(role==3u?(carrier?84u:61u):role==1u?12u:0u);
+        v[7]=0u;
+        v[10]=(uint8_t)(carrier?5u:role==2u?0u:3u);
+        v[15]=(uint8_t)(carrier?1u:role==2u?1u:3u);
+        /* Loud modulators and fractional ratios produce clang, rasp and grit. */
+        v[16]=(uint8_t)(carrier?88u:role==1u?99u:role==2u?97u:92u);
+        v[18]=coarse[family&3u][op];
+        v[19]=fine[family&3u][op];
+        v[20]=(uint8_t)(8u+(op*3u+family+role)%9u);
+    }
+    voice[134]=alg;
+    voice[135]=(uint8_t)(role==1u?7u:role==2u?6u:role==0u?5u:4u);
+    voice[136]=1u;
+    /* Sharp initial pitch fall for the metallic hit and shard patches. */
+    {
+        static const uint8_t start[4][4]={
+            {99u,5u,50u,50u},{91u,22u,50u,50u},
+            {99u,0u,50u,50u},{67u,39u,50u,50u}
+        };
+        static const uint8_t rate[4][4]={
+            {99u,99u,88u,72u},{99u,94u,82u,68u},
+            {99u,99u,91u,76u},{82u,72u,61u,52u}
+        };
+        for(uint32_t i=0;i<4u;i++) {
+            voice[126u+i]=rate[role&3u][i];
+            voice[130u+i]=start[role&3u][i];
+        }
+    }
+    voice[137]=(uint8_t)(role==3u?24u:role==1u?61u:role==2u?55u:38u);
+    voice[138]=(uint8_t)(role==3u?18u:role==0u?0u:3u);
+    voice[139]=(uint8_t)(role==1u?22u:role==2u?29u:role==3u?16u:8u);
+    voice[140]=(uint8_t)(role==3u?28u:role==1u?19u:role==2u?16u:8u);
+    voice[141]=1u;
+    voice[142]=4u;
+    voice[143]=(uint8_t)(role==3u?5u:role==2u?4u:3u);
+    voice[144]=24u;
+    for(uint32_t i=0;i<10u;i++)
+        voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
+}
+static void fm1lab_seed_industrial(uint32_t index,fm1lab_instrument_t *out)
+{
+    const fm1lab_industrial_t *industrial=&fm1lab_industrials[(index-20u)&3u];
+    fm1lab_instrument_init(out,industrial->name);
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        fm1lab_factory_voice_build(voice,industrial->source[p]);
+        fm1lab_make_industrial_voice(voice,(uint8_t)((index-20u)&3u),(uint8_t)p);
+        (void)fm1lab_patch_set_voice(out,p,voice);
+        out->patches[p].level=industrial->level[p];
+        out->patches[p].enabled=1u;
+        out->patches[p].voice[155]=(uint8_t)(p==0u?48u:p==1u?64u:p==2u?80u:72u);
+    }
+}
+
 /* Starter library: a deliberate four-voice combination of M-VAVE recipes. */
 typedef struct { const char *name; uint8_t voice[4]; uint8_t level[4]; } fm1lab_seed_instrument_t;
 static const fm1lab_seed_instrument_t fm1lab_seed_instruments[16] = {
@@ -418,6 +510,12 @@ static void fm1lab_seed_factory_library(void)
             if(!fm1lab_is_untouched_factory(&existing) &&
                memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
             fm1lab_seed_beast(index,&seed);
+        } else if(index>=20u && index<24u) {
+            fm1lab_instrument_t previous;
+            fm1lab_seed_instrument(index,&previous);
+            if(!fm1lab_is_untouched_factory(&existing) &&
+               memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
+            fm1lab_seed_industrial(index,&seed);
         } else {
             if(!fm1lab_is_untouched_factory(&existing)) continue;
             fm1lab_seed_instrument(index,&seed);
