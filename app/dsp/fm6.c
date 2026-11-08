@@ -1135,6 +1135,8 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         s->arp_octaves<1u || s->arp_octaves>4u || (s->arp_length!=8u&&s->arp_length!=16u) ||
         s->arp_output>2u || s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
         return 0;
+    for(uint32_t step=0;step<16u;step++)
+        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_macro[step]>100u)return 0;
     for (uint32_t lane = 0; lane < 2u; ++lane) {
         if (s->lane_patch[lane] >= PATCHES) return 0;
         for (uint32_t step = 0; step < 64u; ++step) {
@@ -1254,7 +1256,7 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
     arp_count=arp_index=arp_live=0u;
     arp_direction=1u;arp_step_position=arp_play_position=0u;
     arp_phase=arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;
-    arp_macro_offset=0;arp_clear_pending=0u;
+    fm6_arp_macro_apply(0);arp_clear_pending=0u;
     return 0;
 }
 
