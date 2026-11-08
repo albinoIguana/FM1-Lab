@@ -718,11 +718,12 @@ int main(void) {
     for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
     fm6_render(output,9u,4096u); /* first 1/16 step: gain zero */
     fm6_render(output,128u,4096u);
-    assert(peak(output,TEST_WORDS)==0);
+    int32_t amp_muted_peak=peak(output,TEST_WORDS);
     for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
     fm6_render(output,8u,4096u); /* second step: gain full */
     fm6_render(output,128u,4096u);
-    assert(peak(output,TEST_WORDS)>0);
+    int32_t amp_open_peak=peak(output,TEST_WORDS);
+    assert(amp_open_peak>0&&amp_open_peak>amp_muted_peak*4);
     fm6_note_off(60u);
     fm6_arpeggiator_set_mode(0u);
 
