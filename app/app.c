@@ -44,8 +44,8 @@ static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
 static uint8_t save_slot, save_patch, save_name_target, save_name_cursor;
 static uint8_t seq_clear_prompt;
 static int16_t seq_clear_turn;
-static uint8_t seq_record_active[NKEYS], seq_record_step[NKEYS], seq_record_lane[NKEYS], seq_record_note[NKEYS];
-static uint32_t seq_record_started[NKEYS];
+static uint8_t seq_record_active[NKEYS+128u], seq_record_step[NKEYS+128u], seq_record_lane[NKEYS+128u], seq_record_note[NKEYS+128u];
+static uint32_t seq_record_started[NKEYS+128u];
 static uint8_t seq_record_redraw;
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_latch, arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
@@ -939,8 +939,10 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
         }
         if ((st & 0xF0u) == 0x90u && d2) {
             voice_note = (int32_t)d1;
+            sequencer_record_capture(NKEYS+d1,(uint8_t)d1,(uint8_t)d2);
             fm6_note_on_mask((uint8_t)d1,(uint8_t)d2,(uint8_t)(0x0fu<<(seq_ui_lane*FM1LAB_PATCH_COUNT))); /* selected Instrument only */
         } else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
+            sequencer_record_release(NKEYS+d1,(uint8_t)d1);
             fm6_note_off_mask((uint8_t)d1,(uint8_t)(0x0fu<<(seq_ui_lane*FM1LAB_PATCH_COUNT)));
             if (voice_note == (int32_t)d1)
                 voice_note = -1;
@@ -1478,7 +1480,7 @@ static void input(void)
             uint32_t held=plat_ms()-ui.rec_t;ui.rec_t=0u;
             if(held<1000u || !FM1B_BLE) {
                 seq_record_armed^=1u;seq_record_last_step=255u;
-                for(uint32_t key=0;key<NKEYS;key++)seq_record_active[key]=0u;
+                for(uint32_t key=0;key<NKEYS+128u;key++)seq_record_active[key]=0u;
                 app_say("RECORD",seq_record_armed?"ARMED":"DISARMED");
             }
         }
