@@ -9,7 +9,7 @@
 
 The active Felucca-family linker/loader reserves a **581,564-byte XIP application slot**. The rest of flash is partitioned for boot/update, VM/configuration, Bluetooth data, user data and device reservations. Those regions are not spare firmware capacity.
 
-The latest successful native device build emitted an application image of **189,588 bytes**, leaving **391,976 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
+The latest successful native device build emitted an application image of **202,376 bytes**, leaving **379,188 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
 
 The Instrument store is separately reserved in the 12-sector `0xF0000..0xFBFFF` pool (48 KiB). Do not move these ranges without re-auditing the pinned BSP; see [REBUILD_AUDIT.md](REBUILD_AUDIT.md).
 
@@ -30,30 +30,30 @@ These regions total 512 KiB and are not interchangeable. The builder separately 
 
 ## 3. Latest successful native target build
 
-CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/42283303903)
+CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/42509214735)
 
 | Measurement | Used | Capacity | Remaining |
 |---|---:|---:|---:|
 | XIP application image | 189,588 B | 581,564 B | 391,976 B |
-| `.data + .bss` (builder region check) | 47,336 B | 98,304 B | 50,968 B |
-| `.pool` | 275,264 B | 344,064 B | 68,800 B |
-| `.pool` after mandatory 8 KiB reserve | — | — | 60,608 B |
+| `.data + .bss` (builder region check) | 60,788 B | 98,304 B | 37,516 B |
+| `.pool` | 292,544 B | 344,064 B | 51,520 B |
+| `.pool` after mandatory 8 KiB reserve | — | — | 43,328 B |
 
 ### Exact ELF section sizes
 
 | ELF section | Used | Region capacity |
 |---|---:|---:|
-| `.text` | 183,064 B | Included in XIP image slot |
+| `.text` | 195,768 B | Included in XIP image slot |
 | `.ram_text` | 3,556 B | 32,768 B |
-| `.data` | 2,968 B | Part of 98,304 B |
-| `.bss` | 44,360 B | Part of 98,304 B |
-| `.pool` | 275,264 B | 344,064 B |
+| `.data` | 3,052 B | Part of 98,304 B |
+| `.bss` | 57,732 B | Part of 98,304 B |
+| `.pool` | 292,544 B | 344,064 B |
 | `.noinit` | 1,836 B | 15,696 B |
-| `app.bin` | 189,588 B | 581,564 B |
+| `app.bin` | 202,376 B | 581,564 B |
 
-The raw `.data + .bss` section sum is 47,328 B (2,968 + 44,360); the builder's address-based region check reports 47,336 B, including 8 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The image size is exactly 189,588 B (183,064 + 3,556 + 2,968), before package wrapping.
+The raw `.data + .bss` section sum is 60,784 B (3,052 + 57,732); the builder's address-based region check reports 60,788 B, including 4 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The image size is exactly 202,376 B (195,768 + 3,556 + 3,052), before package wrapping.
 
-The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. The core's `fm6_note_t` is 244 bytes; 32 live note records account for 7,808 bytes within `.bss`, before the FM1-Lab voice wrappers, four patch records, LFO state and platform globals. Only one FM6 core is linked.
+The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. The core's `fm6_note_t` is 244 bytes; 64 live note records account for 15,616 bytes within `.bss`, before the FM1-Lab voice wrappers, eight patch records, LFO state and platform globals. Only one FM6 core is linked.
 
 ## 4. Pool composition and Instrument-wide FX
 
@@ -65,7 +65,7 @@ The 479-byte Instrument voice-bank record is unchanged. The sidecar's active/fal
 
 ## 5. What this means
 
-- **Four-patch FM6:** the current state fits the 96 KiB region with 50,968 bytes of link-time headroom. Keep the documented eight-voice-per-patch design.
+- **Dual-Instrument FM6:** two sequencer tracks now have independent four-patch banks (eight engine patch slots total), each with its own eight-voice pool. The 64-voice state fits the 96 KiB region with 37,516 bytes of link-time headroom. Keep the documented eight-voice-per-patch design.
 - **FX:** continue using one shared stereo effects rack with per-patch sends, not four duplicate effect engines. Preserve the mandatory 8 KiB pool reserve.
 - **Sequencer:** keep the two lanes' step/event state compact and statically bounded.
 - **UI:** the full-width canvas is the dominant pool allocation. A strip/tile renderer remains a fallback if future audio buffers need space; it is not required by this build's memory budget.
