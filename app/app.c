@@ -24,7 +24,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -42,7 +42,7 @@ static uint8_t seq_record_active[NKEYS], seq_record_step[NKEYS], seq_record_lane
 static uint32_t seq_record_started[NKEYS];
 static uint8_t seq_record_redraw;
 static uint16_t transport_ui_bpm=120u;
-static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
+static uint8_t arp_ui_latch, arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
 static uint8_t arp_ui_output, arp_ui_random, arp_ui_macro_dest, arp_ui_depth=50u;
 
@@ -618,6 +618,8 @@ void app_init(void)
     for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_step_gate[i]=100u;}
     instrument_factory_capture();
     seq_record_mode=(uint8_t)(set.reserved&1u);
+    arp_ui_latch=(uint8_t)((set.reserved>>1)&1u);
+    fm6_arpeggiator_set_latch(arp_ui_latch);
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode=set.performance.arp_mode;
@@ -990,9 +992,9 @@ static void input(void)
         } else {
             if(!ui.arp_hold_fired) {
                 if(page==PAGE_ARP)page=PAGE_ARP_STEPS;
-                else if(page==PAGE_ARP_STEPS)page=PAGE_ARP;
+                else if(page==PAGE_ARP_STEPS)page=PAGE_ARP_LATCH;
                 else page=PAGE_ARP;
-                app_say("ARPEGGIATOR",page==PAGE_ARP?"ENGINE":"STEP EDITOR");
+                app_say("ARPEGGIATOR",page==PAGE_ARP?"ENGINE":page==PAGE_ARP_STEPS?"STEP EDITOR":"LATCH");
             }
             ui.arp_hold_t=0u;ui.arp_hold_fired=0u;
         }
@@ -1240,6 +1242,8 @@ static void input(void)
                     app_say("ARP OCTAVES","UPDATED");
                 }
                 performance_publish();set_dirty=1u;
+            } else if (page == PAGE_ARP_LATCH) {
+                if(index==0u && (e%2)!=0){arp_ui_latch^=1u;set.reserved=(uint16_t)((set.reserved&1u)|((uint16_t)arp_ui_latch<<1));fm6_arpeggiator_set_latch(arp_ui_latch);set_dirty=1u;app_say("ARP LATCH",arp_ui_latch?"ON":"OFF");}
             } else if (page == PAGE_ARP_STEPS) {
                 uint8_t step=arp_ui_step;
                 if(index==0u) { int32_t next=((int32_t)step+e)%arp_ui_length; if(next<0)next+=arp_ui_length; arp_ui_step=(uint8_t)next; }
@@ -1981,6 +1985,15 @@ static uint16_t arp_step_gradient_color(uint8_t accent, uint32_t band, uint32_t 
     if(r>255u)r=255u;if(g>255u)g=255u;if(b>255u)b=255u;
     return RGB(r,g,b);
 }
+static void draw_arp_latch_panel(void)
+{
+    uint16_t accent=RGB(227,75,210);
+    instrument_card(8,22,224,126,panel_fill(),accent,accent);
+    cv_text(20,34,&FONT_XS,"NOTE HOLD BEHAVIOR",C_GRAY);
+    cv_text(20,62,&FONT_B,arp_ui_latch?"LATCH ON":"LATCH OFF",arp_ui_latch?RGB(75,235,135):accent);
+    cv_text(20,96,&FONT_XS,arp_ui_latch?"RELEASED KEYS STAY IN THE ARP":"RELEASED KEYS LEAVE THE ARP",C_WHITE);
+    cv_text(20,126,&FONT_XS,"K1  TOGGLE LATCH",C_GRAY);
+}
 static void draw_arp_steps_panel(void)
 {
     char t[16];
@@ -2141,6 +2154,7 @@ static const char *page_title(uint8_t current)
     case PAGE_SEQ_PIANO: return "PIANO ROLL";
     case PAGE_ARP: return "ARP ENGINE";
     case PAGE_ARP_STEPS: return "ARP STEP EDIT";
+    case PAGE_ARP_LATCH: return "ARP LATCH";
     case PAGE_FX_AMP: return "AMP / DRIVE";
     case PAGE_FX_EQ: return "PARAMETRIC EQ";
     case PAGE_FX_COMPRESSOR: return "COMPRESSOR";
@@ -2166,7 +2180,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_LFO: return RGB(75,220,150);
     case PAGE_LFO_MOD: return RGB(75,190,180);
     case PAGE_SEQ: case PAGE_SEQ_OPTIONS: case PAGE_SEQ_PIANO: return RGB(242,212,59);
-    case PAGE_ARP: case PAGE_ARP_STEPS: return RGB(227,75,210);
+    case PAGE_ARP: case PAGE_ARP_STEPS: case PAGE_ARP_LATCH: return RGB(227,75,210);
     case PAGE_FX_AMP: return RGB(255,140,70);
     case PAGE_FX_EQ: return RGB(85,190,255);
     case PAGE_FX_COMPRESSOR: return RGB(255,170,75);
@@ -2194,8 +2208,8 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         index=(uint32_t)(current-PAGE_SEQ)+1u;total=2u;
     } else if (current == PAGE_SEQ_PIANO) {
         index=1u;total=1u;
-    } else if (current == PAGE_ARP || current == PAGE_ARP_STEPS) {
-        index=(uint32_t)(current-PAGE_ARP)+1u;total=2u;
+    } else if (current >= PAGE_ARP && current <= PAGE_ARP_LATCH) {
+        index=(uint32_t)(current-PAGE_ARP)+1u;total=3u;
     } else if (current <= PAGE_GLOBAL) {
         index = (uint32_t)current + 1u;
         total = (uint32_t)PAGE_GLOBAL + 1u;
@@ -2256,6 +2270,7 @@ static void draw(void)
     else if (page == PAGE_SEQ_PIANO) draw_sequencer_piano_panel();
     else if (page == PAGE_ARP) draw_arp_panel();
     else if (page == PAGE_ARP_STEPS) draw_arp_steps_panel();
+    else if (page == PAGE_ARP_LATCH) draw_arp_latch_panel();
     else if (page == PAGE_FX_CHORUS) draw_fx_panel(0u);
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
