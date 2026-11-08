@@ -13,11 +13,14 @@
 #include "fm1lab_store_library.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
-/* The target SDK is freestanding and ships no string.h declaration header. */
-extern int memcmp(const void *, const void *, unsigned);
-extern size_t strlen(const char *);
-extern int strcmp(const char *, const char *);
-extern int strncmp(const char *, const char *, size_t);
+/* Small freestanding string helpers: the device libc only supplies memcmp. */
+static size_t fm1lab_strlen(const char *s) { size_t n=0u; while(s && s[n])++n; return n; }
+static int fm1lab_strcmp(const char *a,const char *b) {
+    while(*a && *a==*b){++a;++b;} return (unsigned char)*a-(unsigned char)*b;
+}
+static int fm1lab_strncmp(const char *a,const char *b,size_t n) {
+    while(n && *a && *a==*b){++a;++b;--n;} return n?(unsigned char)*a-(unsigned char)*b:0;
+}
 
 static settings_t set;
 static uint8_t set_dirty;
@@ -186,7 +189,7 @@ static void fm1lab_make_evolving_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_
     voice[141]=0u;
     voice[142]=0u; /* sine */
     voice[143]=(uint8_t)(texture?4u:2u);
-    for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[texture])?names[texture][i]:' ');
+    for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[texture])?names[texture][i]:' ');
 }
 
 /* Four dark FM creatures. Each patch is a purpose-built six-operator voice:
@@ -239,7 +242,7 @@ static void fm1lab_make_beast_voice_v1(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_
     voice[143]=(uint8_t)(role==3u?5u:3u);
     {
         static const char *const names[4]={"THROAT","GROWL","TEETH","HOWL"};
-        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
+        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[role&3u])?names[role&3u][i]:' ');
     }
 }
 /* V2 creature voices: push the DX-style engine itself into an inharmonic,
@@ -311,7 +314,7 @@ static void fm1lab_make_beast_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t b
     voice[144]=24u;
     {
         static const char *const names[4]={"THROAT","GROWL","TEETH","HOWL"};
-        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
+        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[role&3u])?names[role&3u][i]:' ');
     }
 }
 typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_beast_instrument_t;
@@ -434,7 +437,7 @@ static void fm1lab_make_industrial_voice(uint8_t voice[FM1LAB_PATCH_BYTES],uint8
     voice[143]=(uint8_t)(role==3u?5u:role==2u?4u:3u);
     voice[144]=24u;
     for(uint32_t i=0;i<10u;i++)
-        voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
+        voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[role&3u])?names[role&3u][i]:' ');
 }
 static void fm1lab_seed_industrial(uint32_t index,fm1lab_instrument_t *out)
 {
@@ -2846,27 +2849,27 @@ void app_frame(void)
 #ifdef PLAT_HOST
 int app_expect(const char *what, int *got)
 {
-    if (!strcmp(what, "octave"))
+    if (!fm1lab_strcmp(what, "octave"))
         *got = set.octave;
-    else if (!strcmp(what, "patch") || !strcmp(what, "wave"))
+    else if (!fm1lab_strcmp(what, "patch") || !fm1lab_strcmp(what, "wave"))
         *got = set.patch;
-    else if (!strcmp(what, "note"))
+    else if (!fm1lab_strcmp(what, "note"))
         *got = voice_note;
-    else if (!strcmp(what, "dirty"))
+    else if (!fm1lab_strcmp(what, "dirty"))
         *got = set_dirty;
-    else if (!strcmp(what, "page"))
+    else if (!fm1lab_strcmp(what, "page"))
         *got = page;
-    else if (!strcmp(what, "cpu"))
+    else if (!fm1lab_strcmp(what, "cpu"))
         *got = (int)app_audio_cpu_pct();
-    else if (!strcmp(what, "xruns"))
+    else if (!fm1lab_strcmp(what, "xruns"))
         *got = (int)app_audio_xruns();
-    else if (!strcmp(what, "shed"))
+    else if (!fm1lab_strcmp(what, "shed"))
         *got = (int)app_audio_overload_shed_count();
-    else if (!strcmp(what, "vel"))           /* the last key's velocity and pressure */
+    else if (!fm1lab_strcmp(what, "vel"))           /* the last key's velocity and pressure */
         *got = ui.vel[ui.last_key];
-    else if (!strcmp(what, "prs"))
+    else if (!fm1lab_strcmp(what, "prs"))
         *got = ui.prs[ui.last_key];
-    else if (!strncmp(what, "turns", 5))    /* turnsN: encoder N's count (plat.h EN_*) */
+    else if (!fm1lab_strncmp(what, "turns", 5))    /* turnsN: encoder N's count (plat.h EN_*) */
         *got = ui.turns[atoi(what + 5) % NE];
     else
         return 0;
