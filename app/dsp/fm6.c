@@ -140,7 +140,7 @@ static uint8_t seq_live_note[2], seq_live_mask[2];
 static uint32_t seq_gate_left[2];
 static volatile uint32_t transport_bpm=120u;
 static uint32_t transport_phase;
-static volatile uint8_t arp_mode, arp_notes[16], arp_velocities[16], arp_count, arp_index, arp_direction=1u;
+static volatile uint8_t arp_mode, arp_latch, arp_notes[16], arp_velocities[16], arp_count, arp_index, arp_direction=1u;
 static volatile uint8_t arp_division=3u, arp_gate=75u, arp_octaves=1u, arp_length=16u;
 static volatile uint8_t arp_step_gain[16], arp_step_accent[16], arp_step_gate[16];
 static volatile uint8_t arp_output, arp_random, arp_macro_dest, arp_depth=50u;
@@ -736,7 +736,7 @@ void fm6_init(void)
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_mix[3]=35u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_time[3]=35u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
     seq_lane_base[0]=0u; seq_lane_base[1]=4u; seq_lane_instrument[0]=seq_lane_instrument[1]=0u; seq_length=16u; seq_position=0u; seq_play_position=0u; seq_running=0u;
     seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=seq_clear_pending[1]=0u;
-    arp_mode=0u; arp_count=0u; arp_index=0u; arp_play_position=0u; arp_direction=1u; arp_live=0u;
+    arp_mode=0u; arp_latch=0u; arp_count=0u; arp_index=0u; arp_play_position=0u; arp_direction=1u; arp_live=0u;
     arp_division=3u;arp_gate=75u;arp_octaves=1u;arp_length=16u;arp_output=0u;arp_random=0u;arp_macro_dest=0u;arp_depth=50u;
     arp_step_position=0u;arp_phase=0u;arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;arp_macro_offset=0;
     transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
@@ -857,6 +857,18 @@ static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint8_t source)
 }
 void fm6_note_off_mask(uint8_t note,uint8_t patch_mask)
 {
+    if(arp_mode && !arp_latch) {
+        for(uint32_t k=0;k<arp_count;k++) if(arp_notes[k]==note) {
+            for(uint32_t j=k+1u;j<arp_count;j++){arp_notes[j-1u]=arp_notes[j];arp_velocities[j-1u]=arp_velocities[j];}
+            --arp_count;if(arp_index>k&&arp_index)--arp_index;
+            if(arp_output==1u)fm6_note_off_source(note,patch_mask,0u);
+            break;
+        }
+        if(!arp_count){
+            if(arp_live)fm6_note_off_source(arp_live_note,arp_patch_mask,3u);
+            arp_live=0u;arp_gate_left=0u;arp_amp_target_q15=32768;fm6_arp_macro_apply(0);
+        }
+    }
     for(uint32_t i=0;i<VOICES;i++) {
         fm1lab_voice_t *v=&voices[i];
         if(v->used && v->note==note && (patch_mask&(1u<<v->patch))) {
@@ -1146,6 +1158,7 @@ void fm6_arpeggiator_set_mode(uint8_t mode) {
 }
 uint8_t fm6_arpeggiator_mode(void) { return arp_mode; }
 void fm6_arpeggiator_reset_steps(void) { arp_reset_pending=1u; }
+void fm6_arpeggiator_set_latch(uint8_t enabled) { arp_latch=(uint8_t)(enabled!=0u); }
 void fm6_sequencer_clear_lane(uint8_t lane) { if(lane<2u)seq_clear_pending[lane]=1u; }
 #ifdef FM6_TEST
 uint8_t fm6_test_arpeggiator_amp_level(void)
