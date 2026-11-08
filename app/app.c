@@ -29,7 +29,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_SAVE, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -41,6 +41,7 @@ static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A'
 static fm1lab_instrument_t instrument_apply_snapshot;
 static fm1lab_insert_state_t inserts_apply_snapshot;
 static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
+static uint8_t save_slot, save_patch, save_name_target, save_name_cursor;
 static uint8_t seq_clear_prompt;
 static int16_t seq_clear_turn;
 static uint8_t seq_record_active[NKEYS], seq_record_step[NKEYS], seq_record_lane[NKEYS], seq_record_note[NKEYS];
@@ -684,15 +685,54 @@ static void instrument_load(uint32_t index, int from_audio)
     }
 }
 
-static int instrument_save(void)
+static int instrument_save_to(uint32_t index)
 {
-    if (!instrument_loaded || !fm1lab_instrument_valid(&current_instrument))
+    if (!instrument_loaded || index >= USER_INSTRUMENT_COUNT ||
+        !fm1lab_instrument_valid(&current_instrument))
         return -1;
-    if (fm1lab_store_library_save_full(instrument_index, &current_instrument, &current_inserts))
+    if (fm1lab_store_library_save_full(index, &current_instrument, &current_inserts))
         return -1;
-    instrument_dirty = 0u;
+    instrument_index=(uint8_t)index;
+    instrument_dirty=0u;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
+    for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)
+        seq_ui_instrument_name[seq_ui_lane][n]=current_instrument.name[n];
+    seq_ui_instrument_name[seq_ui_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
     return 0;
+}
+static int instrument_save(void) { return instrument_save_to(instrument_index); }
+
+static void save_screen_open(void)
+{
+    save_slot=instrument_index;
+    save_patch=set.patch;
+    save_name_target=0u;
+    save_name_cursor=0u;
+    page=PAGE_SAVE;
+    app_say("SAVE INSTRUMENT","CHOOSE SLOT / NAME");
+}
+static void save_name_step(int delta)
+{
+    static const char alphabet[]=" ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+    char *name;
+    uint32_t length;
+    if(save_name_target) {
+        name=(char *)current_instrument.patches[save_patch].voice+145u;
+        length=FM1LAB_PATCH_NAME_BYTES;
+    } else {
+        name=current_instrument.name;
+        length=FM1LAB_INSTRUMENT_NAME_BYTES;
+    }
+    if(save_name_cursor>=length)save_name_cursor=(uint8_t)(length-1u);
+    char c=name[save_name_cursor];
+    uint32_t pos=0u;
+    while(pos<sizeof(alphabet)-1u && alphabet[pos]!=c)++pos;
+    if(pos>=sizeof(alphabet)-1u)pos=0u;
+    int32_t next=((int32_t)pos+delta)%(int32_t)(sizeof(alphabet)-1u);
+    if(next<0)next+=(int32_t)(sizeof(alphabet)-1u);
+    name[save_name_cursor]=alphabet[next];
+    instrument_dirty=1u;set_dirty=1u;
+    if(save_name_target){voice_dirty=1u;}
 }
 
 static void ui_events_drain(void)
@@ -1373,16 +1413,18 @@ static void input(void)
             if(starting)seq_record_last_step=255u;
             app_say("SEQUENCER", starting ? (seq_record_armed?"RECORDING":"PLAYING") : "STOPPED");
         } else if (k == B_SAVE) {
-            int instrument_result = instrument_save();
-            /* set.performance is the UI-owned source of truth; queued audio
-             * updates must not be read back over edits that have not rendered yet. */
-            settings_seal(&set);
-            int settings_result = plat_store_save(OBJ_SETTINGS, &set, sizeof set);
-            if (instrument_result == 0 && settings_result == 0) {
-                set_dirty = 0;
-                app_say("INSTRUMENT", "SAVED");
-            } else {
-                app_say("SAVE", "FAILED");
+            if(page!=PAGE_SAVE) save_screen_open();
+            else {
+                set.patch=save_patch;
+                seq_ui_patch[seq_ui_lane]=save_patch;
+                performance_publish();
+                int instrument_result=instrument_save_to(save_slot);
+                settings_seal(&set);
+                int settings_result=plat_store_save(OBJ_SETTINGS,&set,sizeof set);
+                if(instrument_result==0 && settings_result==0) {
+                    set_dirty=0u;page=PAGE_HOME;patch_focus=0u;
+                    app_say("INSTRUMENT SAVED",instrument_display_name());
+                } else app_say("SAVE FAILED","CHECK SLOT / STORAGE");
             }
         } else {
             app_say("BUTTON", BTN_NAME[k]);
@@ -1451,7 +1493,27 @@ static void input(void)
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
         ui.redraw = 1;
-        if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
+        if(page==PAGE_SAVE) {
+            if(k==EN_PRESET) {
+                int32_t next=((int32_t)save_slot+e)%(int32_t)USER_INSTRUMENT_COUNT;
+                if(next<0)next+=(int32_t)USER_INSTRUMENT_COUNT;
+                save_slot=(uint8_t)next;app_say("SAVE SLOT","SELECTED");
+            } else if(k==EN_SELECT) {
+                int32_t next=((int32_t)save_patch+e)%(int32_t)FM1LAB_PATCH_COUNT;
+                if(next<0)next+=(int32_t)FM1LAB_PATCH_COUNT;
+                save_patch=(uint8_t)next;set.patch=save_patch;seq_ui_patch[seq_ui_lane]=save_patch;
+                save_name_cursor=0u;app_say("PATCH",patch_display_name(save_patch));
+            } else if(k==EN_K1) {
+                uint32_t length=save_name_target?FM1LAB_PATCH_NAME_BYTES:FM1LAB_INSTRUMENT_NAME_BYTES;
+                save_name_cursor=(uint8_t)(((int32_t)save_name_cursor+e+(int32_t)length)%(int32_t)length);
+                app_say("NAME CURSOR","MOVED");
+            } else if(k==EN_K2) {
+                save_name_step(e);app_say("NAME","CHARACTER UPDATED");
+            } else if(k==EN_K3 && (e%2)!=0) {
+                save_name_target^=1u;save_name_cursor=0u;
+                app_say("EDIT NAME",save_name_target?"PATCH NAME":"INSTRUMENT NAME");
+            }
+        } else if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
         } else if (k == EN_ALGO && (page == PAGE_HOME || page == PAGE_OPERATOR_MAP)) {
@@ -1805,7 +1867,8 @@ static void input(void)
     ui.btn = btn;
     plat_glow(1);                            /* the unlit buttons glow, readable in the dark */
     plat_leds(btn | (set_dirty ? 1u << B_SAVE : 0u) |
-              (seq_record_armed ? 1u << B_REC : 0u), keys);
+              (seq_record_armed ? 1u << B_REC : 0u) |
+              (fm6_sequencer_running() ? 1u << B_PLAY : 0u), keys);
 }
 
 void app_input_only(void) { input(); }
@@ -2340,6 +2403,31 @@ static void draw_sequencer_piano_panel(void)
     cv_text(10,166,&FONT_XS,"K1 STEP  K2 PITCH  K3 LEN  K4 VEL   EDIT DELETE",C_GRAY);
 }
 
+static void draw_save_panel(void)
+{
+    char t[32];
+    const uint16_t accent=RGB(36,215,232);
+    instrument_card(5,4,230,170,panel_fill(),accent,accent);
+    cv_text(14,12,&FONT_XS,"SAVE SLOT  /  PRESET KNOB",C_GRAY);
+    int_text((int32_t)save_slot+1,t);text_cat(t," / 32");
+    cv_text(14,30,&FONT_B,t,accent);
+    cv_text(14,55,&FONT_XS,"PATCH  /  SELECT KNOB",C_GRAY);
+    int_text((int32_t)save_patch+1,t);text_cat(t," / 4");
+    cv_text(14,73,&FONT_B,t,patch_color(save_patch));
+    cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  24 CHARS",C_GRAY);
+    if(save_name_target) {
+        for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)t[i]=(char)current_instrument.patches[save_patch].voice[145u+i];
+        t[FM1LAB_PATCH_NAME_BYTES]='\\0';
+    } else {
+        for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++)t[i]=current_instrument.name[i];
+        t[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
+    }
+    cv_text(14,117,&FONT_B,t,accent);
+    int32_t cursor_x=14+(int32_t)save_name_cursor*(save_name_target?8:7);
+    cv_rect(cursor_x,137,save_name_target?7:6,2,C_WHITE);
+    cv_text(14,151,&FONT_XS,"K1 CURSOR  K2 CHAR  K3 NAME TYPE",C_WHITE);
+    cv_text(14,165,&FONT_XS,"SAVE AGAIN TO WRITE   HOME TO EXIT",C_GRAY);
+}
 static void draw_sequencer_options_panel(void)
 {
     uint16_t accent=RGB(242,212,59);
@@ -2561,6 +2649,7 @@ static const char *page_title(uint8_t current)
     case PAGE_FX_PHASER: return "PHASER";
     case PAGE_FX_ROUTING: return "PATCH SENDS";
     case PAGE_INSTRUMENT_MACRO: return "INSTRUMENT MACROS";
+    case PAGE_SAVE: return "SAVE INSTRUMENT";
     default: return "FM1-LAB";
     }
 }
@@ -2642,6 +2731,8 @@ static void draw(void)
 
     /* Page identity replaces the generic FACTORY instrument label. */
     cv_text(8, 15, &FONT_B, page_title(page), accent);
+    cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
+    if(seq_record_armed)cv_text(205,16,&FONT_XS,"REC",RGB(255,80,90));
     if (page == PAGE_HOME) {
         cv_text(151, 17, &FONT_XS, seq_ui_lane ? "T2" : "T1", patch_color(seq_ui_patch[seq_ui_lane]));
         int_text((int32_t)instrument_index + 1, t);
@@ -2664,6 +2755,7 @@ static void draw(void)
     else if (page == PAGE_SEQ) draw_sequencer_panel();
     else if (page == PAGE_SEQ_OPTIONS) draw_sequencer_options_panel();
     else if (page == PAGE_SEQ_PIANO) draw_sequencer_piano_panel();
+    else if (page == PAGE_SAVE) draw_save_panel();
     else if (page == PAGE_ARP) draw_arp_panel();
     else if (page == PAGE_ARP_STEPS) draw_arp_steps_panel();
     else if (page == PAGE_ARP_LATCH) draw_arp_latch_panel();
