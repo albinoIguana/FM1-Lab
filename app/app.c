@@ -1774,7 +1774,7 @@ static void draw_sequencer_panel(void)
     draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
                       seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
-    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?"PLAYING":(seq_record_armed?"RECORD ARMED":"STOPPED"),
+    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"RECORD ARMED":"STOPPED"),
             fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
     cv_text(82,151,&FONT_XS,"SELECT STEP  K1 ON/OFF",C_GRAY);
 }
@@ -1784,7 +1784,7 @@ static void draw_sequencer_options_panel(void)
     instrument_card(8,22,224,126,panel_fill(),accent,accent);
     cv_text(20,34,&FONT_XS,"LOOP RECORD BEHAVIOR",C_GRAY);
     cv_text(20,61,&FONT_B,seq_record_mode?"OVERWRITE":"OVERDUB",accent);
-    cv_text(20,94,&FONT_XS,seq_record_mode?"EACH PASS REPLACES STEPS":"NEW NOTES LAYER INTO LOOP",C_WHITE);
+    cv_text(20,94,&FONT_XS,seq_record_mode?"CLEAR UNPLAYED STEPS":"KEEP UNPLAYED STEPS",C_WHITE);
     cv_text(20,126,&FONT_XS,"K1  CHANGE MODE",C_GRAY);
     cv_text(8,166,&FONT_XS,seq_record_armed?"REC ARMED":"REC DISARMED",seq_record_armed?RGB(255,80,90):C_GRAY);
 }
