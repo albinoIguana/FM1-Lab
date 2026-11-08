@@ -1115,6 +1115,13 @@ void fm6_arpeggiator_set_mode(uint8_t mode) {
     arp_mode=mode;
 }
 uint8_t fm6_arpeggiator_mode(void) { return arp_mode; }
+#ifdef FM6_TEST
+uint8_t fm6_test_arpeggiator_amp_level(void)
+{
+    uint32_t level=(uint32_t)(arp_amp_gain_q15<0?0:arp_amp_gain_q15);
+    return (uint8_t)(level>=32768u?127u:level*127u/32768u);
+}
+#endif
 void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled) { if(effect<4u) fx_enabled[effect]=enabled!=0u; }
 void fm6_fx_set_mix(uint8_t effect,uint8_t mix) { if(effect<4u) fx_mix[effect]=mix>100u?100u:mix; }
 void fm6_fx_set_time(uint8_t effect,uint8_t value) { if(effect<4u) fx_time[effect]=value>100u?100u:value; }
