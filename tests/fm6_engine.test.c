@@ -730,7 +730,7 @@ int main(void) {
     uint8_t amp_gate_levels[2]={0u,0u};
     for(unsigned gate_case=0;gate_case<2u;gate_case++){
         fm6_init();fm6_performance_state_get(&saved);
-        saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=40u;
+        saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=20u;
         saved.arp_length=8u;saved.arp_output=1u;
         saved.arp_step_gate[0]=(uint8_t)(gate_case?1u:0u);
         assert(fm6_performance_state_set(&saved)==0);
