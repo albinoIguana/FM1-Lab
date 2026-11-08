@@ -35,7 +35,6 @@ static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_no
 static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES]={{'F','A','C','T','O','R','Y',0},{'F','A','C','T','O','R','Y',0}};
 static fm1lab_instrument_t instrument_apply_snapshot;
 static fm1lab_insert_state_t inserts_apply_snapshot;
-static volatile uint8_t instrument_apply_lane;
 static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
 static uint8_t seq_clear_prompt;
 static int16_t seq_clear_turn;
@@ -284,7 +283,6 @@ static void instrument_load(uint32_t index, int from_audio)
     if (from_audio) {
         instrument_apply_snapshot=current_instrument;
         inserts_apply_snapshot=current_inserts;
-        instrument_apply_lane=seq_ui_lane;
         instrument_apply_pending = 1u;
         ui_event_push(EV_INSTRUMENT_LOAD, seq_ui_lane, 0, 0);
     } else {
