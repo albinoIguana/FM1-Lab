@@ -392,8 +392,8 @@ static void fm6_arpeggiator_step(void)
     uint32_t index;
     uint8_t note,velocity;
     uint32_t gain=arp_step_gain[step];
-    uint32_t step_gate=arp_step_gate[step];
-    uint32_t effective_gate=(uint32_t)(arp_gate<10u?10u:arp_gate>100u?100u:arp_gate)*step_gate/100u;
+    uint32_t tied=arp_step_gate[step]?1u:0u;
+    uint32_t effective_gate=tied?100u:(uint32_t)(arp_gate<10u?10u:arp_gate>100u?100u:arp_gate);
     if(effective_gate<1u)effective_gate=1u;
     if(arp_live){fm6_note_off_source(arp_live_note,0x0fu,3u);arp_live=0u;}
     arp_gate_left=0u;
@@ -721,7 +721,7 @@ void fm6_init(void)
     }
     fm6_zero_bytes(seq_gate_left,sizeof(seq_gate_left));
     fm6_zero_bytes(seq_live_note,sizeof(seq_live_note)); fm6_zero_bytes(seq_live_patch,sizeof(seq_live_patch));
-    for(uint32_t n=0;n<16u;n++) { arp_notes[n]=0u; arp_velocities[n]=0u; arp_step_gain[n]=127u; arp_step_accent[n]=0u; arp_step_gate[n]=100u; }
+    for(uint32_t n=0;n<16u;n++) { arp_notes[n]=0u; arp_velocities[n]=0u; arp_step_gain[n]=127u; arp_step_accent[n]=0u; arp_step_gate[n]=0u; }
     fm6_zero_bytes(fx_delay,sizeof(fx_delay)); fm6_zero_bytes(fx_delay_r,sizeof(fx_delay_r));
     fm6_zero_bytes(fx_chorus,sizeof(fx_chorus)); fm6_zero_bytes(fx_chorus_r,sizeof(fx_chorus_r));
     fm6_zero_bytes(fx_comb_a,sizeof(fx_comb_a)); fm6_zero_bytes(fx_comb_a_r,sizeof(fx_comb_a_r));
@@ -1174,7 +1174,7 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         s->arp_output>2u || s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
         return 0;
     for(uint32_t step=0;step<16u;step++)
-        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_gate[step]<10u||s->arp_step_gate[step]>100u)return 0;
+        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_gate[step]>1u)return 0;
     for (uint32_t lane = 0; lane < 2u; ++lane) {
         if (s->lane_patch[lane] >= PATCHES) return 0;
         for (uint32_t step = 0; step < 64u; ++step) {
