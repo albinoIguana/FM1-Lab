@@ -24,7 +24,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_MOD, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_ARP_STEPS, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -622,6 +622,8 @@ static struct {
     int32_t last_key;                    /* the key pressed last: its numbers in the header */
     uint8_t looking;                     /* Bluetooth MIDI devices: REC pressed, the scan's list up (lib/btdev) */
     uint32_t rec_t;                      /* REC went down (0: not held, or its hold already acted) */
+    uint32_t arp_hold_t, seq_hold_t, delete_until;
+    uint8_t arp_hold_fired, seq_hold_fired, delete_kind, delete_index;
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint8_t redraw;
@@ -835,14 +837,9 @@ static void input(void)
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", patch_display_name(set.patch));
         } else if (k == B_SEQ) {
-            page = PAGE_SEQ;
-            app_say("SEQUENCER", fm6_sequencer_running() ? "RUNNING" : "TWO LANES");
+            ui.seq_hold_t=plat_ms();ui.seq_hold_fired=0u;
         } else if (k == B_ARP) {
-            if (page == PAGE_ARP) page = PAGE_ARP_STEPS;
-            else if (page == PAGE_ARP_STEPS) page = PAGE_ARP_MOD;
-            else page = PAGE_ARP;
-            app_say("ARPEGGIATOR", page == PAGE_ARP ? "ENGINE" :
-                    page == PAGE_ARP_STEPS ? "STEP EDITOR" : "MODULATION");
+            ui.arp_hold_t=plat_ms();ui.arp_hold_fired=0u;
         } else if (k == B_FX) {
             if (page < PAGE_FX_AMP || page > PAGE_FX_ROUTING) page = PAGE_FX_AMP;
             else page = page == PAGE_FX_ROUTING ? PAGE_FX_AMP : (uint8_t)(page + 1u);
@@ -868,6 +865,46 @@ static void input(void)
             }
         } else {
             app_say("BUTTON", BTN_NAME[k]);
+        }
+    }
+    if(ui.arp_hold_t) {
+        if(btn&(1u<<B_ARP)) {
+            if(!ui.arp_hold_fired && (uint32_t)(plat_ms()-ui.arp_hold_t)>=3000u) {
+                for(uint32_t step=0;step<16u;step++){arp_ui_gain[step]=127u;arp_ui_accent[step]=0u;arp_ui_step_gate[step]=100u;}
+                arp_ui_step=0u;performance_publish();set_dirty=1u;
+                fm6_arpeggiator_reset_steps();
+                ui.arp_hold_fired=1u;ui.delete_kind=1u;ui.delete_until=plat_ms()+1100u;
+                app_say("ARPEGGIATOR","STEPS CLEARED");
+            }
+        } else {
+            if(!ui.arp_hold_fired) {
+                if(page==PAGE_ARP)page=PAGE_ARP_STEPS;
+                else if(page==PAGE_ARP_STEPS)page=PAGE_ARP;
+                else page=PAGE_ARP;
+                app_say("ARPEGGIATOR",page==PAGE_ARP?"ENGINE":"STEP EDITOR");
+            }
+            ui.arp_hold_t=0u;ui.arp_hold_fired=0u;
+        }
+    }
+    if(ui.seq_hold_t) {
+        if(btn&(1u<<B_SEQ)) {
+            if(!ui.seq_hold_fired && (uint32_t)(plat_ms()-ui.seq_hold_t)>=3000u) {
+                uint8_t lane=seq_ui_lane;
+                for(uint32_t step=0;step<64u;step++){
+                    seq_ui_enabled[lane][step]=0u;seq_ui_note[lane][step]=60u;
+                    seq_ui_velocity[lane][step]=100u;seq_ui_gate[lane][step]=75u;
+                }
+                performance_publish();set_dirty=1u;fm6_sequencer_clear_lane(lane);
+                ui.seq_hold_fired=1u;ui.delete_kind=2u;ui.delete_index=(uint8_t)(lane+1u);
+                ui.delete_until=plat_ms()+1100u;
+                app_say("SEQUENCE CLEARED",lane?"SEQUENCE 2":"SEQUENCE 1");
+            }
+        } else {
+            if(!ui.seq_hold_fired) {
+                page=PAGE_SEQ;
+                app_say("SEQUENCER",fm6_sequencer_running()?"RUNNING":"TWO LANES");
+            }
+            ui.seq_hold_t=0u;ui.seq_hold_fired=0u;
         }
     }
     if (FM1B_BLE && ui.rec_t) {             /* REC: held a second, Bluetooth on / off; a press, a device */
@@ -1047,13 +1084,6 @@ static void input(void)
                 else arp_ui_step_gate[step]=(uint8_t)clamp((int32_t)arp_ui_step_gate[step]+e,10,100);
                 performance_publish();set_dirty=1u;
                 app_say("ARP STEP", "UPDATED");
-            } else if (page == PAGE_ARP_MOD) {
-                if(index==0u) arp_ui_output=(uint8_t)(((int32_t)arp_ui_output+e+3)%3);
-                else if(index==1u) arp_ui_random=(uint8_t)clamp((int32_t)arp_ui_random+e,0,100);
-                else if(index==2u) arp_ui_macro_dest=(uint8_t)(((int32_t)arp_ui_macro_dest+e+4)%4);
-                else arp_ui_depth=(uint8_t)clamp((int32_t)arp_ui_depth+e,0,100);
-                performance_publish();set_dirty=1u;
-                app_say("ARP MODULATION","UPDATED");
             } else if (page == PAGE_FX_ROUTING) {
                 uint8_t fx=(uint8_t)index;
                 set.performance.fx_send[set.patch][fx]=(uint8_t)clamp((int32_t)set.performance.fx_send[set.patch][fx]+e,0,100);
@@ -1783,22 +1813,25 @@ static void draw_arp_steps_panel(void)
     int_text(arp_ui_accent[arp_ui_step],t);cv_text(135,137,&FONT_XS,t,C_WHITE);
     cv_text(163,137,&FONT_XS,"GATE",RGB(242,212,59));
     int_text(arp_ui_step_gate[arp_ui_step],t);cv_text(193,137,&FONT_XS,t,C_WHITE);
-    cv_text(5,158,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACCENT  K4 GATE",C_GRAY);
-    cv_text(5,173,&FONT_XS,"PRESET: 8 / 16 STEPS",C_GRAY);
+    cv_text(5,158,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 GATE",C_GRAY);
 }
 
-static void draw_arp_mod_panel(void)
+static void draw_delete_overlay(void)
 {
-    static const char *const outputs[3]={"NOTES","AMP","MACRO"};
-    static const char *const destinations[4]={"BRIGHT","BODY","MOTION","EDGE"};
-    static const uint16_t colors[4]={RGB(36,215,232),RGB(242,212,59),RGB(150,120,255),RGB(255,130,100)};
-    char t[16];
-    draw_arp_card(0u,"K1  OUTPUT",outputs[arp_ui_output%3u],"NOTES / AMP / MACRO",RGB(227,75,210));
-    int_text(arp_ui_random,t); text_cat(t,"%");
-    draw_arp_card(1u,"K2  RANDOMIZE",t,"PATTERN VARIATION",RGB(36,215,232));
-    draw_arp_card(2u,"K3  DESTINATION",destinations[arp_ui_macro_dest%4u],"MACRO TARGET",colors[arp_ui_macro_dest%4u]);
-    int_text(arp_ui_depth,t); text_cat(t,"%");
-    draw_arp_card(3u,"K4  DEPTH",t,"MODULATION AMOUNT",RGB(150,120,255));
+    uint32_t phase=(plat_ms()/110u)&1u;
+    uint16_t accent=ui.delete_kind==1u?RGB(227,75,210):RGB(242,212,59);
+    const char *label=ui.delete_kind==1u?"DELETING ARP":
+        (ui.delete_index==2u?"DELETING SEQUENCE 2":"DELETING SEQUENCE 1");
+    cv_rect(20,48,200,91,RGB(5,9,16));
+    cv_rect(21,49,198,89,accent);
+    cv_rect(23,51,194,85,RGB(12,18,29));
+    cv_rect(103,61+(int32_t)phase*2,34,4,phase?C_WHITE:accent);
+    cv_rect(108,67,24,22,accent);
+    cv_rect(112,71,3,14,RGB(12,18,29));
+    cv_rect(120,71,3,14,RGB(12,18,29));
+    cv_rect(128,71,3,14,RGB(12,18,29));
+    cv_text(120-text_w(&FONT_B,label)/2,96,&FONT_B,label,phase?C_WHITE:accent);
+    cv_text(120-text_w(&FONT_XS,"HOLD COMPLETE")/2,119,&FONT_XS,"HOLD COMPLETE",C_WHITE);
 }
 static void draw_fx_panel(uint8_t fx)
 {
@@ -1869,7 +1902,6 @@ static const char *page_title(uint8_t current)
     case PAGE_SEQ: return "SEQUENCER";
     case PAGE_ARP: return "ARP ENGINE";
     case PAGE_ARP_STEPS: return "ARP STEP EDIT";
-    case PAGE_ARP_MOD: return "ARP MODULATION";
     case PAGE_FX_AMP: return "AMP / DRIVE";
     case PAGE_FX_EQ: return "PARAMETRIC EQ";
     case PAGE_FX_COMPRESSOR: return "COMPRESSOR";
@@ -1895,7 +1927,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_LFO: return RGB(75,220,150);
     case PAGE_LFO_MOD: return RGB(75,190,180);
     case PAGE_SEQ: return RGB(242,212,59);
-    case PAGE_ARP: case PAGE_ARP_STEPS: case PAGE_ARP_MOD: return RGB(227,75,210);
+    case PAGE_ARP: case PAGE_ARP_STEPS: return RGB(227,75,210);
     case PAGE_FX_AMP: return RGB(255,140,70);
     case PAGE_FX_EQ: return RGB(85,190,255);
     case PAGE_FX_COMPRESSOR: return RGB(255,170,75);
@@ -1919,9 +1951,9 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
     } else if (current >= PAGE_OPERATOR_MAP && current <= PAGE_LFO_MOD) {
         index = (uint32_t)(current - PAGE_OPERATOR_MAP) + 1u;
         total = (uint32_t)(PAGE_LFO_MOD - PAGE_OPERATOR_MAP) + 1u;
-    } else if (current >= PAGE_SEQ && current <= PAGE_ARP_MOD) {
+    } else if (current >= PAGE_SEQ && current <= PAGE_ARP_STEPS) {
         if (current == PAGE_SEQ) { index = 1u; total = 1u; }
-        else { index = (uint32_t)(current - PAGE_ARP) + 1u; total = 3u; }
+        else { index = (uint32_t)(current - PAGE_ARP) + 1u; total = 2u; }
     } else if (current <= PAGE_GLOBAL) {
         index = (uint32_t)current + 1u;
         total = (uint32_t)PAGE_GLOBAL + 1u;
@@ -1979,13 +2011,13 @@ static void draw(void)
     else if (page == PAGE_SEQ) draw_sequencer_panel();
     else if (page == PAGE_ARP) draw_arp_panel();
     else if (page == PAGE_ARP_STEPS) draw_arp_steps_panel();
-    else if (page == PAGE_ARP_MOD) draw_arp_mod_panel();
     else if (page == PAGE_FX_CHORUS) draw_fx_panel(0u);
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
     else if (page == PAGE_FX_PHASER) draw_fx_panel(3u);
     else if (page == PAGE_FX_ROUTING) draw_fx_routing_panel();
     else draw_global_panel(pct);
+    if(ui.delete_until && (int32_t)(ui.delete_until-plat_ms())>0)draw_delete_overlay();
     cv_blit(0, 41);
 
     /* Compact control strip. HOME and ENV already show these values in
@@ -2039,6 +2071,7 @@ void app_frame(void)
         last_arp_redraw = now;
         ui.redraw = 1;
     }
+    if(ui.delete_until && (int32_t)(now-ui.delete_until)>=0){ui.delete_until=0u;ui.redraw=1u;}
     if (pct != last_pct || (uint32_t)(plat_ble_connected() | plat_ble_device() << 1) != last_ble ||
         (ui.msg_until && now >= ui.msg_until)) {
         last_pct = pct;
