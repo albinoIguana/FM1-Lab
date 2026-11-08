@@ -366,7 +366,7 @@ int main(void) {
     fm6_init();
     fm6_set_tempo(120u);
     fm6_sequencer_set_lane(0u,0u);
-    fm6_sequencer_set_lane(1u,0u);
+    fm6_sequencer_set_lane(1u,4u);
     fm6_sequencer_set_step(0u,0u,1u,60u,110u,75u);
     fm6_sequencer_set_step(1u,0u,1u,67u,100u,75u);
     fm6_sequencer_set_running(1u);
@@ -384,7 +384,8 @@ int main(void) {
     memset(output,0,sizeof output); fm6_render(output,1u,4096u);
     assert(fm6_sequencer_step()==1u); /* sample 5513: first tick */
     assert(fm6_sequencer_running()==1u);
-    assert(fm6_active_voices_patch(0u)>=2u); /* both independent lanes reached the same FM6 patch */
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++)
+        assert(fm6_active_voices_patch(patch)>=1u); /* each lane fans out to its own four-patch Instrument bank */
     memset(output,0,sizeof output); fm6_render(output,128u,4096u);
     seq_peak=peak(output,TEST_WORDS);
     assert(seq_peak>0);
@@ -502,7 +503,7 @@ int main(void) {
     fm6_set_tempo(300u);
     fm6_sequencer_set_length(64u);
     fm6_sequencer_set_lane(0u, 0u);
-    fm6_sequencer_set_lane(1u, 1u);
+    fm6_sequencer_set_lane(1u, 4u);
     for (unsigned lane = 0; lane < 2u; ++lane)
         for (unsigned step = 0; step < 64u; ++step)
             fm6_sequencer_set_step((uint8_t)lane, (uint8_t)step, 1u,
@@ -660,7 +661,7 @@ int main(void) {
         saved.fx_time[fx] = (uint8_t)(40u + fx * 15u);
         saved.fx_feedback[fx] = (uint8_t)(fx == 0u ? 60u : 70u + fx * 5u);
         saved.fx_depth[fx] = (uint8_t)(35u + fx * 15u);
-        for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
+        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
             saved.fx_send[patch][fx] = (uint8_t)(patch * 20u + fx * 5u);
     }
     assert(fm6_performance_state_valid(&saved));
