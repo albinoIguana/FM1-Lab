@@ -510,12 +510,15 @@ void app_init(void)
         settings_defaults();
         if (plat_store_load(OBJ_SETTINGS, &old_v5, sizeof old_v5) == (int)sizeof old_v5 &&
             settings_import_v5(&set, &old_v5) == 0) {
+            performance_loaded = 1;
             set_dirty = 1u; /* migrate previous current record; initialize arp controls */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v4, sizeof old_v4) == (int)sizeof old_v4 &&
             settings_import_v4(&set, &old_v4) == 0) {
+            performance_loaded = 1;
             set_dirty = 1u; /* migrate v4 settings; compressor starts bypassed */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v3, sizeof old_v3) == (int)sizeof old_v3 &&
             settings_import_v3(&set, &old_v3) == 0) {
+            performance_loaded = 1;
             set_dirty = 1u; /* migrate v3 three-bus performance into v4 four-bus state */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v2, sizeof old_v2) == (int)sizeof old_v2 &&
                    settings_import_v2(&set, &old_v2) == 0) {
