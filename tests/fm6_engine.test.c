@@ -332,8 +332,8 @@ int main(void) {
     fm6_panic();
     assert(fm6_active_voices() == 0u);
 
-    /* Full four-layer stress: all four independent pools reach their
-     * documented per-patch limit simultaneously (32 live FM voices). */
+    /* Dual-Instrument stress: all eight independent patch pools reach their
+     * documented per-patch limit simultaneously (64 live FM voices). */
     fm6_init();
     memcpy(voice, fm6_patch_data(0), 155u);
     for (unsigned patch = 1; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
@@ -343,7 +343,7 @@ int main(void) {
     }
     for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
-            fm6_note_on_mask((uint8_t)(40u + patch * 12u + n), 100u,
+            fm6_note_on_mask((uint8_t)(24u + patch * 10u + n), 100u,
                              (uint8_t)(1u << patch));
         if(fm6_active_voices_patch(patch)!=FM1LAB_VOICE_LIMIT)
             fprintf(stderr,"FM6 pool diagnostic: patch=%u active=%u total=%u\n",
