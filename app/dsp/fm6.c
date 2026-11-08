@@ -1189,51 +1189,62 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
     }
 }
 
+/* Runtime edits use update: change musical controls without flushing held
+ * keys, arp position, or a running sequencer. set() is the cold-restore path. */
+int fm6_performance_state_update(const fm6_performance_state_t *s)
+{
+    if(!fm6_performance_state_valid(s))return -1;
+    transport_bpm=s->tempo_bpm;
+    seq_length=s->seq_length;
+    if(seq_position>=seq_length)seq_position=0u;
+    for(uint32_t lane=0;lane<2u;lane++){
+        seq_lane_patch[lane]=s->lane_patch[lane];
+        for(uint32_t step=0;step<64u;step++){
+            seq_pattern[lane][step].enabled=0u;
+            seq_pattern[lane][step].note=s->seq_note[lane][step];
+            seq_pattern[lane][step].velocity=s->seq_velocity[lane][step];
+            seq_pattern[lane][step].gate=s->seq_gate[lane][step];
+            seq_pattern[lane][step].enabled=s->seq_enabled[lane][step];
+        }
+    }
+    if(arp_mode && !s->arp_mode)arp_clear_pending=1u;
+    if(!arp_mode && s->arp_mode){arp_index=0u;arp_direction=1u;arp_step_position=0u;arp_phase=0u;}
+    arp_mode=s->arp_mode;
+    arp_division=s->arp_division;arp_gate=s->arp_gate;arp_octaves=s->arp_octaves;arp_length=s->arp_length;
+    arp_output=s->arp_output;arp_random=s->arp_random;arp_macro_dest=s->arp_macro_dest;arp_depth=s->arp_depth;
+    for(uint32_t step=0;step<16u;step++){
+        arp_step_gain[step]=s->arp_step_gain[step];
+        arp_step_accent[step]=s->arp_step_accent[step];
+        arp_step_macro[step]=s->arp_step_macro[step];
+    }
+    if(arp_step_position>=arp_length)arp_step_position=0u;
+    fm6_comp_enabled=s->compressor_enabled;fm6_comp_threshold=s->compressor_threshold;
+    fm6_comp_ratio=s->compressor_ratio;fm6_comp_attack=s->compressor_attack;
+    fm6_comp_release=s->compressor_release;fm6_comp_makeup=s->compressor_makeup;
+    fm6_comp_params_update();
+    for(uint32_t fx=0;fx<4u;fx++){
+        fx_enabled[fx]=s->fx_enabled[fx];fx_mix[fx]=s->fx_mix[fx];
+        fx_time[fx]=s->fx_time[fx];fx_feedback[fx]=s->fx_feedback[fx];
+        fx_depth[fx]=s->fx_depth[fx];
+        for(uint32_t patch=0;patch<PATCHES;patch++)fx_send[patch][fx]=s->fx_send[patch][fx];
+    }
+    return 0;
+}
 /* Call during initialization, before audio rendering starts. Runtime transport
  * phase, held keys, live notes, and delay/reverb history are never restored. */
 int fm6_performance_state_set(const fm6_performance_state_t *s)
 {
-    if (!fm6_performance_state_valid(s)) return -1;
-    transport_bpm = s->tempo_bpm;
-    seq_length = s->seq_length;
-    seq_position = 0u;
-    seq_running = 0u;
-    seq_start_pending = seq_stop_pending = 0u;
-    transport_phase = 0u;
-    seq_gate_left[0] = seq_gate_left[1] = 0u;
-    seq_live_note[0] = seq_live_note[1] = 0u;
-    seq_live_patch[0] = seq_live_patch[1] = 0u;
-    for (uint32_t lane = 0; lane < 2u; ++lane) {
-        seq_lane_patch[lane] = s->lane_patch[lane];
-        for (uint32_t step = 0; step < 64u; ++step) {
-            seq_pattern[lane][step].enabled = 0u;
-            seq_pattern[lane][step].note = s->seq_note[lane][step];
-            seq_pattern[lane][step].velocity = s->seq_velocity[lane][step];
-            seq_pattern[lane][step].gate = s->seq_gate[lane][step];
-            seq_pattern[lane][step].enabled = s->seq_enabled[lane][step];
-        }
-    }
-    arp_mode=s->arp_mode;arp_division=s->arp_division;arp_gate=s->arp_gate;arp_octaves=s->arp_octaves;arp_length=s->arp_length;
-    arp_output=s->arp_output;arp_random=s->arp_random;arp_macro_dest=s->arp_macro_dest;arp_depth=s->arp_depth;
-    for(uint32_t step=0;step<16u;step++){arp_step_gain[step]=s->arp_step_gain[step];arp_step_accent[step]=s->arp_step_accent[step];arp_step_macro[step]=s->arp_step_macro[step];}
-    arp_step_position=0u;arp_play_position=0u;arp_phase=0u;arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;arp_macro_offset=0;
-    fm6_comp_enabled=s->compressor_enabled; fm6_comp_threshold=s->compressor_threshold;
-    fm6_comp_ratio=s->compressor_ratio; fm6_comp_attack=s->compressor_attack;
-    fm6_comp_release=s->compressor_release; fm6_comp_makeup=s->compressor_makeup;
-    fm6_comp_envelope=0;
-    fm6_comp_params_update();
-    arp_count = arp_index = arp_live = 0u;
-    arp_direction = 1u;
-    arp_clear_pending = 0u;
-    for (uint32_t fx = 0; fx < 4u; ++fx) {
-        fx_enabled[fx] = s->fx_enabled[fx];
-        fx_mix[fx] = s->fx_mix[fx];
-        fx_time[fx] = s->fx_time[fx];
-        fx_feedback[fx] = s->fx_feedback[fx];
-        fx_depth[fx] = s->fx_depth[fx];
-        for (uint32_t patch = 0; patch < PATCHES; ++patch)
-            fx_send[patch][fx] = s->fx_send[patch][fx];
-    }
+    if(fm6_performance_state_update(s)!=0)return -1;
+    seq_position=0u;seq_running=0u;
+    seq_start_pending=seq_stop_pending=0u;
+    transport_phase=0u;
+    seq_gate_left[0]=seq_gate_left[1]=0u;
+    seq_live_note[0]=seq_live_note[1]=0u;
+    seq_live_patch[0]=seq_live_patch[1]=0u;
+    arp_count=arp_index=arp_live=0u;
+    arp_direction=1u;arp_step_position=arp_play_position=0u;
+    arp_phase=arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;
+    arp_macro_offset=0;arp_clear_pending=0u;
     return 0;
 }
 
