@@ -2311,12 +2311,15 @@ void app_frame(void)
         last_midi = midi_count;
         ui.redraw = 1;
     }
-    /* The ARP playhead moves without encoder or key-state changes. Refresh
-     * this page independently so the highlighted step visibly follows time. */
-    if (page == PAGE_ARP_STEPS && fm6_arpeggiator_active() &&
-        (uint32_t)(now - last_arp_redraw) >= 30u) {
-        last_arp_redraw = now;
-        ui.redraw = 1;
+    /* Transport playheads advance in the audio callback, independently of
+     * UI input. Refresh sequencer and ARP views at a steady cadence so their
+     * highlights follow the actual audio-owned step position. */
+    if (((page == PAGE_SEQ || page == PAGE_SEQ_PIANO) && fm6_sequencer_running()) ||
+        (page == PAGE_ARP_STEPS && fm6_arpeggiator_active())) {
+        if ((uint32_t)(now - last_arp_redraw) >= 30u) {
+            last_arp_redraw = now;
+            ui.redraw = 1u;
+        }
     }
     if(ui.delete_until && (int32_t)(ui.delete_until-now)>0 &&
        (uint32_t)(now-last_arp_redraw)>=70u){last_arp_redraw=now;ui.redraw=1u;}
