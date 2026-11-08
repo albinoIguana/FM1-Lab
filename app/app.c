@@ -55,6 +55,84 @@ static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
 
 /* Main-loop controls never write FM voice state directly. They publish compact events;
  * the audio interrupt is the sole runtime writer of the synthesizer state. */
+
+/* M-VAVE's 16 compact factory DX7 recipes, expanded to the same 156-byte
+ * voice layout used by FM1-Lab/Felucca. PRESET loads one recipe into one patch. */
+enum { FM1LAB_FACTORY_PRESET_COUNT = 16u };
+struct fm1lab_factory_pair {
+    uint8_t level, coarse : 2, detune : 4, mod, ratio, fine, decay, body;
+};
+struct fm1lab_factory_voice {
+    uint8_t attack, decay, settle, release, body, sustain, mod_attack, mod_release, feedback;
+    struct fm1lab_factory_pair pair[3];
+};
+static const char fm1lab_factory_names[FM1LAB_FACTORY_PRESET_COUNT][11] = {
+    "NEON KEYS ","ORBIT BELL","SOFT ORGAN","ROUND BASS","WARM AIR  ","WOOD REED ",
+    "SOFT EP   ","DRY CLAV  ","FM GUITAR ","MARIMBA   ","VIBES     ","SOFT BRASS",
+    "FM STRINGS","SUB BASS  ","METAL HIT ","SOFT LEAD "
+};
+static const struct fm1lab_factory_voice fm1lab_factory_voices[FM1LAB_FACTORY_PRESET_COUNT] = {
+    {96,52,30,62,84,0,99,66,0, {{98,1,7,54,1,0,65,38},{91,1,8,60,1,0,57,58},{79,1,6,48,7,0,80,0}}},
+    {99,50,28,53,70,0,99,62,0, {{96,1,7,58,3,50,59,0},{82,2,7,48,7,0,68,0},{69,3,7,35,11,0,80,0}}},
+    {95,65,45,78,99,99,95,78,0, {{90,1,7,0,1,0,65,0},{87,2,7,0,1,0,65,0},{74,3,7,0,1,0,65,0}}},
+    {97,72,46,82,91,84,99,86,0, {{99,1,7,42,1,0,76,32},{74,2,7,32,1,0,82,20},{0,1,7,0,1,0,80,0}}},
+    {53,47,36,52,96,92,49,55,0, {{90,1,5,42,1,0,55,82},{84,1,9,34,2,0,53,76},{73,2,7,27,1,0,52,78}}},
+    {84,61,46,72,94,89,78,77,1, {{95,1,7,61,2,0,63,86},{82,1,8,38,1,0,68,75},{70,3,7,29,1,0,72,60}}},
+    {94,49,28,60,86,0,96,64,0, {{98,1,7,44,1,0,60,35},{86,1,8,38,3,0,66,20},{72,2,6,31,1,0,72,0}}},
+    {99,75,47,80,42,0,99,83,1, {{96,1,7,67,1,0,82,18},{81,2,7,55,2,0,86,0},{0,1,7,0,1,0,80,0}}},
+    {97,57,32,66,69,0,99,74,0, {{97,1,7,55,1,0,72,18},{83,2,7,46,3,0,81,0},{66,3,7,38,5,0,85,0}}},
+    {99,67,37,72,34,0,99,81,0, {{98,1,7,60,3,0,85,0},{74,2,7,46,5,0,88,0},{58,3,7,32,7,0,91,0}}},
+    {98,52,25,55,78,0,99,65,0, {{94,1,7,56,4,0,76,0},{76,2,8,39,3,0,81,0},{66,3,6,28,2,0,84,0}}},
+    {81,62,42,72,96,90,67,75,1, {{95,1,7,67,1,0,62,90},{84,1,8,46,1,0,65,83},{70,2,6,40,2,0,68,75}}},
+    {61,48,39,54,96,94,57,58,0, {{89,1,5,54,1,0,55,89},{83,1,9,36,2,0,55,83},{72,2,7,30,4,0,58,76}}},
+    {95,72,44,84,96,94,99,86,0, {{99,1,7,0,1,0,80,0},{0,1,7,0,1,0,80,0},{0,1,7,0,1,0,80,0}}},
+    {99,65,40,72,48,0,99,76,0, {{89,1,7,65,7,31,67,0},{70,2,7,58,11,47,73,0},{56,3,7,48,13,79,78,0}}},
+    {88,60,40,71,96,90,82,75,1, {{96,1,7,45,1,0,65,83},{80,1,8,31,2,0,70,72},{71,2,6,24,1,0,74,66}}}
+};
+static void fm1lab_factory_voice_build(uint8_t out[FM1LAB_PATCH_BYTES], uint8_t preset)
+{
+    const struct fm1lab_factory_voice *sound = &fm1lab_factory_voices[preset % FM1LAB_FACTORY_PRESET_COUNT];
+    for (uint32_t i=0;i<FM1LAB_PATCH_BYTES;i++) out[i]=0u;
+    for (uint32_t i=0;i<10u;i++) out[145u+i]=(uint8_t)fm1lab_factory_names[preset % FM1LAB_FACTORY_PRESET_COUNT][i];
+    for (uint32_t op=0;op<6u;op++) {
+        uint8_t *v=out+21u*op;
+        const struct fm1lab_factory_pair *pair=&sound->pair[op/2u];
+        uint8_t carrier=(uint8_t)(op&1u);
+        v[0]=carrier?sound->attack:sound->mod_attack;
+        v[1]=carrier?sound->decay:pair->decay;
+        v[2]=sound->settle; v[3]=carrier?sound->release:sound->mod_release;
+        v[4]=99u; v[5]=carrier?sound->body:pair->body;
+        v[6]=carrier?sound->sustain:(sound->sustain?pair->body:0u);
+        v[8]=50u; v[10]=carrier?8u:18u; v[13]=1u;
+        v[15]=carrier?2u:4u; v[16]=carrier?pair->level:pair->mod;
+        v[18]=carrier?pair->coarse:pair->ratio;
+        v[19]=carrier?0u:pair->fine; v[20]=pair->detune;
+        if (preset==2u) {
+            static const uint8_t levels[6]={89,77,84,68,59,52};
+            static const uint8_t ratios[6]={1,2,3,4,6,8};
+            v[16]=levels[op]; v[18]=ratios[op]; v[19]=0u;
+            v[5]=v[6]=99u; v[15]=1u; v[20]=7u;
+        }
+    }
+    for(uint32_t i=126u;i<130u;i++)out[i]=99u;
+    for(uint32_t i=130u;i<134u;i++)out[i]=50u;
+    out[134]=(uint8_t)(preset==2u?31u:4u);
+    out[135]=sound->feedback; out[136]=1u;
+    out[137]=28u; out[138]=35u;
+    if(preset==4u||preset==5u||preset==12u){out[139]=2u;out[143]=2u;}
+    out[141]=1u; out[142]=4u; out[144]=24u; out[155]=63u;
+}
+static uint8_t fm1lab_factory_preset_for_voice(const uint8_t *voice)
+{
+    for(uint32_t p=0;p<FM1LAB_FACTORY_PRESET_COUNT;p++) {
+        uint8_t name_matches=1u;
+        for(uint32_t i=0;i<10u;i++)
+            if(voice[145u+i]!=(uint8_t)fm1lab_factory_names[p][i]) name_matches=0u;
+        if(name_matches) return (uint8_t)p;
+    }
+    return 0u;
+}
+
 static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 {
     uint8_t head = ui_event_head, next = (uint8_t)((head + 1u) & 63u);
@@ -851,11 +929,19 @@ static void input(void)
             app_say("OPERATOR PITCH", operator_detune_mode ? "DETUNE" : "FINE");
         } else if (k == EN_PRESET) {
             if (page == PAGE_HOME && patch_focus) {
-                int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
-                if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
-                set.patch = (uint8_t)next;
-                set_dirty = 1u;
-                app_say("PATCH", patch_display_name(set.patch));
+                uint8_t voice[FM1LAB_PATCH_BYTES];
+                uint8_t *selected = current_instrument.patches[set.patch].voice;
+                int32_t next = ((int32_t)fm1lab_factory_preset_for_voice(selected) + e) %
+                    (int32_t)FM1LAB_FACTORY_PRESET_COUNT;
+                if (next < 0) next += (int32_t)FM1LAB_FACTORY_PRESET_COUNT;
+                fm1lab_factory_voice_build(voice, (uint8_t)next);
+                voice[155] = selected[155]; /* keep this patch's pan */
+                if (fm1lab_patch_set_voice(&current_instrument, set.patch, voice) == 0) {
+                    voice_edit_changed();
+                    app_say("PATCH PRESET", fm1lab_factory_names[next]);
+                } else {
+                    app_say("PRESET ERROR", "PATCH UNCHANGED");
+                }
             } else if (instrument_apply_pending) {
                 app_say("INSTRUMENT", "LOADING");
             } else {
