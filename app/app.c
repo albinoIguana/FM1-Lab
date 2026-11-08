@@ -633,7 +633,6 @@ void app_init(void)
         }
         for (uint32_t lane = 0; lane < 2u; ++lane) {
             seq_ui_instrument[lane] = set.performance.lane_instrument[lane];
-            seq_ui_instrument[lane] = 0u;
             seq_ui_patch[lane] = 0u;
             for (uint32_t step = 0; step < 64u; ++step) {
                 seq_ui_enabled[lane][step] = set.performance.seq_enabled[lane][step];
@@ -645,6 +644,7 @@ void app_init(void)
         }
     } else {
         for (uint32_t lane = 0; lane < 2u; ++lane) {
+            seq_ui_instrument[lane] = 0u;
             seq_ui_patch[lane] = 0u;
             for (uint32_t step = 0; step < 64u; ++step) {
                 seq_ui_note[lane][step] = (uint8_t)(lane ? 67u : 48u);
