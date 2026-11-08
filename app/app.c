@@ -840,7 +840,7 @@ static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
 
 static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocity)
 {
-    if(!seq_record_armed || (page!=PAGE_SEQ && page!=PAGE_SEQ_OPTIONS))return;
+    if(!seq_record_armed)return;
     uint8_t lane=seq_ui_lane;
     uint8_t step=fm6_sequencer_running()?fm6_sequencer_playing_step():seq_ui_step;
     seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;seq_ui_velocity[lane][step]=velocity;
@@ -862,8 +862,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
 }
 static void sequencer_record_step_advance(void)
 {
-    if(!seq_record_armed || !seq_record_mode ||
-       (page!=PAGE_SEQ && page!=PAGE_SEQ_OPTIONS) || !fm6_sequencer_running()) {
+    if(!seq_record_armed || !seq_record_mode || !fm6_sequencer_running()) {
         seq_record_last_step=255u;return;
     }
     uint8_t step=fm6_sequencer_playing_step();
@@ -1367,14 +1366,12 @@ static void input(void)
             else page = page == PAGE_FX_ROUTING ? PAGE_FX_AMP : (uint8_t)(page + 1u);
             app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
         } else if (k == B_PLAY) {
-            if (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS || page == PAGE_SEQ_PIANO) {
-                uint8_t starting=(uint8_t)!fm6_sequencer_running();
-                ui_event_push(EV_SEQ_RUN,starting,0u,0u);
-                if(starting)seq_record_last_step=255u;
-                app_say("SEQUENCER", starting ? (seq_record_armed?"RECORDING":"PLAYING") : "STOPPED");
-            } else {
-                app_say("PLAY", "SELECT SEQUENCER");
-            }
+            /* PLAY is a global transport toggle; the current page only
+             * determines what is displayed, never whether transport runs. */
+            uint8_t starting=(uint8_t)!fm6_sequencer_running();
+            ui_event_push(EV_SEQ_RUN,starting,0u,0u);
+            if(starting)seq_record_last_step=255u;
+            app_say("SEQUENCER", starting ? (seq_record_armed?"RECORDING":"PLAYING") : "STOPPED");
         } else if (k == B_SAVE) {
             int instrument_result = instrument_save();
             /* set.performance is the UI-owned source of truth; queued audio
