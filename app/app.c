@@ -431,7 +431,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     if(!seq_record_active[key] || seq_record_note[key]!=note)return;
     uint32_t elapsed=plat_ms()-seq_record_started[key];
     uint32_t step_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/4u;
-    uint8_t gate=(uint8_t)clamp((int32_t)(elapsed*100u/(step_ms?step_ms:1u)),10,100);
+    uint8_t gate=(uint8_t)(elapsed>=step_ms?100u:clamp((int32_t)(elapsed*100u/(step_ms?step_ms:1u)),10,100));
     seq_ui_gate[seq_record_lane[key]][seq_record_step[key]]=gate;
     seq_record_active[key]=0u;performance_publish();set_dirty=1u;ui.redraw=1u;
 }
@@ -805,19 +805,6 @@ static void ble_device_say(void)
     else
         app_say("BLE", "SCANNING");
 }
-static void ble_device_button(void)
-{
-    int ev;
-    if (!btdev_busy() && !ui.looking) {
-        ui.looking = 1;
-        app_say("BLE", "SCANNING");
-        return;
-    }
-    ev = btdev_save();
-    ui.looking = 0;
-    app_say(ev == BTDEV_CONNECTING ? btdev_word(ev) : "BLE", ev == BTDEV_CONNECTING ? btdev_name() : btdev_word(ev));
-}
-
 static void input(void)
 {
     uint32_t keys, btn = plat_buttons(), k;
