@@ -500,6 +500,7 @@ void app_init(void)
     settings_v4_t old_v4;
     settings_v5_t old_v5;
     settings_v6_t old_v6;
+    settings_v7_t old_v7;
     int performance_loaded = 0;
     int loaded;
     fm6_init();
@@ -509,7 +510,11 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v6, sizeof old_v6) == (int)sizeof old_v6 &&
+        if (plat_store_load(OBJ_SETTINGS, &old_v7, sizeof old_v7) == (int)sizeof old_v7 &&
+            settings_import_v7(&set, &old_v7) == 0) {
+            performance_loaded = 1;
+            set_dirty = 1u;
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v6, sizeof old_v6) == (int)sizeof old_v6 &&
             settings_import_v6(&set, &old_v6) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V6 macro-step values become neutral full-length gates */
@@ -870,10 +875,10 @@ static void input(void)
     if(ui.arp_hold_t) {
         if(btn&(1u<<B_ARP)) {
             if(!ui.arp_hold_fired && (uint32_t)(plat_ms()-ui.arp_hold_t)>=3000u) {
-                for(uint32_t step=0;step<16u;step++){arp_ui_gain[step]=127u;arp_ui_accent[step]=0u;arp_ui_step_gate[step]=100u;}
+                for(uint32_t step=0;step<16u;step++){arp_ui_gain[step]=127u;arp_ui_accent[step]=0u;arp_ui_step_gate[step]=0u;}
                 arp_ui_step=0u;performance_publish();set_dirty=1u;
                 fm6_arpeggiator_reset_steps();
-                ui.arp_hold_fired=1u;ui.delete_kind=1u;ui.delete_until=plat_ms()+1100u;
+                ui.arp_hold_fired=1u;ui.delete_kind=1u;ui.delete_until=plat_ms()+2100u;
                 app_say("ARPEGGIATOR","STEPS CLEARED");
             }
         } else {
@@ -896,7 +901,7 @@ static void input(void)
                 }
                 performance_publish();set_dirty=1u;fm6_sequencer_clear_lane(lane);
                 ui.seq_hold_fired=1u;ui.delete_kind=2u;ui.delete_index=(uint8_t)(lane+1u);
-                ui.delete_until=plat_ms()+1100u;
+                ui.delete_until=plat_ms()+2100u;
                 app_say("SEQUENCE CLEARED",lane?"SEQUENCE 2":"SEQUENCE 1");
             }
         } else {
@@ -1081,7 +1086,7 @@ static void input(void)
                 if(index==0u) { int32_t next=((int32_t)step+e)%arp_ui_length; if(next<0)next+=arp_ui_length; arp_ui_step=(uint8_t)next; }
                 else if(index==1u) arp_ui_gain[step]=(uint8_t)clamp((int32_t)arp_ui_gain[step]+e,0,127);
                 else if(index==2u) arp_ui_accent[step]=(uint8_t)clamp((int32_t)arp_ui_accent[step]+e,0,100);
-                else arp_ui_step_gate[step]=(uint8_t)clamp((int32_t)arp_ui_step_gate[step]+e,10,100);
+                else if(e) arp_ui_step_gate[step]=(uint8_t)!arp_ui_step_gate[step];
                 performance_publish();set_dirty=1u;
                 app_say("ARP STEP", "UPDATED");
             } else if (page == PAGE_FX_ROUTING) {
@@ -1773,65 +1778,83 @@ static void draw_arp_steps_panel(void)
     char t[16];
     uint8_t playing=fm6_arpeggiator_playing_step(), active=fm6_arpeggiator_active();
     int32_t gap=2, width=(224-(int32_t)(arp_ui_length-1u)*gap)/(int32_t)arp_ui_length;
-    int32_t top=28, height=100, bottom=top+height;
-    cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP PATTERN":"16 STEP PATTERN",C_GRAY);
-    cv_text(155,2,&FONT_XS,active?"RUNNING":"READY",active?RGB(75,235,135):C_GRAY);
+    int32_t top=29, height=91, bottom=top+height;
+    uint16_t gain_color=RGB(36,215,232), accent_color=RGB(227,75,210), tie_color=RGB(242,212,59);
+    cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP LOOP":"16 STEP LOOP",C_GRAY);
+    cv_text(151,2,&FONT_XS,active?"PLAYING":"STANDBY",active?RGB(75,235,135):C_GRAY);
+    cv_rect(5,18,214,1,RGB(35,51,64));
     for(uint32_t i=0;i<arp_ui_length;i++) {
         int32_t x=8+(int32_t)i*(width+gap);
         uint8_t gain=arp_ui_gain[i], emphasis=arp_ui_accent[i];
-        uint8_t gate=arp_ui_step_gate[i]<10u?10u:arp_ui_step_gate[i]>100u?100u:arp_ui_step_gate[i];
-        int32_t bar_h=(int32_t)gain*(height-8)/127, bar_w=(width-4)*(int32_t)gate/100;
+        uint8_t tied=arp_ui_step_gate[i]?1u:0u;
+        int32_t bar_h=(int32_t)gain*(height-10)/127;
         uint8_t is_playing=(uint8_t)(active && i==(uint32_t)(playing%arp_ui_length));
         uint8_t is_selected=(uint8_t)(i==arp_ui_step);
-        uint32_t bands=8u;
+        uint32_t bands=7u;
         int_text((int32_t)i+1,t);
-        cv_text(x+(width-text_w(&FONT_XS,t))/2,15,&FONT_XS,t,is_selected?C_WHITE:C_GRAY);
-        cv_rect(x,top,width,height,C_LINE);
-        cv_rect(x+1,top+1,width-2,height-2,RGB(13,20,29));
+        cv_text(x+(width-text_w(&FONT_XS,t))/2,21,&FONT_XS,t,is_selected?C_WHITE:C_GRAY);
+        cv_rect(x,top,width,height,is_selected?C_WHITE:RGB(43,59,72));
+        cv_rect(x+1,top+1,width-2,height-2,RGB(12,20,29));
+        cv_rect(x+2,top+2,width-4,2,emphasis?accent_color:RGB(34,49,61));
         if(bar_h<2&&gain)bar_h=2;
-        if(bar_w<1)bar_w=1;
         if(gain) {
-            int32_t fill_x=x+(width-bar_w)/2, fill_y=bottom-3-bar_h;
+            int32_t fill_x=x+2, fill_y=bottom-4-bar_h;
+            int32_t bar_w=width-4;
             int32_t band_h=(bar_h+(int32_t)bands-1)/(int32_t)bands;
             for(uint32_t band=0;band<bands;band++) {
                 int32_t yy=fill_y+(int32_t)band*band_h, hh=band_h;
-                if(yy+hh>bottom-3)hh=bottom-3-yy;
+                if(yy+hh>bottom-4)hh=bottom-4-yy;
                 if(hh>0)cv_rect(fill_x,yy,bar_w,hh,arp_step_gradient_color(emphasis,band,bands,is_playing));
             }
         }
-        if(is_playing)cv_rect(x+1,top+1,width-2,2,RGB(255,150,255));
+        if(tied && i+1u<arp_ui_length) {
+            int32_t bridge_y=bottom-1;
+            cv_rect(x+width-1,bridge_y,gap+2,2,tie_color);
+            cv_rect(x+width-1,bridge_y-2,1,4,tie_color);
+            cv_rect(x+width+gap,bridge_y-2,1,4,tie_color);
+        }
+        if(is_playing) {
+            cv_rect(x+1,top+1,width-2,2,RGB(255,150,255));
+            cv_rect(x+1,bottom-3,width-2,1,RGB(255,150,255));
+        }
         if(is_selected) {
             cv_rect(x,top,width,1,C_WHITE);cv_rect(x,bottom-1,width,1,C_WHITE);
             cv_rect(x,top,1,height,C_WHITE);cv_rect(x+width-1,top,1,height,C_WHITE);
         }
     }
-    cv_text(5,137,&FONT_XS,"STEP",C_GRAY);
-    int_text((int32_t)arp_ui_step+1,t);cv_text(31,137,&FONT_XS,t,C_WHITE);
-    cv_text(55,137,&FONT_XS,"GAIN",RGB(36,215,232));
-    int_text(arp_ui_gain[arp_ui_step],t);cv_text(83,137,&FONT_XS,t,C_WHITE);
-    cv_text(112,137,&FONT_XS,"ACC",RGB(227,75,210));
-    int_text(arp_ui_accent[arp_ui_step],t);cv_text(135,137,&FONT_XS,t,C_WHITE);
-    cv_text(163,137,&FONT_XS,"GATE",RGB(242,212,59));
-    int_text(arp_ui_step_gate[arp_ui_step],t);cv_text(193,137,&FONT_XS,t,C_WHITE);
-    cv_text(5,158,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 GATE",C_GRAY);
+    cv_text(5,128,&FONT_XS,"STEP",C_GRAY);
+    int_text((int32_t)arp_ui_step+1,t);cv_text(31,128,&FONT_XS,t,C_WHITE);
+    cv_text(55,128,&FONT_XS,"GAIN",gain_color);
+    int_text(arp_ui_gain[arp_ui_step],t);cv_text(83,128,&FONT_XS,t,C_WHITE);
+    cv_text(112,128,&FONT_XS,"ACC",accent_color);
+    int_text(arp_ui_accent[arp_ui_step],t);cv_text(135,128,&FONT_XS,t,C_WHITE);
+    cv_text(163,128,&FONT_XS,"TIE",tie_color);
+    cv_text(193,128,&FONT_XS,arp_ui_step_gate[arp_ui_step]?"ON":"OFF",arp_ui_step_gate[arp_ui_step]?tie_color:C_GRAY);
+    cv_text(5,151,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 TIE",C_GRAY);
+    cv_text(5,165,&FONT_XS,"PRESET  8 / 16 STEPS",C_GRAY);
 }
 
 static void draw_delete_overlay(void)
 {
-    uint32_t phase=(plat_ms()/110u)&1u;
+    uint32_t phase=(plat_ms()/180u)&3u;
     uint16_t accent=ui.delete_kind==1u?RGB(227,75,210):RGB(242,212,59);
-    const char *label=ui.delete_kind==1u?"DELETING ARP":
-        (ui.delete_index==2u?"DELETING SEQUENCE 2":"DELETING SEQUENCE 1");
-    cv_rect(20,48,200,91,RGB(5,9,16));
-    cv_rect(21,49,198,89,accent);
-    cv_rect(23,51,194,85,RGB(12,18,29));
-    cv_rect(103,61+(int32_t)phase*2,34,4,phase?C_WHITE:accent);
-    cv_rect(108,67,24,22,accent);
-    cv_rect(112,71,3,14,RGB(12,18,29));
-    cv_rect(120,71,3,14,RGB(12,18,29));
-    cv_rect(128,71,3,14,RGB(12,18,29));
-    cv_text(120-text_w(&FONT_B,label)/2,96,&FONT_B,label,phase?C_WHITE:accent);
-    cv_text(120-text_w(&FONT_XS,"HOLD COMPLETE")/2,119,&FONT_XS,"HOLD COMPLETE",C_WHITE);
+    const char *label=ui.delete_kind==1u?"CLEARING ARP":
+        (ui.delete_index==2u?"CLEARING SEQUENCE 2":"CLEARING SEQUENCE 1");
+    uint32_t remaining=(uint32_t)(ui.delete_until-plat_ms());
+    uint32_t elapsed=remaining<2100u?2100u-remaining:2100u;
+    int32_t progress=(int32_t)(elapsed*176u/2100u);
+    rounded_panel(18,48,204,91,3,RGB(5,9,16),accent);
+    rounded_panel(21,51,198,85,3,RGB(12,18,29),RGB(31,47,59));
+    cv_rect(96,62,32,2,RGB(43,59,72));
+    cv_rect(96,62+(int32_t)(phase&1u)*2,8,2,accent);
+    cv_rect(108,70,24,16,RGB(20,31,43));
+    cv_rect(111,73,4,10,accent);
+    cv_rect(120,73,4,10,phase&1u?C_WHITE:accent);
+    cv_rect(129,73,4,10,accent);
+    cv_text(120-text_w(&FONT_B,label)/2,96,&FONT_B,label,C_WHITE);
+    cv_rect(34,119,176,3,RGB(31,47,59));
+    if(progress>176)progress=176;
+    if(progress>0)cv_rect(34,119,progress,3,accent);
 }
 static void draw_fx_panel(uint8_t fx)
 {
