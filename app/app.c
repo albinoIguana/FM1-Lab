@@ -2038,7 +2038,7 @@ static const char *instrument_display_name(void)
     uint32_t i=0u; while(i<FM1LAB_INSTRUMENT_NAME_BYTES && current_instrument.name[i]) { name[i]=current_instrument.name[i]; ++i; }
     while(i && name[i-1u]==' ') --i;
     if(!i) { name[0]='I';name[1]='N';name[2]='S';name[3]='T';name[4]='R';name[5]='U';name[6]='M';name[7]='E';name[8]='N';name[9]='T';i=10u; }
-    name[i]='\\0'; return name;
+    name[i]='\0'; return name;
 }
 
 static const char *patch_display_name(uint32_t patch)
@@ -2417,10 +2417,10 @@ static void draw_save_panel(void)
     cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  24 CHARS",C_GRAY);
     if(save_name_target) {
         for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)t[i]=(char)current_instrument.patches[save_patch].voice[145u+i];
-        t[FM1LAB_PATCH_NAME_BYTES]='\\0';
+        t[FM1LAB_PATCH_NAME_BYTES]='\0';
     } else {
         for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++)t[i]=current_instrument.name[i];
-        t[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
+        t[FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
     }
     cv_text(14,117,&FONT_B,t,accent);
     int32_t cursor_x=14+(int32_t)save_name_cursor*(save_name_target?8:7);
