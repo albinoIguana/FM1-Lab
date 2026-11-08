@@ -142,7 +142,7 @@ static volatile uint32_t transport_bpm=120u;
 static uint32_t transport_phase;
 static volatile uint8_t arp_mode, arp_notes[16], arp_velocities[16], arp_count, arp_index, arp_direction=1u;
 static volatile uint8_t arp_division=3u, arp_gate=75u, arp_octaves=1u, arp_length=16u;
-static volatile uint8_t arp_step_gain[16], arp_step_accent[16], arp_step_macro[16];
+static volatile uint8_t arp_step_gain[16], arp_step_accent[16], arp_step_gate[16];
 static volatile uint8_t arp_output, arp_random, arp_macro_dest, arp_depth=50u;
 static volatile uint8_t arp_step_position;
 static uint32_t arp_random_state=0x6D2B79F5u, arp_phase, arp_gate_left;
@@ -392,7 +392,10 @@ static void fm6_arpeggiator_step(void)
     uint8_t step=(uint8_t)(arp_step_position%(arp_length?arp_length:16u));
     uint32_t index;
     uint8_t note,velocity;
-    uint32_t gain=arp_step_gain[step],accent=arp_step_accent[step];
+    uint32_t gain=arp_step_gain[step];
+    uint32_t step_gate=arp_step_gate[step];
+    uint32_t effective_gate=(uint32_t)(arp_gate<10u?10u:arp_gate>100u?100u:arp_gate)*step_gate/100u;
+    if(effective_gate<1u)effective_gate=1u;
     if(arp_live){fm6_note_off_source(arp_live_note,0x0fu,3u);arp_live=0u;}
     if(!arp_mode||!count){
         arp_gate_left=0u;arp_amp_target_q15=32768;
@@ -400,14 +403,17 @@ static void fm6_arpeggiator_step(void)
         return;
     }
     if(arp_output==2u){
-        int32_t offset=((int32_t)arp_step_macro[step]-50)*(int32_t)arp_depth/50;
-        fm6_arp_macro_apply(offset);
+        /* Macro output is a fixed per-step modulation amount; K4's
+         * per-step gate controls how long that modulation is held. */
+        fm6_arp_macro_apply((int32_t)arp_depth-50);
     } else fm6_arp_macro_apply(0);
     if(arp_output==1u){
         uint32_t level=gain>127u?127u:gain;
-        level=level+(127u-level)*accent/100u;
         arp_amp_target_q15=(int32_t)(level*32768u/127u);
-        arp_gate_left=(uint32_t)((uint64_t)fm6_arp_step_period()*(arp_gate<10u?10u:arp_gate>100u?100u:arp_gate)/100u);
+        arp_gate_left=(uint32_t)((uint64_t)fm6_arp_step_period()*effective_gate/100u);
+        if(!arp_gate_left)arp_gate_left=1u;
+    } else if(arp_output==2u) {
+        arp_gate_left=(uint32_t)((uint64_t)fm6_arp_step_period()*effective_gate/100u);
         if(!arp_gate_left)arp_gate_left=1u;
     } else {
         arp_amp_target_q15=32768;
@@ -425,7 +431,7 @@ static void fm6_arpeggiator_step(void)
         if(note>127u)note=127u;
         velocity=arp_velocities[note_index];
         velocity=(uint8_t)((uint32_t)velocity*gain/127u);
-        velocity=(uint8_t)(velocity+((127u-velocity)*accent/100u));
+        /* Accent is visual-only; gain controls note velocity. */
         if(velocity) {
             arp_live_note=note;
             fm6_note_start_tuned_mask(note,velocity,0x0fu,0,3u);
@@ -708,7 +714,7 @@ void fm6_init(void)
     }
     fm6_zero_bytes(seq_gate_left,sizeof(seq_gate_left));
     fm6_zero_bytes(seq_live_note,sizeof(seq_live_note)); fm6_zero_bytes(seq_live_patch,sizeof(seq_live_patch));
-    for(uint32_t n=0;n<16u;n++) { arp_notes[n]=0u; arp_velocities[n]=0u; arp_step_gain[n]=127u; arp_step_accent[n]=0u; arp_step_macro[n]=50u; }
+    for(uint32_t n=0;n<16u;n++) { arp_notes[n]=0u; arp_velocities[n]=0u; arp_step_gain[n]=127u; arp_step_accent[n]=0u; arp_step_gate[n]=100u; }
     fm6_zero_bytes(fx_delay,sizeof(fx_delay)); fm6_zero_bytes(fx_delay_r,sizeof(fx_delay_r));
     fm6_zero_bytes(fx_chorus,sizeof(fx_chorus)); fm6_zero_bytes(fx_chorus_r,sizeof(fx_chorus_r));
     fm6_zero_bytes(fx_comb_a,sizeof(fx_comb_a)); fm6_zero_bytes(fx_comb_a_r,sizeof(fx_comb_a_r));
@@ -974,6 +980,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             if(arp_gate_left && --arp_gate_left==0u) {
                 if(arp_live){fm6_note_off_source(arp_live_note,0x0fu,3u);arp_live=0u;}
                 if(arp_output==1u)arp_amp_target_q15=0;
+                if(arp_output==2u)fm6_arp_macro_apply(0);
             }
             {int32_t delta=arp_amp_target_q15-arp_amp_gain_q15;if(delta)arp_amp_gain_q15+=delta/32+(delta>0?1:-1);}
             for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane] && --seq_gate_left[lane]==0u)
@@ -1144,7 +1151,7 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         s->arp_output>2u || s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
         return 0;
     for(uint32_t step=0;step<16u;step++)
-        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_macro[step]>100u)return 0;
+        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_gate[step]<10u||s->arp_step_gate[step]>100u)return 0;
     for (uint32_t lane = 0; lane < 2u; ++lane) {
         if (s->lane_patch[lane] >= PATCHES) return 0;
         for (uint32_t step = 0; step < 64u; ++step) {
@@ -1185,7 +1192,7 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
     }
     s->arp_mode = arp_mode;s->arp_division=arp_division;s->arp_gate=arp_gate;s->arp_octaves=arp_octaves;s->arp_length=arp_length;
     s->arp_output=arp_output;s->arp_random=arp_random;s->arp_macro_dest=arp_macro_dest;s->arp_depth=arp_depth;
-    for(uint32_t step=0;step<16u;step++){s->arp_step_gain[step]=arp_step_gain[step];s->arp_step_accent[step]=arp_step_accent[step];s->arp_step_macro[step]=arp_step_macro[step];}
+    for(uint32_t step=0;step<16u;step++){s->arp_step_gain[step]=arp_step_gain[step];s->arp_step_accent[step]=arp_step_accent[step];s->arp_step_gate[step]=arp_step_gate[step];}
     s->compressor_enabled=fm6_comp_enabled; s->compressor_threshold=fm6_comp_threshold;
     s->compressor_ratio=fm6_comp_ratio; s->compressor_attack=fm6_comp_attack;
     s->compressor_release=fm6_comp_release; s->compressor_makeup=fm6_comp_makeup;
@@ -1236,7 +1243,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
     for(uint32_t step=0;step<16u;step++){
         arp_step_gain[step]=s->arp_step_gain[step];
         arp_step_accent[step]=s->arp_step_accent[step];
-        arp_step_macro[step]=s->arp_step_macro[step];
+        arp_step_gate[step]=s->arp_step_gate[step];
     }
     if(arp_step_position>=arp_length)arp_step_position=0u;
     fm6_comp_enabled=s->compressor_enabled;fm6_comp_threshold=s->compressor_threshold;
