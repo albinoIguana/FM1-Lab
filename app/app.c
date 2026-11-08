@@ -24,7 +24,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_ARP_STEPS, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_ARP, PAGE_ARP_STEPS, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -32,6 +32,9 @@ static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,0u};
+static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
+static uint8_t seq_record_active[NKEYS], seq_record_step[NKEYS], seq_record_lane[NKEYS], seq_record_note[NKEYS];
+static uint32_t seq_record_started[NKEYS];
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
@@ -410,6 +413,42 @@ static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
         voice_edit_changed();
 }
 
+static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocity)
+{
+    if(!seq_record_armed || (page!=PAGE_SEQ && page!=PAGE_SEQ_OPTIONS))return;
+    uint8_t lane=seq_ui_lane;
+    uint8_t step=fm6_sequencer_running()?fm6_sequencer_playing_step():seq_ui_step;
+    seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;seq_ui_velocity[lane][step]=velocity;
+    if(!seq_ui_gate[lane][step])seq_ui_gate[lane][step]=75u;
+    if(fm6_sequencer_running()) {
+        seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
+        seq_record_note[key]=note;seq_record_started[key]=plat_ms();
+    } else seq_ui_step=(uint8_t)((step+1u)%64u);
+    performance_publish();set_dirty=1u;ui.redraw=1u;
+}
+static void sequencer_record_release(uint32_t key, uint8_t note)
+{
+    if(!seq_record_active[key] || seq_record_note[key]!=note)return;
+    uint32_t elapsed=plat_ms()-seq_record_started[key];
+    uint32_t step_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/4u;
+    uint8_t gate=(uint8_t)clamp((int32_t)(elapsed*100u/(step_ms?step_ms:1u)),10,100);
+    seq_ui_gate[seq_record_lane[key]][seq_record_step[key]]=gate;
+    seq_record_active[key]=0u;performance_publish();set_dirty=1u;ui.redraw=1u;
+}
+static void sequencer_record_step_advance(void)
+{
+    if(!seq_record_armed || !seq_record_mode ||
+       (page!=PAGE_SEQ && page!=PAGE_SEQ_OPTIONS) || !fm6_sequencer_running()) {
+        seq_record_last_step=255u;return;
+    }
+    uint8_t step=fm6_sequencer_playing_step();
+    if(step==seq_record_last_step)return;
+    seq_record_last_step=step;
+    uint8_t lane=seq_ui_lane;
+    seq_ui_enabled[lane][step]=0u;seq_ui_note[lane][step]=60u;
+    seq_ui_velocity[lane][step]=100u;seq_ui_gate[lane][step]=75u;
+    performance_publish();set_dirty=1u;ui.redraw=1u;
+}
 static void note_on(int32_t note, uint32_t vel)
 {
     voice_note = note;
@@ -542,6 +581,7 @@ void app_init(void)
     page = PAGE_HOME;
     for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_step_gate[i]=100u;}
     instrument_factory_capture();
+    seq_record_mode=(uint8_t)(set.reserved&1u);
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode=set.performance.arp_mode;
@@ -784,6 +824,7 @@ static void input(void)
     int32_t e;
     touch_poll();                            /* the sensed keys' presses, velocities and pressure */
     keys = touch_keys();
+    sequencer_record_step_advance();
     for (k = 0; k < NKEYS; k++) {            /* key 0 is F3 (MIDI 53) */
         uint32_t bit = 1u << k, v;
         int32_t note = 53 + (int32_t)k + 12 * set.octave;
@@ -792,10 +833,12 @@ static void input(void)
             ui.vel[k] = (uint8_t)v;
             ui.prs[k] = 0;
             ui.last_key = (int32_t)k;
+            sequencer_record_capture(k,(uint8_t)note,(uint8_t)v);
             note_on(note, v);
             plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
         } else if (!(keys & bit) && (ui.keys & bit)) {
             ui.prs[k] = 0;
+            sequencer_record_release(k,(uint8_t)note);
             note_off(note);
             plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note << 16, TO_USB | TO_BLE);
         } else if ((keys & bit) && touch_pressure(k) != ui.prs[k]) {   /* pressure: poly aftertouch */
@@ -812,8 +855,8 @@ static void input(void)
             octave_step(-1);
         else if (k == B_OCTUP)
             octave_step(1);
-        else if (k == B_REC && FM1B_BLE)
-            ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
+        else if (k == B_REC)
+            ui.rec_t = plat_ms();                /* short release arms recording; long hold retains Bluetooth toggle */
         else if (k == B_HOME) {
             page = PAGE_HOME;
             patch_focus = 0u;
@@ -850,9 +893,11 @@ static void input(void)
             else page = page == PAGE_FX_ROUTING ? PAGE_FX_AMP : (uint8_t)(page + 1u);
             app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
         } else if (k == B_PLAY) {
-            if (page == PAGE_SEQ) {
-                ui_event_push(EV_SEQ_RUN,(uint8_t)!fm6_sequencer_running(),0u,0u);
-                app_say("SEQUENCER", fm6_sequencer_running() ? "PLAYING" : "STOPPED");
+            if (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS) {
+                uint8_t starting=(uint8_t)!fm6_sequencer_running();
+                ui_event_push(EV_SEQ_RUN,starting,0u,0u);
+                if(starting)seq_record_last_step=255u;
+                app_say("SEQUENCER", starting ? (seq_record_armed?"RECORDING":"PLAYING") : "STOPPED");
             } else {
                 app_say("PLAY", "SELECT SEQUENCER");
             }
@@ -906,24 +951,23 @@ static void input(void)
             }
         } else {
             if(!ui.seq_hold_fired) {
-                page=PAGE_SEQ;
-                app_say("SEQUENCER",fm6_sequencer_running()?"RUNNING":"TWO LANES");
+                if(page==PAGE_SEQ)page=PAGE_SEQ_OPTIONS;
+                else page=PAGE_SEQ;
+                app_say("SEQUENCER",page==PAGE_SEQ_OPTIONS?"RECORD MODE":"TWO LANES");
             }
             ui.seq_hold_t=0u;ui.seq_hold_fired=0u;
         }
     }
-    if (FM1B_BLE && ui.rec_t) {             /* REC: held a second, Bluetooth on / off; a press, a device */
+    if (ui.rec_t) {
         if (btn >> B_REC & 1u) {
-            if (plat_ms() - ui.rec_t >= 1000u) {
-                ui.rec_t = 0;
-                ble_toggle();
-            }
+            if (FM1B_BLE && plat_ms()-ui.rec_t>=1000u) {ui.rec_t=0u;ble_toggle();}
         } else {
-            ui.rec_t = 0;
-            if (FM1B_BLE_CENTRAL && !set.ble_off)
-                ble_device_button();
-            else
-                app_say("BUTTON", "REC");
+            uint32_t held=plat_ms()-ui.rec_t;ui.rec_t=0u;
+            if(held<1000u) {
+                seq_record_armed^=1u;seq_record_last_step=255u;
+                for(uint32_t key=0;key<NKEYS;key++)seq_record_active[key]=0u;
+                app_say("RECORD",seq_record_armed?"ARMED":"DISARMED");
+            }
         }
     }
     for (k = 0; k < NE; k++) {               /* an encoder turned: its count; PRESET also changes the wave */
@@ -1050,6 +1094,11 @@ static void input(void)
                     transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
                     performance_publish(); set_dirty=1u;
                     app_say("MASTER TEMPO","UPDATED");
+                }
+            } else if (page == PAGE_SEQ_OPTIONS) {
+                if(index==0u && (e%2)!=0) {
+                    seq_record_mode^=1u;set.reserved=seq_record_mode;set_dirty=1u;
+                    app_say("LOOP RECORD",seq_record_mode?"OVERWRITE":"OVERDUB");
                 }
             } else if (page == PAGE_SEQ) {
                 uint8_t lane=seq_ui_lane, step=seq_ui_step;
@@ -1231,7 +1280,8 @@ static void input(void)
     ui.keys = keys;
     ui.btn = btn;
     plat_glow(1);                            /* the unlit buttons glow, readable in the dark */
-    plat_leds(btn | (set_dirty ? 1u << B_SAVE : 0u), keys);
+    plat_leds(btn | (set_dirty ? 1u << B_SAVE : 0u) |
+              (seq_record_armed ? 1u << B_REC : 0u), keys);
 }
 
 void app_input_only(void) { input(); }
@@ -1737,9 +1787,19 @@ static void draw_sequencer_panel(void)
     draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
                       seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
-    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?"PLAYING":"STOPPED",
-            fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
+    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?"PLAYING":(seq_record_armed?"RECORD ARMED":"STOPPED"),
+            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
     cv_text(82,151,&FONT_XS,"SELECT STEP  K1 ON/OFF",C_GRAY);
+}
+static void draw_sequencer_options_panel(void)
+{
+    uint16_t accent=RGB(242,212,59);
+    instrument_card(8,22,224,126,panel_fill(),accent,accent);
+    cv_text(20,34,&FONT_XS,"LOOP RECORD BEHAVIOR",C_GRAY);
+    cv_text(20,61,&FONT_B,seq_record_mode?"OVERWRITE":"OVERDUB",accent);
+    cv_text(20,94,&FONT_XS,seq_record_mode?"EACH PASS REPLACES STEPS":"NEW NOTES LAYER INTO LOOP",C_WHITE);
+    cv_text(20,126,&FONT_XS,"K1  CHANGE MODE",C_GRAY);
+    cv_text(8,166,&FONT_XS,seq_record_armed?"REC ARMED":"REC DISARMED",seq_record_armed?RGB(255,80,90):C_GRAY);
 }
 static void draw_arp_card(uint32_t index, const char *label, const char *value,
                           const char *hint, uint16_t accent)
@@ -1831,7 +1891,6 @@ static void draw_arp_steps_panel(void)
     cv_text(163,128,&FONT_XS,"TIE",tie_color);
     cv_text(193,128,&FONT_XS,arp_ui_step_gate[arp_ui_step]?"ON":"OFF",arp_ui_step_gate[arp_ui_step]?tie_color:C_GRAY);
     cv_text(5,151,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 TIE",C_GRAY);
-    cv_text(5,165,&FONT_XS,"PRESET  8 / 16 STEPS",C_GRAY);
 }
 
 static void draw_delete_overlay(void)
@@ -1923,6 +1982,7 @@ static const char *page_title(uint8_t current)
     case PAGE_LFO: return "LFO";
     case PAGE_LFO_MOD: return "LFO MODULATION";
     case PAGE_SEQ: return "SEQUENCER";
+    case PAGE_SEQ_OPTIONS: return "SEQ RECORD";
     case PAGE_ARP: return "ARP ENGINE";
     case PAGE_ARP_STEPS: return "ARP STEP EDIT";
     case PAGE_FX_AMP: return "AMP / DRIVE";
@@ -1949,7 +2009,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_ENV: return RGB(255,170,75);
     case PAGE_LFO: return RGB(75,220,150);
     case PAGE_LFO_MOD: return RGB(75,190,180);
-    case PAGE_SEQ: return RGB(242,212,59);
+    case PAGE_SEQ: case PAGE_SEQ_OPTIONS: return RGB(242,212,59);
     case PAGE_ARP: case PAGE_ARP_STEPS: return RGB(227,75,210);
     case PAGE_FX_AMP: return RGB(255,140,70);
     case PAGE_FX_EQ: return RGB(85,190,255);
@@ -1974,9 +2034,10 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
     } else if (current >= PAGE_OPERATOR_MAP && current <= PAGE_LFO_MOD) {
         index = (uint32_t)(current - PAGE_OPERATOR_MAP) + 1u;
         total = (uint32_t)(PAGE_LFO_MOD - PAGE_OPERATOR_MAP) + 1u;
-    } else if (current >= PAGE_SEQ && current <= PAGE_ARP_STEPS) {
-        if (current == PAGE_SEQ) { index = 1u; total = 1u; }
-        else { index = (uint32_t)(current - PAGE_ARP) + 1u; total = 2u; }
+    } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS) {
+        index=(uint32_t)(current-PAGE_SEQ)+1u;total=2u;
+    } else if (current == PAGE_ARP || current == PAGE_ARP_STEPS) {
+        index=(uint32_t)(current-PAGE_ARP)+1u;total=2u;
     } else if (current <= PAGE_GLOBAL) {
         index = (uint32_t)current + 1u;
         total = (uint32_t)PAGE_GLOBAL + 1u;
@@ -2032,6 +2093,7 @@ static void draw(void)
     else if (page == PAGE_LFO) draw_lfo_panel(0);
     else if (page == PAGE_LFO_MOD) draw_lfo_panel(1);
     else if (page == PAGE_SEQ) draw_sequencer_panel();
+    else if (page == PAGE_SEQ_OPTIONS) draw_sequencer_options_panel();
     else if (page == PAGE_ARP) draw_arp_panel();
     else if (page == PAGE_ARP_STEPS) draw_arp_steps_panel();
     else if (page == PAGE_FX_CHORUS) draw_fx_panel(0u);
