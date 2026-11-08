@@ -2487,7 +2487,8 @@ static void draw_step_columns(uint8_t lane, uint8_t first, uint8_t count,
                                const uint8_t *enabled, const uint8_t *accent_values,
                                uint16_t accent)
 {
-    int32_t gap=2, width=(224-(int32_t)(count-1u)*gap)/(int32_t)count;
+    int32_t gap=count<=16u?2:0;
+    int32_t width=(224-(int32_t)(count-1u)*gap)/(int32_t)count;
     for(uint32_t i=0;i<count;i++) {
         uint8_t step=(uint8_t)(first+i), active=enabled?enabled[step]:1u;
         uint8_t value=velocity?velocity[step]:100u;
@@ -2508,7 +2509,9 @@ static void draw_step_columns(uint8_t lane, uint8_t first, uint8_t count,
 static void draw_sequencer_panel(void)
 {
     uint8_t playing=fm6_sequencer_playing_step();
-    const uint8_t count=16u;
+    uint8_t count=set.performance.seq_length;
+    if(count<2u)count=2u;
+    if(count>64u)count=64u;
     cv_text(6,0,&FONT_XS,"TRACK 1",patch_color(seq_ui_patch[0]));
     cv_text(78,0,&FONT_XS,seq_ui_instrument_name[0],C_WHITE);
     draw_step_columns(0u,0u,count,20,48,seq_ui_lane==0u?seq_ui_step:255u,
@@ -2519,10 +2522,13 @@ static void draw_sequencer_panel(void)
     draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
                       seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
-    cv_text(6,145,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
+    cv_text(6,148,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
             fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
-    cv_text(88,158,&FONT_XS,"K1 STEP   K2 CLEAR",C_GRAY);
-    cv_text(88,171,&FONT_XS,"K3 VELOCITY   K4 GATE",C_GRAY);
+    /* Four equal-width footer cells keep every encoder hint on one line. */
+    cv_text(6,166,&FONT_XS,"K1 STEP",C_GRAY);
+    cv_text(66,166,&FONT_XS,"K2 CLEAR",C_GRAY);
+    cv_text(126,166,&FONT_XS,"K3 VEL",C_GRAY);
+    cv_text(186,166,&FONT_XS,"K4 GATE",C_GRAY);
 }
 static void draw_sequencer_piano_panel(void)
 {
