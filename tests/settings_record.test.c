@@ -251,6 +251,7 @@ int main(void)
     imported=good;
     assert(settings_import_v6(&imported,&v6)==0);
     assert(imported.performance.tempo_bpm==good.performance.tempo_bpm);
+    assert(imported.performance.lane_instrument[0]==0u&&imported.performance.lane_instrument[1]==0u);
     for(unsigned step=0;step<16u;step++)assert(imported.performance.arp_step_gate[step]==0u);
 
     /* V7 percent gates migrate to binary ties. Repair the known bad step-2
@@ -288,6 +289,7 @@ int main(void)
     imported=good;
     assert(settings_import_v8(&imported,&v8)==0);
     assert(imported.performance.arp_step_gain[1]==127u&&imported.performance.arp_step_accent[1]==0u);
+    assert(imported.performance.lane_instrument[0]==0u&&imported.performance.lane_instrument[1]==0u);
     assert(imported.performance.arp_step_gain[2]==88u&&imported.performance.arp_step_accent[2]==23u);
     assert(imported.reserved==1u);
     v8.performance.arp_step_gain[1]=68u;
