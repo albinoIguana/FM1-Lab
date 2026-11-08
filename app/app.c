@@ -543,6 +543,7 @@ void app_init(void)
     settings_v5_t old_v5;
     settings_v6_t old_v6;
     settings_v7_t old_v7;
+    settings_v8_t old_v8;
     int performance_loaded = 0;
     int loaded;
     fm6_init();
@@ -552,7 +553,11 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v7, sizeof old_v7) == (int)sizeof old_v7 &&
+        if (plat_store_load(OBJ_SETTINGS, &old_v8, sizeof old_v8) == (int)sizeof old_v8 &&
+            settings_import_v8(&set, &old_v8) == 0) {
+            performance_loaded = 1;
+            set_dirty = 1u; /* V8 -> V9 repairs the accidental ARP step-2 seed */
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v7, sizeof old_v7) == (int)sizeof old_v7 &&
             settings_import_v7(&set, &old_v7) == 0) {
             performance_loaded = 1;
             set_dirty = 1u;
