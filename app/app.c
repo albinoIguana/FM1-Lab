@@ -495,12 +495,16 @@ static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
         out->patches[p].voice[155]=64u;
     }
 }
+/* A factory placeholder is identified by its factory name and neutral
+ * mixer/macro state, not by byte-for-byte voice equality. The last voice byte
+ * changed meaning across firmware generations (legacy sentinel -> pan), and
+ * the FM engine's factory voices can also evolve between builds. */
 static int fm1lab_is_untouched_factory(const fm1lab_instrument_t *in)
 {
-    if(!in || !fm1lab_instrument_valid(in)) return 0;
+    if(!in || !fm1lab_instrument_valid(in) ||
+       fm1lab_strncmp(in->name,"FACTORY",7u)!=0) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
-        if(memcmp(in->patches[p].voice,factory_instrument.patches[p].voice,FM1LAB_PATCH_BYTES)!=0 ||
-           in->patches[p].level!=31u || !in->patches[p].enabled) return 0;
+        if(in->patches[p].level!=31u || !in->patches[p].enabled) return 0;
         for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)
             if(in->patches[p].macros[m]!=50u) return 0;
     }
@@ -515,15 +519,23 @@ static void fm1lab_seed_factory_library(void)
         if(index>=16u && index<20u) {
             fm1lab_instrument_t previous;
             fm1lab_seed_beast_v1(index,&previous);
+            fm1lab_seed_beast(index,&seed);
+            /* Upgrade factory placeholders and the known V1 beast bank.
+             * Keep any other named/edited Instrument intact. */
+            if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
+               fm1lab_strncmp(existing.name,seed.name,FM1LAB_INSTRUMENT_NAME_BYTES)==0) continue;
             if(!fm1lab_is_untouched_factory(&existing) &&
                memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
-            fm1lab_seed_beast(index,&seed);
         } else if(index>=20u && index<24u) {
             fm1lab_instrument_t previous;
             fm1lab_seed_instrument(index,&previous);
+            fm1lab_seed_industrial(index,&seed);
+            /* Upgrade factory placeholders and the known previous industrial
+             * bank; custom Instruments are never replaced. */
+            if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
+               fm1lab_strncmp(existing.name,seed.name,FM1LAB_INSTRUMENT_NAME_BYTES)==0) continue;
             if(!fm1lab_is_untouched_factory(&existing) &&
                memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
-            fm1lab_seed_industrial(index,&seed);
         } else {
             if(!fm1lab_is_untouched_factory(&existing)) continue;
             fm1lab_seed_instrument(index,&seed);
