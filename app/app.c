@@ -315,7 +315,7 @@ static void ui_events_drain(void)
         else if (type == EV_MASTER_COMP)
             fm6_master_comp_set(a,b);
         else if (type == EV_PERFORMANCE_APPLY) {
-            (void)fm6_performance_state_set(&performance_update_snapshot);
+            (void)fm6_performance_state_update(&performance_update_snapshot);
             performance_update_pending = 0u;
         } else if (type == EV_SEQ_RUN)
             fm6_sequencer_set_running(a);
