@@ -110,7 +110,7 @@ static inline int settings_import_v5(settings_t *dst,const settings_v5_t *src) {
     dst->performance.tempo_bpm=src->performance.tempo_bpm;
     dst->performance.seq_length=src->performance.seq_length;dst->performance.arp_mode=src->performance.arp_mode;
     for(uint32_t lane=0;lane<2u;lane++){
-        dst->performance.lane_instrument[lane]=src->performance.lane_patch[lane];
+        dst->performance.lane_instrument[lane]=0u;
         for(uint32_t step=0;step<64u;step++){
             dst->performance.seq_enabled[lane][step]=src->performance.seq_enabled[lane][step];
             dst->performance.seq_note[lane][step]=src->performance.seq_note[lane][step];
@@ -173,7 +173,7 @@ static inline int settings_import_v3(settings_t *dst, const settings_v3_t *src) 
     dst->performance.seq_length=src->performance.seq_length;
     dst->performance.arp_mode=src->performance.arp_mode;
     for (uint32_t lane=0; lane<2u; ++lane) {
-        dst->performance.lane_instrument[lane]=src->performance.lane_patch[lane];
+        dst->performance.lane_instrument[lane]=0u;
         for (uint32_t step=0; step<64u; ++step) {
             dst->performance.seq_enabled[lane][step]=src->performance.seq_enabled[lane][step];
             dst->performance.seq_note[lane][step]=src->performance.seq_note[lane][step];
@@ -236,7 +236,7 @@ static inline int settings_import_v4(settings_t *dst,const settings_v4_t *src) {
     dst->performance.tempo_bpm=src->performance.tempo_bpm;
     dst->performance.seq_length=src->performance.seq_length;dst->performance.arp_mode=src->performance.arp_mode;
     for(uint32_t lane=0;lane<2u;lane++){
-        dst->performance.lane_instrument[lane]=src->performance.lane_patch[lane];
+        dst->performance.lane_instrument[lane]=0u;
         for(uint32_t step=0;step<64u;step++){
             dst->performance.seq_enabled[lane][step]=src->performance.seq_enabled[lane][step];
             dst->performance.seq_note[lane][step]=src->performance.seq_note[lane][step];
@@ -284,6 +284,7 @@ static inline int settings_import_v6(settings_t *dst,const settings_v6_t *src) {
         for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)dst->macros[patch][m]=src->macros[patch][m];
     }
     dst->performance=src->performance;
+    dst->performance.lane_instrument[0]=dst->performance.lane_instrument[1]=0u;
     for(uint32_t step=0;step<16u;step++)dst->performance.arp_step_gate[step]=0u;
     return 0;
 }
@@ -312,6 +313,7 @@ static inline int settings_import_v7(settings_t *dst,const settings_v7_t *src) {
         for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)dst->macros[patch][m]=src->macros[patch][m];
     }
     dst->performance=src->performance;
+    dst->performance.lane_instrument[0]=dst->performance.lane_instrument[1]=0u;
     for(uint32_t step=0;step<16u;step++)dst->performance.arp_step_gate[step]=0u;
     if(dst->performance.arp_step_gain[1]==69u&&dst->performance.arp_step_accent[1]==64u){
         dst->performance.arp_step_gain[1]=127u;
@@ -337,6 +339,8 @@ static inline int settings_v8_valid(const settings_v8_t *v) {
 static inline int settings_import_v8(settings_t *dst,const settings_v8_t *src) {
     if(!dst||!settings_v8_valid(src))return -1;
     memcpy(dst,src,sizeof *dst);
+    /* V8 lane_patch values selected individual patches, not library Instruments. */
+    dst->performance.lane_instrument[0]=dst->performance.lane_instrument[1]=0u;
     if(dst->performance.arp_step_gain[1]==69u&&dst->performance.arp_step_accent[1]==64u){
         dst->performance.arp_step_gain[1]=127u;
         dst->performance.arp_step_accent[1]=0u;
