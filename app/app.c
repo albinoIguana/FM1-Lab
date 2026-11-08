@@ -33,6 +33,8 @@ static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
 static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
+static uint8_t seq_clear_prompt;
+static int16_t seq_clear_turn;
 static uint8_t seq_record_active[NKEYS], seq_record_step[NKEYS], seq_record_lane[NKEYS], seq_record_note[NKEYS];
 static uint32_t seq_record_started[NKEYS];
 static uint8_t seq_record_redraw;
@@ -967,6 +969,9 @@ static void input(void)
             continue;
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
+        if(seq_clear_prompt && !(page==PAGE_SEQ && k==EN_K2)) {
+            seq_clear_prompt=0u;seq_clear_turn=0;
+        }
         ui.redraw = 1;
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
@@ -1002,15 +1007,7 @@ static void input(void)
             set.patch = seq_ui_patch[seq_ui_lane];
             patch_focus = 1u;
             app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 SELECTED" : "T1 SELECTED");
-        } else if (k == EN_ALGO && page == PAGE_SEQ) {
-            int32_t patch = ((int32_t)seq_ui_patch[seq_ui_lane] + e) % 4;
-            if (patch < 0) patch += 4;
-            seq_ui_patch[seq_ui_lane] = (uint8_t)patch;
-            set.patch = (uint8_t)patch;
-            patch_focus = 1u;
-            performance_publish();
-            set_dirty = 1u;
-            app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
+
         } else if (k == EN_ALGO && page == PAGE_FX_ROUTING) {
             int32_t next=((int32_t)set.patch+e)%4;
             if(next<0) next+=4;
@@ -1043,10 +1040,14 @@ static void input(void)
             performance_publish();set_dirty=1u;
             app_say("ARP LENGTH",arp_ui_length==8u?"8 STEPS":"16 STEPS");
         } else if (k == EN_PRESET && page == PAGE_SEQ) {
-            int32_t next = ((int32_t)seq_ui_step + e) % 64;
-            if (next < 0) next += 64;
-            seq_ui_step = (uint8_t)next;
-            app_say("SEQUENCER STEP", "SELECTED");
+            int32_t patch = ((int32_t)seq_ui_patch[seq_ui_lane] + e) % 4;
+            if (patch < 0) patch += 4;
+            seq_ui_patch[seq_ui_lane] = (uint8_t)patch;
+            set.patch = (uint8_t)patch;
+            patch_focus = 1u;
+            performance_publish();
+            set_dirty = 1u;
+            app_say("TRACK PATCH", patch_display_name((uint32_t)patch));
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             int32_t mode = ((int32_t)operator_detune_mode + e) % 2;
             if (mode < 0) mode += 2;
@@ -1100,15 +1101,42 @@ static void input(void)
             } else if (page == PAGE_SEQ) {
                 uint8_t lane=seq_ui_lane, step=seq_ui_step;
                 if(index==0u) {
-                    /* Each encoder detent toggles once; multi-detent reads
-                     * must preserve even/odd parity instead of toggling once. */
-                    if (e % 2 != 0) seq_ui_enabled[lane][step]^=1u;
-                } else if(index==1u) seq_ui_note[lane][step]=(uint8_t)clamp((int32_t)seq_ui_note[lane][step]+e,0,127);
-                else if(index==2u) seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
-                else seq_ui_gate[lane][step]=(uint8_t)clamp((int32_t)seq_ui_gate[lane][step]+e,10,100);
-                performance_publish();
-                set_dirty = 1u;
-                app_say("SEQUENCER STEP", "UPDATED");
+                    int32_t next=((int32_t)step+e)%64;
+                    if(next<0)next+=64;
+                    seq_ui_step=(uint8_t)next;
+                    seq_clear_prompt=0u;
+                } else if(index==1u) {
+                    if(!seq_clear_prompt) {
+                        seq_clear_prompt=1u;
+                        seq_clear_turn=0;
+                        app_say("CLEAR STEP?","TURN K2 TO CONFIRM");
+                    } else {
+                        int32_t movement=e<0?-e:e;
+                        seq_clear_turn=(int16_t)(seq_clear_turn+movement);
+                        if(seq_clear_turn>=2) {
+                            seq_ui_enabled[lane][step]=0u;
+                            seq_ui_note[lane][step]=60u;
+                            seq_ui_velocity[lane][step]=100u;
+                            seq_ui_gate[lane][step]=75u;
+                            seq_ui_accent[lane][step]=0u;
+                            seq_clear_prompt=0u;seq_clear_turn=0;
+                            performance_publish();set_dirty=1u;
+                            app_say("STEP CLEARED","");
+                        }
+                    }
+                } else if(index==2u) {
+                    seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
+                    seq_clear_prompt=0u;
+                    performance_publish();set_dirty=1u;
+                    app_say("STEP VELOCITY","UPDATED");
+                } else {
+                    seq_ui_accent[lane][step]=(uint8_t)clamp((int32_t)seq_ui_accent[lane][step]+e,0,100);
+                    seq_clear_prompt=0u;
+                    performance_publish();set_dirty=1u;
+                    app_say("STEP ACCENT","UPDATED");
+                }
+                if(index==0u)app_say("STEP","SELECTED");
+                if(index==1u && seq_clear_prompt)ui.redraw=1u;
             } else if (page == PAGE_ARP) {
                 if(index==0u) {
                     int32_t mode=((int32_t)arp_ui_mode+e)%5;
@@ -1889,6 +1917,18 @@ static void draw_delete_overlay(void)
     if(progress>176)progress=176;
     if(progress>0)cv_rect(34,119,progress,3,accent);
 }
+static void draw_seq_clear_prompt(void)
+{
+    char t[20];
+    rounded_panel(17,55,206,78,4,RGB(5,9,16),RGB(242,212,59));
+    rounded_panel(20,58,200,72,4,RGB(12,18,29),RGB(57,66,72));
+    cv_text(120-text_w(&FONT_B,"CLEAR STEP?")/2,72,&FONT_B,"CLEAR STEP?",RGB(255,226,95));
+    cv_text(120-text_w(&FONT_XS,"TURN K2 TO CONFIRM")/2,96,&FONT_XS,"TURN K2 TO CONFIRM",C_WHITE);
+    t[0]='T';t[1]=(char)('1'+seq_ui_lane);t[2]=' ';t[3]='S';t[4]='T';t[5]='E';t[6]='P';t[7]=' ';
+    int_text((int32_t)seq_ui_step+1,t+8);
+    cv_text(120-text_w(&FONT_XS,t)/2,115,&FONT_XS,t,C_GRAY);
+}
+
 static void draw_fx_panel(uint8_t fx)
 {
     static const char *const names[4]={"CHORUS","DELAY","REVERB","PHASER"};
@@ -2073,6 +2113,7 @@ static void draw(void)
     else if (page == PAGE_FX_ROUTING) draw_fx_routing_panel();
     else draw_global_panel(pct);
     if(ui.delete_until && (int32_t)(ui.delete_until-plat_ms())>0)draw_delete_overlay();
+    if(page==PAGE_SEQ && seq_clear_prompt)draw_seq_clear_prompt();
     cv_blit(0, 41);
 
     /* Compact control strip. HOME and ENV already show these values in
