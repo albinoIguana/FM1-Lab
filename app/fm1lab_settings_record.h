@@ -10,7 +10,8 @@
 #define SET_MAGIC_V4 0x4C314D49u
 #define SET_MAGIC_V5 0x4C314D4Au
 #define SET_MAGIC_V6 0x4C314D4Bu
-#define SET_MAGIC SET_MAGIC_V6
+#define SET_MAGIC_V7 0x4C314D4Cu
+#define SET_MAGIC SET_MAGIC_V7
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off, rsv[1]; } settings_v1_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; } settings_v2_t;
 typedef struct {
@@ -42,6 +43,7 @@ typedef struct {
 } fm6_performance_state_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v5_t performance; uint16_t reserved; uint16_t crc; } settings_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_v6_t;
 static inline uint16_t settings_crc16(const void *data, size_t length) {
     const uint8_t *bytes=(const uint8_t *)data; uint16_t crc=0xFFFFu;
     while(length--) { crc^=(uint16_t)*bytes++<<8; for(uint32_t bit=0;bit<8u;++bit) crc=(uint16_t)((crc&0x8000u)?(((uint32_t)crc<<1)^0x1021u):((uint32_t)crc<<1)); }
@@ -65,7 +67,7 @@ static inline void settings_arp_defaults(settings_t *dst) {
     for(uint32_t step=0;step<16u;step++){
         dst->performance.arp_step_gain[step]=127u;
         dst->performance.arp_step_accent[step]=0u;
-        dst->performance.arp_step_macro[step]=50u;
+        dst->performance.arp_step_gate[step]=100u;
     }
 }
 static inline int settings_v5_valid(const settings_v5_t *v) {
@@ -250,6 +252,35 @@ static inline int settings_import_v4(settings_t *dst,const settings_v4_t *src) {
     dst->performance.compressor_ratio=40u;dst->performance.compressor_attack=20u;
     dst->performance.compressor_release=40u;dst->performance.compressor_makeup=0u;
     settings_arp_defaults(dst);
+    return 0;
+}
+
+static inline int settings_v6_valid(const settings_v6_t *v) {
+    if(!v||v->magic!=SET_MAGIC_V6||v->octave < -2||v->octave>2||v->patch>=FM1LAB_PATCH_COUNT||
+       (v->enabled_mask&0xF0u)||v->ble_off>1u||v->reserved!=0u||
+       v->crc!=settings_crc16(v,offsetof(settings_v6_t,crc)))return 0;
+    fm6_performance_state_t p=v->performance;
+    /* V6's final per-step byte was macro amount; it becomes full gate. */
+    for(uint32_t step=0;step<16u;step++){
+        if(p.arp_step_gate[step]>100u)return 0;
+        p.arp_step_gate[step]=100u;
+    }
+    if(!fm6_performance_state_valid(&p))return 0;
+    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){
+        if(v->levels[patch]>127u)return 0;
+        for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)if(v->macros[patch][m]>100u)return 0;
+    }
+    return 1;
+}
+static inline int settings_import_v6(settings_t *dst,const settings_v6_t *src) {
+    if(!dst||!settings_v6_valid(src))return -1;
+    dst->octave=src->octave;dst->patch=src->patch;dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
+    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){
+        dst->levels[patch]=src->levels[patch];
+        for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)dst->macros[patch][m]=src->macros[patch][m];
+    }
+    dst->performance=src->performance;
+    for(uint32_t step=0;step<16u;step++)dst->performance.arp_step_gate[step]=100u;
     return 0;
 }
 
