@@ -349,7 +349,7 @@ static inline int settings_import_v8(settings_t *dst,const settings_v8_t *src) {
 }
 
 static inline int settings_valid(const settings_t *v) {
-    if(!v || v->magic!=SET_MAGIC || v->octave < -2 || v->octave>2 || v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u || v->reserved>1u || !fm6_performance_state_valid(&v->performance) || v->crc!=settings_crc16(v,offsetof(settings_t,crc))) return 0;
+    if(!v || v->magic!=SET_MAGIC || v->octave < -2 || v->octave>2 || v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u || v->reserved>3u || !fm6_performance_state_valid(&v->performance) || v->crc!=settings_crc16(v,offsetof(settings_t,crc))) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p) { if(v->levels[p]>127u) return 0; for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m) if(v->macros[p][m]>100u) return 0; }
     return 1;
 }
