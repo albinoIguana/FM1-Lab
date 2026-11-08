@@ -159,6 +159,7 @@ int main(void)
     assert(!settings_v3_valid(&damaged_v3));
     assert(settings_import_v3(&imported,&v3)==0);
     assert(imported.performance.tempo_bpm==128u);
+    assert(imported.performance.lane_instrument[0]==0u&&imported.performance.lane_instrument[1]==0u);
     assert(imported.performance.fx_enabled[0]==1u && imported.performance.fx_send[2][2]==55u);
     assert(imported.performance.fx_enabled[FM6_FX_PHASER]==0u);
     assert(imported.performance.fx_send[2][FM6_FX_PHASER]==0u);
@@ -193,6 +194,7 @@ int main(void)
     imported=good;
     assert(settings_import_v4(&imported,&v4)==0);
     assert(imported.performance.tempo_bpm==141u);
+    assert(imported.performance.lane_instrument[0]==0u&&imported.performance.lane_instrument[1]==0u);
     assert(imported.performance.fx_enabled[FM6_FX_PHASER]==1u);
     assert(imported.performance.fx_send[3][FM6_FX_PHASER]==60u);
     assert(imported.performance.compressor_enabled==0u);
@@ -231,6 +233,7 @@ int main(void)
     imported=good;
     assert(settings_import_v5(&imported,&v5)==0);
     assert(imported.performance.tempo_bpm==133u&&imported.performance.arp_mode==4u);
+    assert(imported.performance.lane_instrument[0]==0u&&imported.performance.lane_instrument[1]==0u);
     assert(imported.performance.compressor_enabled==1u&&imported.performance.compressor_ratio==61u);
     assert(imported.performance.arp_division==3u&&imported.performance.arp_gate==75u);
     assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_gate[15]==0u);
@@ -267,6 +270,7 @@ int main(void)
     assert(settings_import_v7(&imported,&v7)==0);
     for(unsigned step=0;step<16u;step++)assert(imported.performance.arp_step_gate[step]==0u);
     assert(imported.performance.arp_step_gain[1]==127u&&imported.performance.arp_step_accent[1]==0u);
+    assert(imported.performance.lane_instrument[0]==0u&&imported.performance.lane_instrument[1]==0u);
     assert(imported.performance.arp_step_gain[2]==127u&&imported.performance.arp_step_accent[2]==0u);
 
     /* V8 -> V9 repairs the known accidental ARP step-2 factory seed. */
