@@ -184,8 +184,82 @@ static void fm1lab_make_evolving_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_
     for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[texture])?names[texture][i]:' ');
 }
 
-/* Starter library: every Instrument is a deliberate four-voice combination
- * of the sixteen M-VAVE factory recipes, not four copies of one patch. */
+/* Four dark FM creatures. Each patch is a purpose-built six-operator voice:
+ * low throat, grinding growl, sharp teeth, and a slow spectral howl. */
+static void fm1lab_make_beast_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t beast, uint8_t role)
+{
+    static const uint8_t algorithms[4][4] = {
+        {15u, 16u, 20u, 24u}, {17u, 15u, 21u, 23u},
+        {16u, 18u, 20u, 24u}, {15u, 17u, 22u, 24u}
+    };
+    static const uint8_t coarse[4][6] = {
+        {1u,2u,3u,5u,7u,1u}, {1u,3u,2u,6u,9u,1u},
+        {1u,2u,4u,7u,11u,1u}, {1u,3u,5u,8u,13u,1u}
+    };
+    static const uint8_t fine[4][6] = {
+        {0u,7u,19u,31u,11u,0u}, {0u,13u,27u,8u,37u,0u},
+        {0u,9u,23u,41u,16u,0u}, {0u,17u,33u,5u,29u,0u}
+    };
+    uint8_t algorithm=algorithms[beast&3u][role&3u];
+    uint8_t carriers=fm1lab_carrier_mask(algorithm);
+    voice[134]=algorithm;
+    voice[135]=(uint8_t)(role==0u?7u:role==1u?6u:role==2u?5u:4u);
+    for(uint32_t op=0;op<6u;op++) {
+        uint8_t *v=voice+(5u-op)*21u;
+        uint8_t carrier=(uint8_t)((carriers>>op)&1u);
+        uint8_t spread=(uint8_t)((op*3u+beast*2u)%13u);
+        /* A quick bite followed by an uneven, vocal-like decay. */
+        v[0]=(uint8_t)(carrier?82u+spread:91u-spread/2u);
+        v[1]=(uint8_t)(role==0u?48u+spread:role==1u?31u+spread:58u+spread);
+        v[2]=(uint8_t)(role==3u?22u+spread:45u+spread);
+        v[3]=(uint8_t)(role==2u?35u+spread:62u+spread);
+        v[4]=99u;
+        v[5]=(uint8_t)(carrier?94u:82u);
+        v[6]=(uint8_t)(carrier?(role==0u?84u:72u):(role==1u?65u:42u+spread));
+        v[7]=0u;
+        v[10]=(uint8_t)(carrier?8u:18u);
+        v[15]=(uint8_t)(carrier?1u:4u);
+        v[16]=(uint8_t)(carrier?94u:(role==0u?88u:role==1u?99u:78u+spread));
+        v[18]=coarse[beast&3u][op];
+        v[19]=fine[beast&3u][op];
+        v[20]=(uint8_t)(7u+(op%4u)*2u);
+    }
+    /* Slow, slightly unstable pitch/level movement keeps the held note alive. */
+    voice[137]=(uint8_t)(role==3u?31u:role==1u?47u:38u+beast*3u);
+    voice[138]=(uint8_t)(role==3u?12u:role==1u?5u:18u);
+    voice[139]=(uint8_t)(role==2u?12u:role==3u?24u:18u);
+    voice[140]=(uint8_t)(role==3u?34u:role==1u?12u:18u);
+    voice[141]=0u;
+    voice[142]=0u;
+    voice[143]=(uint8_t)(role==3u?5u:3u);
+    {
+        static const char *const names[4]={"THROAT","GROWL","TEETH","HOWL"};
+        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
+    }
+}
+typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_beast_instrument_t;
+static const fm1lab_beast_instrument_t fm1lab_beasts[4]={
+    {"HOUND",{3u,5u,14u,12u},{22u,16u,11u,9u}},
+    {"RAVAGE",{14u,11u,15u,5u},{20u,15u,10u,8u}},
+    {"ABYSS",{13u,12u,14u,4u},{21u,16u,10u,8u}},
+    {"WRAITH",{5u,12u,10u,14u},{20u,16u,11u,9u}}
+};
+static void fm1lab_seed_beast(uint32_t index,fm1lab_instrument_t *out)
+{
+    const fm1lab_beast_instrument_t *beast=&fm1lab_beasts[(index-16u)&3u];
+    fm1lab_instrument_init(out,beast->name);
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        fm1lab_factory_voice_build(voice,beast->source[p]);
+        fm1lab_make_beast_voice(voice,(uint8_t)((index-16u)&3u),(uint8_t)p);
+        (void)fm1lab_patch_set_voice(out,p,voice);
+        out->patches[p].level=beast->level[p];
+        out->patches[p].enabled=1u;
+        out->patches[p].voice[155]=(uint8_t)(p==0u?48u:p==1u?64u:p==2u?80u:72u);
+    }
+}
+
+/* Starter library: a deliberate four-voice combination of M-VAVE recipes. */
 typedef struct { const char *name; uint8_t voice[4]; uint8_t level[4]; } fm1lab_seed_instrument_t;
 static const fm1lab_seed_instrument_t fm1lab_seed_instruments[16] = {
  {"GLASS",{1,4,10,0},{25,18,12,8}},
@@ -212,15 +286,12 @@ static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
     uint32_t n=0u;
     while(n<10u && seed->name[n]) { name[n]=seed->name[n]; ++n; }
     if(index>=16u && n<10u) { name[n++]=' '; name[n++]='2'; }
-    name[n]='\0';
+    name[n]='\\0';
     fm1lab_instrument_init(out,name);
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
-        /* The second bank rotates the same four voices into a new blend. */
         uint32_t source=(index>=16u)?((p+1u)&3u):p;
         fm1lab_factory_voice_build(voice,seed->voice[source]);
-        /* Half of every Instrument is intentionally long-form: one slow pad
-         * swell and one evolving, brighter counter-layer. */
         if(p==1u) fm1lab_make_evolving_voice(voice,0u);
         else if(p==3u) fm1lab_make_evolving_voice(voice,1u);
         (void)fm1lab_patch_set_voice(out,p,voice);
@@ -245,9 +316,17 @@ static void fm1lab_seed_factory_library(void)
     for(uint32_t index=0;index<FM1LAB_STORE_INSTRUMENT_COUNT;index++) {
         fm1lab_instrument_t existing, seed;
         fm1lab_insert_state_t inserts;
-        if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0 ||
-           !fm1lab_is_untouched_factory(&existing)) continue;
-        fm1lab_seed_instrument(index,&seed);
+        if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0) continue;
+        if(index>=16u && index<20u) {
+            fm1lab_instrument_t previous;
+            fm1lab_seed_instrument(index,&previous);
+            if(!fm1lab_is_untouched_factory(&existing) &&
+               memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
+            fm1lab_seed_beast(index,&seed);
+        } else {
+            if(!fm1lab_is_untouched_factory(&existing)) continue;
+            fm1lab_seed_instrument(index,&seed);
+        }
         if(fm1lab_store_library_save_full(index,&seed,&inserts)!=0)
             app_say("LIBRARY SEED","SAVE FAILED");
     }
