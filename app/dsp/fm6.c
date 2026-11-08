@@ -145,6 +145,7 @@ static volatile uint8_t arp_division=3u, arp_gate=75u, arp_octaves=1u, arp_lengt
 static volatile uint8_t arp_step_gain[16], arp_step_accent[16], arp_step_gate[16];
 static volatile uint8_t arp_output, arp_random, arp_macro_dest, arp_depth=50u;
 static volatile uint8_t arp_step_position;
+static volatile uint8_t arp_patch_mask=0x0fu;
 static uint32_t arp_random_state=0x6D2B79F5u, arp_phase, arp_gate_left;
 static int32_t arp_amp_gain_q15=32768, arp_amp_target_q15=32768;
 static int32_t arp_macro_offset;
@@ -395,7 +396,7 @@ static void fm6_arpeggiator_step(void)
     uint32_t tied=arp_step_gate[step]?1u:0u;
     uint32_t effective_gate=tied?100u:(uint32_t)(arp_gate<10u?10u:arp_gate>100u?100u:arp_gate);
     if(effective_gate<1u)effective_gate=1u;
-    if(arp_live){fm6_note_off_source(arp_live_note,0x0fu,3u);arp_live=0u;}
+    if(arp_live){fm6_note_off_source(arp_live_note,arp_patch_mask,3u);arp_live=0u;}
     arp_gate_left=0u;
     if(!arp_mode||!count){
         arp_gate_left=0u;arp_amp_target_q15=32768;
@@ -433,7 +434,7 @@ static void fm6_arpeggiator_step(void)
         /* Gain controls velocity; accent boosts all four macros for the gate. */
         if(velocity) {
             arp_live_note=note;
-            fm6_note_start_tuned_mask(note,velocity,0x0fu,0,3u);
+            fm6_note_start_tuned_mask(note,velocity,arp_patch_mask,0,3u);
             arp_live=1u;
             arp_gate_left=(uint32_t)((uint64_t)fm6_arp_step_period()*effective_gate/100u);
             if(!arp_gate_left)arp_gate_left=1u;
@@ -780,7 +781,7 @@ void fm6_panic(void)
     fm6_zero_bytes(voices, sizeof(voices));
     pitch_bend_16 = 0;
     seq_running=0u; seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=seq_clear_pending[1]=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
-    arp_count=0u; arp_live=0u; arp_index=0u;arp_gate_left=0u;
+    arp_count=0u; arp_live=0u; arp_index=0u;arp_gate_left=0u;arp_patch_mask=0x0fu;
     arp_amp_gain_q15=arp_amp_target_q15=32768;fm6_arp_macro_apply(0);
 }
 
@@ -815,6 +816,7 @@ void fm6_note_on_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int
     if(note>127u || !velocity) return;
     if(arp_mode) {
         uint32_t pos=0u;
+        arp_patch_mask=patch_mask;
         if(!arp_count){arp_index=0u;arp_direction=1u;arp_step_position=0u;arp_phase=0u;}
         while(pos<arp_count && arp_notes[pos]<note) ++pos;
         if(pos<arp_count && arp_notes[pos]==note) return;
@@ -876,7 +878,7 @@ void fm6_note_off(uint8_t note)
             if(arp_output==1u)fm6_note_off_source(note,(uint8_t)((1u<<PATCHES)-1u),0u);
             break;
         }
-        if(!arp_count && arp_live) { fm6_note_off_source(arp_live_note,0x0fu,3u); arp_live=0u; }
+        if(!arp_count && arp_live) { fm6_note_off_source(arp_live_note,arp_patch_mask,3u); arp_live=0u; }
         if(!arp_count){arp_gate_left=0u;arp_amp_target_q15=32768;fm6_arp_macro_apply(0);}
         return;
     }
@@ -1261,9 +1263,9 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
     if(arp_mode && arp_output!=s->arp_output){
         for(uint32_t n=0;n<arp_count;n++){
             if(arp_output==1u && s->arp_output!=1u)
-                fm6_note_off_source(arp_notes[n],0x0fu,0u);
+                fm6_note_off_source(arp_notes[n],arp_patch_mask,0u);
             else if(arp_output!=1u && s->arp_output==1u)
-                fm6_note_start_tuned_mask(arp_notes[n],arp_velocities[n],0x0fu,0,0u);
+                fm6_note_start_tuned_mask(arp_notes[n],arp_velocities[n],arp_patch_mask,0,0u);
         }
         arp_gate_left=0u;arp_amp_target_q15=32768;
     }
