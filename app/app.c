@@ -1787,9 +1787,9 @@ static void draw_envelope_panel(void)
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
     uint16_t accent = patch_color(set.patch);
-    cv_text(140, 0, &FONT_XS, "OPERATOR", C_GRAY);
-    int_text(env_operator, t); cv_text(204, 0, &FONT_XS, t, accent);
-    cv_text(6, 0, &FONT_XS, carrier ? "CARRIER ENVELOPE" : "MODULATOR ENVELOPE", carrier ? accent : C_GRAY);
+    cv_text(6, 0, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
+    int_text(env_operator, t); text_cat(t, "  /  6");
+    cv_text(204, 0, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
