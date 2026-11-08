@@ -692,9 +692,10 @@ int main(void) {
     assert(fm6_performance_state_set(&saved)==0);
     fm6_note_on(60u,100u);
     for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
-    assert(fm6_arpeggiator_active()==0u); /* 5512 samples: before 1/16 tick */
+    assert(fm6_active_voices()==0u); /* 5512 samples: before first 1/16 note */
     fm6_render(output,9u,4096u);
     assert(fm6_arpeggiator_active()==1u);
+    assert(fm6_active_voices()>0u);
     fm6_performance_state_get(&restored);
     restored.arp_gate=55u;
     assert(fm6_performance_state_update(&restored)==0);
