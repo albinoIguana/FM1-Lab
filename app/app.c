@@ -650,6 +650,8 @@ void app_init(void)
          * them for recovery rather than replacing them with factory data. */
         app_say("BANK ERROR", "DATA PRESERVED");
     }
+    set.patch = seq_ui_patch[seq_ui_lane];
+    patch_focus = 1u;
     instrument_load(0u, 0);
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         fm6_patch_set_enabled(p, 1u);
@@ -847,8 +849,9 @@ static void input(void)
             ui.rec_t = plat_ms();                /* short release arms recording; long hold retains Bluetooth toggle */
         else if (k == B_HOME) {
             page = PAGE_HOME;
-            patch_focus = 0u;
-            app_say("INSTRUMENT", "ALL FOUR PATCHES");
+            set.patch = seq_ui_patch[seq_ui_lane];
+            patch_focus = 1u;
+            app_say("INSTRUMENT", seq_ui_lane ? "TRACK 2 PATCH" : "TRACK 1 PATCH");
         } else if (k == B_GLO) {
             page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
@@ -995,14 +998,16 @@ static void input(void)
             app_say("ENVELOPE OPERATOR", fm1lab_voice_operator_is_carrier(
                 current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
         } else if (k == EN_SELECT && page == PAGE_SEQ) {
-            int32_t next = ((int32_t)seq_ui_step + e) % 64;
-            if (next < 0) next += 64;
-            seq_ui_step = (uint8_t)next;
-            app_say("STEP", "SELECTED");
+            seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
+            set.patch = seq_ui_patch[seq_ui_lane];
+            patch_focus = 1u;
+            app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 SELECTED" : "T1 SELECTED");
         } else if (k == EN_ALGO && page == PAGE_SEQ) {
             int32_t patch = ((int32_t)seq_ui_patch[seq_ui_lane] + e) % 4;
             if (patch < 0) patch += 4;
             seq_ui_patch[seq_ui_lane] = (uint8_t)patch;
+            set.patch = (uint8_t)patch;
+            patch_focus = 1u;
             performance_publish();
             set_dirty = 1u;
             app_say("LANE PATCH", fm6_patch_name((uint32_t)patch));
@@ -1025,7 +1030,11 @@ static void input(void)
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
             set.patch = (uint8_t)next;
-            if (page == PAGE_HOME) patch_focus = 1u;
+            if (page == PAGE_HOME) {
+                patch_focus = 1u;
+                seq_ui_patch[seq_ui_lane] = set.patch;
+                performance_publish();
+            }
             set_dirty = 1;
             app_say("PATCH", patch_display_name(set.patch));
         } else if (k == EN_PRESET && page == PAGE_ARP_STEPS) {
@@ -1034,10 +1043,10 @@ static void input(void)
             performance_publish();set_dirty=1u;
             app_say("ARP LENGTH",arp_ui_length==8u?"8 STEPS":"16 STEPS");
         } else if (k == EN_PRESET && page == PAGE_SEQ) {
-            /* PRESET selects the visible sequencer lane here; it must not
-             * switch Instruments while editing a pattern. */
-            seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
-            app_say("SEQUENCER LANE", seq_ui_lane ? "B" : "A");
+            int32_t next = ((int32_t)seq_ui_step + e) % 64;
+            if (next < 0) next += 64;
+            seq_ui_step = (uint8_t)next;
+            app_say("SEQUENCER STEP", "SELECTED");
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             int32_t mode = ((int32_t)operator_detune_mode + e) % 2;
             if (mode < 0) mode += 2;
@@ -1244,6 +1253,8 @@ static void input(void)
                  * continues to adjust that layer's level. */
                 patch_focus = 1u;
                 set.patch = (uint8_t)index;
+                seq_ui_patch[seq_ui_lane] = set.patch;
+                performance_publish();
                 int32_t value = (int32_t)set.levels[index] + e;
                 if (value < 0) value = 0;
                 if (value > 127) value = 127;
@@ -2033,6 +2044,7 @@ static void draw(void)
     /* Page identity replaces the generic FACTORY instrument label. */
     cv_text(8, 15, &FONT_B, page_title(page), accent);
     if (page == PAGE_HOME) {
+        cv_text(151, 17, &FONT_XS, seq_ui_lane ? "T2" : "T1", patch_color(seq_ui_patch[seq_ui_lane]));
         int_text((int32_t)instrument_index + 1, t);
         text_cat(t, "/32");
         cv_text(198, 17, &FONT_XS, t, C_GRAY);
