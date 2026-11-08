@@ -133,7 +133,7 @@ uint64_t fm6_test_output_peak(void) { return fm6_test_output_peak_q23; }
 #define FM6_CHORUS_SIZE 2048u
 typedef struct { uint8_t enabled, note, velocity, gate; } fm6_step_t;
 static volatile fm6_step_t seq_pattern[2][64];
-static volatile uint8_t seq_lane_base[2] = {0u,4u}, seq_length=16u, seq_position, seq_running;
+static volatile uint8_t seq_lane_base[2] = {0u,4u}, seq_lane_instrument[2]={0u,0u}, seq_length=16u, seq_position, seq_running;
 static volatile uint8_t seq_start_pending, seq_stop_pending, arp_clear_pending, arp_reset_pending, seq_clear_pending[2];
 static volatile uint8_t seq_play_position, arp_play_position;
 static uint8_t seq_live_note[2], seq_live_mask[2];
@@ -734,7 +734,7 @@ void fm6_init(void)
     for(uint32_t fx=0;fx<4u;fx++) fx_enabled[fx]=0u;
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<4u;fx++) fx_send[p][fx]=fx==3u?0u:100u;
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_mix[3]=35u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_time[3]=35u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
-    seq_lane_base[0]=0u; seq_lane_base[1]=4u; seq_length=16u; seq_position=0u; seq_play_position=0u; seq_running=0u;
+    seq_lane_base[0]=0u; seq_lane_base[1]=4u; seq_lane_instrument[0]=seq_lane_instrument[1]=0u; seq_length=16u; seq_position=0u; seq_play_position=0u; seq_running=0u;
     seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=seq_clear_pending[1]=0u;
     arp_mode=0u; arp_count=0u; arp_index=0u; arp_play_position=0u; arp_direction=1u; arp_live=0u;
     arp_division=3u;arp_gate=75u;arp_octaves=1u;arp_length=16u;arp_output=0u;arp_random=0u;arp_macro_dest=0u;arp_depth=50u;
@@ -1215,7 +1215,7 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
     s->tempo_bpm = (uint16_t)transport_bpm;
     s->seq_length = seq_length;
     for (uint32_t lane = 0; lane < 2u; ++lane) {
-        /* lane_instrument is application/library metadata; DSP bank routing is fixed per lane. */
+        s->lane_instrument[lane]=seq_lane_instrument[lane];
         for (uint32_t step = 0; step < 64u; ++step) {
             s->seq_enabled[lane][step] = seq_pattern[lane][step].enabled;
             s->seq_note[lane][step] = seq_pattern[lane][step].note;
@@ -1249,7 +1249,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
     seq_length=s->seq_length;
     if(seq_position>=seq_length)seq_position=0u;
     for(uint32_t lane=0;lane<2u;lane++){
-        /* Keep each sequencer lane on its own four-patch bank. */
+        seq_lane_instrument[lane]=s->lane_instrument[lane];
         for(uint32_t step=0;step<64u;step++){
             seq_pattern[lane][step].enabled=0u;
             seq_pattern[lane][step].note=s->seq_note[lane][step];
