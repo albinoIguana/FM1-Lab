@@ -558,12 +558,12 @@ int main(void) {
     }
     memset(output, 0, sizeof output);
     fm6_render(output, TEST_FRAMES, 4096u);
-    assert(fm6_active_voices() == 4u);
+    assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT);
     fm6_overload();
     assert(fm6_overload_shed_count() == 1u);
     memset(output, 0, sizeof output);
     fm6_render(output, TEST_FRAMES, 4096u);
-    assert(fm6_active_voices() == 3u);
+    assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT-1u);
     for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
         assert(fm6_active_voices_patch(patch) <= 1u);
     fm6_overload();
