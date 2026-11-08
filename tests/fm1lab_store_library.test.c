@@ -27,12 +27,28 @@ static void make_legacy_insert_snapshot(uint8_t *dst,const uint8_t *src,int v2)
     memset(dst,0,snap);
     memcpy(dst,src,header);
     for(unsigned i=0;i<32u;i++){
-        const uint8_t *state=src+12u+i*14u;
+        const uint8_t *state=src+12u+i*18u;
         uint8_t *legacy=dst+header+i*56u;
         for(unsigned p=0;p<4u;p++)memcpy(legacy+p*14u,state,14u);
     }
     uint16_t crc=test_crc16(dst,data);
     dst[data]=(uint8_t)crc;dst[data+1u]=(uint8_t)(crc>>8);
+}
+static void make_v3_insert_snapshot(uint8_t *dst,const uint8_t *src)
+{
+    memset(dst,0,462u);memcpy(dst,src,12u);
+    for(unsigned i=0;i<32u;i++)memcpy(dst+12u+i*14u,src+12u+i*18u,14u);
+    uint16_t crc=test_crc16(dst,460u);dst[460]=(uint8_t)crc;dst[461]=(uint8_t)(crc>>8);
+}
+static void downgrade_insert_sidecar_to_v3(void)
+{
+    uint8_t old[936];memset(old,0,sizeof old);
+    old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x33u;
+    old[4]=3u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
+    for(unsigned copy=0;copy<2u;copy++)
+        make_v3_insert_snapshot(old+12u+copy*462u,objects[4]+12u+copy*590u);
+    uint16_t header_crc=test_crc16(old,8u);old[8]=(uint8_t)header_crc;old[9]=(uint8_t)(header_crc>>8);
+    memcpy(objects[4],old,sizeof old);object_len[4]=(uint16_t)sizeof old;
 }
 static void downgrade_insert_sidecar_to_v1(void)
 {
@@ -42,7 +58,7 @@ static void downgrade_insert_sidecar_to_v1(void)
     old[4]=1u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
     for(unsigned bank=0;bank<4u;bank++)objects[bank][5]=(uint8_t)bank;
     for(unsigned copy=0;copy<2u;copy++){
-        const uint8_t *src=objects[4]+12u+copy*462u;
+        const uint8_t *src=objects[4]+12u+copy*590u;
         make_legacy_insert_snapshot(old+12u+copy*1802u,src,0);
     }
     uint16_t header_crc=test_crc16(old,8u);
@@ -148,9 +164,21 @@ int main(void) {
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     inserts.amp_enabled=1u; inserts.drive=73u; inserts.tone=29u; inserts.output=61u;
     inserts.eq_enabled=1u; inserts.eq[1].frequency=67u; inserts.eq[1].gain=19u; inserts.eq[1].q=23u;
+    inserts.instrument_macros[0]=68u;inserts.instrument_macros[1]=42u;
+    inserts.instrument_macros[2]=77u;inserts.instrument_macros[3]=33u;
     assert(fm1lab_store_library_save_full(0u,&source,&inserts)==0);
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
+    /* V3 stores the original 14-byte insert state; migration adds four
+     * neutral instrument macros while preserving the active/fallback journal. */
+    downgrade_insert_sidecar_to_v3();
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+    assert(restored.drive==inserts.drive && restored.eq[1].gain==inserts.eq[1].gain);
+    for(unsigned m=0;m<4u;m++)assert(restored.instrument_macros[m]==50u);
+    fm1lab_insert_state_init(&inserts);
+    inserts.amp_enabled=1u;inserts.drive=73u;inserts.tone=29u;inserts.output=61u;
+    inserts.eq_enabled=1u;inserts.eq[1].frequency=67u;inserts.eq[1].gain=19u;inserts.eq[1].q=23u;
+    assert(fm1lab_store_library_save_full(0u,&loaded,&inserts)==0);
     /* V2 and V1 per-patch sidecars migrate to one global chain without
      * touching the fixed 479-byte Instrument records. Identical legacy patch
      * values collapse losslessly; divergent values are safely bypassed. */
