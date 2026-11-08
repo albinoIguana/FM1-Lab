@@ -68,6 +68,7 @@ uint8_t fm6_arpeggiator_mode(void);
 int fm6_performance_state_valid(const fm6_performance_state_t *state);
 void fm6_performance_state_get(fm6_performance_state_t *state);
 int fm6_performance_state_set(const fm6_performance_state_t *state);
+int fm6_performance_state_update(const fm6_performance_state_t *state);
 void fm6_fx_set_enabled(uint8_t effect, uint8_t enabled);
 void fm6_fx_set_mix(uint8_t effect, uint8_t mix);
 void fm6_fx_set_time(uint8_t effect, uint8_t value);
