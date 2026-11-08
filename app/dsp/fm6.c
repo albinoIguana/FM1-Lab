@@ -141,6 +141,7 @@ static uint32_t seq_gate_left[2];
 static volatile uint32_t transport_bpm=120u;
 static uint32_t transport_phase;
 static volatile uint8_t arp_mode, arp_notes[16], arp_velocities[16], arp_count, arp_index, arp_direction=1u;
+static uint32_t arp_random_state=0x6D2B79F5u;
 static uint8_t arp_live_note, arp_live;
 static int32_t fx_delay[FM6_DELAY_SIZE] PLAT_POOL, fx_delay_r[FM6_DELAY_SIZE] PLAT_POOL;
 static int32_t fx_chorus[FM6_CHORUS_SIZE] PLAT_POOL, fx_chorus_r[FM6_CHORUS_SIZE] PLAT_POOL;
@@ -361,14 +362,17 @@ static void fm6_transport_step(void)
         if(arp_live) fm6_note_off_source(arp_live_note,0x0fu,3u);
         if(arp_mode==1u) arp_index=(uint8_t)(arp_index%arp_count);
         else if(arp_mode==2u) arp_index=(uint8_t)(arp_count-1u-(arp_index%arp_count));
-        else {
+        else if(arp_mode==4u) {
+            arp_random_state^=arp_random_state<<13; arp_random_state^=arp_random_state>>17; arp_random_state^=arp_random_state<<5;
+            arp_index=(uint8_t)(arp_random_state%arp_count);
+        } else {
             if(arp_index>=arp_count) { arp_index=arp_count>1u?(uint8_t)(arp_count-2u):0u; arp_direction=0u; }
             else if(!arp_direction && arp_index==0u) arp_direction=1u;
         }
         arp_play_position=arp_index;
         arp_live_note=arp_notes[arp_index]; fm6_note_start_tuned_mask(arp_live_note,arp_velocities[arp_index],0x0fu,0,3u); arp_live=1u;
         if(arp_mode==3u) { if(arp_direction) ++arp_index; else if(arp_index) --arp_index; }
-        else ++arp_index;
+        else if(arp_mode!=4u) ++arp_index;
     } else if(arp_live) { fm6_note_off_source(arp_live_note,0x0fu,3u); arp_live=0u; }
 }
 static int32_t fm6_allpass_stage(int32_t input, int32_t *state, int32_t coefficient_q15)
@@ -1018,7 +1022,7 @@ uint8_t fm6_sequencer_running(void) { return seq_running; }
 uint8_t fm6_arpeggiator_playing_step(void) { return arp_play_position; }
 uint8_t fm6_arpeggiator_active(void) { return (uint8_t)(arp_mode && arp_count && arp_live); }
 void fm6_arpeggiator_set_mode(uint8_t mode) {
-    if(mode>3u) mode=3u;
+    if(mode>4u) mode=4u;
     /* Enabling starts with an empty held-note set naturally (keys played
      * while bypassed are not captured). Only disabling needs an audio-owner
      * release/clear event for the currently generated arp note. */
@@ -1043,7 +1047,7 @@ uint8_t fm6_fx_get_send(uint8_t patch,uint8_t effect) { return patch<PATCHES&&ef
 int fm6_performance_state_valid(const fm6_performance_state_t *s)
 {
     if (!s || s->tempo_bpm < 30u || s->tempo_bpm > 300u ||
-        s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 3u)
+        s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 4u)
         return 0;
     for (uint32_t lane = 0; lane < 2u; ++lane) {
         if (s->lane_patch[lane] >= PATCHES) return 0;
