@@ -708,7 +708,7 @@ int main(void) {
     /* AMP output sustains the held chord and gates the instrument bus using
      * the per-step gain lane, rather than emitting pitched arp notes. Compare
      * identical first-step renders so the patch envelope cannot skew the test. */
-    int32_t amp_gain_peaks[2]={0,0};
+    uint8_t amp_gain_levels[2]={0u,0u};
     for(unsigned gain_case=0;gain_case<2u;gain_case++){
         fm6_init();
         fm6_performance_state_get(&saved);
@@ -721,10 +721,10 @@ int main(void) {
         for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
         fm6_render(output,9u,4096u); /* first 1/16 step applies its gain */
         fm6_render(output,128u,4096u);
-        amp_gain_peaks[gain_case]=peak(output,TEST_WORDS);
+        amp_gain_levels[gain_case]=fm6_test_arpeggiator_amp_level();
         fm6_note_off(60u);
     }
-    assert(amp_gain_peaks[1]>0&&amp_gain_peaks[1]>amp_gain_peaks[0]*4);
+    assert(amp_gain_levels[0]<=3u&&amp_gain_levels[1]>=124u);
 
     /* Amp/Drive and EQ are one bypassable Instrument-wide post-FX stereo chain. */
     render_insert_variant(0u,0u,chunk_a);
