@@ -706,29 +706,25 @@ int main(void) {
     fm6_arpeggiator_set_mode(0u);
 
     /* AMP output sustains the held chord and gates the instrument bus using
-     * the per-step gain lane, rather than emitting pitched arp notes. */
-    fm6_init();
-    fm6_performance_state_get(&saved);
-    saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=50u;
-    saved.arp_length=8u;saved.arp_output=1u;
-    saved.arp_step_gain[0]=0u;saved.arp_step_gain[1]=127u;
-    assert(fm6_performance_state_set(&saved)==0);
-    fm6_note_on(60u,100u);
-    assert(fm6_active_voices()>0u);
-    for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
-    fm6_render(output,9u,4096u); /* first 1/16 step: gain zero */
-    fm6_render(output,128u,4096u);
-    int32_t amp_muted_peak=peak(output,TEST_WORDS);
-    for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
-    fm6_render(output,8u,4096u); /* second step: gain full */
-    fm6_render(output,128u,4096u);
-    int32_t amp_open_peak=peak(output,TEST_WORDS);
-    printf("FM6 amp arp peaks: muted=%ld open=%ld voices=%u active=%u step=%u\\n",
-           (long)amp_muted_peak,(long)amp_open_peak,(unsigned)fm6_active_voices(),
-           (unsigned)fm6_arpeggiator_active(),(unsigned)fm6_arpeggiator_playing_step());
-    assert(amp_open_peak>0&&amp_open_peak>amp_muted_peak*4);
-    fm6_note_off(60u);
-    fm6_arpeggiator_set_mode(0u);
+     * the per-step gain lane, rather than emitting pitched arp notes. Compare
+     * identical first-step renders so the patch envelope cannot skew the test. */
+    int32_t amp_gain_peaks[2]={0,0};
+    for(unsigned gain_case=0;gain_case<2u;gain_case++){
+        fm6_init();
+        fm6_performance_state_get(&saved);
+        saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=100u;
+        saved.arp_length=8u;saved.arp_output=1u;
+        saved.arp_step_gain[0]=(uint8_t)(gain_case?127u:0u);
+        assert(fm6_performance_state_set(&saved)==0);
+        fm6_note_on(60u,100u);
+        assert(fm6_active_voices()>0u);
+        for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,9u,4096u); /* first 1/16 step applies its gain */
+        fm6_render(output,128u,4096u);
+        amp_gain_peaks[gain_case]=peak(output,TEST_WORDS);
+        fm6_note_off(60u);
+    }
+    assert(amp_gain_peaks[1]>0&&amp_gain_peaks[1]>amp_gain_peaks[0]*4);
 
     /* Amp/Drive and EQ are one bypassable Instrument-wide post-FX stereo chain. */
     render_insert_variant(0u,0u,chunk_a);
