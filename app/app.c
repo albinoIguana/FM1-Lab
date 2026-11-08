@@ -756,6 +756,8 @@ static void instrument_sync_settings(void)
     }
 }
 
+static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
+
 static void instrument_load(uint32_t index, int from_audio)
 {
     fm1lab_instrument_t candidate;
@@ -770,7 +772,7 @@ static void instrument_load(uint32_t index, int from_audio)
     instrument_index = (uint8_t)index;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
-    for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)seq_ui_instrument_name[seq_ui_lane][n]=current_instrument.name[n];seq_ui_instrument_name[seq_ui_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
+    sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     instrument_loaded = 1u;
     instrument_dirty = 0u;
     instrument_sync_settings();
@@ -799,9 +801,7 @@ static int instrument_save_to(uint32_t index)
     instrument_index=(uint8_t)index;
     instrument_dirty=0u;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
-    for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)
-        seq_ui_instrument_name[seq_ui_lane][n]=current_instrument.name[n];
-    seq_ui_instrument_name[seq_ui_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
+    sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     return 0;
 }
 static int instrument_save(void) { return instrument_save_to(instrument_index); }
@@ -985,19 +985,27 @@ static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
 
 static void sequencer_cache_instrument_name(uint8_t lane, const char *source)
 {
-    uint32_t n=0u;
+    uint32_t in=0u,out=0u;
     if(lane>1u)return;
-    while(n<FM1LAB_INSTRUMENT_NAME_BYTES && source[n]) {
-        unsigned char c=(unsigned char)source[n];
-        seq_ui_instrument_name[lane][n]=(c>=32u && c<=126u)?(char)c:' ';
-        ++n;
+    while(source && in<FM1LAB_INSTRUMENT_NAME_BYTES && source[in]) {
+        unsigned char ch=(unsigned char)source[in++];
+        /* Strip the literal colour-tag fragments found in some imported names. */
+        if(ch=='<' && in<FM1LAB_INSTRUMENT_NAME_BYTES && source[in]=='c') {
+            while(in<FM1LAB_INSTRUMENT_NAME_BYTES && source[in] && source[in]!='>')++in;
+            if(in<FM1LAB_INSTRUMENT_NAME_BYTES && source[in]=='>')++in;
+            continue;
+        }
+        if(ch>=32u && ch<=126u && out<FM1LAB_INSTRUMENT_NAME_BYTES)
+            seq_ui_instrument_name[lane][out++]=(char)ch;
+        else if(ch<32u && out && seq_ui_instrument_name[lane][out-1u]!=' ')
+            seq_ui_instrument_name[lane][out++]=' ';
     }
-    while(n && seq_ui_instrument_name[lane][n-1u]==' ')--n;
-    seq_ui_instrument_name[lane][n]='\\0';
-    if(!n) {
+    while(out && seq_ui_instrument_name[lane][out-1u]==' ')--out;
+    seq_ui_instrument_name[lane][out]='\0';
+    if(!out) {
         const char *fallback="INSTRUMENT";
-        while(*fallback)seq_ui_instrument_name[lane][n++]=*fallback++;
-        seq_ui_instrument_name[lane][n]='\\0';
+        while(*fallback && out<FM1LAB_INSTRUMENT_NAME_BYTES)seq_ui_instrument_name[lane][out++]=*fallback++;
+        seq_ui_instrument_name[lane][out]='\0';
     }
 }
 static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocity)
@@ -1299,7 +1307,7 @@ void app_init(void)
             other=factory_instrument;
             fm1lab_insert_state_init(&other_inserts);
         }
-        for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)seq_ui_instrument_name[other_lane][n]=other.name[n];seq_ui_instrument_name[other_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
+        sequencer_cache_instrument_name(other_lane,other.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
         instrument_apply_engine_bank(other_lane,&other,&other_inserts,0u);
     }
@@ -2206,12 +2214,12 @@ static const char *patch_display_name(uint32_t patch)
      * previous Instrument while the UI has already changed focus. */
     const uint8_t *raw = current_instrument.patches[patch].voice + 145u;
     uint32_t n = FM1LAB_PATCH_NAME_BYTES;
-    while (n && (raw[n-1u] == ' ' || raw[n-1u] == '\\0')) --n;
+    while (n && (raw[n-1u] == ' ' || raw[n-1u] == '\0')) --n;
     if (n) {
         for (uint32_t i=0u;i<n;i++)
             display[patch][i] = (raw[i] >= 32u && raw[i] <= 126u) ? (char)raw[i] : ' ';
         while (n && display[patch][n-1u] == ' ') --n;
-        display[patch][n] = '\\0';
+        display[patch][n] = '\0';
         if (n && !patch_name_is_factory(display[patch])) return display[patch];
     }
     fallback[patch][0] = 'P'; fallback[patch][1] = 'A';
@@ -2241,7 +2249,14 @@ static void draw_home_panel(void)
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
         cv_text(x + 65, y + 5, &FONT_XS, enabled ? "ON" : "MUTED",
                 enabled ? RGB(75,235,135) : C_GRAY);
-        cv_text(x + 12, y + 23, &FONT_B, patch_display_name(p), C_WHITE);
+        {
+            const char *name=patch_display_name(p);
+            char short_name[12];
+            uint32_t n=0u;
+            while(name[n] && n<9u){short_name[n]=name[n];++n;}
+            short_name[n]='\0';
+            cv_text(x + 12, y + 23, &FONT_B, short_name, C_WHITE);
+        }
         cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
         cv_text(x + 34, y + 49, &FONT_XS, t, accent);
@@ -2810,7 +2825,7 @@ static void draw_fx_routing_panel(void)
 static const char *page_title(uint8_t current)
 {
     switch (current) {
-    case PAGE_HOME: return patch_display_name(set.patch);
+    case PAGE_HOME: return "HOME";
     case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
     case PAGE_GLOBAL: return "GLOBAL";
     case PAGE_OPERATOR_MAP: return "OPERATOR MAP";
@@ -3008,7 +3023,7 @@ void app_frame(void)
     /* Transport playheads advance in the audio callback, independently of
      * UI input. Refresh sequencer and ARP views at a steady cadence so their
      * highlights follow the actual audio-owned step position. */
-    if (((page == PAGE_SEQ || page == PAGE_SEQ_PIANO) && fm6_sequencer_running()) ||
+    if (page == PAGE_SEQ || page == PAGE_SEQ_PIANO ||
         (page == PAGE_ARP_STEPS && fm6_arpeggiator_active())) {
         if ((uint32_t)(now - last_arp_redraw) >= 30u) {
             last_arp_redraw = now;
