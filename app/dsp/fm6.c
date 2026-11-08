@@ -1132,7 +1132,7 @@ void fm6_sequencer_set_running(uint8_t running) {
     if(!next&&seq_running) seq_stop_pending=1u;
     seq_running=next;
 }
-void fm6_sequencer_set_length(uint8_t steps) { seq_length=steps<1u?1u:steps>64u?64u:steps; if(seq_position>=seq_length) seq_position=0u; }
+void fm6_sequencer_set_length(uint8_t steps) { seq_length=steps<2u?2u:steps>64u?64u:steps; if(seq_position>=seq_length) seq_position=0u; }
 void fm6_sequencer_set_lane(uint8_t lane,uint8_t patch_base) { if(lane<2u&&(patch_base==0u||patch_base==4u)) seq_lane_base[lane]=patch_base; }
 void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t note,uint8_t velocity,uint8_t gate) {
     if(lane>=2u||step>=64u||note>127u||velocity>127u) return;
@@ -1259,7 +1259,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
 {
     if(!fm6_performance_state_valid(s))return -1;
     transport_bpm=s->tempo_bpm;
-    seq_length=s->seq_length;
+    seq_length=s->seq_length<2u?2u:s->seq_length>64u?64u:s->seq_length;
     if(seq_position>=seq_length)seq_position=0u;
     for(uint32_t lane=0;lane<2u;lane++){
         seq_lane_instrument[lane]=s->lane_instrument[lane];
