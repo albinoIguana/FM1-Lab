@@ -3,7 +3,7 @@
  *
  * FM6 core: Felucca's integer-only MSFA/Dexed-derived core, Apache-2.0.
  * The core is included in this translation unit because its compact API is
- * intentionally static; this wrapper supplies the four-patch instrument, four independent eight-voice
+ * intentionally static; this wrapper supplies the two four-patch Instrument banks, eight independent eight-voice
  * pools, and per-patch note allocation.
  */
 #include <stdint.h>
