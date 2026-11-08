@@ -12,7 +12,8 @@
 #define SET_MAGIC_V6 0x4C314D4Bu
 #define SET_MAGIC_V7 0x4C314D4Cu
 #define SET_MAGIC_V8 0x4C314D4Du
-#define SET_MAGIC SET_MAGIC_V8
+#define SET_MAGIC_V9 0x4C314D4Eu
+#define SET_MAGIC SET_MAGIC_V9
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off, rsv[1]; } settings_v1_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; } settings_v2_t;
 typedef struct {
@@ -46,6 +47,7 @@ typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_v6_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_v7_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_v8_t;
 static inline uint16_t settings_crc16(const void *data, size_t length) {
     const uint8_t *bytes=(const uint8_t *)data; uint16_t crc=0xFFFFu;
     while(length--) { crc^=(uint16_t)*bytes++<<8; for(uint32_t bit=0;bit<8u;++bit) crc=(uint16_t)((crc&0x8000u)?(((uint32_t)crc<<1)^0x1021u):((uint32_t)crc<<1)); }
@@ -311,6 +313,30 @@ static inline int settings_import_v7(settings_t *dst,const settings_v7_t *src) {
     }
     dst->performance=src->performance;
     for(uint32_t step=0;step<16u;step++)dst->performance.arp_step_gate[step]=0u;
+    if(dst->performance.arp_step_gain[1]==69u&&dst->performance.arp_step_accent[1]==64u){
+        dst->performance.arp_step_gain[1]=127u;
+        dst->performance.arp_step_accent[1]=0u;
+    }
+    return 0;
+}
+
+/* V8 used the same persisted layout as V9, but could contain the known
+ * accidental step-2 ARP seed (gain 69 / accent 64). Keep the repair in the
+ * versioned migration so it is applied once and then saved as V9. */
+static inline int settings_v8_valid(const settings_v8_t *v) {
+    if(!v||v->magic!=SET_MAGIC_V8||v->octave < -2||v->octave>2||v->patch>=FM1LAB_PATCH_COUNT||
+       (v->enabled_mask&0xF0u)||v->ble_off>1u||v->reserved>1u||
+       !fm6_performance_state_valid(&v->performance)||
+       v->crc!=settings_crc16(v,offsetof(settings_v8_t,crc)))return 0;
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++){
+        if(v->levels[p]>127u)return 0;
+        for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)if(v->macros[p][m]>100u)return 0;
+    }
+    return 1;
+}
+static inline int settings_import_v8(settings_t *dst,const settings_v8_t *src) {
+    if(!dst||!settings_v8_valid(src))return -1;
+    memcpy(dst,src,sizeof *dst);
     if(dst->performance.arp_step_gain[1]==69u&&dst->performance.arp_step_accent[1]==64u){
         dst->performance.arp_step_gain[1]=127u;
         dst->performance.arp_step_accent[1]=0u;
