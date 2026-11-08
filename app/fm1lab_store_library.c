@@ -18,16 +18,21 @@ static PLAT_POOL uint8_t bank_work[BANK_BYTES];
 #define INSERTS_V2_SNAPSHOT_DATA_BYTES 1804u
 #define INSERTS_V2_SNAPSHOT_BYTES 1806u
 #define INSERTS_V2_TOTAL_BYTES 3624u
-#define INSERTS_MAGIC 0x33534e49u
-#define INSERTS_VERSION 3u
+#define INSERTS_V3_MAGIC 0x33534e49u
+#define INSERTS_V3_VERSION 3u
+#define INSERTS_V3_SNAPSHOT_DATA_BYTES 460u
+#define INSERTS_V3_SNAPSHOT_BYTES 462u
+#define INSERTS_V3_TOTAL_BYTES 936u
+#define INSERTS_MAGIC 0x34534e49u
+#define INSERTS_VERSION 4u
 #define INSERTS_HEADER_BYTES 12u
-#define INSERTS_SNAPSHOT_DATA_BYTES 460u
-#define INSERTS_SNAPSHOT_BYTES 462u
-#define INSERTS_TOTAL_BYTES 936u
+#define INSERTS_SNAPSHOT_DATA_BYTES 588u
+#define INSERTS_SNAPSHOT_BYTES 590u
+#define INSERTS_TOTAL_BYTES 1192u
 #define INSERTS_STATE_OFFSET 12u
 #define INSERTS_LEGACY_PATCH_BYTES 14u
 #define INSERTS_LEGACY_INSTRUMENT_BYTES (4u * INSERTS_LEGACY_PATCH_BYTES)
-_Static_assert(sizeof(fm1lab_insert_state_t)==14u, "Global insert state layout changed");
+_Static_assert(sizeof(fm1lab_insert_state_t)==18u, "Instrument macro/insert state layout changed");
 _Static_assert(INSERTS_TOTAL_BYTES<=3840u, "Insert sidecar exceeds one store sector");
 /* Oversized read/scratch buffers intentionally accept the previous V1/V2
  * journal records before compacting them into the V3 global-Instrument form. */
@@ -205,6 +210,16 @@ static int inserts_record_valid(const uint8_t *r){
 }
 static int inserts_v1_snapshot_valid(const uint8_t *s){return read16(s+1800u)==crc16(s,1800u);}
 static int inserts_v2_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_V2_SNAPSHOT_DATA_BYTES)==crc16(s,INSERTS_V2_SNAPSHOT_DATA_BYTES);}
+static int inserts_v3_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_V3_SNAPSHOT_DATA_BYTES)==crc16(s,INSERTS_V3_SNAPSHOT_DATA_BYTES);}
+static void inserts_snapshot_convert_v3(uint8_t *dst,const uint8_t *src){
+ bytes_zero(dst,INSERTS_SNAPSHOT_BYTES);bytes_copy(dst,src,12u);
+ for(unsigned i=0;i<FM1LAB_STORE_INSTRUMENT_COUNT;i++){
+  uint8_t *to=dst+INSERTS_STATE_OFFSET+i*sizeof(fm1lab_insert_state_t);
+  const uint8_t *from=src+INSERTS_STATE_OFFSET+i*14u;
+  bytes_copy(to,from,14u);for(unsigned m=0;m<4u;m++)to[14u+m]=50u;
+ }
+ inserts_snapshot_seal(dst);
+}
 
 /* Old V1/V2 stored four independent patch inserts. Collapse to a single
  * Instrument-wide chain. Average controls for reference, but only retain
@@ -279,6 +294,16 @@ static void inserts_record_load(uint8_t *r){
   if(fallback_ok){inserts_snapshot_convert_v1(inserts_snapshot_work,old_fallback);bytes_copy(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
   else bytes_zero(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,INSERTS_SNAPSHOT_BYTES);
   if(active_ok){inserts_snapshot_convert_v1(inserts_snapshot_work,old_active);bytes_copy(r+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
+  else bytes_zero(r+INSERTS_HEADER_BYTES,INSERTS_SNAPSHOT_BYTES);
+  inserts_header_seal(r);return;
+ }
+ if(n==(int)INSERTS_V3_TOTAL_BYTES&&read32(r)==INSERTS_V3_MAGIC&&read16(r+4u)==INSERTS_V3_VERSION&&
+    read16(r+6u)==INSERTS_V3_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)){
+  uint8_t *old_active=r+INSERTS_HEADER_BYTES,*old_fallback=old_active+INSERTS_V3_SNAPSHOT_BYTES;
+  int active_ok=inserts_v3_snapshot_valid(old_active),fallback_ok=inserts_v3_snapshot_valid(old_fallback);
+  if(fallback_ok){inserts_snapshot_convert_v3(inserts_snapshot_work,old_fallback);bytes_copy(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
+  else bytes_zero(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,INSERTS_SNAPSHOT_BYTES);
+  if(active_ok){inserts_snapshot_convert_v3(inserts_snapshot_work,old_active);bytes_copy(r+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
   else bytes_zero(r+INSERTS_HEADER_BYTES,INSERTS_SNAPSHOT_BYTES);
   inserts_header_seal(r);return;
  }
