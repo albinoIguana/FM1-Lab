@@ -21,7 +21,7 @@ static void render_phaser_test(uint8_t rate, uint8_t depth, int32_t *destination
     assert(fm6_fx_time(FM6_FX_PHASER)==35u);
     assert(fm6_fx_feedback(FM6_FX_PHASER)==20u);
     assert(fm6_fx_depth(FM6_FX_PHASER)==65u);
-    for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
+    for (unsigned patch=1u; patch<FM6_ENGINE_PATCH_COUNT; ++patch)
         fm6_patch_set_enabled((uint8_t)patch,0u);
     fm6_fx_set_enabled(FM6_FX_PHASER,1u);
     fm6_fx_set_mix(FM6_FX_PHASER,100u);
@@ -50,7 +50,7 @@ static uint64_t render_pan_send_peak(uint8_t pan, unsigned effect, unsigned chan
 {
     static int32_t warmup[2048u * 2u];
     fm6_init();
-    for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
+    for (unsigned patch=1u; patch<FM6_ENGINE_PATCH_COUNT; ++patch)
         fm6_patch_set_enabled((uint8_t)patch,0u);
     fm6_patch_set_pan(0u,pan);
     fm6_fx_set_send(0u,(uint8_t)effect,100u);
@@ -64,7 +64,7 @@ static int32_t render_pan_channel_peak(uint8_t pan, unsigned channel)
 {
     static int32_t warmup[2048u * 2u];
     fm6_init();
-    for (unsigned patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch)
+    for (unsigned patch=1u; patch<FM6_ENGINE_PATCH_COUNT; ++patch)
         fm6_patch_set_enabled((uint8_t)patch,0u);
     fm6_patch_set_pan(0u,pan);
     fm6_render(warmup,2048u,4096u); /* settle master and pan smoothing before measurement */
@@ -85,7 +85,7 @@ static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
     uint8_t voice[156] = {0};
     fm6_init();
     memcpy(voice, fm6_patch_data(0u), 155u);
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         if (patch && fm6_patch_set_voice(patch, voice) != 0)
             return 0u;
         fm6_patch_set_level(patch, 31u);
@@ -127,7 +127,7 @@ static void render_master_eq_pan(uint8_t pan, int32_t *destination)
 {
     static int32_t warmup[2048u * 2u];
     fm6_init();
-    for (unsigned patch = 1u; patch < FM1LAB_PATCH_COUNT; ++patch)
+    for (unsigned patch = 1u; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
         fm6_patch_set_enabled((uint8_t)patch, 0u);
     fm6_patch_set_pan(0u, pan);
     fm6_master_insert_set(FM6_INSERT_EQ_ENABLED, 1u);
@@ -144,7 +144,7 @@ static int32_t render_compressor_peak(uint8_t enabled)
 {
     static int32_t warmup[2048u*2u];
     fm6_init();
-    for(unsigned patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)fm6_patch_set_level(patch,127u);
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++)fm6_patch_set_level(patch,127u);
     fm6_master_comp_set(FM6_COMP_ENABLED,enabled);
     fm6_master_comp_set(FM6_COMP_THRESHOLD,0u);
     fm6_master_comp_set(FM6_COMP_RATIO,100u);
@@ -168,7 +168,7 @@ static void render_compressor_stereo(uint8_t enabled,int32_t *destination)
     fm6_init();
     memcpy(voice,fm6_patch_data(0u),155u);
     assert(fm6_patch_set_voice(1u,voice)==0);
-    for(unsigned patch=2u;patch<FM1LAB_PATCH_COUNT;patch++)
+    for(unsigned patch=2u;patch<FM6_ENGINE_PATCH_COUNT;patch++)
         fm6_patch_set_enabled((uint8_t)patch,0u);
     fm6_patch_set_level(0u,127u);
     fm6_patch_set_level(1u,31u);
@@ -187,12 +187,12 @@ static void render_compressor_stereo(uint8_t enabled,int32_t *destination)
 }
 
 int main(void) {
-    assert(fm6_patch_count() == FM1LAB_PATCH_COUNT);
+    assert(fm6_patch_count() == FM6_ENGINE_PATCH_COUNT);
     fm6_init();
     assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 1u &&
            fm6_patch_enabled(2) == 1u && fm6_patch_enabled(3) == 1u);
     /* New factory patches start at <=25% linear amplitude. */
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
         assert(fm6_patch_level(patch) == 31u);
 
     /* A patch's gain must not fall as additional identical patches are
@@ -221,7 +221,7 @@ int main(void) {
     fm6_init();
     uint8_t reference_voice[156] = {0};
     memcpy(reference_voice, fm6_patch_data(0u), 155u);
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         if (patch) assert(fm6_patch_set_voice(patch, reference_voice) == 0);
         fm6_patch_set_level((uint8_t)patch, 31u);
         fm6_patch_set_enabled((uint8_t)patch, 1u);
@@ -282,7 +282,7 @@ int main(void) {
     assert(peak(output, TEST_WORDS) == 0);
     fm6_note_on(60u, 100u);
     /* Patch 0 remains muted; only the other three factory layers start. */
-    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT - 1u);
+    assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT - 1u);
     fm6_panic();
     assert(fm6_patch_algorithm(0) < 32u && fm6_patch_name(0)[0]);
     uint8_t voice[156] = {0};
@@ -336,24 +336,24 @@ int main(void) {
      * documented per-patch limit simultaneously (32 live FM voices). */
     fm6_init();
     memcpy(voice, fm6_patch_data(0), 155u);
-    for (unsigned patch = 1; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 1; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         assert(fm6_patch_set_voice(patch, voice) == 0);
         fm6_patch_set_level(patch, 127u);
         fm6_patch_set_enabled(patch, 1u);
     }
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
             fm6_note_on_mask((uint8_t)(40u + patch * 12u + n), 100u,
                              (uint8_t)(1u << patch));
         assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
     }
-    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
+    assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
 
     /* Overfilling one layer may steal only inside that layer's own pool. */
     fm6_note_on_mask(100u, 100u, 0x04u);
     fm6_note_on_mask(101u, 100u, 0x04u);
-    assert(fm6_active_voices() == FM1LAB_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+    assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
         assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
 
     memset(output, 0, sizeof output);
@@ -443,7 +443,7 @@ int main(void) {
         fm6_init();
         /* Isolate patch 0 so the other default-on factory layers cannot
          * contribute their own sends to this single-layer routing check. */
-        for (unsigned patch = 1u; patch < FM1LAB_PATCH_COUNT; ++patch)
+        for (unsigned patch = 1u; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
             fm6_patch_set_enabled((uint8_t)patch, 0u);
         fm6_fx_set_enabled((uint8_t)effect,1u);
         fm6_fx_set_mix((uint8_t)effect,100u);
@@ -454,7 +454,7 @@ int main(void) {
             fm6_render(wet+block*TEST_WORDS,128u,4096u);
         fm6_init();
         /* Match the wet render's one-layer fixture; only the send differs. */
-        for (unsigned patch = 1u; patch < FM1LAB_PATCH_COUNT; ++patch)
+        for (unsigned patch = 1u; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
             fm6_patch_set_enabled((uint8_t)patch, 0u);
         fm6_note_on(60u,110u);
         for(unsigned block=0;block<64u;block++)
@@ -482,7 +482,7 @@ int main(void) {
      * the target's real-time CPU deadline. */
     fm6_init();
     memcpy(voice, fm6_patch_data(0), 155u);
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         if (patch) assert(fm6_patch_set_voice(patch, voice) == 0);
         fm6_patch_set_enabled(patch, 1u);
         fm6_patch_set_level(patch, 127u);
@@ -496,7 +496,7 @@ int main(void) {
         fm6_fx_set_mix((uint8_t)effect, 100u);
         fm6_fx_set_time((uint8_t)effect, 100u);
         fm6_fx_set_feedback((uint8_t)effect, (uint8_t)(effect == 0u ? 70u : 90u));
-        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
             fm6_fx_set_send((uint8_t)patch, (uint8_t)effect, 100u);
     }
     fm6_set_tempo(300u);
@@ -527,8 +527,8 @@ int main(void) {
         for (unsigned frame = 0; frame < TEST_FRAMES; ++frame)
             if (output[frame * 2u] != output[frame * 2u + 1u]) ++stereo_frames;
         rendered_frames += TEST_FRAMES;
-        assert(fm6_active_voices() <= FM1LAB_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
-        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        assert(fm6_active_voices() <= FM6_ENGINE_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
+        for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
             assert(fm6_active_voices_patch(patch) <= FM1LAB_VOICE_LIMIT);
     }
     assert(rendered_frames >= 44000u);
@@ -546,7 +546,7 @@ int main(void) {
      * fade it rather than hard-cutting it, and preserve the other patch pools. */
     fm6_init();
     memcpy(voice, fm6_patch_data(0), 155u);
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         if (patch) assert(fm6_patch_set_voice(patch, voice) == 0);
         fm6_patch_set_enabled(patch, 1u);
         fm6_note_on_mask((uint8_t)(60u + patch), 100u,
@@ -560,7 +560,7 @@ int main(void) {
     memset(output, 0, sizeof output);
     fm6_render(output, TEST_FRAMES, 4096u);
     assert(fm6_active_voices() == 3u);
-    for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
         assert(fm6_active_voices_patch(patch) <= 1u);
     fm6_overload();
     assert(fm6_overload_shed_count() == 2u);
@@ -572,7 +572,7 @@ int main(void) {
      * the same notes and all three FX buses active. */
     fm6_init();
     memcpy(voice, fm6_patch_data(0), 155u);
-    for (unsigned patch = 1; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 1; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         assert(fm6_patch_set_voice(patch, voice) == 0);
         fm6_patch_set_enabled(patch, 1u);
         fm6_patch_set_level(patch, 127u);
@@ -582,7 +582,7 @@ int main(void) {
         fm6_fx_set_mix((uint8_t)fx, (uint8_t)(35u + fx * 20u));
         fm6_fx_set_time((uint8_t)fx, (uint8_t)(45u + fx * 10u));
         fm6_fx_set_feedback((uint8_t)fx, (uint8_t)(30u + fx * 15u));
-        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
             fm6_fx_set_send((uint8_t)patch, (uint8_t)fx, 80u);
     }
     fm6_note_on_mask(60u, 105u, 0x0Fu);
@@ -591,7 +591,7 @@ int main(void) {
 
     fm6_init();
     memcpy(voice, fm6_patch_data(0), 155u);
-    for (unsigned patch = 1; patch < FM1LAB_PATCH_COUNT; ++patch) {
+    for (unsigned patch = 1; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
         assert(fm6_patch_set_voice(patch, voice) == 0);
         fm6_patch_set_enabled(patch, 1u);
         fm6_patch_set_level(patch, 127u);
@@ -601,7 +601,7 @@ int main(void) {
         fm6_fx_set_mix((uint8_t)fx, (uint8_t)(35u + fx * 20u));
         fm6_fx_set_time((uint8_t)fx, (uint8_t)(45u + fx * 10u));
         fm6_fx_set_feedback((uint8_t)fx, (uint8_t)(30u + fx * 15u));
-        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
             fm6_fx_set_send((uint8_t)patch, (uint8_t)fx, 80u);
     }
     fm6_note_on_mask(60u, 105u, 0x0Fu);
@@ -634,8 +634,8 @@ int main(void) {
     memset(&restored, 0, sizeof restored);
     saved.tempo_bpm = 137u;
     saved.seq_length = 48u;
-    saved.lane_patch[0] = 2u;
-    saved.lane_patch[1] = 3u;
+    saved.lane_instrument[0] = 2u;
+    saved.lane_instrument[1] = 3u;
     for (unsigned lane = 0; lane < 2u; ++lane)
         for (unsigned step = 0; step < 64u; ++step) {
             saved.seq_enabled[lane][step] = (uint8_t)((step % 3u) == lane);
@@ -660,7 +660,7 @@ int main(void) {
         saved.fx_time[fx] = (uint8_t)(40u + fx * 15u);
         saved.fx_feedback[fx] = (uint8_t)(fx == 0u ? 60u : 70u + fx * 5u);
         saved.fx_depth[fx] = (uint8_t)(35u + fx * 15u);
-        for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
+        for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
             saved.fx_send[patch][fx] = (uint8_t)(patch * 20u + fx * 5u);
     }
     assert(fm6_performance_state_valid(&saved));
