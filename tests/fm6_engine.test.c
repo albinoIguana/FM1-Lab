@@ -628,7 +628,8 @@ int main(void) {
     /* Performance state snapshot/restore covers every sequencer step, lane
      * assignment, tempo, arp mode, effect control and per-patch send. */
     fm6_performance_state_t saved, restored;
-    memset(&saved, 0, sizeof saved);
+    fm6_init();
+    fm6_performance_state_get(&saved);
     memset(&restored, 0, sizeof restored);
     saved.tempo_bpm = 137u;
     saved.seq_length = 48u;
@@ -641,7 +642,14 @@ int main(void) {
             saved.seq_velocity[lane][step] = (uint8_t)(70u + step % 58u);
             saved.seq_gate[lane][step] = (uint8_t)(10u + step % 91u);
         }
-    saved.arp_mode = 3u;
+    saved.arp_mode=3u;saved.arp_division=4u;saved.arp_gate=63u;
+    saved.arp_octaves=3u;saved.arp_length=8u;saved.arp_output=2u;
+    saved.arp_random=37u;saved.arp_macro_dest=2u;saved.arp_depth=71u;
+    for(unsigned step=0;step<16u;step++){
+        saved.arp_step_gain[step]=(uint8_t)(60u+step*4u);
+        saved.arp_step_accent[step]=(uint8_t)(step*5u);
+        saved.arp_step_macro[step]=(uint8_t)(20u+step*4u);
+    }
     saved.compressor_enabled=1u; saved.compressor_threshold=42u;
     saved.compressor_ratio=67u; saved.compressor_attack=15u;
     saved.compressor_release=75u; saved.compressor_makeup=10u;
@@ -674,6 +682,26 @@ int main(void) {
     fm6_sequencer_set_running(1u);
     assert(fm6_sequencer_running() == 1u);
     fm6_sequencer_set_running(0u);
+
+    /* Live performance updates must preserve a held-note arp and its running
+     * phase rather than invoking the cold-restore path. */
+    fm6_init();
+    fm6_performance_state_get(&saved);
+    saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=100u;
+    assert(fm6_performance_state_set(&saved)==0);
+    fm6_note_on(60u,100u);
+    for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
+    assert(fm6_arpeggiator_active()==0u); /* 5512 samples: before 1/16 tick */
+    fm6_render(output,9u,4096u);
+    assert(fm6_arpeggiator_active()==1u);
+    fm6_performance_state_get(&restored);
+    restored.arp_gate=55u;
+    assert(fm6_performance_state_update(&restored)==0);
+    assert(fm6_arpeggiator_active()==1u); /* update retained the sounding note */
+    for(unsigned block=0;block<8u;block++)fm6_render(output,128u,4096u);
+    assert(fm6_arpeggiator_active()==1u);
+    fm6_note_off(60u);
+    fm6_arpeggiator_set_mode(0u);
 
     /* Amp/Drive and EQ are one bypassable Instrument-wide post-FX stereo chain. */
     render_insert_variant(0u,0u,chunk_a);
