@@ -33,7 +33,7 @@ static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
-static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_macro[16];
+static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
 static uint8_t arp_ui_output, arp_ui_random, arp_ui_macro_dest, arp_ui_depth=50u;
 
@@ -163,7 +163,7 @@ static void performance_publish(void)
     for(uint32_t step=0;step<16u;step++){
         set.performance.arp_step_gain[step]=arp_ui_gain[step];
         set.performance.arp_step_accent[step]=arp_ui_accent[step];
-        set.performance.arp_step_macro[step]=arp_ui_macro[step];
+        set.performance.arp_step_gate[step]=arp_ui_step_gate[step];
     }
     for (uint32_t lane=0; lane<2u; ++lane) {
         set.performance.lane_patch[lane] = seq_ui_patch[lane];
@@ -499,6 +499,7 @@ void app_init(void)
     settings_v3_t old_v3;
     settings_v4_t old_v4;
     settings_v5_t old_v5;
+    settings_v6_t old_v6;
     int performance_loaded = 0;
     int loaded;
     fm6_init();
@@ -508,7 +509,11 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v5, sizeof old_v5) == (int)sizeof old_v5 &&
+        if (plat_store_load(OBJ_SETTINGS, &old_v6, sizeof old_v6) == (int)sizeof old_v6 &&
+            settings_import_v6(&set, &old_v6) == 0) {
+            performance_loaded = 1;
+            set_dirty = 1u; /* V6 macro-step values become neutral full-length gates */
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v5, sizeof old_v5) == (int)sizeof old_v5 &&
             settings_import_v5(&set, &old_v5) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* migrate previous current record; initialize arp controls */
@@ -530,7 +535,7 @@ void app_init(void)
         settings_seal(&set);
     }
     page = PAGE_HOME;
-    for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_macro[i]=50u;}
+    for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_step_gate[i]=100u;}
     instrument_factory_capture();
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
@@ -542,7 +547,7 @@ void app_init(void)
         for(uint32_t step=0;step<16u;step++){
             arp_ui_gain[step]=set.performance.arp_step_gain[step];
             arp_ui_accent[step]=set.performance.arp_step_accent[step];
-            arp_ui_macro[step]=set.performance.arp_step_macro[step];
+            arp_ui_step_gate[step]=set.performance.arp_step_gate[step];
         }
         for (uint32_t lane = 0; lane < 2u; ++lane) {
             seq_ui_patch[lane] = set.performance.lane_patch[lane];
@@ -1039,7 +1044,7 @@ static void input(void)
                 if(index==0u) { int32_t next=((int32_t)step+e)%arp_ui_length; if(next<0)next+=arp_ui_length; arp_ui_step=(uint8_t)next; }
                 else if(index==1u) arp_ui_gain[step]=(uint8_t)clamp((int32_t)arp_ui_gain[step]+e,0,127);
                 else if(index==2u) arp_ui_accent[step]=(uint8_t)clamp((int32_t)arp_ui_accent[step]+e,0,100);
-                else arp_ui_macro[step]=(uint8_t)clamp((int32_t)arp_ui_macro[step]+e,0,100);
+                else arp_ui_step_gate[step]=(uint8_t)clamp((int32_t)arp_ui_step_gate[step]+e,10,100);
                 performance_publish();set_dirty=1u;
                 app_say("ARP STEP", "UPDATED");
             } else if (page == PAGE_ARP_MOD) {
@@ -1723,61 +1728,65 @@ static void draw_arp_panel(void)
     int_text(arp_ui_octaves,t); text_cat(t," OCT");
     draw_arp_card(3u,"K4  OCTAVES",t,"RANGE",RGB(255,130,100));
 }
+static uint16_t arp_step_gradient_color(uint8_t accent, uint32_t band, uint32_t bands, uint8_t playing)
+{
+    /* Accent is visual-only: it controls a bottom-up color ramp. */
+    uint32_t progress=bands>1u?band*100u/(bands-1u):100u;
+    uint32_t level=18u+((uint32_t)accent*progress*82u)/10000u;
+    uint32_t r=20u+(207u*level)/100u, g=12u+(63u*level)/100u, b=34u+(176u*level)/100u;
+    if(playing){r+=r/2u;g+=g/2u;b+=b/2u;}
+    if(r>255u)r=255u;if(g>255u)g=255u;if(b>255u)b=255u;
+    return RGB(r,g,b);
+}
 static void draw_arp_steps_panel(void)
 {
     char t[16];
-    uint8_t playing=fm6_arpeggiator_playing_step();
-    uint8_t active=fm6_arpeggiator_active();
-    uint16_t accent=RGB(227,75,210);
-    uint16_t play_color=RGB(255,112,255); /* approximately 50% brighter than the base magenta */
-    int32_t gap=2;
-    int32_t width=(224-(int32_t)(arp_ui_length-1u)*gap)/(int32_t)arp_ui_length;
+    uint8_t playing=fm6_arpeggiator_playing_step(), active=fm6_arpeggiator_active();
+    int32_t gap=2, width=(224-(int32_t)(arp_ui_length-1u)*gap)/(int32_t)arp_ui_length;
     int32_t top=28, height=100, bottom=top+height;
-
-    /* This is a step sequencer view, not a four-card settings page:
-     * every step gets a full-height lane and a readable level bar. */
     cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP PATTERN":"16 STEP PATTERN",C_GRAY);
     cv_text(155,2,&FONT_XS,active?"RUNNING":"READY",active?RGB(75,235,135):C_GRAY);
-
     for(uint32_t i=0;i<arp_ui_length;i++) {
         int32_t x=8+(int32_t)i*(width+gap);
         uint8_t gain=arp_ui_gain[i], emphasis=arp_ui_accent[i];
-        int32_t bar_h=(int32_t)gain*(height-8)/127;
-        int32_t bar_w=width-4;
+        uint8_t gate=arp_ui_step_gate[i]<10u?10u:arp_ui_step_gate[i]>100u?100u:arp_ui_step_gate[i];
+        int32_t bar_h=(int32_t)gain*(height-8)/127, bar_w=(width-4)*(int32_t)gate/100;
         uint8_t is_playing=(uint8_t)(active && i==(uint32_t)(playing%arp_ui_length));
         uint8_t is_selected=(uint8_t)(i==arp_ui_step);
-
+        uint32_t bands=8u;
         int_text((int32_t)i+1,t);
         cv_text(x+(width-text_w(&FONT_XS,t))/2,15,&FONT_XS,t,is_selected?C_WHITE:C_GRAY);
         cv_rect(x,top,width,height,C_LINE);
         cv_rect(x+1,top+1,width-2,height-2,RGB(13,20,29));
-        if(emphasis) bar_w=(width-4)/2+(int32_t)emphasis*((width-4)/2)/100;
-        if(bar_h<2 && gain)bar_h=2;
-        if(gain) cv_rect(x+(width-bar_w)/2,bottom-3-bar_h,bar_w,bar_h,
-                         is_playing?play_color:accent);
-        /* A thin bright cap makes the moving playhead obvious without
-         * painting a black block over the step's data. */
-        if(is_playing) cv_rect(x+1,top+1,width-2,2,play_color);
+        if(bar_h<2&&gain)bar_h=2;
+        if(bar_w<1)bar_w=1;
+        if(gain) {
+            int32_t fill_x=x+(width-bar_w)/2, fill_y=bottom-3-bar_h;
+            int32_t band_h=(bar_h+(int32_t)bands-1)/(int32_t)bands;
+            for(uint32_t band=0;band<bands;band++) {
+                int32_t yy=fill_y+(int32_t)band*band_h, hh=band_h;
+                if(yy+hh>bottom-3)hh=bottom-3-yy;
+                if(hh>0)cv_rect(fill_x,yy,bar_w,hh,arp_step_gradient_color(emphasis,band,bands,is_playing));
+            }
+        }
+        if(is_playing)cv_rect(x+1,top+1,width-2,2,RGB(255,150,255));
         if(is_selected) {
-            cv_rect(x,top,width,1,C_WHITE);
-            cv_rect(x,bottom-1,width,1,C_WHITE);
-            cv_rect(x,top,1,height,C_WHITE);
-            cv_rect(x+width-1,top,1,height,C_WHITE);
+            cv_rect(x,top,width,1,C_WHITE);cv_rect(x,bottom-1,width,1,C_WHITE);
+            cv_rect(x,top,1,height,C_WHITE);cv_rect(x+width-1,top,1,height,C_WHITE);
         }
     }
-
-    /* Compact, non-card parameter readout keeps the step graphic dominant. */
-    cv_text(5,137,&FONT_XS,"SELECT",C_GRAY);
-    int_text((int32_t)arp_ui_step+1,t); cv_text(42,137,&FONT_XS,t,C_WHITE);
-    cv_text(70,137,&FONT_XS,"GAIN",RGB(36,215,232));
-    int_text(arp_ui_gain[arp_ui_step],t); cv_text(101,137,&FONT_XS,t,C_WHITE);
-    cv_text(128,137,&FONT_XS,"ACC",RGB(242,212,59));
-    int_text(arp_ui_accent[arp_ui_step],t); cv_text(151,137,&FONT_XS,t,C_WHITE);
-    cv_text(177,137,&FONT_XS,"MACRO",RGB(150,120,255));
-    int_text(arp_ui_macro[arp_ui_step],t); cv_text(215-text_w(&FONT_XS,t),137,&FONT_XS,t,C_WHITE);
-    cv_text(5,158,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACCENT  K4 MACRO",C_GRAY);
+    cv_text(5,137,&FONT_XS,"STEP",C_GRAY);
+    int_text((int32_t)arp_ui_step+1,t);cv_text(31,137,&FONT_XS,t,C_WHITE);
+    cv_text(55,137,&FONT_XS,"GAIN",RGB(36,215,232));
+    int_text(arp_ui_gain[arp_ui_step],t);cv_text(83,137,&FONT_XS,t,C_WHITE);
+    cv_text(112,137,&FONT_XS,"ACC",RGB(227,75,210));
+    int_text(arp_ui_accent[arp_ui_step],t);cv_text(135,137,&FONT_XS,t,C_WHITE);
+    cv_text(163,137,&FONT_XS,"GATE",RGB(242,212,59));
+    int_text(arp_ui_step_gate[arp_ui_step],t);cv_text(193,137,&FONT_XS,t,C_WHITE);
+    cv_text(5,158,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACCENT  K4 GATE",C_GRAY);
     cv_text(5,173,&FONT_XS,"PRESET: 8 / 16 STEPS",C_GRAY);
 }
+
 static void draw_arp_mod_panel(void)
 {
     static const char *const outputs[3]={"NOTES","AMP","MACRO"};
