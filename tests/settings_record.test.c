@@ -18,6 +18,8 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         (s->arp_length!=8u&&s->arp_length!=16u) || s->arp_output>2u ||
         s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
         return 0;
+    for(unsigned step=0;step<16u;step++)
+        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_macro[step]>100u)return 0;
     for (unsigned lane = 0; lane < 2u; ++lane) {
         if (s->lane_patch[lane] >= FM1LAB_PATCH_COUNT) return 0;
         for (unsigned step = 0; step < 64u; ++step)
