@@ -705,6 +705,27 @@ int main(void) {
     fm6_note_off(60u);
     fm6_arpeggiator_set_mode(0u);
 
+    /* AMP output sustains the held chord and gates the instrument bus using
+     * the per-step gain lane, rather than emitting pitched arp notes. */
+    fm6_init();
+    fm6_performance_state_get(&saved);
+    saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=50u;
+    saved.arp_length=8u;saved.arp_output=1u;
+    saved.arp_step_gain[0]=0u;saved.arp_step_gain[1]=127u;
+    assert(fm6_performance_state_set(&saved)==0);
+    fm6_note_on(60u,100u);
+    assert(fm6_active_voices()>0u);
+    for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
+    fm6_render(output,9u,4096u); /* first 1/16 step: gain zero */
+    fm6_render(output,128u,4096u);
+    assert(peak(output,TEST_WORDS)==0);
+    for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
+    fm6_render(output,8u,4096u); /* second step: gain full */
+    fm6_render(output,128u,4096u);
+    assert(peak(output,TEST_WORDS)>0);
+    fm6_note_off(60u);
+    fm6_arpeggiator_set_mode(0u);
+
     /* Amp/Drive and EQ are one bypassable Instrument-wide post-FX stereo chain. */
     render_insert_variant(0u,0u,chunk_a);
     render_insert_variant(1u,0u,chunk_b);
