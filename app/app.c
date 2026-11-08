@@ -24,7 +24,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -37,6 +37,7 @@ static uint8_t arp_ui_mode;
 
 static const char *patch_display_name(uint32_t patch);
 static uint16_t panel_fill(void);
+static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro);
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -177,11 +178,20 @@ static void instrument_apply_engine(void)
         fm6_patch_set_level(p, part->level);
         fm6_patch_set_pan(p, fm1lab_patch_pan(&current_instrument, p));
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
-            fm6_macro_set(p, m, part->macros[m]);
+            fm6_macro_set(p, m, instrument_macro_effective(p, m));
     }
     fm6_master_insert_reset_state();
     for(uint32_t field=0;field<FM6_INSERT_FIELD_COUNT;++field)
         fm6_master_insert_set(field,fm1lab_insert_state_get(&current_inserts,field));
+}
+
+static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro)
+{
+    int32_t value;
+    if (patch >= FM1LAB_PATCH_COUNT || macro >= FM1LAB_MACRO_COUNT) return 50u;
+    value = (int32_t)current_instrument.patches[patch].macros[macro] +
+        (int32_t)current_inserts.instrument_macros[macro] - 50;
+    return (uint8_t)clamp(value, 0, 100);
 }
 
 static void instrument_factory_capture(void)
@@ -777,8 +787,14 @@ static void input(void)
                 page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
             app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
-            page = page==PAGE_MACRO?PAGE_HOME:PAGE_MACRO;
-            app_say(page==PAGE_MACRO?"PATCH MACROS":"HOME",patch_display_name(set.patch));
+            if (page == PAGE_MACRO || page == PAGE_INSTRUMENT_MACRO) {
+                page = PAGE_HOME;
+                app_say("HOME", "ALL FOUR PATCHES");
+            } else {
+                page = patch_focus ? PAGE_MACRO : PAGE_INSTRUMENT_MACRO;
+                app_say(page == PAGE_MACRO ? "PATCH MACROS" : "INSTRUMENT MACROS",
+                        page == PAGE_MACRO ? patch_display_name(set.patch) : "FOUR-PATCH CONTROL");
+            }
         } else if (k == B_EDIT) {
             page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
             app_say("OPERATOR ROLES", patch_display_name(set.patch));
@@ -1064,6 +1080,17 @@ static void input(void)
                 };
                 voice_edit_global(fields[index], e);
                 app_say("LFO MODULATION", "UPDATED");
+            } else if (page == PAGE_INSTRUMENT_MACRO) {
+                int32_t value = (int32_t)current_inserts.instrument_macros[index] + e;
+                if (value < 0) value = 0;
+                if (value > 100) value = 100;
+                current_inserts.instrument_macros[index] = (uint8_t)value;
+                instrument_dirty = 1u;
+                for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p)
+                    ui_event_push(EV_MACRO_SET, (uint8_t)p, (uint8_t)index,
+                                  instrument_macro_effective(p, index));
+                set_dirty = 1u;
+                app_say("INSTRUMENT MACRO", "UPDATED");
             } else if (page == PAGE_MACRO) {
                 int32_t value = (int32_t)set.macros[set.patch][index] + e;
                 if (value < 0) value = 0;
@@ -1342,6 +1369,8 @@ static void draw_macro_panel(void)
     uint32_t now = plat_ms();
     uint16_t accent = patch_color(set.patch);
     char t[24];
+    cv_text(6, 0, &FONT_XS, set.patch == 0u ? "PATCH 1 MACROS" :
+        set.patch == 1u ? "PATCH 2 MACROS" : set.patch == 2u ? "PATCH 3 MACROS" : "PATCH 4 MACROS", accent);
     cv_text(164, 0, &FONT_XS, "ALG", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
     cv_text(204, 0, &FONT_XS, t, accent);
@@ -1357,6 +1386,31 @@ static void draw_macro_panel(void)
         cv_rect(x + 9, y + 42, 98, 6, RGB(31, 43, 55));
         cv_rect(x + 9, y + 42, (int32_t)value * 98 / 100, 6, accent);
         cv_rect(x + 9 + (int32_t)value * 98 / 100, y + 39, 2, 12, C_WHITE);
+        cv_text(x + 9, y + 64, &FONT_XS, hints[m], C_GRAY);
+    }
+}
+static void draw_instrument_macro_panel(void)
+{
+    static const char *const names[4] = {"K1 BRIGHT", "K2 BODY", "K3 MOTION", "K4 EDGE"};
+    static const char *const hints[4] = {"SHARED TONE SHIFT", "SHARED BODY SHIFT", "SHARED MOTION SHIFT", "SHARED EDGE SHIFT"};
+    const uint16_t accent = RGB(150,120,255);
+    const uint32_t now = plat_ms();
+    char t[24];
+    cv_text(6, 0, &FONT_XS, "INSTRUMENT MACROS", accent);
+    cv_text(166, 0, &FONT_XS, "NEUTRAL 50", C_GRAY);
+    for (uint32_t m = 0; m < 4u; ++m) {
+        int32_t x = panel_grid_x(m);
+        int32_t y = panel_grid_y(m, UI_GRID_TOP, UI_GRID_ROW_STEP);
+        uint32_t value = current_inserts.instrument_macros[m];
+        uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
+        instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), border, accent);
+        cv_text(x + 9, y + 9, &FONT_XS, names[m], C_WHITE);
+        int_text((int32_t)value, t);
+        cv_text(x + 88, y + 7, &FONT_B, t, accent);
+        cv_rect(x + 9, y + 42, 98, 6, RGB(31,43,55));
+        cv_rect(x + 9 + 49, y + 40, 1, 10, C_GRAY);
+        if (value >= 50u) cv_rect(x + 9 + 49, y + 42, (int32_t)(value - 50u) * 49 / 50, 6, accent);
+        else cv_rect(x + 9 + (int32_t)value * 49 / 50, y + 42, (int32_t)(50u - value) * 49 / 50, 6, accent);
         cv_text(x + 9, y + 64, &FONT_XS, hints[m], C_GRAY);
     }
 }
@@ -1668,7 +1722,7 @@ static void draw(void)
 {
     char t[24];
     uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
-    uint16_t accent = patch_color(set.patch);
+    uint16_t accent = page == PAGE_INSTRUMENT_MACRO ? RGB(150,120,255) : patch_color(set.patch);
     cv_begin(240, 37, screen_bg());
 
     /* Global status strip: tempo, physical battery gauge, and active arp. */
@@ -1698,6 +1752,7 @@ static void draw(void)
     cv_begin(240, 180, screen_bg());
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
+    else if (page == PAGE_INSTRUMENT_MACRO) draw_instrument_macro_panel();
     else if (page == PAGE_FX_AMP) draw_amp_panel();
     else if (page == PAGE_FX_EQ) draw_eq_panel();
     else if (page == PAGE_FX_COMPRESSOR) draw_compressor_panel();
