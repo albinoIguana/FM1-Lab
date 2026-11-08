@@ -31,7 +31,7 @@ static uint8_t patch_focus;
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
-               seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
+               seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_mode, arp_ui_step, arp_ui_gain[16], arp_ui_accent[16], arp_ui_macro[16];
 
@@ -521,6 +521,7 @@ void app_init(void)
             seq_ui_patch[lane] = set.performance.lane_patch[lane];
             for (uint32_t step = 0; step < 64u; ++step) {
                 seq_ui_enabled[lane][step] = set.performance.seq_enabled[lane][step];
+                 seq_ui_accent[lane][step] = 50u;
                 seq_ui_note[lane][step] = set.performance.seq_note[lane][step];
                 seq_ui_velocity[lane][step] = set.performance.seq_velocity[lane][step];
                 seq_ui_gate[lane][step] = set.performance.seq_gate[lane][step];
@@ -534,6 +535,7 @@ void app_init(void)
                 seq_ui_velocity[lane][step] = 100u;
                 seq_ui_gate[lane][step] = 50u;
                 seq_ui_enabled[lane][step] = (uint8_t)((step < 16u) && (step % 4u == (lane ? 2u : 0u)));
+                 seq_ui_accent[lane][step] = 50u;
                 /* Performance state is applied below from one coherent snapshot. */
             }
         }
@@ -1606,7 +1608,8 @@ static void draw_lfo_panel(uint32_t modulation)
 static void draw_step_columns(uint8_t lane, uint8_t first, uint8_t count,
                                int32_t top, int32_t height, uint8_t selected,
                                uint8_t playing, const uint8_t *velocity,
-                               const uint8_t *enabled, uint16_t accent)
+                               const uint8_t *enabled, const uint8_t *accent_values,
+                               uint16_t accent)
 {
     int32_t gap=2, width=(224-(int32_t)(count-1u)*gap)/(int32_t)count;
     for(uint32_t i=0;i<count;i++) {
@@ -1614,7 +1617,8 @@ static void draw_step_columns(uint8_t lane, uint8_t first, uint8_t count,
         uint8_t value=velocity?velocity[step]:100u;
         int32_t x=8+(int32_t)i*(width+gap);
         int32_t bar_h=(int32_t)value*(height-18)/127;
-        int32_t bar_w=active?width-2:width/2;
+        uint8_t accent_value=accent_values?accent_values[step]:50u;
+        int32_t bar_w=active?(width/2+(int32_t)accent_value*(width/2-2)/100):width/2;
         int32_t bx=x+(width-bar_w)/2;
         uint16_t color=active?accent:C_LINE;
         cv_rect(x,top,width,height,C_LINE);
@@ -1633,12 +1637,12 @@ static void draw_sequencer_panel(void)
     cv_text(78,0,&FONT_XS,instrument_display_name(),C_WHITE);
     draw_step_columns(0u,0u,count,20,48,seq_ui_lane==0u?seq_ui_step:255u,
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[0],
-                      seq_ui_enabled[0],patch_color(seq_ui_patch[0]));
+                      seq_ui_enabled[0],seq_ui_accent[0],patch_color(seq_ui_patch[0]));
     cv_text(6,77,&FONT_XS,"TRACK 2",patch_color(seq_ui_patch[1]));
     cv_text(78,77,&FONT_XS,instrument_display_name(),C_WHITE);
     draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
-                      seq_ui_enabled[1],patch_color(seq_ui_patch[1]));
+                      seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
     cv_text(6,151,&FONT_XS,fm6_sequencer_running()?"PLAYING":"STOPPED",
             fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
     cv_text(82,151,&FONT_XS,"SELECT STEP  K1 ON/OFF",C_GRAY);
@@ -1666,7 +1670,7 @@ static void draw_arp_steps_panel(void)
     cv_text(174,0,&FONT_XS,"16 STEPS",C_GRAY);
     draw_step_columns(0u,0u,16u,24,112,arp_ui_step,
                       fm6_arpeggiator_active()?playing:255u,
-                      arp_ui_gain,0,accent);
+                      arp_ui_gain,0,arp_ui_accent,accent);
     cv_text(8,145,&FONT_XS,"GAIN",C_GRAY); int_text(arp_ui_gain[arp_ui_step],t); cv_text(43,145,&FONT_B,t,C_WHITE);
     cv_text(82,145,&FONT_XS,"ACCENT",C_GRAY); int_text(arp_ui_accent[arp_ui_step],t); cv_text(126,145,&FONT_B,t,C_WHITE);
     cv_text(164,145,&FONT_XS,"MACRO",C_GRAY); int_text(arp_ui_macro[arp_ui_step],t); cv_text(205,145,&FONT_B,t,C_WHITE);
