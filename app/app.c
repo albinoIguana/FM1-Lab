@@ -137,6 +137,53 @@ static void fm1lab_factory_voice_build(uint8_t out[FM1LAB_PATCH_BYTES], uint8_t 
     out[141]=1u; out[142]=4u; out[144]=24u; out[155]=63u;
 }
 
+
+/* Turn a factory recipe into a genuinely long-form layer. DX-style EG rates
+ * are inverse-time controls: lower values create slower stages. Two contrasting
+ * evolvers are used per Instrument; the remaining voices keep the attack clear. */
+static void fm1lab_make_evolving_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t texture)
+{
+    static const char *const names[2]={"SLOW AIR","EVOLVE FX"};
+    uint8_t carriers=fm1lab_carrier_mask(voice[134]&31u);
+    for(uint32_t op=0;op<6u;op++) {
+        uint8_t *v=voice+(5u-op)*21u;
+        uint8_t carrier=(uint8_t)((carriers>>op)&1u);
+        uint8_t spread=(uint8_t)(op*2u);
+        if(!texture) {
+            /* Broad, slow swell; modulator envelopes move at different rates
+             * so the harmonic color opens after the fundamental arrives. */
+            v[0]=(uint8_t)(carrier?13u+spread:20u+spread);
+            v[1]=(uint8_t)(carrier?24u+spread:31u+spread);
+            v[2]=(uint8_t)(carrier?35u+spread:43u+spread);
+            v[3]=(uint8_t)(carrier?19u+spread:27u+spread);
+            v[4]=99u;
+            v[5]=(uint8_t)(carrier?88u:76u);
+            v[6]=(uint8_t)(carrier?72u:48u);
+            v[7]=0u;
+        } else {
+            /* More spectral movement and a slower, uneven fade; deliberately
+             * contrasts with SLOW AIR instead of doubling its envelope. */
+            v[0]=(uint8_t)(carrier?19u+spread:11u+spread);
+            v[1]=(uint8_t)(carrier?34u+spread:24u+spread);
+            v[2]=(uint8_t)(carrier?46u+spread:37u+spread);
+            v[3]=(uint8_t)(carrier?23u+spread:16u+spread);
+            v[4]=99u;
+            v[5]=(uint8_t)(carrier?82u:68u);
+            v[6]=(uint8_t)(carrier?58u:36u);
+            v[7]=0u;
+            if(!carrier && v[18]<28u) v[18]=(uint8_t)(v[18]+(op%3u)+1u);
+        }
+    }
+    voice[137]=(uint8_t)(texture?29u:17u); /* slow LFO */
+    voice[138]=(uint8_t)(texture?24u:48u); /* let the note bloom before modulation */
+    voice[139]=(uint8_t)(texture?7u:3u);  /* restrained pitch movement */
+    voice[140]=(uint8_t)(texture?42u:26u); /* audible but gradual level movement */
+    voice[141]=0u;
+    voice[142]=0u; /* sine */
+    voice[143]=(uint8_t)(texture?4u:2u);
+    for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[texture])?names[texture][i]:' ');
+}
+
 /* Starter library: every Instrument is a deliberate four-voice combination
  * of the sixteen M-VAVE factory recipes, not four copies of one patch. */
 typedef struct { const char *name; uint8_t voice[4]; uint8_t level[4]; } fm1lab_seed_instrument_t;
@@ -172,6 +219,10 @@ static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
         /* The second bank rotates the same four voices into a new blend. */
         uint32_t source=(index>=16u)?((p+1u)&3u):p;
         fm1lab_factory_voice_build(voice,seed->voice[source]);
+        /* Half of every Instrument is intentionally long-form: one slow pad
+         * swell and one evolving, brighter counter-layer. */
+        if(p==1u) fm1lab_make_evolving_voice(voice,0u);
+        else if(p==3u) fm1lab_make_evolving_voice(voice,1u);
         (void)fm1lab_patch_set_voice(out,p,voice);
         out->patches[p].level=seed->level[source];
         out->patches[p].enabled=1u;
