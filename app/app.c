@@ -678,11 +678,16 @@ static void instrument_load(uint32_t index, int from_audio)
     instrument_loaded = 1u;
     instrument_dirty = 0u;
     instrument_sync_settings();
-    if (from_audio) {
+    if (from_audio == 1) {
+        /* PRESET changes replace this lane's engine bank. The master chain
+         * is shared, so only a true Instrument change may replace it. */
         instrument_apply_snapshot=current_instrument;
         inserts_apply_snapshot=current_inserts;
         instrument_apply_pending = 1u;
-        ui_event_push(EV_INSTRUMENT_LOAD, seq_ui_lane, (uint8_t)(from_audio == 2 ? 0u : 1u), 0);
+        ui_event_push(EV_INSTRUMENT_LOAD, seq_ui_lane, 0u, 1u);
+    } else if (from_audio == 2) {
+        /* Track focus is UI-only. Both four-patch banks are already resident;
+         * rewriting voices here kills active notes and creates an audible dip. */
     } else {
         instrument_apply_engine();
     }
