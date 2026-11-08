@@ -24,7 +24,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_ARP_STEPS, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_MOD, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -35,6 +35,7 @@ static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_macro[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
+static uint8_t arp_ui_output, arp_ui_random, arp_ui_macro_dest, arp_ui_depth=50u;
 
 static const char *patch_display_name(uint32_t patch);
 static const char *instrument_display_name(void);
@@ -808,8 +809,10 @@ static void input(void)
             app_say("SEQUENCER", fm6_sequencer_running() ? "RUNNING" : "TWO LANES");
         } else if (k == B_ARP) {
             if (page == PAGE_ARP) page = PAGE_ARP_STEPS;
+            else if (page == PAGE_ARP_STEPS) page = PAGE_ARP_MOD;
             else page = PAGE_ARP;
-            app_say("ARPEGGIATOR", page == PAGE_ARP ? "ENGINE" : "STEP EDITOR");
+            app_say("ARPEGGIATOR", page == PAGE_ARP ? "ENGINE" :
+                    page == PAGE_ARP_STEPS ? "STEP EDITOR" : "MODULATION");
         } else if (k == B_FX) {
             if (page < PAGE_FX_AMP || page > PAGE_FX_ROUTING) page = PAGE_FX_AMP;
             else page = page == PAGE_FX_ROUTING ? PAGE_FX_AMP : (uint8_t)(page + 1u);
@@ -1005,6 +1008,12 @@ static void input(void)
                 else if(index==2u) arp_ui_accent[step]=(uint8_t)clamp((int32_t)arp_ui_accent[step]+e,0,100);
                 else arp_ui_macro[step]=(uint8_t)clamp((int32_t)arp_ui_macro[step]+e,0,100);
                 app_say("ARP STEP", "UPDATED");
+            } else if (page == PAGE_ARP_MOD) {
+                if(index==0u) arp_ui_output=(uint8_t)(((int32_t)arp_ui_output+e+3)%3);
+                else if(index==1u) arp_ui_random=(uint8_t)clamp((int32_t)arp_ui_random+e,0,100);
+                else if(index==2u) arp_ui_macro_dest=(uint8_t)(((int32_t)arp_ui_macro_dest+e+4)%4);
+                else arp_ui_depth=(uint8_t)clamp((int32_t)arp_ui_depth+e,0,100);
+                app_say("ARP MODULATION","UPDATED");
             } else if (page == PAGE_FX_ROUTING) {
                 uint8_t fx=(uint8_t)index;
                 set.performance.fx_send[set.patch][fx]=(uint8_t)clamp((int32_t)set.performance.fx_send[set.patch][fx]+e,0,100);
@@ -1700,6 +1709,19 @@ static void draw_arp_steps_panel(void)
                       fm6_arpeggiator_active()?(uint8_t)(playing%arp_ui_length):255u,
                       arp_ui_gain,0,arp_ui_accent,accent);
 }
+static void draw_arp_mod_panel(void)
+{
+    static const char *const outputs[3]={"NOTES","AMP","MIDI CC"};
+    static const char *const destinations[4]={"BRIGHT","BODY","MOTION","EDGE"};
+    static const uint16_t colors[4]={RGB(36,215,232),RGB(242,212,59),RGB(150,120,255),RGB(255,130,100)};
+    char t[16];
+    draw_arp_card(0u,"K1  OUTPUT",outputs[arp_ui_output%3u],"NOTES / AMP / CC",RGB(227,75,210));
+    int_text(arp_ui_random,t); text_cat(t,"%");
+    draw_arp_card(1u,"K2  RANDOMIZE",t,"PATTERN VARIATION",RGB(36,215,232));
+    draw_arp_card(2u,"K3  DESTINATION",destinations[arp_ui_macro_dest%4u],"MACRO TARGET",colors[arp_ui_macro_dest%4u]);
+    int_text(arp_ui_depth,t); text_cat(t,"%");
+    draw_arp_card(3u,"K4  DEPTH",t,"MODULATION AMOUNT",RGB(150,120,255));
+}
 static void draw_fx_panel(uint8_t fx)
 {
     static const char *const names[4]={"CHORUS","DELAY","REVERB","PHASER"};
@@ -1769,6 +1791,7 @@ static const char *page_title(uint8_t current)
     case PAGE_SEQ: return "SEQUENCER";
     case PAGE_ARP: return "ARP ENGINE";
     case PAGE_ARP_STEPS: return "ARP STEP EDIT";
+    case PAGE_ARP_MOD: return "ARP MODULATION";
     case PAGE_FX_AMP: return "AMP / DRIVE";
     case PAGE_FX_EQ: return "PARAMETRIC EQ";
     case PAGE_FX_COMPRESSOR: return "COMPRESSOR";
@@ -1794,7 +1817,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_LFO: return RGB(75,220,150);
     case PAGE_LFO_MOD: return RGB(75,190,180);
     case PAGE_SEQ: return RGB(242,212,59);
-    case PAGE_ARP: case PAGE_ARP_STEPS: return RGB(227,75,210);
+    case PAGE_ARP: case PAGE_ARP_STEPS: case PAGE_ARP_MOD: return RGB(227,75,210);
     case PAGE_FX_AMP: return RGB(255,140,70);
     case PAGE_FX_EQ: return RGB(85,190,255);
     case PAGE_FX_COMPRESSOR: return RGB(255,170,75);
@@ -1818,9 +1841,9 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
     } else if (current >= PAGE_OPERATOR_MAP && current <= PAGE_LFO_MOD) {
         index = (uint32_t)(current - PAGE_OPERATOR_MAP) + 1u;
         total = (uint32_t)(PAGE_LFO_MOD - PAGE_OPERATOR_MAP) + 1u;
-    } else if (current >= PAGE_SEQ && current <= PAGE_ARP_STEPS) {
+    } else if (current >= PAGE_SEQ && current <= PAGE_ARP_MOD) {
         if (current == PAGE_SEQ) { index = 1u; total = 1u; }
-        else { index = (uint32_t)(current - PAGE_ARP) + 1u; total = 2u; }
+        else { index = (uint32_t)(current - PAGE_ARP) + 1u; total = 3u; }
     } else if (current <= PAGE_GLOBAL) {
         index = (uint32_t)current + 1u;
         total = (uint32_t)PAGE_GLOBAL + 1u;
@@ -1878,6 +1901,7 @@ static void draw(void)
     else if (page == PAGE_SEQ) draw_sequencer_panel();
     else if (page == PAGE_ARP) draw_arp_panel();
     else if (page == PAGE_ARP_STEPS) draw_arp_steps_panel();
+    else if (page == PAGE_ARP_MOD) draw_arp_mod_panel();
     else if (page == PAGE_FX_CHORUS) draw_fx_panel(0u);
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
