@@ -32,7 +32,7 @@ static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
-static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES]={{'F','A','C','T','O','R','Y',0},{'F','A','C','T','O','R','Y',0}};
+static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A','C','T','O','R','Y',0},{'F','A','C','T','O','R','Y',0}};
 static fm1lab_instrument_t instrument_apply_snapshot;
 static fm1lab_insert_state_t inserts_apply_snapshot;
 static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
@@ -135,6 +135,70 @@ static void fm1lab_factory_voice_build(uint8_t out[FM1LAB_PATCH_BYTES], uint8_t 
     if(preset==4u||preset==5u||preset==12u){out[139]=2u;out[143]=2u;}
     out[141]=1u; out[142]=4u; out[144]=24u; out[155]=63u;
 }
+
+/* Starter library: every Instrument is a deliberate four-voice combination
+ * of the sixteen M-VAVE factory recipes, not four copies of one patch. */
+typedef struct { const char *name; uint8_t voice[4]; uint8_t level[4]; } fm1lab_seed_instrument_t;
+static const fm1lab_seed_instrument_t fm1lab_seed_instruments[16] = {
+ {"GLASS",{1,4,10,0},{25,18,12,8}},
+ {"PLUSH",{6,2,12,10},{24,18,14,10}},
+ {"PULSE",{15,3,0,14},{23,20,12,8}},
+ {"TIDE",{12,5,4,1},{22,18,14,10}},
+ {"DUST",{7,8,13,14},{24,18,12,8}},
+ {"HALO",{10,1,6,11},{22,18,14,10}},
+ {"STATIC",{14,15,7,13},{24,18,12,8}},
+ {"VELVET",{2,12,4,6},{23,18,14,10}},
+ {"BASSLINE",{3,13,7,0},{25,20,12,8}},
+ {"PRISM",{9,10,1,6},{22,18,14,10}},
+ {"REED",{5,11,12,4},{22,18,14,10}},
+ {"SPARK",{0,14,9,15},{24,18,12,8}},
+ {"NIGHT",{13,12,1,2},{25,18,12,8}},
+ {"CHIME",{1,9,10,6},{22,18,14,10}},
+ {"MOTOR",{3,15,14,7},{24,18,12,8}},
+ {"BLOOM",{4,11,12,10},{22,18,14,10}}
+};
+static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
+{
+    const fm1lab_seed_instrument_t *seed=&fm1lab_seed_instruments[index&15u];
+    char name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
+    uint32_t n=0u;
+    while(n<10u && seed->name[n]) { name[n]=seed->name[n]; ++n; }
+    if(index>=16u && n<10u) { name[n++]=' '; name[n++]='2'; }
+    name[n]='\0';
+    fm1lab_instrument_init(out,name);
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        fm1lab_factory_voice_build(voice,seed->voice[p]);
+        (void)fm1lab_patch_set_voice(out,p,voice);
+        out->patches[p].level=seed->level[p];
+        out->patches[p].enabled=1u;
+        out->patches[p].voice[155]=64u;
+    }
+}
+static int fm1lab_is_untouched_factory(const fm1lab_instrument_t *in)
+{
+    if(!in || !fm1lab_instrument_valid(in)) return 0;
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
+        if(memcmp(in->patches[p].voice,factory_instrument.patches[p].voice,FM1LAB_PATCH_BYTES)!=0 ||
+           in->patches[p].level!=31u || !in->patches[p].enabled) return 0;
+        for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)
+            if(in->patches[p].macros[m]!=50u) return 0;
+    }
+    return 1;
+}
+static void fm1lab_seed_factory_library(void)
+{
+    for(uint32_t index=0;index<FM1LAB_STORE_INSTRUMENT_COUNT;index++) {
+        fm1lab_instrument_t existing, seed;
+        fm1lab_insert_state_t inserts;
+        if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0 ||
+           !fm1lab_is_untouched_factory(&existing)) continue;
+        fm1lab_seed_instrument(index,&seed);
+        if(fm1lab_store_library_save_full(index,&seed,&inserts)!=0)
+            app_say("LIBRARY SEED","SAVE FAILED");
+    }
+}
+
 static uint8_t fm1lab_factory_preset_for_voice(const uint8_t *voice)
 {
     for(uint32_t p=0;p<FM1LAB_FACTORY_PRESET_COUNT;p++) {
@@ -276,7 +340,7 @@ static void instrument_load(uint32_t index, int from_audio)
     instrument_index = (uint8_t)index;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
-    for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)seq_ui_instrument_name[seq_ui_lane][n]=current_instrument.name[n];
+    for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)seq_ui_instrument_name[seq_ui_lane][n]=current_instrument.name[n];seq_ui_instrument_name[seq_ui_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
     instrument_loaded = 1u;
     instrument_dirty = 0u;
     instrument_sync_settings();
@@ -689,6 +753,8 @@ void app_init(void)
          * them for recovery rather than replacing them with factory data. */
         app_say("BANK ERROR", "DATA PRESERVED");
     }
+    /* Replace only untouched factory placeholders; edited Instruments survive. */
+    fm1lab_seed_factory_library();
     set.patch = seq_ui_patch[seq_ui_lane];
     patch_focus = 0u;
     instrument_load(seq_ui_instrument[seq_ui_lane], 0);
@@ -702,7 +768,7 @@ void app_init(void)
             other=factory_instrument;
             fm1lab_insert_state_init(&other_inserts);
         }
-        for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)seq_ui_instrument_name[other_lane][n]=other.name[n];
+        for(uint32_t n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)seq_ui_instrument_name[other_lane][n]=other.name[n];seq_ui_instrument_name[other_lane][FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
         instrument_apply_engine_bank(other_lane,&other,&other_inserts,0u);
     }
@@ -1151,7 +1217,7 @@ static void input(void)
                     app_say("SAVE FAILED", "PRESET NOT CHANGED");
                     continue;
                 }
-                int32_t next = ((int32_t)instrument_index + e) % (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
+                int32_t next = ((int32_t)seq_ui_instrument[seq_ui_lane] + e) % (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
                 if (next < 0) next += (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
                 if ((uint32_t)next != instrument_index) {
                     instrument_load((uint32_t)next, 1);
@@ -1666,16 +1732,9 @@ static void draw_operator_map(void)
     };
     uint8_t maxima[4] = {99u, 1u, 31u, operator_detune_mode ? 14u : 99u};
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
-    uint8_t values[4] = {0u, 0u, 0u, 0u}, algorithm = 1u;
+    uint8_t values[4] = {0u, 0u, 0u, 0u};
     char t[16];
     uint16_t accent = patch_color(set.patch);
-    int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
-    (void)fm1lab_voice_global_get(voice, FM1LAB_GLOBAL_ALGORITHM, &algorithm);
-    cv_text(91, 0, &FONT_XS, "ALG", C_GRAY);
-    int_text(algorithm, t); cv_text(113, 0, &FONT_XS, t, accent);
-    cv_text(145, 0, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
-    int_text(env_operator, t); text_cat(t, "/6");
-    cv_text(202, 0, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
@@ -1785,11 +1844,7 @@ static void draw_envelope_panel(void)
     static const char *const levels[4] = {"LEVEL 1", "LEVEL 2", "LEVEL 3", "LEVEL 4"};
     char t[16];
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
-    int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
     uint16_t accent = patch_color(set.patch);
-    cv_text(6, 0, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
-    int_text(env_operator, t); text_cat(t, "  /  6");
-    cv_text(204, 0, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
