@@ -983,6 +983,23 @@ static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
         voice_edit_changed();
 }
 
+static void sequencer_cache_instrument_name(uint8_t lane, const char *source)
+{
+    uint32_t n=0u;
+    if(lane>1u)return;
+    while(n<FM1LAB_INSTRUMENT_NAME_BYTES && source[n]) {
+        unsigned char c=(unsigned char)source[n];
+        seq_ui_instrument_name[lane][n]=(c>=32u && c<=126u)?(char)c:' ';
+        ++n;
+    }
+    while(n && seq_ui_instrument_name[lane][n-1u]==' ')--n;
+    seq_ui_instrument_name[lane][n]='\\0';
+    if(!n) {
+        const char *fallback="INSTRUMENT";
+        while(*fallback)seq_ui_instrument_name[lane][n++]=*fallback++;
+        seq_ui_instrument_name[lane][n]='\\0';
+    }
+}
 static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocity)
 {
     if(!seq_record_armed)return;
@@ -1001,9 +1018,28 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     if(!seq_record_active[key] || seq_record_note[key]!=note)return;
     uint32_t elapsed=plat_ms()-seq_record_started[key];
     uint32_t step_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/4u;
-    uint8_t gate=(uint8_t)(elapsed>=step_ms?100u:clamp((int32_t)(elapsed*100u/(step_ms?step_ms:1u)),10,100));
-    seq_ui_gate[seq_record_lane[key]][seq_record_step[key]]=gate;
-    seq_record_active[key]=0u;performance_publish();set_dirty=1u;seq_record_redraw=1u;
+    if(!step_ms)step_ms=1u;
+    uint8_t lane=seq_record_lane[key], first=seq_record_step[key];
+    uint32_t full_steps=elapsed/step_ms, remainder=elapsed%step_ms;
+    uint32_t loop_length=set.performance.seq_length;
+    if(loop_length<2u)loop_length=2u;
+    if(loop_length>64u)loop_length=64u;
+    /* Fill each complete step spanned by the held key, then store the
+     * remaining partial step. Exact-boundary releases add no extra step. */
+    for(uint32_t offset=0u;offset<full_steps && offset<loop_length;offset++) {
+        uint8_t step=(uint8_t)(((uint32_t)first+offset)%loop_length);
+        seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;
+        seq_ui_gate[lane][step]=100u;
+    }
+    if(remainder || !full_steps) {
+        uint8_t step=(uint8_t)(((uint32_t)first+full_steps)%loop_length);
+        uint8_t gate=(uint8_t)clamp((int32_t)(remainder*100u/step_ms),10,100);
+        seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;
+        seq_ui_velocity[lane][step]=seq_ui_velocity[lane][first];
+        seq_ui_gate[lane][step]=gate;
+    }
+    seq_record_active[key]=0u;
+    performance_publish();set_dirty=1u;seq_record_redraw=1u;
 }
 static void sequencer_record_step_advance(void)
 {
