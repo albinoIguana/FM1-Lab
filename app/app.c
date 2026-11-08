@@ -13,7 +13,11 @@
 #include "fm1lab_store_library.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
-#include <string.h>
+/* The target SDK is freestanding and ships no string.h declaration header. */
+extern int memcmp(const void *, const void *, size_t);
+extern size_t strlen(const char *);
+extern int strcmp(const char *, const char *);
+extern int strncmp(const char *, const char *, size_t);
 
 static settings_t set;
 static uint8_t set_dirty;
