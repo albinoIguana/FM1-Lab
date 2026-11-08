@@ -331,7 +331,7 @@ static void ui_events_drain(void)
         if (type == EV_NOTE_ON)
             fm6_note_on_mask(a, b, c);
         else if (type == EV_NOTE_OFF)
-            fm6_note_off(a);
+            fm6_note_off_mask(a,c);
         else if (type == EV_PANIC)
             fm6_panic();
         else if (type == EV_MACRO_SET)
@@ -487,7 +487,7 @@ static void note_on(int32_t note, uint32_t vel)
 }
 static void note_off(int32_t note)
 {
-    ui_event_push(EV_NOTE_OFF, (uint8_t)note, 0, 0);
+    ui_event_push(EV_NOTE_OFF, (uint8_t)note, 0, (uint8_t)(0x0fu << (seq_ui_lane*FM1LAB_PATCH_COUNT)));
     if (voice_note == note)
         voice_note = -1;
 }
@@ -508,7 +508,7 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
             voice_note = (int32_t)d1;
             fm6_note_on_mask((uint8_t)d1,(uint8_t)d2,(uint8_t)(0x0fu<<(seq_ui_lane*FM1LAB_PATCH_COUNT))); /* selected Instrument only */
         } else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
-            fm6_note_off((uint8_t)d1);
+            fm6_note_off_mask((uint8_t)d1,(uint8_t)(0x0fu<<(seq_ui_lane*FM1LAB_PATCH_COUNT)));
             if (voice_note == (int32_t)d1)
                 voice_note = -1;
         }
@@ -693,7 +693,7 @@ void app_init(void)
     {
         fm1lab_instrument_t other;
         fm1lab_insert_state_t other_inserts;
-        uint8_t other_lane=1u;
+        uint8_t other_lane=(uint8_t)(seq_ui_lane^1u);
         uint32_t other_index=seq_ui_instrument[other_lane];
         if(fm1lab_store_library_load_full(other_index,&other,&other_inserts)!=0 ||
            !fm1lab_instrument_valid(&other) || !fm1lab_insert_state_valid(&other_inserts)){
