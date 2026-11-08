@@ -68,6 +68,7 @@ uint8_t fm6_arpeggiator_playing_step(void);
 uint8_t fm6_arpeggiator_active(void);
 void fm6_arpeggiator_set_mode(uint8_t mode);
 uint8_t fm6_arpeggiator_mode(void);
+void fm6_arpeggiator_set_latch(uint8_t enabled);
 #ifdef FM6_TEST
 uint8_t fm6_test_arpeggiator_amp_level(void);
 #endif
