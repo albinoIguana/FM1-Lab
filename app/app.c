@@ -1130,10 +1130,10 @@ static void input(void)
                     performance_publish();set_dirty=1u;
                     app_say("STEP VELOCITY","UPDATED");
                 } else {
-                    seq_ui_accent[lane][step]=(uint8_t)clamp((int32_t)seq_ui_accent[lane][step]+e,0,100);
+                    seq_ui_gate[lane][step]=(uint8_t)clamp((int32_t)seq_ui_gate[lane][step]+e,10,100);
                     seq_clear_prompt=0u;
                     performance_publish();set_dirty=1u;
-                    app_say("STEP ACCENT","UPDATED");
+                    app_say("STEP GATE","UPDATED");
                 }
                 if(index==0u)app_say("STEP","SELECTED");
                 if(index==1u && seq_clear_prompt)ui.redraw=1u;
@@ -1791,7 +1791,7 @@ static void draw_sequencer_panel(void)
                       seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
     cv_text(6,151,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"RECORD ARMED":"STOPPED"),
             fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
-    cv_text(82,151,&FONT_XS,"SELECT STEP  K1 ON/OFF",C_GRAY);
+    cv_text(82,151,&FONT_XS,"K1 STEP  K2 CLEAR  K3 VEL  K4 GATE",C_GRAY);
 }
 static void draw_sequencer_options_panel(void)
 {
