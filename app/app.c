@@ -778,7 +778,10 @@ static void ui_events_drain(void)
         else if (type == EV_INSTRUMENT_LOAD) {
             /* Replace only this track's four-patch bank; preserve the other
              * Instrument and any notes it currently has sounding. */
-            instrument_apply_engine_bank(a,&instrument_apply_snapshot,&inserts_apply_snapshot,1u);
+            /* Track focus changes replace only that lane's four patches.
+             * The post-mix insert chain is shared by both sequencer lanes;
+             * swapping it here causes a gain jump and resets its filter state. */
+            instrument_apply_engine_bank(a,&instrument_apply_snapshot,&inserts_apply_snapshot,c);
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
         } else if (type == EV_MASTER_INSERT)
@@ -1557,7 +1560,7 @@ static void input(void)
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
             set.patch = seq_ui_patch[seq_ui_lane];
             patch_focus = 0u;
-            instrument_load(seq_ui_instrument[seq_ui_lane],1);
+            instrument_load(seq_ui_instrument[seq_ui_lane],2);
             performance_publish();set_dirty=1u;
             app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
 
