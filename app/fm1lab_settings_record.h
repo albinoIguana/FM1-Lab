@@ -262,10 +262,10 @@ static inline int settings_v6_valid(const settings_v6_t *v) {
        (v->enabled_mask&0xF0u)||v->ble_off>1u||v->reserved!=0u||
        v->crc!=settings_crc16(v,offsetof(settings_v6_t,crc)))return 0;
     fm6_performance_state_t p=v->performance;
-    /* V6's final per-step byte was macro amount; it becomes full gate. */
+    /* V6's final per-step byte was macro amount; initialize the new tie flag off. */
     for(uint32_t step=0;step<16u;step++){
         if(p.arp_step_gate[step]>100u)return 0;
-        p.arp_step_gate[step]=100u;
+        p.arp_step_gate[step]=0u;
     }
     if(!fm6_performance_state_valid(&p))return 0;
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){
