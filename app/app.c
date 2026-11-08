@@ -1827,7 +1827,7 @@ static void draw_sequencer_piano_panel(void)
     cv_text(116,120,&FONT_XS,"VELOCITY",C_GRAY);
     int_text(seq_ui_velocity[seq_ui_lane][seq_ui_step],value);
     cv_text(177,120,&FONT_B,value,C_WHITE);
-    cv_text(18,151,&FONT_XS,"K1 STEP  K2 PITCH  K3 VELOCITY  K4 GATE",C_GRAY);
+    cv_text(18,151,&FONT_XS,"K1 STEP  K2 PITCH  K3 VEL  K4 GATE",C_GRAY);
 }
 
 static void draw_sequencer_options_panel(void)
