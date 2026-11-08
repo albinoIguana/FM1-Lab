@@ -13,6 +13,7 @@
 #include "fm1lab_store_library.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
+#include <string.h>
 
 static settings_t set;
 static uint8_t set_dirty;
