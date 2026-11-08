@@ -2355,10 +2355,10 @@ static void draw_sequencer_panel(void)
     draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
                       seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
-    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
-            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
-    cv_text(88,151,&FONT_XS,"K1 STEP   K2 CLEAR",C_GRAY);
-    cv_text(88,164,&FONT_XS,"K3 VELOCITY   K4 GATE",C_GRAY);
+    cv_text(6,145,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
+            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY)));
+    cv_text(88,158,&FONT_XS,"K1 STEP   K2 CLEAR",C_GRAY);
+    cv_text(88,171,&FONT_XS,"K3 VELOCITY   K4 GATE",C_GRAY);
 }
 static void draw_sequencer_piano_panel(void)
 {
@@ -2366,12 +2366,12 @@ static void draw_sequencer_piano_panel(void)
     const uint8_t lane=seq_ui_lane, first=(uint8_t)((seq_ui_step/16u)*16u);
     const uint8_t selected=(uint8_t)(seq_ui_step-first);
     const uint16_t accent=patch_color(seq_ui_patch[lane]);
-    const int32_t gx=24, gy=32, gw=208, gh=108, cw=13, rh=4;
+    const int32_t gx=24, gy=28, gw=208, gh=72, cw=13, rh=3;
     int32_t low=(int32_t)seq_ui_note[lane][seq_ui_step]-12;
     if(low<0)low=0;
     if(low>103)low=103;
     const int32_t high=low+23;
-    instrument_card(4,2,232,174,panel_fill(),accent,accent);
+    instrument_card(4,2,232,154,panel_fill(),accent,accent);
     cv_text(12,8,&FONT_XS,lane?"TRACK 2  /  NOTES":"TRACK 1  /  NOTES",accent);
     cv_text(148,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE);
     /* Sixteen-step, two-octave note grid modelled on established FM-1 piano-roll editors. */
@@ -2406,19 +2406,19 @@ static void draw_sequencer_piano_panel(void)
         }
         if((col%4u)==0u) {
             int_text((int32_t)step+1,value);
-            cv_text(x+1,142,&FONT_XS,value,C_GRAY);
+            cv_text(x+1,104,&FONT_XS,value,C_GRAY);
         }
     }
-    cv_text(12,153,&FONT_XS,"NOTE",C_GRAY);
+    cv_text(12,116,&FONT_XS,"NOTE",C_GRAY);
     int_text(seq_ui_enabled[lane][seq_ui_step]?seq_ui_note[lane][seq_ui_step]:0,value);
-    cv_text(43,153,&FONT_B,seq_ui_enabled[lane][seq_ui_step]?value:"--",accent);
-    cv_text(82,153,&FONT_XS,"VEL",C_GRAY);
+    cv_text(43,116,&FONT_B,seq_ui_enabled[lane][seq_ui_step]?value:"--",accent);
+    cv_text(82,116,&FONT_XS,"VEL",C_GRAY);
     int_text(seq_ui_velocity[lane][seq_ui_step],value);
-    cv_text(108,153,&FONT_B,value,C_WHITE);
-    cv_text(144,153,&FONT_XS,"GATE",C_GRAY);
+    cv_text(108,116,&FONT_B,value,C_WHITE);
+    cv_text(144,116,&FONT_XS,"GATE",C_GRAY);
     int_text(seq_ui_gate[lane][seq_ui_step],value);
-    cv_text(177,153,&FONT_B,value,C_WHITE);
-    cv_text(8,166,&FONT_XS,"K1 STEP K2 PITCH K3 LEN K4 VEL EDIT DEL",C_GRAY);
+    cv_text(177,116,&FONT_B,value,C_WHITE);
+    cv_text(8,137,&FONT_XS,"K1 STEP K2 PITCH K3 LEN K4 VEL EDIT DEL",C_GRAY);
 }
 
 static void draw_save_panel(void)
@@ -2726,6 +2726,12 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         total = 2u;
     } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS) {
         index = current == PAGE_SEQ ? 1u : 2u;
+        total = 2u;
+    } else if (current == PAGE_ENV) {
+        index = env_levels ? 2u : 1u;
+        total = 2u;
+    } else if (current == PAGE_OPERATOR_MAP || current == PAGE_MACRO) {
+        index = current == PAGE_OPERATOR_MAP ? 1u : 2u;
         total = 2u;
     } else if (current >= PAGE_ARP && current <= PAGE_ARP_LATCH) {
         index = (uint32_t)(current - PAGE_ARP) + 1u;
