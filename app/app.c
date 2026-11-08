@@ -33,7 +33,7 @@ static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
-static uint8_t arp_ui_mode, arp_ui_step, arp_ui_gain[16], arp_ui_accent[16], arp_ui_macro[16];
+static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_macro[16];
 
 static const char *patch_display_name(uint32_t patch);
 static const char *instrument_display_name(void);
@@ -922,6 +922,10 @@ static void input(void)
             if (page == PAGE_HOME) patch_focus = 1u;
             set_dirty = 1;
             app_say("PATCH", patch_display_name(set.patch));
+        } else if (k == EN_PRESET && page == PAGE_ARP_STEPS) {
+            arp_ui_length=arp_ui_length==16u?8u:16u;
+            if(arp_ui_step>=arp_ui_length)arp_ui_step=(uint8_t)(arp_ui_length-1u);
+            app_say("ARP LENGTH",arp_ui_length==8u?"8 STEPS":"16 STEPS");
         } else if (k == EN_PRESET && page == PAGE_SEQ) {
             /* PRESET selects the visible sequencer lane here; it must not
              * switch Instruments while editing a pattern. */
@@ -991,7 +995,7 @@ static void input(void)
                 }
             } else if (page == PAGE_ARP_STEPS) {
                 uint8_t step=arp_ui_step;
-                if(index==0u) { int32_t next=((int32_t)step+e)%16; if(next<0)next+=16; arp_ui_step=(uint8_t)next; }
+                if(index==0u) { int32_t next=((int32_t)step+e)%arp_ui_length; if(next<0)next+=arp_ui_length; arp_ui_step=(uint8_t)next; }
                 else if(index==1u) arp_ui_gain[step]=(uint8_t)clamp((int32_t)arp_ui_gain[step]+e,0,127);
                 else if(index==2u) arp_ui_accent[step]=(uint8_t)clamp((int32_t)arp_ui_accent[step]+e,0,100);
                 else arp_ui_macro[step]=(uint8_t)clamp((int32_t)arp_ui_macro[step]+e,0,100);
@@ -1667,9 +1671,9 @@ static void draw_arp_steps_panel(void)
     uint8_t playing=fm6_arpeggiator_playing_step();
     uint16_t accent=RGB(227,75,210);
     cv_text(8,0,&FONT_XS,"ARP STEP EDIT",accent);
-    cv_text(174,0,&FONT_XS,"16 STEPS",C_GRAY);
-    draw_step_columns(0u,0u,16u,24,112,arp_ui_step,
-                      fm6_arpeggiator_active()?playing:255u,
+    int_text(arp_ui_length,t); text_cat(t," STEPS"); cv_text(174,0,&FONT_XS,t,C_GRAY);
+    draw_step_columns(0u,0u,arp_ui_length,24,112,arp_ui_step,
+                      fm6_arpeggiator_active()?(uint8_t)(playing%arp_ui_length):255u,
                       arp_ui_gain,0,arp_ui_accent,accent);
     cv_text(8,145,&FONT_XS,"GAIN",C_GRAY); int_text(arp_ui_gain[arp_ui_step],t); cv_text(43,145,&FONT_B,t,C_WHITE);
     cv_text(82,145,&FONT_XS,"ACCENT",C_GRAY); int_text(arp_ui_accent[arp_ui_step],t); cv_text(126,145,&FONT_B,t,C_WHITE);
