@@ -883,8 +883,19 @@ static void input(void)
                         page == PAGE_MACRO ? patch_display_name(set.patch) : "FOUR-PATCH CONTROL");
             }
         } else if (k == B_EDIT) {
-            page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
-            app_say("OPERATOR ROLES", patch_display_name(set.patch));
+            if(page==PAGE_SEQ_PIANO) {
+                uint8_t lane=seq_ui_lane, step=seq_ui_step;
+                seq_ui_enabled[lane][step]=0u;
+                seq_ui_note[lane][step]=60u;
+                seq_ui_velocity[lane][step]=100u;
+                seq_ui_gate[lane][step]=75u;
+                seq_ui_accent[lane][step]=0u;
+                performance_publish();set_dirty=1u;
+                app_say("NOTE DELETED","STEP CLEARED");
+            } else {
+                page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
+                app_say("OPERATOR ROLES", patch_display_name(set.patch));
+            }
         } else if (k == B_SEQ) {
             ui.seq_hold_t=plat_ms();ui.seq_hold_fired=0u;
         } else if (k == B_ARP) {
@@ -1115,6 +1126,7 @@ static void input(void)
                     seq_clear_prompt=0u;
                 } else if(index==1u && page==PAGE_SEQ_PIANO) {
                     seq_ui_note[lane][step]=(uint8_t)clamp((int32_t)seq_ui_note[lane][step]+e,0,127);
+                    seq_ui_enabled[lane][step]=1u;
                     performance_publish();set_dirty=1u;
                     app_say("NOTE PITCH","UPDATED");
                 } else if(index==1u) {
@@ -1137,15 +1149,22 @@ static void input(void)
                         }
                     }
                 } else if(index==2u) {
-                    seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
-                    seq_clear_prompt=0u;
+                    if(page==PAGE_SEQ_PIANO) {
+                        seq_ui_gate[lane][step]=(uint8_t)clamp((int32_t)seq_ui_gate[lane][step]+e,10,100);
+                        seq_ui_enabled[lane][step]=1u;
+                        app_say("NOTE LENGTH","UPDATED");
+                    } else {
+                        seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
+                        seq_clear_prompt=0u;
+                        app_say("STEP VELOCITY","UPDATED");
+                    }
                     performance_publish();set_dirty=1u;
-                    app_say("STEP VELOCITY","UPDATED");
                 } else {
-                    seq_ui_gate[lane][step]=(uint8_t)clamp((int32_t)seq_ui_gate[lane][step]+e,10,100);
+                    seq_ui_velocity[lane][step]=(uint8_t)clamp((int32_t)seq_ui_velocity[lane][step]+e,0,127);
+                    seq_ui_enabled[lane][step]=1u;
                     seq_clear_prompt=0u;
                     performance_publish();set_dirty=1u;
-                    app_say("STEP GATE","UPDATED");
+                    app_say(page==PAGE_SEQ_PIANO?"NOTE VELOCITY":"STEP GATE","UPDATED");
                 }
                 if(index==0u)app_say("STEP","SELECTED");
                 if(index==1u && seq_clear_prompt)ui.redraw=1u;
@@ -1808,26 +1827,62 @@ static void draw_sequencer_panel(void)
 static void draw_sequencer_piano_panel(void)
 {
     char value[20];
-    uint16_t accent=patch_color(seq_ui_patch[seq_ui_lane]);
-    instrument_card(8,18,224,145,panel_fill(),accent,accent);
-    cv_text(18,28,&FONT_XS,seq_ui_lane?"TRACK 2 NOTE":"TRACK 1 NOTE",C_GRAY);
-    cv_text(18,48,&FONT_B,patch_display_name(seq_ui_patch[seq_ui_lane]),accent);
-    /* Compact two-octave keyboard backdrop; the selected note is highlighted. */
-    for(uint32_t n=0;n<24u;n++){
-        int32_t y=70+(int32_t)n*3;
-        uint16_t color=(n==(uint32_t)(23u-(seq_ui_note[seq_ui_lane][seq_ui_step]%24u)))?accent:RGB(29,43,57);
-        cv_rect(18,y,82,2,color);
+    const uint8_t lane=seq_ui_lane, first=(uint8_t)((seq_ui_step/16u)*16u);
+    const uint8_t selected=(uint8_t)(seq_ui_step-first);
+    const uint16_t accent=patch_color(seq_ui_patch[lane]);
+    const int32_t gx=24, gy=32, gw=208, gh=108, cw=13, rh=4;
+    int32_t low=(int32_t)seq_ui_note[lane][seq_ui_step]-12;
+    if(low<0)low=0;
+    if(low>103)low=103;
+    const int32_t high=low+23;
+    instrument_card(4,2,232,174,panel_fill(),accent,accent);
+    cv_text(12,8,&FONT_XS,lane?"TRACK 2  /  NOTES":"TRACK 1  /  NOTES",accent);
+    cv_text(148,8,&FONT_XS,patch_display_name(seq_ui_patch[lane]),C_WHITE);
+    /* Sixteen-step, two-octave note grid modelled on established FM-1 piano-roll editors. */
+    for(uint32_t row=0;row<24u;row++) {
+        int32_t note=high-(int32_t)row, y=gy+(int32_t)row*rh;
+        uint8_t pc=(uint8_t)(note%12);
+        uint8_t black=(uint8_t)(pc==1u||pc==3u||pc==6u||pc==8u||pc==10u);
+        cv_rect(gx,y,gw,rh-1,black?RGB(20,29,42):RGB(34,45,57));
+        if(pc==0u||pc==5u)cv_rect(gx,y,gw,1,RGB(75,86,101));
     }
-    cv_text(116,72,&FONT_XS,"STEP",C_GRAY);
-    int_text((int32_t)seq_ui_step+1,value);
-    cv_text(151,72,&FONT_B,value,C_WHITE);
-    cv_text(116,96,&FONT_XS,"NOTE",C_GRAY);
-    int_text(seq_ui_note[seq_ui_lane][seq_ui_step],value);
-    cv_text(151,96,&FONT_B,value,accent);
-    cv_text(116,120,&FONT_XS,"VELOCITY",C_GRAY);
-    int_text(seq_ui_velocity[seq_ui_lane][seq_ui_step],value);
-    cv_text(177,120,&FONT_B,value,C_WHITE);
-    cv_text(18,151,&FONT_XS,"K1 STEP  K2 PITCH  K3 VEL  K4 GATE",C_GRAY);
+    for(uint32_t col=0;col<=16u;col++) {
+        int32_t x=gx+(int32_t)col*cw;
+        cv_rect(x,gy,1,gh,((col%4u)==0u)?RGB(86,98,112):RGB(49,61,75));
+    }
+    for(uint32_t col=0;col<16u;col++) {
+        uint8_t step=(uint8_t)(first+col);
+        int32_t x=gx+(int32_t)col*cw;
+        if(step==seq_ui_step)rounded_panel(x,gy,cw,gh,1u,0u,C_WHITE);
+        if(fm6_sequencer_running()&&step==fm6_sequencer_playing_step())
+            cv_rect(x+5,gy,2,gh,RGB(242,212,59));
+        if(seq_ui_enabled[lane][step]) {
+            int32_t note=seq_ui_note[lane][step];
+            if(note>=low&&note<=high) {
+                int32_t y=gy+(high-note)*rh+1;
+                int32_t barw=(int32_t)(seq_ui_gate[lane][step]?seq_ui_gate[lane][step]:75u)*(cw-2)/100;
+                int32_t barh=2+(int32_t)seq_ui_velocity[lane][step]*2/127;
+                if(barw<2)barw=2;
+                if(barh>3)barh=3;
+                cv_rect(x+1,y,barw,barh,accent);
+                if(step==seq_ui_step)cv_rect(x+1,y,barw,1,C_WHITE);
+            }
+        }
+        if((col%4u)==0u) {
+            int_text((int32_t)step+1,value);
+            cv_text(x+1,142,&FONT_XS,value,C_GRAY);
+        }
+    }
+    cv_text(12,153,&FONT_XS,"NOTE",C_GRAY);
+    int_text(seq_ui_enabled[lane][seq_ui_step]?seq_ui_note[lane][seq_ui_step]:0,value);
+    cv_text(43,153,&FONT_B,seq_ui_enabled[lane][seq_ui_step]?value:"--",accent);
+    cv_text(82,153,&FONT_XS,"VEL",C_GRAY);
+    int_text(seq_ui_velocity[lane][seq_ui_step],value);
+    cv_text(108,153,&FONT_B,value,C_WHITE);
+    cv_text(144,153,&FONT_XS,"GATE",C_GRAY);
+    int_text(seq_ui_gate[lane][seq_ui_step],value);
+    cv_text(177,153,&FONT_B,value,C_WHITE);
+    cv_text(10,166,&FONT_XS,"K1 STEP  K2 PITCH  K3 LEN  K4 VEL   EDIT DELETE",C_GRAY);
 }
 
 static void draw_sequencer_options_panel(void)
