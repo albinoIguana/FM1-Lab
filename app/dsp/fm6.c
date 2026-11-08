@@ -404,7 +404,7 @@ static void fm6_arpeggiator_step(void)
     }
     {
         /* Accent is an audible transient across all four macros. */
-        int32_t boost=(int32_t)arp_step_accent[step]*35/100;
+        int32_t boost=gain?(int32_t)arp_step_accent[step]*35/100:0;
         if(arp_output==2u)boost+=(int32_t)arp_depth-50;
         fm6_arp_macro_apply(boost);
     }
@@ -421,11 +421,7 @@ static void fm6_arpeggiator_step(void)
         if(arp_index>=count)arp_index=0u;
         if(arp_mode==1u||arp_mode==2u) arp_index=(uint8_t)(arp_index%count);
         else if(arp_mode==4u) arp_index=(uint8_t)(fm6_arp_random()%count);
-        else if(arp_mode==3u) {
-            if(count<2u){arp_index=0u;arp_direction=1u;}
-            else if(arp_direction && arp_index>=count-1u){arp_direction=0u;arp_index=(uint8_t)(count-2u);}
-            else if(!arp_direction && arp_index==0u){arp_direction=1u;arp_index=1u;}
-        }
+        else if(arp_mode==3u && count<2u){arp_index=0u;arp_direction=1u;}
         if(arp_random && arp_mode!=4u && (fm6_arp_random()%100u)<arp_random)
             index=fm6_arp_random()%count;
         else index=arp_mode==2u?(count-1u-arp_index):arp_index;
@@ -442,8 +438,16 @@ static void fm6_arpeggiator_step(void)
             arp_gate_left=(uint32_t)((uint64_t)fm6_arp_step_period()*effective_gate/100u);
             if(!arp_gate_left)arp_gate_left=1u;
         }
-        if(arp_mode==3u){if(arp_direction)++arp_index;else if(arp_index)--arp_index;}
-        else if(arp_mode!=4u)++arp_index;
+        if(arp_mode==3u) {
+            if(count<2u)arp_index=0u;
+            else if(arp_direction) {
+                if((uint32_t)arp_index+1u>=count){arp_direction=0u;arp_index=(uint8_t)(count-2u);}
+                else ++arp_index;
+            } else {
+                if(arp_index==0u){arp_direction=1u;arp_index=1u;}
+                else --arp_index;
+            }
+        } else if(arp_mode!=4u)++arp_index;
     }
     arp_play_position=step;
     arp_step_position=(uint8_t)((step+1u)%(arp_length?arp_length:16u));
@@ -997,7 +1001,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             if(arp_gate_left && --arp_gate_left==0u) {
                 if(arp_live){fm6_note_off_source(arp_live_note,0x0fu,3u);arp_live=0u;}
                 if(arp_output==1u)arp_amp_target_q15=0;
-                if(arp_output==2u)fm6_arp_macro_apply(0);
+                fm6_arp_macro_apply(0);
             }
             {int32_t delta=arp_amp_target_q15-arp_amp_gain_q15;if(delta)arp_amp_gain_q15+=delta/32+(delta>0?1:-1);}
             for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane] && --seq_gate_left[lane]==0u)
