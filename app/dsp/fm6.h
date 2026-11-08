@@ -65,6 +65,9 @@ uint8_t fm6_arpeggiator_playing_step(void);
 uint8_t fm6_arpeggiator_active(void);
 void fm6_arpeggiator_set_mode(uint8_t mode);
 uint8_t fm6_arpeggiator_mode(void);
+#ifdef FM6_TEST
+uint8_t fm6_test_arpeggiator_amp_level(void);
+#endif
 int fm6_performance_state_valid(const fm6_performance_state_t *state);
 void fm6_performance_state_get(fm6_performance_state_t *state);
 int fm6_performance_state_set(const fm6_performance_state_t *state);
