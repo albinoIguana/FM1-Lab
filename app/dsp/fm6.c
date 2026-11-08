@@ -410,8 +410,7 @@ static void fm6_arpeggiator_step(void)
         if(!arp_gate_left)arp_gate_left=1u;
     } else {
         arp_amp_target_q15=32768;
-        if(arp_mode==1u) arp_index=(uint8_t)(arp_index%count);
-        else if(arp_mode==2u) arp_index=(uint8_t)(count-1u-(arp_index%count));
+        if(arp_mode==1u||arp_mode==2u) arp_index=(uint8_t)(arp_index%count);
         else if(arp_mode==4u) arp_index=(uint8_t)(fm6_arp_random()%count);
         else {
             if(arp_index>=count){arp_index=count>1u?(uint8_t)(count-2u):0u;arp_direction=0u;}
@@ -419,7 +418,7 @@ static void fm6_arpeggiator_step(void)
         }
         if(arp_random && arp_mode!=4u && (fm6_arp_random()%100u)<arp_random)
             index=fm6_arp_random()%count;
-        else index=arp_index;
+        else index=arp_mode==2u?(count-1u-arp_index):arp_index;
         uint32_t octave=index/arp_count, note_index=index%arp_count;
         note=(uint8_t)((uint32_t)arp_notes[note_index]+octave*12u);
         if(note>127u)note=127u;
