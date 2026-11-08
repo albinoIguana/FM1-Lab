@@ -2355,9 +2355,10 @@ static void draw_sequencer_panel(void)
     draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
                       fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
                       seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
-    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"RECORD ARMED":"STOPPED"),
+    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
             fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
-    cv_text(82,151,&FONT_XS,"K1 STEP  K2 CLEAR  K3 VEL  K4 GATE",C_GRAY);
+    cv_text(88,151,&FONT_XS,"K1 STEP   K2 CLEAR",C_GRAY);
+    cv_text(88,164,&FONT_XS,"K3 VELOCITY   K4 GATE",C_GRAY);
 }
 static void draw_sequencer_piano_panel(void)
 {
@@ -2417,7 +2418,8 @@ static void draw_sequencer_piano_panel(void)
     cv_text(144,153,&FONT_XS,"GATE",C_GRAY);
     int_text(seq_ui_gate[lane][seq_ui_step],value);
     cv_text(177,153,&FONT_B,value,C_WHITE);
-    cv_text(10,166,&FONT_XS,"K1 STEP  K2 PITCH  K3 LEN  K4 VEL   EDIT DELETE",C_GRAY);
+    cv_text(12,166,&FONT_XS,"K1 STEP   K2 PITCH   K3 LENGTH",C_GRAY);
+    cv_text(12,177,&FONT_XS,"K4 VELOCITY   EDIT DELETE",C_GRAY);
 }
 
 static void draw_save_panel(void)
@@ -2723,11 +2725,9 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
     } else if (current == PAGE_LFO || current == PAGE_LFO_MOD) {
         index = current == PAGE_LFO ? 1u : 2u;
         total = 2u;
-    } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS ||
-               current == PAGE_SEQ_PIANO) {
-        index = current == PAGE_SEQ ? 1u :
-                current == PAGE_SEQ_OPTIONS ? 2u : 3u;
-        total = 3u;
+    } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS) {
+        index = current == PAGE_SEQ ? 1u : 2u;
+        total = 2u;
     } else if (current >= PAGE_ARP && current <= PAGE_ARP_LATCH) {
         index = (uint32_t)(current - PAGE_ARP) + 1u;
         total = 3u;
