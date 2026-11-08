@@ -1170,7 +1170,7 @@ static void input(void)
                 }
             } else if (page == PAGE_SEQ_OPTIONS) {
                 if(index==0u && (e%2)!=0) {
-                    seq_record_mode^=1u;set.reserved=seq_record_mode;set_dirty=1u;
+                    seq_record_mode^=1u;set.reserved=(uint16_t)((set.reserved&2u)|seq_record_mode);set_dirty=1u;
                     app_say("LOOP RECORD",seq_record_mode?"OVERWRITE":"OVERDUB");
                 }
             } else if (page == PAGE_SEQ || page == PAGE_SEQ_PIANO) {
