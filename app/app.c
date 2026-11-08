@@ -14,7 +14,7 @@
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
 /* The target SDK is freestanding and ships no string.h declaration header. */
-extern int memcmp(const void *, const void *, size_t);
+extern int memcmp(const void *, const void *, unsigned);
 extern size_t strlen(const char *);
 extern int strcmp(const char *, const char *);
 extern int strncmp(const char *, const char *, size_t);
@@ -313,6 +313,7 @@ static void fm1lab_make_beast_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t b
         for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<strlen(names[role&3u])?names[role&3u][i]:' ');
     }
 }
+typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_beast_instrument_t;
 static void fm1lab_seed_beast_v1(uint32_t index,fm1lab_instrument_t *out)
 {
     const fm1lab_beast_instrument_t *beast;
@@ -336,7 +337,6 @@ static void fm1lab_seed_beast_v1(uint32_t index,fm1lab_instrument_t *out)
     }
 }
 
-typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_beast_instrument_t;
 static const fm1lab_beast_instrument_t fm1lab_beasts[4]={
     {"HOUND",{3u,5u,14u,12u},{22u,16u,11u,9u}},
     {"RAVAGE",{14u,11u,15u,5u},{20u,15u,10u,8u}},
@@ -477,7 +477,7 @@ static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
     uint32_t n=0u;
     while(n<10u && seed->name[n]) { name[n]=seed->name[n]; ++n; }
     if(index>=16u && n<10u) { name[n++]=' '; name[n++]='2'; }
-    name[n]='\\0';
+    name[n]='\0';
     fm1lab_instrument_init(out,name);
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
