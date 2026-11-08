@@ -405,10 +405,30 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
     fx_delay_r[dp]=fm6_sat_q23((int64_t)(fx_enabled[1]?sends[1][1]:0)+(int64_t)delay_feedback_r*fx_feedback[1]/100u);
     fx_delay_pos=(uint16_t)((dp+1u)&(FM6_DELAY_SIZE-1u));
     int32_t a_l=fx_comb_a[fx_comb_pos_a],b_l=fx_comb_b[fx_comb_pos_b],c_l=fx_comb_c[fx_comb_pos_c];
-    int32_t a_r=fx_comb_a_r[fx_comb_pos_a],b_r=fx_comb_b_r[fx_comb_pos_b],c_r=fx_comb_c_r[fx_comb_pos_c];
+    int32_t a_r=fx_comb_a_r[fx_comb_pos_a],b_r=fx_comb_b_r[fx_comb_pos_b],c_r=fx_comb_c[fx_comb_pos_c];
     int32_t reverb_r=0;
-    if(fx_enabled[2] && fx_mix[2]) { reverb=(a_l+b_l+c_l)/3; reverb_r=(a_r+b_r+c_r)/3; }
-    uint32_t decay=40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
+    /* Reverb type is stored in the otherwise-unused depth slot: 0 Room,
+     * 1 Hall, 2 Plate. Each mode changes the comb feedback and tap blend,
+     * rather than merely renaming one shared sound. Older records contain
+     * the former neutral value (50), which resolves safely to Hall. */
+    uint8_t reverb_type=fx_depth[2]<=2u?fx_depth[2]:1u;
+    if(fx_enabled[2] && fx_mix[2]) {
+        if(reverb_type==2u) {
+            reverb=(a_l*2+b_l*2+c_l)/5;
+            reverb_r=(a_r*2+b_r*2+c_r)/5;
+        } else if(reverb_type==0u) {
+            reverb=(a_l*3+b_l+c_l)/5;
+            reverb_r=(a_r*3+b_r+c_r)/5;
+        } else {
+            reverb=(a_l+b_l+c_l)/3;
+            reverb_r=(a_r+b_r+c_r)/3;
+        }
+    }
+    uint32_t decay=reverb_type==0u
+        ? 30u+(uint32_t)fx_time[2]*20u/100u+(uint32_t)fx_feedback[2]*8u/100u
+        : reverb_type==2u
+            ? 60u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*10u/100u
+            : 40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
     int32_t reverb_input_l=fx_enabled[2]?sends[2][0]:0;
     int32_t reverb_input_r=fx_enabled[2]?sends[2][1]:0;
     fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)reverb_input_l+(int64_t)a_l*decay/100);
