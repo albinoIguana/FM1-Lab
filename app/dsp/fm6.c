@@ -871,7 +871,7 @@ void fm6_note_off_mask(uint8_t note,uint8_t patch_mask)
     }
     for(uint32_t i=0;i<VOICES;i++) {
         fm1lab_voice_t *v=&voices[i];
-        if(v->used && v->note==note && (patch_mask&(1u<<v->patch))) {
+        if(v->used && v->note==note && v->source==0u && (patch_mask&(1u<<v->patch))) {
             fm1lab_patch_t *p=&instrument[v->patch];
             fm6_note_key(&v->state,p->effective,0);
         }
