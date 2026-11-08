@@ -331,7 +331,7 @@ static void ui_events_drain(void)
         uint8_t b = ui_events[tail].b, c = ui_events[tail].c;
         ui_event_tail = (uint8_t)((tail + 1u) & 63u);
         if (type == EV_NOTE_ON)
-            fm6_note_on_mask(a, b, (uint8_t)(0x0fu << (seq_ui_lane*FM1LAB_PATCH_COUNT)));
+            fm6_note_on_mask(a, b, c);
         else if (type == EV_NOTE_OFF)
             fm6_note_off(a);
         else if (type == EV_PANIC)
@@ -355,9 +355,8 @@ static void ui_events_drain(void)
         } else if (type == EV_SEQ_RUN)
             fm6_sequencer_set_running(a);
         else if (type == EV_PATCH_VOICE) {
-            uint32_t engine_patch=(uint32_t)seq_ui_lane*FM1LAB_PATCH_COUNT+a;
-            (void)fm6_patch_set_voice(engine_patch, voice_update_snapshot);
-            fm6_patch_set_pan(engine_patch, fm1lab_patch_pan(&current_instrument, a));
+            (void)fm6_patch_set_voice(a, voice_update_snapshot);
+            fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a%FM1LAB_PATCH_COUNT));
             voice_update_pending = 0u;
         }
     }
@@ -485,7 +484,7 @@ static void sequencer_record_step_advance(void)
 static void note_on(int32_t note, uint32_t vel)
 {
     voice_note = note;
-    ui_event_push(EV_NOTE_ON, (uint8_t)note, (uint8_t)vel, 0);
+    ui_event_push(EV_NOTE_ON, (uint8_t)note, (uint8_t)vel, (uint8_t)(0x0fu << (seq_ui_lane*FM1LAB_PATCH_COUNT)));
 }
 static void note_off(int32_t note)
 {
@@ -508,7 +507,7 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
         }
         if ((st & 0xF0u) == 0x90u && d2) {
             voice_note = (int32_t)d1;
-            fm6_note_on((uint8_t)d1, (uint8_t)d2); /* MIDI is already in the audio interrupt. */
+            fm6_note_on_mask((uint8_t)d1,(uint8_t)d2,(uint8_t)(0x0fu<<(seq_ui_lane*FM1LAB_PATCH_COUNT))); /* selected Instrument only */
         } else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
             fm6_note_off((uint8_t)d1);
             if (voice_note == (int32_t)d1)
@@ -1079,6 +1078,7 @@ static void input(void)
             set.patch = seq_ui_patch[seq_ui_lane];
             patch_focus = 0u;
             instrument_load(seq_ui_instrument[seq_ui_lane],1);
+            performance_publish();set_dirty=1u;
             app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
 
         } else if (k == EN_ALGO && page == PAGE_FX_ROUTING) {
@@ -1154,6 +1154,7 @@ static void input(void)
                 if (next < 0) next += (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
                 if ((uint32_t)next != instrument_index) {
                     instrument_load((uint32_t)next, 1);
+                    performance_publish();set_dirty=1u;
                     int_text(next + 1, t);
                     app_say("INSTRUMENT", t);
                 }
