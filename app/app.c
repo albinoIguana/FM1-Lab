@@ -34,6 +34,7 @@ static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_macro[16];
+static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
 
 static const char *patch_display_name(uint32_t patch);
 static const char *instrument_display_name(void);
@@ -806,8 +807,9 @@ static void input(void)
             page = PAGE_SEQ;
             app_say("SEQUENCER", fm6_sequencer_running() ? "RUNNING" : "TWO LANES");
         } else if (k == B_ARP) {
-            page = PAGE_ARP;
-            app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
+            if (page == PAGE_ARP) page = PAGE_ARP_STEPS;
+            else page = PAGE_ARP;
+            app_say("ARPEGGIATOR", page == PAGE_ARP ? "ENGINE" : "STEP EDITOR");
         } else if (k == B_FX) {
             if (page < PAGE_FX_AMP || page > PAGE_FX_ROUTING) page = PAGE_FX_AMP;
             else page = page == PAGE_FX_ROUTING ? PAGE_FX_AMP : (uint8_t)(page + 1u);
@@ -885,9 +887,6 @@ static void input(void)
             env_operator = (uint8_t)(next + 1);
             app_say("ENVELOPE OPERATOR", fm1lab_voice_operator_is_carrier(
                 current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
-        } else if (k == EN_SELECT && (page == PAGE_ARP || page == PAGE_ARP_STEPS)) {
-            page = page == PAGE_ARP ? PAGE_ARP_STEPS : PAGE_ARP;
-            app_say("ARPEGGIATOR", page == PAGE_ARP_STEPS ? "STEP EDITOR" : "ENGINE");
         } else if (k == EN_SELECT && page == PAGE_SEQ) {
             int32_t next = ((int32_t)seq_ui_step + e) % 64;
             if (next < 0) next += 64;
@@ -990,8 +989,14 @@ static void input(void)
                     performance_publish(); set_dirty=1u;
                     app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":arp_ui_mode==3u?"UP / DOWN":"RANDOM");
                 } else if(index==1u) {
-                    transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
-                    performance_publish(); set_dirty=1u; app_say("ARP CLOCK", "UPDATED");
+                    arp_ui_division=(uint8_t)(((int32_t)arp_ui_division+e+6)%6);
+                    app_say("ARP DIVISION",arp_ui_division==0u?"1/1":arp_ui_division==1u?"1/2":arp_ui_division==2u?"1/4":arp_ui_division==3u?"1/8":arp_ui_division==4u?"1/16":"1/32");
+                } else if(index==2u) {
+                    arp_ui_gate=(uint8_t)clamp((int32_t)arp_ui_gate+e,10,200);
+                    app_say("ARP GATE","UPDATED");
+                } else {
+                    arp_ui_octaves=(uint8_t)clamp((int32_t)arp_ui_octaves+e,1,4);
+                    app_say("ARP OCTAVES","UPDATED");
                 }
             } else if (page == PAGE_ARP_STEPS) {
                 uint8_t step=arp_ui_step;
@@ -1651,33 +1656,49 @@ static void draw_sequencer_panel(void)
             fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
     cv_text(82,151,&FONT_XS,"SELECT STEP  K1 ON/OFF",C_GRAY);
 }
+static void draw_arp_card(uint32_t index, const char *label, const char *value,
+                          const char *hint, uint16_t accent)
+{
+    int32_t x=panel_grid_x(index), y=panel_grid_y(index,4,66);
+    instrument_card(x,y,UI_GRID_CARD_W,62,panel_fill(),accent,accent);
+    cv_text(x+9,y+7,&FONT_XS,label,C_GRAY);
+    cv_text(x+9,y+23,&FONT_B,value,accent);
+    cv_text(x+9,y+45,&FONT_XS,hint,C_WHITE);
+}
 static void draw_arp_panel(void)
 {
     static const char *const modes[5]={"OFF","UP","DOWN","UP/DOWN","RANDOM"};
+    static const char *const divisions[6]={"1/1","1/2","1/4","1/8","1/16","1/32"};
     char t[16];
     uint16_t accent=RGB(227,75,210);
-    cv_text(8,8,&FONT_XS,"MODE",C_GRAY);
-    cv_text(8,28,&FONT_B,modes[arp_ui_mode<5u?arp_ui_mode:0u],accent);
-    cv_text(128,8,&FONT_XS,"CLOCK",C_GRAY);
-    int_text(transport_ui_bpm,t); cv_text(128,28,&FONT_B,t,RGB(36,215,232));
-    cv_text(8,76,&FONT_XS,"K1 MODE",C_WHITE);
-    cv_text(128,76,&FONT_XS,"K2 CLOCK",C_WHITE);
-    cv_text(8,112,&FONT_XS,"HOLD NOTES TO PLAY",C_GRAY);
-    cv_text(8,138,&FONT_XS,"SELECT KNOB: STEP EDITOR",accent);
+    draw_arp_card(0u,"K1  MODE",modes[arp_ui_mode<5u?arp_ui_mode:0u],"ORDER / ENABLE",accent);
+    draw_arp_card(1u,"K2  DIVISION",divisions[arp_ui_division<6u?arp_ui_division:3u],"NOTE RATE",RGB(36,215,232));
+    int_text(arp_ui_gate,t); text_cat(t,"%");
+    draw_arp_card(2u,"K3  GATE",t,"NOTE LENGTH",RGB(242,212,59));
+    int_text(arp_ui_octaves,t); text_cat(t," OCT");
+    draw_arp_card(3u,"K4  OCTAVES",t,"RANGE",RGB(255,130,100));
+    cv_text(8,143,&FONT_XS,"HOLD NOTES TO PLAY",C_GRAY);
 }
 static void draw_arp_steps_panel(void)
 {
     char t[16];
     uint8_t playing=fm6_arpeggiator_playing_step();
     uint16_t accent=RGB(227,75,210);
-    cv_text(8,0,&FONT_XS,"ARP STEP EDIT",accent);
-    int_text(arp_ui_length,t); text_cat(t," STEPS"); cv_text(174,0,&FONT_XS,t,C_GRAY);
-    draw_step_columns(0u,0u,arp_ui_length,24,112,arp_ui_step,
+    static const char *const labels[4]={"STEP","GAIN","ACCENT","MACRO"};
+    uint8_t values[4]={arp_ui_step+1u,arp_ui_gain[arp_ui_step],arp_ui_accent[arp_ui_step],arp_ui_macro[arp_ui_step]};
+    static const uint16_t colors[4]={RGB(227,75,210),RGB(36,215,232),RGB(242,212,59),RGB(150,120,255)};
+    for(uint32_t i=0;i<4u;i++) {
+        int32_t x=panel_grid_x(i), y=panel_grid_y(i,4,66);
+        instrument_card(x,y,UI_GRID_CARD_W,62,panel_fill(),colors[i],colors[i]);
+        cv_text(x+9,y+7,&FONT_XS,labels[i],C_GRAY);
+        int_text(values[i],t); cv_text(x+9,y+23,&FONT_B,t,colors[i]);
+        cv_text(x+9,y+45,&FONT_XS,i==0u?"K1 SELECT":i==1u?"K2 VELOCITY":i==2u?"K3 EMPHASIS":"K4 MACRO AMT",C_WHITE);
+    }
+    rounded_panel(2,137,236,40,3,panel_fill(),accent);
+    int_text(arp_ui_length,t); text_cat(t," STEPS"); cv_text(8,139,&FONT_XS,t,C_GRAY);
+    draw_step_columns(0u,0u,arp_ui_length,149,23,arp_ui_step,
                       fm6_arpeggiator_active()?(uint8_t)(playing%arp_ui_length):255u,
                       arp_ui_gain,0,arp_ui_accent,accent);
-    cv_text(8,145,&FONT_XS,"GAIN",C_GRAY); int_text(arp_ui_gain[arp_ui_step],t); cv_text(43,145,&FONT_B,t,C_WHITE);
-    cv_text(82,145,&FONT_XS,"ACCENT",C_GRAY); int_text(arp_ui_accent[arp_ui_step],t); cv_text(126,145,&FONT_B,t,C_WHITE);
-    cv_text(164,145,&FONT_XS,"MACRO",C_GRAY); int_text(arp_ui_macro[arp_ui_step],t); cv_text(205,145,&FONT_B,t,C_WHITE);
 }
 static void draw_fx_panel(uint8_t fx)
 {
@@ -1798,8 +1819,8 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         index = (uint32_t)(current - PAGE_OPERATOR_MAP) + 1u;
         total = (uint32_t)(PAGE_LFO_MOD - PAGE_OPERATOR_MAP) + 1u;
     } else if (current >= PAGE_SEQ && current <= PAGE_ARP_STEPS) {
-        index = (uint32_t)(current - PAGE_SEQ) + 1u;
-        total = (uint32_t)(PAGE_ARP_STEPS - PAGE_SEQ) + 1u;
+        if (current == PAGE_SEQ) { index = 1u; total = 1u; }
+        else { index = (uint32_t)(current - PAGE_ARP) + 1u; total = 2u; }
     } else if (current <= PAGE_GLOBAL) {
         index = (uint32_t)current + 1u;
         total = (uint32_t)PAGE_GLOBAL + 1u;
