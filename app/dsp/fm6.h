@@ -55,6 +55,8 @@ void fm6_note_off_mask(uint8_t note, uint8_t patch_mask);
 void fm6_pitch_bend(uint16_t value);
 void fm6_set_tempo(uint16_t bpm);
 void fm6_sequencer_set_running(uint8_t running);
+void fm6_arpeggiator_reset_steps(void);
+void fm6_sequencer_clear_lane(uint8_t lane);
 void fm6_sequencer_set_length(uint8_t steps);
 void fm6_sequencer_set_lane(uint8_t lane, uint8_t patch);
 void fm6_sequencer_set_step(uint8_t lane, uint8_t step, uint8_t enabled, uint8_t note, uint8_t velocity, uint8_t gate);
