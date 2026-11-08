@@ -339,8 +339,9 @@ static void ui_events_drain(void)
         else if (type == EV_PATCH_LEVEL)
             fm6_patch_set_level(a, b);
         else if (type == EV_INSTRUMENT_LOAD) {
-            fm6_panic();
-            instrument_apply_engine();
+            /* Replace only this track's four-patch bank; preserve the other
+             * Instrument and any notes it currently has sounding. */
+            instrument_apply_engine_bank(a,&instrument_apply_snapshot,&inserts_apply_snapshot,1u);
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
         } else if (type == EV_MASTER_INSERT)
