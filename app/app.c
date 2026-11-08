@@ -169,9 +169,11 @@ static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
     fm1lab_instrument_init(out,name);
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
-        fm1lab_factory_voice_build(voice,seed->voice[p]);
+        /* The second bank rotates the same four voices into a new blend. */
+        uint32_t source=(index>=16u)?((p+1u)&3u):p;
+        fm1lab_factory_voice_build(voice,seed->voice[source]);
         (void)fm1lab_patch_set_voice(out,p,voice);
-        out->patches[p].level=seed->level[p];
+        out->patches[p].level=seed->level[source];
         out->patches[p].enabled=1u;
         out->patches[p].voice[155]=64u;
     }
