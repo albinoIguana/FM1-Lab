@@ -6,6 +6,7 @@
 
 #define FM6_SAMPLE_RATE_HZ 44100u /* fm1-base device/main_fm1.c: FS */
 #define FM1LAB_PATCH_COUNT 4u
+#define FM6_ENGINE_PATCH_COUNT 8u /* two independent four-patch sequencer instruments */
 #define FM1LAB_MACRO_COUNT 4u
 #define FM1LAB_VOICE_LIMIT 8u /* voices per patch; four independent pools */
 enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUNT };
@@ -15,7 +16,7 @@ enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUN
 typedef struct {
     uint16_t tempo_bpm;
     uint8_t seq_length;
-    uint8_t lane_patch[2];
+    uint8_t lane_instrument[2]; /* library Instrument slot (0..31) per sequencer lane */
     uint8_t seq_enabled[2][64];
     uint8_t seq_note[2][64];
     uint8_t seq_velocity[2][64];
@@ -27,7 +28,7 @@ typedef struct {
     uint8_t fx_mix[4];
     uint8_t fx_time[4];
     uint8_t fx_feedback[4];
-    uint8_t fx_send[4][4];
+    uint8_t fx_send[FM1LAB_PATCH_COUNT][4]; /* layer-role sends shared by both track banks */
     uint8_t fx_depth[4];
     uint8_t compressor_enabled, compressor_threshold, compressor_ratio;
     uint8_t compressor_attack, compressor_release, compressor_makeup;
@@ -58,7 +59,7 @@ void fm6_sequencer_set_running(uint8_t running);
 void fm6_arpeggiator_reset_steps(void);
 void fm6_sequencer_clear_lane(uint8_t lane);
 void fm6_sequencer_set_length(uint8_t steps);
-void fm6_sequencer_set_lane(uint8_t lane, uint8_t patch);
+void fm6_sequencer_set_lane(uint8_t lane, uint8_t patch_base); /* 0 for T1 bank, 4 for T2 bank */
 void fm6_sequencer_set_step(uint8_t lane, uint8_t step, uint8_t enabled, uint8_t note, uint8_t velocity, uint8_t gate);
 uint8_t fm6_sequencer_step(void);
 uint8_t fm6_sequencer_playing_step(void);
