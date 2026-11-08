@@ -35,6 +35,7 @@ static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][
 static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
 static uint8_t seq_record_active[NKEYS], seq_record_step[NKEYS], seq_record_lane[NKEYS], seq_record_note[NKEYS];
 static uint32_t seq_record_started[NKEYS];
+static uint8_t seq_record_redraw;
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
@@ -424,7 +425,7 @@ static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocit
         seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
         seq_record_note[key]=note;seq_record_started[key]=plat_ms();
     } else seq_ui_step=(uint8_t)((step+1u)%64u);
-    performance_publish();set_dirty=1u;ui.redraw=1u;
+    performance_publish();set_dirty=1u;seq_record_redraw=1u;
 }
 static void sequencer_record_release(uint32_t key, uint8_t note)
 {
@@ -433,7 +434,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     uint32_t step_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/4u;
     uint8_t gate=(uint8_t)(elapsed>=step_ms?100u:clamp((int32_t)(elapsed*100u/(step_ms?step_ms:1u)),10,100));
     seq_ui_gate[seq_record_lane[key]][seq_record_step[key]]=gate;
-    seq_record_active[key]=0u;performance_publish();set_dirty=1u;ui.redraw=1u;
+    seq_record_active[key]=0u;performance_publish();set_dirty=1u;seq_record_redraw=1u;
 }
 static void sequencer_record_step_advance(void)
 {
@@ -447,7 +448,7 @@ static void sequencer_record_step_advance(void)
     uint8_t lane=seq_ui_lane;
     seq_ui_enabled[lane][step]=0u;seq_ui_note[lane][step]=60u;
     seq_ui_velocity[lane][step]=100u;seq_ui_gate[lane][step]=75u;
-    performance_publish();set_dirty=1u;ui.redraw=1u;
+    performance_publish();set_dirty=1u;seq_record_redraw=1u;
 }
 static void note_on(int32_t note, uint32_t vel)
 {
@@ -2112,6 +2113,7 @@ void app_frame(void)
     static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     input();
+    if(seq_record_redraw){ui.redraw=1u;seq_record_redraw=0u;}
     if (performance_update_dirty && !performance_update_pending) performance_publish();
     speak();
     for (i = 0; i < NE; i++)                 /* an encoder's light goes out */
