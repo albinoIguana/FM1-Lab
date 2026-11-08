@@ -2330,7 +2330,7 @@ static void draw_fx_routing_panel(void)
 static const char *page_title(uint8_t current)
 {
     switch (current) {
-    case PAGE_HOME: return "HOME";
+    case PAGE_HOME: return patch_display_name(set.patch);
     case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
     case PAGE_GLOBAL: return "GLOBAL";
     case PAGE_OPERATOR_MAP: return "OPERATOR MAP";
