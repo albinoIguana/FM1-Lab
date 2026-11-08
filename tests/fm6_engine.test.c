@@ -649,7 +649,7 @@ int main(void) {
     for(unsigned step=0;step<16u;step++){
         saved.arp_step_gain[step]=(uint8_t)(60u+step*4u);
         saved.arp_step_accent[step]=(uint8_t)(step*5u);
-        saved.arp_step_macro[step]=(uint8_t)(20u+step*4u);
+        saved.arp_step_gate[step]=(uint8_t)(20u+step*4u);
     }
     saved.compressor_enabled=1u; saved.compressor_threshold=42u;
     saved.compressor_ratio=67u; saved.compressor_attack=15u;
@@ -725,6 +725,23 @@ int main(void) {
         fm6_note_off(60u);
     }
     assert(amp_gain_levels[0]<=3u&&amp_gain_levels[1]>=124u);
+
+    /* Per-step gate scales the global gate and closes AMP output early. */
+    uint8_t amp_gate_levels[2]={0u,0u};
+    for(unsigned gate_case=0;gate_case<2u;gate_case++){
+        fm6_init();fm6_performance_state_get(&saved);
+        saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=100u;
+        saved.arp_length=8u;saved.arp_output=1u;
+        saved.arp_step_gate[0]=(uint8_t)(gate_case?100u:25u);
+        assert(fm6_performance_state_set(&saved)==0);
+        fm6_note_on(60u,100u);
+        for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,9u,4096u);
+        for(unsigned block=0;block<12u;block++)fm6_render(output,128u,4096u);
+        amp_gate_levels[gate_case]=fm6_test_arpeggiator_amp_level();
+        fm6_note_off(60u);
+    }
+    assert(amp_gate_levels[0]<=3u&&amp_gate_levels[1]>=100u);
 
     /* Amp/Drive and EQ are one bypassable Instrument-wide post-FX stereo chain. */
     render_insert_variant(0u,0u,chunk_a);
