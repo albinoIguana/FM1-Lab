@@ -1269,6 +1269,28 @@ static const char *patch_display_name(uint32_t patch)
     return fallback[patch];
 }
 
+/* The Instrument owns the four patches; show its stored name in the global
+ * header. Empty factory slots get a useful slot label rather than a blank. */
+static void instrument_display_name(char out[FM1LAB_INSTRUMENT_NAME_BYTES + 1u])
+{
+    uint32_t n = 0u;
+    for (uint32_t i = 0u; i < FM1LAB_INSTRUMENT_NAME_BYTES &&
+         n < FM1LAB_INSTRUMENT_NAME_BYTES; ++i) {
+        char ch = current_instrument.name[i];
+        if (!ch) break;
+        out[n++] = ch;
+    }
+    while (n && out[n - 1u] == ' ') --n;
+    if (!n) {
+        const char fallback[] = "INSTRUMENT";
+        while (fallback[n] && n < FM1LAB_INSTRUMENT_NAME_BYTES)
+            out[n] = fallback[n], ++n;
+    }
+    if (n > 17u) n = 17u;
+    while (n && out[n - 1u] == ' ') --n;
+    out[n] = 0;
+}
+
 static void draw_home_panel(void)
 {
     char t[24];
@@ -1284,9 +1306,10 @@ static void draw_home_panel(void)
         rounded_panel(x, y, 116, 85, 3, panel_fill(),
                       (!patch_focus || p == set.patch) ? accent : C_LINE);
         cv_rect(x + 5, y + 7, 2, 70, accent);
-        int_text((int32_t)p + 1, t);
+        t[0] = 'P'; t[1] = 'A'; t[2] = 'T'; t[3] = 'C'; t[4] = 'H'; t[5] = ' ';
+        int_text((int32_t)p + 1, t + 6);
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
-        cv_text(x + 28, y + 5, &FONT_XS, enabled ? "LAYER ACTIVE" : "LAYER MUTED",
+        cv_text(x + 65, y + 5, &FONT_XS, enabled ? "ON" : "MUTED",
                 enabled ? RGB(75,235,135) : C_GRAY);
         cv_text(x + 12, y + 23, &FONT_B, patch_display_name(p), C_WHITE);
         cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_GRAY);
@@ -1371,7 +1394,8 @@ static void draw_amp_panel(void)
     const fm1lab_insert_state_t *v=&current_inserts;
     char t[16];uint16_t accent=RGB(36,215,232);
     uint8_t values[4]={v->drive,v->tone,v->output,v->amp_enabled};
-    cv_text(6,2,&FONT_XS,"MASTER BUS",C_WHITE);
+    cv_text(6,2,&FONT_XS,"TONE",C_GRAY);
+    cv_text(52,2,&FONT_XS,"AMP / DRIVE",C_WHITE);
     cv_text(172,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
@@ -1395,7 +1419,8 @@ static void draw_eq_panel(void)
     const fm1lab_eq_band_state_t *b=&v->eq[eq_ui_band];
     uint8_t enabled=(uint8_t)((v->eq_enabled>>(eq_ui_band+1u))&1u);
     char t[16],qtext[8];uint16_t accent=RGB(36,215,232);
-    cv_text(6,2,&FONT_XS,"MASTER BUS",C_WHITE);
+    cv_text(6,2,&FONT_XS,"TONE",C_GRAY);
+    cv_text(52,2,&FONT_XS,"PARAMETRIC EQ",C_WHITE);
     cv_text(164,2,&FONT_XS,bands[eq_ui_band],accent);
     cv_text(202,2,&FONT_XS,(v->eq_enabled&1u)?"ON":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
@@ -1419,7 +1444,8 @@ static void draw_compressor_panel(void)
     uint8_t values[4]={compressor_value(FM6_COMP_THRESHOLD),compressor_value(FM6_COMP_RATIO),
         compressor_value(FM6_COMP_ATTACK),compressor_value(FM6_COMP_RELEASE)};
     char t[16];uint16_t accent=RGB(36,215,232);
-    cv_text(6,2,&FONT_XS,"MASTER BUS",C_WHITE);
+    cv_text(6,2,&FONT_XS,"DYNAMICS",C_GRAY);
+    cv_text(76,2,&FONT_XS,"STEREO COMP",C_WHITE);
     cv_text(164,2,&FONT_XS,compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS",
         compressor_value(FM6_COMP_ENABLED)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
@@ -1563,7 +1589,8 @@ static void draw_fx_panel(uint8_t fx)
         fx==FM6_FX_PHASER?fm6_fx_depth(fx):fm6_fx_feedback(fx),
         fx==FM6_FX_PHASER?fm6_fx_feedback(fx):fm6_fx_get_send(set.patch,fx)};
     char t[16]; uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
-    cv_text(6,2,&FONT_XS,names[fx],C_WHITE);
+    cv_text(6,2,&FONT_XS,"SPACE",C_GRAY);
+    cv_text(58,2,&FONT_XS,names[fx],C_WHITE);
     cv_text(154,2,&FONT_XS,fm6_fx_enabled(fx)?"ACTIVE":"BYPASS",fm6_fx_enabled(fx)?RGB(75,235,135):RGB(255,82,101));
     for(uint32_t k=0;k<4u;++k) {
         int32_t x=panel_grid_x(k);
@@ -1582,7 +1609,8 @@ static void draw_fx_routing_panel(void)
     static const char *const names[FM6_FX_COUNT]={"CHORUS SEND","DELAY SEND","REVERB SEND","PHASER SEND"};
     char t[16];
     uint16_t accent=patch_color(set.patch);
-    cv_text(154,2,&FONT_XS,"SEND ROUTING",accent);
+    cv_text(6,2,&FONT_XS,"PATCH",C_GRAY);
+    cv_text(58,2,&FONT_XS,"FX SEND ROUTING",accent);
     for(uint32_t fx=0;fx<FM6_FX_COUNT;++fx) {
         uint8_t value=fm6_fx_get_send(set.patch,(uint8_t)fx);
         int32_t x=panel_grid_x(fx);
@@ -1645,8 +1673,13 @@ static void draw(void)
     }
     if (arp_ui_mode) cv_text(216, 1, &FONT_XS, "ARP", RGB(75,235,135));
 
-    /* The second line identifies the selected instrument patch. */
-    cv_text(8, 15, &FONT_B, patch_display_name(set.patch), C_WHITE);
+    /* The Instrument name is distinct from the four patch names below. */
+    char instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES + 1u];
+    instrument_display_name(instrument_name);
+    cv_text(8, 15, &FONT_B, instrument_name, C_WHITE);
+    int_text((int32_t)instrument_index + 1, t);
+    text_cat(t, "/32");
+    cv_text(198, 17, &FONT_XS, t, C_GRAY);
     cv_rect(0, 34, 240, 3, accent);
     cv_blit(0, 0);
     cv_begin(240, 180, screen_bg());
