@@ -1655,7 +1655,6 @@ static void input(void)
                     uint8_t next=(uint8_t)clamp((int32_t)set.performance.seq_length+e,2,64);
                     if(next!=set.performance.seq_length) {
                         set.performance.seq_length=next;
-                        fm6_sequencer_set_length(next);
                         if(seq_ui_step>=next)seq_ui_step=(uint8_t)(next-1u);
                         performance_publish();set_dirty=1u;
                         app_say("LOOP LENGTH",next==64u?"64 STEPS":"UPDATED");
