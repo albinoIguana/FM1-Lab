@@ -2487,22 +2487,20 @@ static void draw_step_columns(uint8_t lane, uint8_t first, uint8_t count,
                                const uint8_t *enabled, const uint8_t *accent_values,
                                uint16_t accent)
 {
-    int32_t gap=count<=16u?2:0;
+    int32_t gap=count<=8u?2:1;
     int32_t width=(224-(int32_t)(count-1u)*gap)/(int32_t)count;
     for(uint32_t i=0;i<count;i++) {
         uint8_t step=(uint8_t)(first+i), active=enabled?enabled[step]:1u;
         uint8_t value=velocity?velocity[step]:100u;
-        int32_t x=8+(int32_t)i*(width+gap);
-        int32_t bar_h=(int32_t)value*(height-18)/127;
         uint8_t accent_value=accent_values?accent_values[step]:50u;
-        int32_t bar_w=active?(width/2+(int32_t)accent_value*(width/2-2)/100):width/2;
+        int32_t x=8+(int32_t)i*(width+gap);
+        int32_t bar_h=1+(int32_t)value*(height-5)/127;
+        int32_t bar_w=active?(width/2+(int32_t)accent_value*(width/2-1)/100):width/2;
         int32_t bx=x+(width-bar_w)/2;
-        uint16_t color=active?accent:C_LINE;
         cv_rect(x,top,width,height,C_LINE);
-        if(bar_h<3 && active)bar_h=3;
-        if(active) cv_rect(bx,top+height-4-bar_h,bar_w,bar_h,color);
-        if(step==selected) rounded_panel(x-1,top-2,width+2,height+4,3,0u,RGB(255,255,255));
-        if(step==playing) rounded_panel(x-2,top-3,width+4,height+6,3,0u,RGB(242,212,59));
+        if(active && bar_h>0)cv_rect(bx,top+height-2-bar_h,bar_w,bar_h,accent);
+        if(step==selected)rounded_panel(x-1,top-1,width+2,height+2,2,0u,RGB(255,255,255));
+        if(step==playing)rounded_panel(x-1,top-1,width+2,height+2,2,0u,RGB(242,212,59));
     }
     (void)lane;
 }
@@ -2510,21 +2508,40 @@ static void draw_sequencer_panel(void)
 {
     uint8_t playing=fm6_sequencer_playing_step();
     uint8_t count=set.performance.seq_length;
+    uint8_t rows;
     if(count<2u)count=2u;
     if(count>64u)count=64u;
+    rows=(uint8_t)((count+15u)/16u);
+
+    /* Each lane gets up to four rows; every row contains at most 16 steps. */
     cv_text(6,0,&FONT_XS,"TRACK 1",patch_color(seq_ui_patch[0]));
     cv_text(78,0,&FONT_XS,seq_ui_instrument_name[0],C_WHITE);
-    draw_step_columns(0u,0u,count,20,48,seq_ui_lane==0u?seq_ui_step:255u,
-                      fm6_sequencer_running()?playing:255u,seq_ui_velocity[0],
-                      seq_ui_enabled[0],seq_ui_accent[0],patch_color(seq_ui_patch[0]));
-    cv_text(6,77,&FONT_XS,"TRACK 2",patch_color(seq_ui_patch[1]));
-    cv_text(78,77,&FONT_XS,seq_ui_instrument_name[1],C_WHITE);
-    draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
-                      fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
-                      seq_ui_enabled[1],seq_ui_accent[1],patch_color(seq_ui_patch[1]));
-    cv_text(6,148,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
+    for(uint32_t row=0;row<rows;row++) {
+        uint8_t first=(uint8_t)(row*16u);
+        uint8_t n=(uint8_t)(count-first);
+        if(n>16u)n=16u;
+        draw_step_columns(0u,first,n,15+(int32_t)row*12,10,
+                          seq_ui_lane==0u?seq_ui_step:255u,
+                          fm6_sequencer_running()?playing:255u,
+                          seq_ui_velocity[0],seq_ui_enabled[0],
+                          seq_ui_accent[0],patch_color(seq_ui_patch[0]));
+    }
+
+    cv_text(6,66,&FONT_XS,"TRACK 2",patch_color(seq_ui_patch[1]));
+    cv_text(78,66,&FONT_XS,seq_ui_instrument_name[1],C_WHITE);
+    for(uint32_t row=0;row<rows;row++) {
+        uint8_t first=(uint8_t)(row*16u);
+        uint8_t n=(uint8_t)(count-first);
+        if(n>16u)n=16u;
+        draw_step_columns(1u,first,n,81+(int32_t)row*12,10,
+                          seq_ui_lane==1u?seq_ui_step:255u,
+                          fm6_sequencer_running()?playing:255u,
+                          seq_ui_velocity[1],seq_ui_enabled[1],
+                          seq_ui_accent[1],patch_color(seq_ui_patch[1]));
+    }
+
+    cv_text(6,139,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
             fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
-    /* Four equal-width footer cells keep every encoder hint on one line. */
     cv_text(6,166,&FONT_XS,"K1 STEP",C_GRAY);
     cv_text(66,166,&FONT_XS,"K2 CLEAR",C_GRAY);
     cv_text(126,166,&FONT_XS,"K3 VEL",C_GRAY);
