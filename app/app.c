@@ -963,7 +963,7 @@ static void input(void)
             if (FM1B_BLE && plat_ms()-ui.rec_t>=1000u) {ui.rec_t=0u;ble_toggle();}
         } else {
             uint32_t held=plat_ms()-ui.rec_t;ui.rec_t=0u;
-            if(held<1000u) {
+            if(held<1000u || !FM1B_BLE) {
                 seq_record_armed^=1u;seq_record_last_step=255u;
                 for(uint32_t key=0;key<NKEYS;key++)seq_record_active[key]=0u;
                 app_say("RECORD",seq_record_armed?"ARMED":"DISARMED");
