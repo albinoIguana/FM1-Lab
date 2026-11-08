@@ -862,7 +862,7 @@ void fm6_note_off(uint8_t note)
             break;
         }
         if(!arp_count && arp_live) { fm6_note_off_source(arp_live_note,0x0fu,3u); arp_live=0u; }
-        if(!arp_count)arp_amp_target_q15=32768;
+        if(!arp_count){arp_amp_target_q15=32768;fm6_arp_macro_apply(0);}
         return;
     }
     fm6_note_off_source(note,(uint8_t)((1u<<PATCHES)-1u),0u);
@@ -1103,7 +1103,7 @@ uint8_t fm6_sequencer_step(void) { return seq_position; }
 uint8_t fm6_sequencer_playing_step(void) { return seq_play_position; }
 uint8_t fm6_sequencer_running(void) { return seq_running; }
 uint8_t fm6_arpeggiator_playing_step(void) { return arp_play_position; }
-uint8_t fm6_arpeggiator_active(void) { return (uint8_t)(arp_mode && arp_count && (arp_live||arp_output==1u)); }
+uint8_t fm6_arpeggiator_active(void) { return (uint8_t)(arp_mode && arp_count); }
 void fm6_arpeggiator_set_mode(uint8_t mode) {
     if(mode>4u) mode=4u;
     /* Enabling starts with an empty held-note set naturally (keys played
@@ -1224,6 +1224,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
     arp_mode=s->arp_mode;
     arp_division=s->arp_division;arp_gate=s->arp_gate;arp_octaves=s->arp_octaves;arp_length=s->arp_length;
     arp_output=s->arp_output;arp_random=s->arp_random;arp_macro_dest=s->arp_macro_dest;arp_depth=s->arp_depth;
+    if(arp_output!=2u)fm6_arp_macro_apply(0);
     for(uint32_t step=0;step<16u;step++){
         arp_step_gain[step]=s->arp_step_gain[step];
         arp_step_accent[step]=s->arp_step_accent[step];
