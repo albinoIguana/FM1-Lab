@@ -1390,18 +1390,18 @@ static void draw_operator_map(void)
 
 static void draw_amp_panel(void)
 {
-    static const char *const labels[4]={"DRIVE","TONE","OUTPUT","AMP STATE"};
+    static const char *const labels[4]={"K1  BYPASS","K2  DRIVE","K3  TONE","K4  OUTPUT"};
     const fm1lab_insert_state_t *v=&current_inserts;
     char t[16];uint16_t accent=RGB(36,215,232);
-    uint8_t values[4]={v->drive,v->tone,v->output,v->amp_enabled};
+    uint8_t values[4]={v->amp_enabled,v->drive,v->tone,v->output};
     cv_text(6,2,&FONT_XS,"TONE",C_GRAY);
     cv_text(52,2,&FONT_XS,"AMP / DRIVE",C_WHITE);
-    cv_text(172,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
+    cv_text(178,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        panel_grid_card(i, UI_GRID_TOP, UI_GRID_ROW_STEP, accent);
+        panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
         cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
-        if(i==3u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",accent);
+        if(i==0u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",values[i]?RGB(75,235,135):RGB(255,82,101));
         else {int_text(values[i],t);cv_text(x+7,y+23,&FONT_B,t,accent);cv_rect(x+48,y+29,55,5,C_LINE);cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);}
     }
 }
@@ -1417,52 +1417,41 @@ static void draw_eq_panel(void)
     static const char *const bands[3]={"LOW","MID","HIGH"};
     const fm1lab_insert_state_t *v=&current_inserts;
     const fm1lab_eq_band_state_t *b=&v->eq[eq_ui_band];
-    uint8_t enabled=(uint8_t)((v->eq_enabled>>(eq_ui_band+1u))&1u);
-    char t[16],qtext[8];uint16_t accent=RGB(36,215,232);
+    char t[16];uint16_t accent=RGB(36,215,232);
     cv_text(6,2,&FONT_XS,"TONE",C_GRAY);
     cv_text(52,2,&FONT_XS,"PARAMETRIC EQ",C_WHITE);
-    cv_text(164,2,&FONT_XS,bands[eq_ui_band],accent);
-    cv_text(202,2,&FONT_XS,(v->eq_enabled&1u)?"ON":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
+    cv_text(178,2,&FONT_XS,(v->eq_enabled&1u)?"ACTIVE":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
-        cv_text(x+7,y+6,&FONT_XS,i==0u?"FREQUENCY":i==1u?"GAIN":i==2u?"Q":"BAND",C_GRAY);
-        if(i==0u){int_text((int32_t)eq_frequency_hz(b->frequency),t);text_cat(t,"Hz");}
-        else if(i==1u){int_text((int32_t)b->gain-12,t);text_cat(t,"dB");}
-        else if(i==2u){
-            uint32_t q=5u+(uint32_t)b->q*35u/31u;
-            int_text((int32_t)(q/10u),qtext);text_cat(qtext,".");
-            int_text((int32_t)(q%10u),qtext+2);
-            cv_text(x+7,y+23,&FONT_B,qtext,accent);continue;
-        } else {cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?accent:C_GRAY);continue;}
-        cv_text(x+7,y+23,&FONT_B,t,accent);
+        panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
+        cv_text(x+7,y+6,&FONT_XS,i==0u?"K1  BYPASS":i==1u?"K2  BAND":i==2u?"K3  FREQUENCY":"K4  GAIN",C_GRAY);
+        if(i==0u) cv_text(x+7,y+23,&FONT_B,(v->eq_enabled&1u)?"ON":"OFF",(v->eq_enabled&1u)?RGB(75,235,135):RGB(255,82,101));
+        else if(i==1u) cv_text(x+7,y+23,&FONT_B,bands[eq_ui_band],accent);
+        else if(i==2u) {int_text((int32_t)eq_frequency_hz(b->frequency),t);text_cat(t,"Hz");cv_text(x+7,y+23,&FONT_B,t,accent);}
+        else {int_text((int32_t)b->gain-12,t);text_cat(t,"dB");cv_text(x+7,y+23,&FONT_B,t,accent);}
     }
 }
 static void draw_compressor_panel(void)
 {
-    static const char *const labels[4]={"THRESHOLD","RATIO","ATTACK","RELEASE"};
-    uint8_t values[4]={compressor_value(FM6_COMP_THRESHOLD),compressor_value(FM6_COMP_RATIO),
-        compressor_value(FM6_COMP_ATTACK),compressor_value(FM6_COMP_RELEASE)};
+    uint8_t enabled=compressor_value(FM6_COMP_ENABLED);
+    uint8_t values[4]={enabled,compressor_value(FM6_COMP_RATIO),
+        compressor_value(FM6_COMP_THRESHOLD),compressor_value(FM6_COMP_ATTACK)};
     char t[16];uint16_t accent=RGB(36,215,232);
     cv_text(6,2,&FONT_XS,"DYNAMICS",C_GRAY);
     cv_text(76,2,&FONT_XS,"STEREO COMP",C_WHITE);
-    cv_text(164,2,&FONT_XS,compressor_value(FM6_COMP_ENABLED)?"ACTIVE":"BYPASS",
-        compressor_value(FM6_COMP_ENABLED)?RGB(75,235,135):C_GRAY);
+    cv_text(178,2,&FONT_XS,enabled?"ACTIVE":"BYPASS",enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
-        cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
-        if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
-        else if(i==2u){uint32_t ms=1u+(uint32_t)values[i]*49u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
-        else if(i==3u){uint32_t ms=20u+(uint32_t)values[i]*480u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
-        else int_text(values[i],t);
-        cv_text(x+7,y+23,&FONT_B,t,accent);
-        cv_rect(x+48,y+29,55,5,C_LINE);
-        cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);
+        panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
+        cv_text(x+7,y+6,&FONT_XS,i==0u?"K1  BYPASS":i==1u?"K2  RATIO":i==2u?"K3  THRESHOLD":"K4  ATTACK",C_GRAY);
+        if(i==0u) cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?RGB(75,235,135):RGB(255,82,101));
+        else {
+            if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
+            else if(i==3u){uint32_t ms=1u+(uint32_t)values[i]*49u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
+            else int_text(values[i],t);
+            cv_text(x+7,y+23,&FONT_B,t,accent);
+        }
     }
-    int_text((int32_t)compressor_value(FM6_COMP_MAKEUP)*12/100,t);text_cat(t,"dB");
-    cv_text(6,132,&FONT_XS,"MAKEUP",C_GRAY);
-    cv_text(56,132,&FONT_XS,t,accent);
 }
 
 static void draw_global_panel(uint32_t pct)
@@ -1584,23 +1573,34 @@ static void draw_arp_panel(void)
 }
 static void draw_fx_panel(uint8_t fx)
 {
-    const char *names[4]={"CHORUS","DELAY","REVERB","PHASER"};
-    uint8_t values[4]={fm6_fx_mix(fx),fm6_fx_time(fx),
-        fx==FM6_FX_PHASER?fm6_fx_depth(fx):fm6_fx_feedback(fx),
-        fx==FM6_FX_PHASER?fm6_fx_feedback(fx):fm6_fx_get_send(set.patch,fx)};
-    char t[16]; uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
+    static const char *const names[4]={"CHORUS","DELAY","REVERB","PHASER"};
+    static const char *const types[3]={"ROOM","HALL","PLATE"};
+    char t[16];
+    uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
+    uint8_t enabled=fm6_fx_enabled(fx);
+    uint8_t values[4]={enabled,fx==FM6_FX_REVERB?set.performance.fx_depth[2]:fm6_fx_time(fx),
+        fm6_fx_mix(fx),fx==FM6_FX_PHASER?fm6_fx_feedback(fx):fm6_fx_feedback(fx)};
+    const char *labels[4]={"K1  BYPASS",fx==FM6_FX_REVERB?"K2  TYPE":
+        fx==FM6_FX_CHORUS?"K2  RATE":fx==FM6_FX_DELAY?"K2  TIME":"K2  RATE",
+        "K3  WET","K4  FEEDBACK"};
     cv_text(6,2,&FONT_XS,"SPACE",C_GRAY);
     cv_text(58,2,&FONT_XS,names[fx],C_WHITE);
-    cv_text(154,2,&FONT_XS,fm6_fx_enabled(fx)?"ACTIVE":"BYPASS",fm6_fx_enabled(fx)?RGB(75,235,135):RGB(255,82,101));
+    cv_text(178,2,&FONT_XS,enabled?"ACTIVE":"BYPASS",enabled?RGB(75,235,135):RGB(255,82,101));
     for(uint32_t k=0;k<4u;++k) {
-        int32_t x=panel_grid_x(k);
-        int32_t y=panel_grid_y(k,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        panel_grid_card(k, UI_GRID_TOP, UI_GRID_ROW_STEP, accent);
-        cv_text(x+7,y+6,&FONT_XS,k==0u?"K1 WET":k==1u?(fx==0u||fx==3u?"K2 RATE":fx==1u?"K2 TIME":"K2 DECAY"):k==2u?(fx==FM6_FX_PHASER?"K3 DEPTH":"K3 FEEDBACK"):fx==FM6_FX_PHASER?"K4 RESONANCE":"K4 PATCH SEND",C_GRAY);
-        int_text(values[k],t);
-        cv_text(x+7,y+23,&FONT_B,t,accent);
-        cv_rect(x+48,y+29,55,5,C_LINE);
-        cv_rect(x+48,y+29,(int32_t)values[k]*55/100,5,accent);
+        int32_t x=panel_grid_x(k),y=panel_grid_y(k,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        panel_grid_card(k,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
+        cv_text(x+7,y+6,&FONT_XS,labels[k],C_GRAY);
+        if(k==0u) cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?RGB(75,235,135):RGB(255,82,101));
+        else if(k==1u && fx==FM6_FX_REVERB) {
+            uint8_t type=values[k]<=2u?values[k]:1u;
+            cv_text(x+7,y+23,&FONT_B,types[type],accent);
+            cv_text(x+7,y+43,&FONT_XS,"ROOM / HALL / PLATE",C_GRAY);
+        } else {
+            int_text(values[k],t);
+            cv_text(x+7,y+23,&FONT_B,t,accent);
+            cv_rect(x+48,y+29,55,5,C_LINE);
+            cv_rect(x+48,y+29,(int32_t)values[k]*55/100,5,accent);
+        }
     }
 }
 
