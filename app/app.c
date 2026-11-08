@@ -1009,6 +1009,12 @@ void app_init(void)
         settings_seal(&set);
     }
     page = PAGE_HOME;
+    /* A cold start always opens the first patch of the active Instrument.
+     * Patch focus is transient UI state, not a preference to restore. */
+    set.patch = 0u;
+    seq_ui_patch[0] = 0u;
+    seq_ui_patch[1] = 0u;
+    patch_focus = 0u;
     for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_step_gate[i]=100u;}
     instrument_factory_capture();
     seq_record_mode=(uint8_t)(set.reserved&1u);
@@ -1037,7 +1043,16 @@ void app_init(void)
                 seq_ui_gate[lane][step] = set.performance.seq_gate[lane][step];
             }
         }
+        /* ARP is opt-in: do not resurrect a previously saved DOWN/UP mode. */
+        if (set.performance.arp_mode != 0u) {
+            set.performance.arp_mode = 0u;
+            arp_ui_mode = 0u;
+            fm6_arpeggiator_set_mode(0u);
+            set_dirty = 1u;
+        }
     } else {
+        arp_ui_mode = 0u;
+        fm6_arpeggiator_set_mode(0u);
         for (uint32_t lane = 0; lane < 2u; ++lane) {
             seq_ui_instrument[lane] = 0u;
             seq_ui_patch[lane] = 0u;
