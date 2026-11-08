@@ -1704,11 +1704,11 @@ static void draw_sequencer_panel(void)
 static void draw_arp_card(uint32_t index, const char *label, const char *value,
                           const char *hint, uint16_t accent)
 {
-    int32_t x=panel_grid_x(index), y=panel_grid_y(index,4,66);
-    instrument_card(x,y,UI_GRID_CARD_W,62,panel_fill(),accent,accent);
-    cv_text(x+9,y+7,&FONT_XS,label,C_GRAY);
-    cv_text(x+9,y+23,&FONT_B,value,accent);
-    cv_text(x+9,y+45,&FONT_XS,hint,C_WHITE);
+    int32_t x=panel_grid_x(index), y=panel_grid_y(index,UI_GRID_TOP,UI_GRID_ROW_STEP);
+    instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
+    cv_text(x+9,y+9,&FONT_XS,label,C_GRAY);
+    cv_text(x+9,y+28,&FONT_B,value,accent);
+    cv_text(x+9,y+67,&FONT_XS,hint,C_WHITE);
 }
 static void draw_arp_panel(void)
 {
@@ -1722,7 +1722,6 @@ static void draw_arp_panel(void)
     draw_arp_card(2u,"K3  GATE",t,"NOTE LENGTH",RGB(242,212,59));
     int_text(arp_ui_octaves,t); text_cat(t," OCT");
     draw_arp_card(3u,"K4  OCTAVES",t,"RANGE",RGB(255,130,100));
-    cv_text(8,143,&FONT_XS,"HOLD NOTES TO PLAY",C_GRAY);
 }
 static void draw_arp_steps_panel(void)
 {
