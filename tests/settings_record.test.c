@@ -135,7 +135,7 @@ int main(void)
     memset(&v3, 0, sizeof v3);
     v3.magic=SET_MAGIC_V3; v3.octave=0; v3.patch=1u; v3.enabled_mask=0x0Fu;
     v3.performance.tempo_bpm=128u; v3.performance.seq_length=16u;
-    v3.performance.lane_instrument[0]=0u; v3.performance.lane_instrument[1]=2u;
+    v3.performance.lane_patch[0]=0u; v3.performance.lane_patch[1]=2u;
     for(unsigned lane=0;lane<2u;++lane) for(unsigned step=0;step<64u;++step) {
         v3.performance.seq_note[lane][step]=60u;
         v3.performance.seq_velocity[lane][step]=100u;
@@ -177,7 +177,7 @@ int main(void)
     memset(&v4,0,sizeof v4);
     v4.magic=SET_MAGIC_V4; v4.octave=1; v4.patch=2u; v4.enabled_mask=0x0fu;
     v4.performance.tempo_bpm=141u; v4.performance.seq_length=32u;
-    v4.performance.lane_instrument[0]=1u; v4.performance.lane_instrument[1]=3u;
+    v4.performance.lane_patch[0]=1u; v4.performance.lane_patch[1]=3u;
     for(unsigned fx=0;fx<4u;fx++){
         v4.performance.fx_enabled[fx]=1u; v4.performance.fx_mix[fx]=40u;
         v4.performance.fx_time[fx]=45u; v4.performance.fx_feedback[fx]=30u;
@@ -208,7 +208,7 @@ int main(void)
     memset(&v5,0,sizeof v5);
     v5.magic=SET_MAGIC_V5;v5.octave=-1;v5.patch=3u;v5.enabled_mask=0x0fu;
     v5.performance.tempo_bpm=133u;v5.performance.seq_length=24u;
-    v5.performance.lane_instrument[0]=2u;v5.performance.lane_instrument[1]=1u;
+    v5.performance.lane_patch[0]=2u;v5.performance.lane_patch[1]=1u;
     v5.performance.arp_mode=4u;v5.performance.compressor_enabled=1u;
     v5.performance.compressor_threshold=48u;v5.performance.compressor_ratio=61u;
     for(unsigned lane=0;lane<2u;lane++)for(unsigned step=0;step<64u;step++){
