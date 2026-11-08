@@ -1342,9 +1342,9 @@ static void draw_macro_panel(void)
     uint32_t now = plat_ms();
     uint16_t accent = patch_color(set.patch);
     char t[24];
-    cv_text(164, 2, &FONT_XS, "ALG", C_GRAY);
+    cv_text(164, 0, &FONT_XS, "ALG", C_GRAY);
     int_text((int32_t)fm6_patch_algorithm(set.patch) + 1, t);
-    cv_text(204, 2, &FONT_XS, t, accent);
+    cv_text(204, 0, &FONT_XS, t, accent);
     for (uint32_t m = 0; m < 4u; ++m) {
         int32_t x = panel_grid_x(m);
         int32_t y = panel_grid_y(m, UI_GRID_TOP, UI_GRID_ROW_STEP);
@@ -1374,11 +1374,11 @@ static void draw_operator_map(void)
     uint16_t accent = patch_color(set.patch);
     int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
     (void)fm1lab_voice_global_get(voice, FM1LAB_GLOBAL_ALGORITHM, &algorithm);
-    cv_text(91, 2, &FONT_XS, "ALG", C_GRAY);
-    int_text(algorithm, t); cv_text(113, 2, &FONT_XS, t, accent);
-    cv_text(145, 2, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
-    cv_text(202, 2, &FONT_XS, "OP", C_GRAY);
-    int_text(env_operator, t); cv_text(226, 2, &FONT_XS, t, accent);
+    cv_text(91, 0, &FONT_XS, "ALG", C_GRAY);
+    int_text(algorithm, t); cv_text(113, 0, &FONT_XS, t, accent);
+    cv_text(145, 0, &FONT_XS, carrier ? "CARRIER" : "MODULATOR", carrier ? accent : C_GRAY);
+    cv_text(202, 0, &FONT_XS, "OP", C_GRAY);
+    int_text(env_operator, t); cv_text(226, 0, &FONT_XS, t, accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
@@ -1405,9 +1405,9 @@ static void draw_amp_panel(void)
     const fm1lab_insert_state_t *v=&current_inserts;
     char t[16];uint16_t accent=RGB(36,215,232);
     uint8_t values[4]={v->amp_enabled,v->drive,v->tone,v->output};
-    cv_text(6,2,&FONT_XS,"TONE",C_GRAY);
-    cv_text(52,2,&FONT_XS,"AMP / DRIVE",C_WHITE);
-    cv_text(178,2,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
+    cv_text(6,0,&FONT_XS,"TONE",C_GRAY);
+    cv_text(52,0,&FONT_XS,"AMP / DRIVE",C_WHITE);
+    cv_text(178,0,&FONT_XS,v->amp_enabled?"ACTIVE":"BYPASS",v->amp_enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
@@ -1429,9 +1429,9 @@ static void draw_eq_panel(void)
     const fm1lab_insert_state_t *v=&current_inserts;
     const fm1lab_eq_band_state_t *b=&v->eq[eq_ui_band];
     char t[16];uint16_t accent=RGB(36,215,232);
-    cv_text(6,2,&FONT_XS,"TONE",C_GRAY);
-    cv_text(52,2,&FONT_XS,"PARAMETRIC EQ",C_WHITE);
-    cv_text(178,2,&FONT_XS,(v->eq_enabled&1u)?"ACTIVE":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
+    cv_text(6,0,&FONT_XS,"TONE",C_GRAY);
+    cv_text(52,0,&FONT_XS,"PARAMETRIC EQ",C_WHITE);
+    cv_text(178,0,&FONT_XS,(v->eq_enabled&1u)?"ACTIVE":"BYPASS",(v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
@@ -1448,9 +1448,9 @@ static void draw_compressor_panel(void)
     uint8_t values[4]={enabled,compressor_value(FM6_COMP_RATIO),
         compressor_value(FM6_COMP_THRESHOLD),compressor_value(FM6_COMP_ATTACK)};
     char t[16];uint16_t accent=RGB(36,215,232);
-    cv_text(6,2,&FONT_XS,"DYNAMICS",C_GRAY);
-    cv_text(76,2,&FONT_XS,"STEREO COMP",C_WHITE);
-    cv_text(178,2,&FONT_XS,enabled?"ACTIVE":"BYPASS",enabled?RGB(75,235,135):C_GRAY);
+    cv_text(6,0,&FONT_XS,"DYNAMICS",C_GRAY);
+    cv_text(76,0,&FONT_XS,"STEREO COMP",C_WHITE);
+    cv_text(178,0,&FONT_XS,enabled?"ACTIVE":"BYPASS",enabled?RGB(75,235,135):C_GRAY);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
@@ -1502,9 +1502,9 @@ static void draw_envelope_panel(void)
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     int carrier = fm1lab_voice_operator_is_carrier(voice, env_operator);
     uint16_t accent = patch_color(set.patch);
-    cv_text(140, 2, &FONT_XS, "OPERATOR", C_GRAY);
-    int_text(env_operator, t); cv_text(204, 2, &FONT_XS, t, accent);
-    cv_text(6, 19, &FONT_XS, carrier ? "CARRIER ENVELOPE" : "MODULATOR ENVELOPE", carrier ? accent : C_GRAY);
+    cv_text(140, 0, &FONT_XS, "OPERATOR", C_GRAY);
+    int_text(env_operator, t); cv_text(204, 0, &FONT_XS, t, accent);
+    cv_text(6, 0, &FONT_XS, carrier ? "CARRIER ENVELOPE" : "MODULATOR ENVELOPE", carrier ? accent : C_GRAY);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
@@ -1535,7 +1535,7 @@ static void draw_lfo_panel(uint32_t modulation)
     char t[20];
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint16_t accent = patch_color(set.patch);
-    cv_text(164, 2, &FONT_XS, modulation ? "MODULATION" : "OSCILLATOR", accent);
+    cv_text(164, 0, &FONT_XS, modulation ? "MODULATION" : "OSCILLATOR", accent);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
@@ -1559,8 +1559,8 @@ static void draw_lfo_panel(uint32_t modulation)
 static void draw_sequencer_panel(void)
 {
     char t[16]; uint8_t lane=seq_ui_lane, step=seq_ui_step;
-    cv_text(6,2,&FONT_XS,lane?"LANE B":"LANE A",patch_color(seq_ui_patch[lane]));
-    cv_text(130,2,&FONT_XS,patch_display_name(seq_ui_patch[lane]),C_WHITE);
+    cv_text(6,0,&FONT_XS,lane?"LANE B":"LANE A",patch_color(seq_ui_patch[lane]));
+    cv_text(130,0,&FONT_XS,patch_display_name(seq_ui_patch[lane]),C_WHITE);
     for(uint32_t i=0;i<16u;i++) {
         int32_t x=5+(int32_t)(i%8u)*29, y=12+(int32_t)(i/8u)*49;
         uint8_t s=(uint8_t)((step/16u)*16u+i);
@@ -1596,9 +1596,9 @@ static void draw_fx_panel(uint8_t fx)
     const char *labels[4]={"K1  BYPASS",fx==FM6_FX_REVERB?"K2  TYPE":
         fx==FM6_FX_CHORUS?"K2  RATE":fx==FM6_FX_DELAY?"K2  TIME":"K2  RATE",
         "K3  WET","K4  FEEDBACK"};
-    cv_text(6,2,&FONT_XS,"SPACE",C_GRAY);
-    cv_text(58,2,&FONT_XS,names[fx],C_WHITE);
-    cv_text(178,2,&FONT_XS,enabled?"ACTIVE":"BYPASS",enabled?RGB(75,235,135):RGB(255,82,101));
+    cv_text(6,0,&FONT_XS,"SPACE",C_GRAY);
+    cv_text(58,0,&FONT_XS,names[fx],C_WHITE);
+    cv_text(178,0,&FONT_XS,enabled?"ACTIVE":"BYPASS",enabled?RGB(75,235,135):RGB(255,82,101));
     for(uint32_t k=0;k<4u;++k) {
         int32_t x=panel_grid_x(k),y=panel_grid_y(k,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(k,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
@@ -1622,8 +1622,8 @@ static void draw_fx_routing_panel(void)
     static const char *const names[FM6_FX_COUNT]={"CHORUS SEND","DELAY SEND","REVERB SEND","PHASER SEND"};
     char t[16];
     uint16_t accent=patch_color(set.patch);
-    cv_text(6,2,&FONT_XS,"PATCH",C_GRAY);
-    cv_text(58,2,&FONT_XS,"FX SEND ROUTING",accent);
+    cv_text(6,0,&FONT_XS,"PATCH",C_GRAY);
+    cv_text(58,0,&FONT_XS,"FX SEND ROUTING",accent);
     for(uint32_t fx=0;fx<FM6_FX_COUNT;++fx) {
         uint8_t value=fm6_fx_get_send(set.patch,(uint8_t)fx);
         int32_t x=panel_grid_x(fx);
