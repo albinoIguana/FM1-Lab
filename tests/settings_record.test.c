@@ -193,6 +193,41 @@ int main(void)
     assert(imported.performance.arp_octaves==1u&&imported.performance.arp_length==16u);
     assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_macro[15]==50u);
 
+    /* V5 was the prior current record (including compressor controls).
+     * Upgrade it losslessly and initialize the newly introduced arp fields. */
+    settings_v5_t v5;
+    memset(&v5,0,sizeof v5);
+    v5.magic=SET_MAGIC_V5;v5.octave=-1;v5.patch=3u;v5.enabled_mask=0x0fu;
+    v5.performance.tempo_bpm=133u;v5.performance.seq_length=24u;
+    v5.performance.lane_patch[0]=2u;v5.performance.lane_patch[1]=1u;
+    v5.performance.arp_mode=4u;v5.performance.compressor_enabled=1u;
+    v5.performance.compressor_threshold=48u;v5.performance.compressor_ratio=61u;
+    for(unsigned lane=0;lane<2u;lane++)for(unsigned step=0;step<64u;step++){
+        v5.performance.seq_note[lane][step]=60u;
+        v5.performance.seq_velocity[lane][step]=90u;
+        v5.performance.seq_gate[lane][step]=75u;
+    }
+    for(unsigned fx=0;fx<4u;fx++){
+        v5.performance.fx_enabled[fx]=1u;v5.performance.fx_mix[fx]=40u;
+        v5.performance.fx_time[fx]=45u;v5.performance.fx_feedback[fx]=30u;
+        v5.performance.fx_depth[fx]=55u;
+        for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++)v5.performance.fx_send[p][fx]=60u;
+    }
+    for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
+        v5.levels[p]=80u;
+        for(unsigned m=0;m<FM1LAB_MACRO_COUNT;m++)v5.macros[p][m]=50u;
+    }
+    v5.crc=settings_crc16(&v5,offsetof(settings_v5_t,crc));
+    assert(settings_v5_valid(&v5));
+    imported=good;
+    assert(settings_import_v5(&imported,&v5)==0);
+    assert(imported.performance.tempo_bpm==133u&&imported.performance.arp_mode==4u);
+    assert(imported.performance.compressor_enabled==1u&&imported.performance.compressor_ratio==61u);
+    assert(imported.performance.arp_division==3u&&imported.performance.arp_gate==75u);
+    assert(imported.performance.arp_step_gain[0]==127u&&imported.performance.arp_step_macro[15]==50u);
+    settings_v5_t bad_v5=v5;bad_v5.performance.tempo_bpm=29u;
+    assert(!settings_v5_valid(&bad_v5));
+
     puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5 migration tests passed");
     return 0;
 }
