@@ -891,7 +891,7 @@ static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocit
     if(fm6_sequencer_running()) {
         seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
         seq_record_note[key]=note;seq_record_started[key]=plat_ms();
-    } else seq_ui_step=(uint8_t)((step+1u)%64u);
+    } else seq_ui_step=(uint8_t)((step+1u)%(set.performance.seq_length<2u?2u:set.performance.seq_length));
     performance_publish();set_dirty=1u;seq_record_redraw=1u;
 }
 static void sequencer_record_release(uint32_t key, uint8_t note)
@@ -1064,6 +1064,10 @@ void app_init(void)
     seq_record_mode=(uint8_t)(set.reserved&1u);
     arp_ui_latch=(uint8_t)((set.reserved>>1)&1u);
     fm6_arpeggiator_set_latch(arp_ui_latch);
+    if(set.performance.seq_length<2u) {
+        set.performance.seq_length=16u;
+        set_dirty=1u;
+    }
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode=set.performance.arp_mode;
@@ -1647,6 +1651,15 @@ static void input(void)
                 if(index==0u && (e%2)!=0) {
                     seq_record_mode^=1u;set.reserved=(uint16_t)((set.reserved&2u)|seq_record_mode);set_dirty=1u;
                     app_say("LOOP RECORD",seq_record_mode?"OVERWRITE":"OVERDUB");
+                } else if(index==1u && e!=0) {
+                    uint8_t next=(uint8_t)clamp((int32_t)set.performance.seq_length+e,2,64);
+                    if(next!=set.performance.seq_length) {
+                        set.performance.seq_length=next;
+                        fm6_sequencer_set_length(next);
+                        if(seq_ui_step>=next)seq_ui_step=(uint8_t)(next-1u);
+                        performance_publish();set_dirty=1u;
+                        app_say("LOOP LENGTH",next==64u?"64 STEPS":"UPDATED");
+                    }
                 }
             } else if (page == PAGE_SEQ || page == PAGE_SEQ_PIANO) {
                 uint8_t lane=seq_ui_lane, step=seq_ui_step;
@@ -2433,15 +2446,31 @@ static void draw_save_panel(void)
     cv_text(14,151,&FONT_XS,"K1 CURSOR  K2 CHAR  K3 NAME TYPE",C_WHITE);
     cv_text(14,165,&FONT_XS,"SAVE AGAIN TO WRITE   HOME TO EXIT",C_GRAY);
 }
+static void draw_sequencer_options_card(uint32_t index,const char *label,const char *value,
+        const char *hint,uint16_t accent)
+{
+    int32_t x=panel_grid_x(index),y=panel_grid_y(index,UI_GRID_TOP,UI_GRID_ROW_STEP);
+    instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
+    cv_text(x+9,y+9,&FONT_XS,label,C_GRAY);
+    cv_text(x+9,y+28,&FONT_B,value,accent);
+    cv_text(x+9,y+67,&FONT_XS,hint,C_WHITE);
+}
 static void draw_sequencer_options_panel(void)
 {
-    uint16_t accent=RGB(242,212,59);
-    instrument_card(8,22,224,126,panel_fill(),accent,accent);
-    cv_text(20,34,&FONT_XS,"LOOP RECORD BEHAVIOR",C_GRAY);
-    cv_text(20,61,&FONT_B,seq_record_mode?"OVERWRITE":"OVERDUB",accent);
-    cv_text(20,94,&FONT_XS,seq_record_mode?"CLEAR UNPLAYED STEPS":"KEEP UNPLAYED STEPS",C_WHITE);
-    cv_text(20,126,&FONT_XS,"K1  CHANGE MODE",C_GRAY);
-    cv_text(8,166,&FONT_XS,seq_record_armed?"REC ARMED":"REC DISARMED",seq_record_armed?RGB(255,80,90):C_GRAY);
+    char value[16];
+    const uint16_t yellow=RGB(242,212,59);
+    const uint16_t cyan=RGB(36,215,232);
+    const uint16_t red=RGB(255,105,115);
+    draw_sequencer_options_card(0u,"K1  RECORD MODE",
+        seq_record_mode?"OVERWRITE":"OVERDUB",
+        seq_record_mode?"CLEAR UNPLAYED STEPS":"KEEP UNPLAYED STEPS",yellow);
+    int_text(set.performance.seq_length,value);text_cat(value," STEPS");
+    draw_sequencer_options_card(1u,"K2  LOOP LENGTH",value,"TURN 2-64  /  DEFAULT 16",cyan);
+    draw_sequencer_options_card(2u,"RECORD STATUS",
+        seq_record_armed?"ARMED":"DISARMED",
+        "REC BUTTON TO ARM",seq_record_armed?red:RGB(110,125,140));
+    draw_sequencer_options_card(3u,"LOOP SCOPE","BOTH TRACKS",
+        "ONE SHARED LOOP",RGB(150,120,255));
 }
 static void draw_arp_card(uint32_t index, const char *label, const char *value,
                           const char *hint, uint16_t accent)
@@ -2640,7 +2669,7 @@ static const char *page_title(uint8_t current)
     case PAGE_LFO: return "LFO";
     case PAGE_LFO_MOD: return "LFO MODULATION";
     case PAGE_SEQ: return "SEQUENCER";
-    case PAGE_SEQ_OPTIONS: return "SEQ RECORD";
+    case PAGE_SEQ_OPTIONS: return "SEQ OPTIONS";
     case PAGE_SEQ_PIANO: return "PIANO ROLL";
     case PAGE_ARP: return "ARP ENGINE";
     case PAGE_ARP_STEPS: return "ARP STEP EDIT";
