@@ -24,7 +24,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_ARP, PAGE_ARP_STEPS, PAGE_FX_AMP, PAGE_FX_EQ, PAGE_FX_COMPRESSOR, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -33,9 +33,10 @@ static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_patch[2]={0u,0u};
 static uint16_t transport_ui_bpm=120u;
-static uint8_t arp_ui_mode;
+static uint8_t arp_ui_mode, arp_ui_step, arp_ui_gain[16], arp_ui_accent[16], arp_ui_macro[16];
 
 static const char *patch_display_name(uint32_t patch);
+static const char *instrument_display_name(void);
 static uint16_t panel_fill(void);
 static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro);
 
@@ -511,6 +512,7 @@ void app_init(void)
         settings_seal(&set);
     }
     page = PAGE_HOME;
+    for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=100u;arp_ui_accent[i]=50u;arp_ui_macro[i]=0u;}
     instrument_factory_capture();
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
@@ -803,9 +805,6 @@ static void input(void)
             app_say("SEQUENCER", fm6_sequencer_running() ? "RUNNING" : "TWO LANES");
         } else if (k == B_ARP) {
             page = PAGE_ARP;
-            arp_ui_mode = (uint8_t)((arp_ui_mode + 1u) % 4u);
-            performance_publish();
-            set_dirty = 1u;
             app_say("ARPEGGIATOR", arp_ui_mode == 0u ? "OFF" : arp_ui_mode == 1u ? "UP" : arp_ui_mode == 2u ? "DOWN" : "UP / DOWN");
         } else if (k == B_FX) {
             if (page < PAGE_FX_AMP || page > PAGE_FX_ROUTING) page = PAGE_FX_AMP;
@@ -884,6 +883,9 @@ static void input(void)
             env_operator = (uint8_t)(next + 1);
             app_say("ENVELOPE OPERATOR", fm1lab_voice_operator_is_carrier(
                 current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
+        } else if (k == EN_SELECT && (page == PAGE_ARP || page == PAGE_ARP_STEPS)) {
+            page = page == PAGE_ARP ? PAGE_ARP_STEPS : PAGE_ARP;
+            app_say("ARPEGGIATOR", page == PAGE_ARP_STEPS ? "STEP EDITOR" : "ENGINE");
         } else if (k == EN_SELECT && page == PAGE_SEQ) {
             int32_t next = ((int32_t)seq_ui_step + e) % 64;
             if (next < 0) next += 64;
@@ -976,18 +978,22 @@ static void input(void)
                 app_say("SEQUENCER STEP", "UPDATED");
             } else if (page == PAGE_ARP) {
                 if(index==0u) {
-                    transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
-                    performance_publish();
-                    set_dirty = 1u;
-                    app_say("TEMPO", "UPDATED");
-                } else if(index==1u) {
-                    int32_t mode=((int32_t)arp_ui_mode+e)%4;
-                    if(mode<0) mode+=4;
+                    int32_t mode=((int32_t)arp_ui_mode+e)%5;
+                    if(mode<0) mode+=5;
                     arp_ui_mode=(uint8_t)mode;
-                    performance_publish();
-                    set_dirty = 1u;
-                    app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN");
+                    performance_publish(); set_dirty=1u;
+                    app_say("ARP MODE",arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":arp_ui_mode==3u?"UP / DOWN":"RANDOM");
+                } else if(index==1u) {
+                    transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
+                    performance_publish(); set_dirty=1u; app_say("ARP CLOCK", "UPDATED");
                 }
+            } else if (page == PAGE_ARP_STEPS) {
+                uint8_t step=arp_ui_step;
+                if(index==0u) { int32_t next=((int32_t)step+e)%16; if(next<0)next+=16; arp_ui_step=(uint8_t)next; }
+                else if(index==1u) arp_ui_gain[step]=(uint8_t)clamp((int32_t)arp_ui_gain[step]+e,0,127);
+                else if(index==2u) arp_ui_accent[step]=(uint8_t)clamp((int32_t)arp_ui_accent[step]+e,0,100);
+                else arp_ui_macro[step]=(uint8_t)clamp((int32_t)arp_ui_macro[step]+e,0,100);
+                app_say("ARP STEP", "UPDATED");
             } else if (page == PAGE_FX_ROUTING) {
                 uint8_t fx=(uint8_t)index;
                 set.performance.fx_send[set.patch][fx]=(uint8_t)clamp((int32_t)set.performance.fx_send[set.patch][fx]+e,0,100);
@@ -1294,6 +1300,15 @@ static int patch_name_is_factory(const char *name)
             name[4]=='o' && name[5]=='r' && name[6]=='y' && name[7]=='\\0');
 }
 
+static const char *instrument_display_name(void)
+{
+    static char name[FM1LAB_INSTRUMENT_NAME_BYTES + 1u];
+    uint32_t i=0u; while(i<FM1LAB_INSTRUMENT_NAME_BYTES && current_instrument.name[i]) { name[i]=current_instrument.name[i]; ++i; }
+    while(i && name[i-1u]==' ') --i;
+    if(!i) { name[0]='I';name[1]='N';name[2]='S';name[3]='T';name[4]='R';name[5]='U';name[6]='M';name[7]='E';name[8]='N';name[9]='T';i=10u; }
+    name[i]='\\0'; return name;
+}
+
 static const char *patch_display_name(uint32_t patch)
 {
     const char *name = fm6_patch_name(patch);
@@ -1588,33 +1603,73 @@ static void draw_lfo_panel(uint32_t modulation)
     }
 }
 
+static void draw_step_columns(uint8_t lane, uint8_t first, uint8_t count,
+                               int32_t top, int32_t height, uint8_t selected,
+                               uint8_t playing, const uint8_t *velocity,
+                               const uint8_t *enabled, uint16_t accent)
+{
+    int32_t gap=2, width=(224-(int32_t)(count-1u)*gap)/(int32_t)count;
+    for(uint32_t i=0;i<count;i++) {
+        uint8_t step=(uint8_t)(first+i), active=enabled?enabled[step]:1u;
+        uint8_t value=velocity?velocity[step]:100u;
+        int32_t x=8+(int32_t)i*(width+gap);
+        int32_t bar_h=(int32_t)value*(height-18)/127;
+        int32_t bar_w=active?width-2:width/2;
+        int32_t bx=x+(width-bar_w)/2;
+        uint16_t color=active?accent:C_LINE;
+        cv_rect(x,top,width,height,C_LINE);
+        if(bar_h<3 && active)bar_h=3;
+        if(active) cv_rect(bx,top+height-4-bar_h,bar_w,bar_h,color);
+        if(step==selected) rounded_panel(x-1,top-2,width+2,height+4,3,0u,RGB(255,255,255));
+        if(step==playing) rounded_panel(x-2,top-3,width+4,height+6,3,0u,RGB(242,212,59));
+    }
+    (void)lane;
+}
 static void draw_sequencer_panel(void)
 {
-    char t[16]; uint8_t lane=seq_ui_lane, step=seq_ui_step;
-    cv_text(6,0,&FONT_XS,lane?"LANE B":"LANE A",patch_color(seq_ui_patch[lane]));
-    cv_text(130,0,&FONT_XS,patch_display_name(seq_ui_patch[lane]),C_WHITE);
-    for(uint32_t i=0;i<16u;i++) {
-        int32_t x=5+(int32_t)(i%8u)*29, y=12+(int32_t)(i/8u)*49;
-        uint8_t s=(uint8_t)((step/16u)*16u+i);
-        uint16_t color=seq_ui_enabled[lane][s]?patch_color(seq_ui_patch[lane]):C_LINE;
-        rounded_panel(x,y,25,38,4,panel_fill(),s==step?C_WHITE:color);
-        int_text(s+1u,t); cv_text(x+5,y+4,&FONT_XS,t,C_GRAY);
-        cv_rect(x+4,y+23,17,(int32_t)seq_ui_velocity[lane][s]*12/127, color);
-    }
-    cv_text(6,116, &FONT_XS, fm6_sequencer_running()?"TRANSPORT RUNNING":"TRANSPORT STOPPED",fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
+    uint8_t playing=fm6_sequencer_playing_step();
+    const uint8_t count=16u;
+    cv_text(6,0,&FONT_XS,"TRACK 1",patch_color(seq_ui_patch[0]));
+    cv_text(78,0,&FONT_XS,instrument_display_name(),C_WHITE);
+    draw_step_columns(0u,0u,count,20,48,seq_ui_lane==0u?seq_ui_step:255u,
+                      fm6_sequencer_running()?playing:255u,seq_ui_velocity[0],
+                      seq_ui_enabled[0],patch_color(seq_ui_patch[0]));
+    cv_text(6,77,&FONT_XS,"TRACK 2",patch_color(seq_ui_patch[1]));
+    cv_text(78,77,&FONT_XS,instrument_display_name(),C_WHITE);
+    draw_step_columns(1u,0u,count,94,48,seq_ui_lane==1u?seq_ui_step:255u,
+                      fm6_sequencer_running()?playing:255u,seq_ui_velocity[1],
+                      seq_ui_enabled[1],patch_color(seq_ui_patch[1]));
+    cv_text(6,151,&FONT_XS,fm6_sequencer_running()?"PLAYING":"STOPPED",
+            fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
+    cv_text(82,151,&FONT_XS,"SELECT STEP  K1 ON/OFF",C_GRAY);
 }
 static void draw_arp_panel(void)
 {
+    static const char *const modes[5]={"OFF","UP","DOWN","UP/DOWN","RANDOM"};
     char t[16];
-    const char *mode=arp_ui_mode==0u?"OFF":arp_ui_mode==1u?"UP":arp_ui_mode==2u?"DOWN":"UP / DOWN";
-    instrument_card(2,7,116,85,panel_fill(),RGB(36,215,232),RGB(36,215,232));
-    cv_text(11,17,&FONT_XS,"ARPEGGIATOR",C_GRAY); cv_text(11,42,&FONT_B,mode,RGB(36,215,232));
-    cv_text(11,70,&FONT_XS,"PLAY MODE",C_GRAY);
-    instrument_card(122,7,116,85,panel_fill(),RGB(227,75,210),RGB(227,75,210));
-    cv_text(131,17,&FONT_XS,"CLOCK",C_GRAY); int_text(transport_ui_bpm,t); cv_text(131,42,&FONT_B,t,RGB(227,75,210));
-    cv_text(131,70,&FONT_XS,"BPM",C_GRAY);
-    cv_text(6,111,&FONT_XS,"HOLD NOTES ON THE KEYBED",C_WHITE);
-    cv_text(6,130,&FONT_XS,"K1 TEMPO   K2 MODE",C_GRAY);
+    uint16_t accent=RGB(227,75,210);
+    cv_text(8,8,&FONT_XS,"MODE",C_GRAY);
+    cv_text(8,28,&FONT_B,modes[arp_ui_mode<5u?arp_ui_mode:0u],accent);
+    cv_text(128,8,&FONT_XS,"CLOCK",C_GRAY);
+    int_text(transport_ui_bpm,t); cv_text(128,28,&FONT_B,t,RGB(36,215,232));
+    cv_text(8,76,&FONT_XS,"K1 MODE",C_WHITE);
+    cv_text(128,76,&FONT_XS,"K2 CLOCK",C_WHITE);
+    cv_text(8,112,&FONT_XS,"HOLD NOTES TO PLAY",C_GRAY);
+    cv_text(8,138,&FONT_XS,"SELECT KNOB: STEP EDITOR",accent);
+}
+static void draw_arp_steps_panel(void)
+{
+    char t[16];
+    uint8_t playing=fm6_arpeggiator_playing_step();
+    uint16_t accent=RGB(227,75,210);
+    cv_text(8,0,&FONT_XS,"ARP STEP EDIT",accent);
+    cv_text(174,0,&FONT_XS,"16 STEPS",C_GRAY);
+    draw_step_columns(0u,0u,16u,24,112,arp_ui_step,
+                      fm6_arpeggiator_active()?playing:255u,
+                      arp_ui_gain,0,accent);
+    cv_text(8,145,&FONT_XS,"GAIN",C_GRAY); int_text(arp_ui_gain[arp_ui_step],t); cv_text(43,145,&FONT_B,t,C_WHITE);
+    cv_text(82,145,&FONT_XS,"ACCENT",C_GRAY); int_text(arp_ui_accent[arp_ui_step],t); cv_text(126,145,&FONT_B,t,C_WHITE);
+    cv_text(164,145,&FONT_XS,"MACRO",C_GRAY); int_text(arp_ui_macro[arp_ui_step],t); cv_text(205,145,&FONT_B,t,C_WHITE);
 }
 static void draw_fx_panel(uint8_t fx)
 {
@@ -1683,7 +1738,8 @@ static const char *page_title(uint8_t current)
     case PAGE_LFO: return "LFO";
     case PAGE_LFO_MOD: return "LFO MODULATION";
     case PAGE_SEQ: return "SEQUENCER";
-    case PAGE_ARP: return "ARPEGGIATOR";
+    case PAGE_ARP: return "ARP ENGINE";
+    case PAGE_ARP_STEPS: return "ARP STEP EDIT";
     case PAGE_FX_AMP: return "AMP / DRIVE";
     case PAGE_FX_EQ: return "PARAMETRIC EQ";
     case PAGE_FX_COMPRESSOR: return "COMPRESSOR";
@@ -1709,7 +1765,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_LFO: return RGB(75,220,150);
     case PAGE_LFO_MOD: return RGB(75,190,180);
     case PAGE_SEQ: return RGB(242,212,59);
-    case PAGE_ARP: return RGB(227,75,210);
+    case PAGE_ARP: case PAGE_ARP_STEPS: return RGB(227,75,210);
     case PAGE_FX_AMP: return RGB(255,140,70);
     case PAGE_FX_EQ: return RGB(85,190,255);
     case PAGE_FX_COMPRESSOR: return RGB(255,170,75);
@@ -1733,9 +1789,9 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
     } else if (current >= PAGE_OPERATOR_MAP && current <= PAGE_LFO_MOD) {
         index = (uint32_t)(current - PAGE_OPERATOR_MAP) + 1u;
         total = (uint32_t)(PAGE_LFO_MOD - PAGE_OPERATOR_MAP) + 1u;
-    } else if (current >= PAGE_SEQ && current <= PAGE_ARP) {
+    } else if (current >= PAGE_SEQ && current <= PAGE_ARP_STEPS) {
         index = (uint32_t)(current - PAGE_SEQ) + 1u;
-        total = (uint32_t)(PAGE_ARP - PAGE_SEQ) + 1u;
+        total = (uint32_t)(PAGE_ARP_STEPS - PAGE_SEQ) + 1u;
     } else if (current <= PAGE_GLOBAL) {
         index = (uint32_t)current + 1u;
         total = (uint32_t)PAGE_GLOBAL + 1u;
@@ -1792,6 +1848,7 @@ static void draw(void)
     else if (page == PAGE_LFO_MOD) draw_lfo_panel(1);
     else if (page == PAGE_SEQ) draw_sequencer_panel();
     else if (page == PAGE_ARP) draw_arp_panel();
+    else if (page == PAGE_ARP_STEPS) draw_arp_steps_panel();
     else if (page == PAGE_FX_CHORUS) draw_fx_panel(0u);
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
