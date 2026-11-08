@@ -22,6 +22,7 @@ typedef struct { uint8_t frequency, gain, q; } fm1lab_eq_band_state_t;
 typedef struct {
     uint8_t amp_enabled, drive, tone, output, eq_enabled;
     fm1lab_eq_band_state_t eq[FM1LAB_EQ_BAND_COUNT];
+    uint8_t instrument_macros[4]; /* neutral=50; shared offsets over each patch macro */
 } fm1lab_insert_state_t;
 
 static inline void fm1lab_insert_state_init(fm1lab_insert_state_t *v) {
@@ -30,10 +31,12 @@ static inline void fm1lab_insert_state_init(fm1lab_insert_state_t *v) {
     v->eq_enabled=14u;
     v->eq[0].frequency=18u; v->eq[1].frequency=50u; v->eq[2].frequency=82u;
     for (unsigned b=0;b<FM1LAB_EQ_BAND_COUNT;b++){v->eq[b].gain=12u;v->eq[b].q=10u;}
+    for (unsigned m=0;m<4u;m++)v->instrument_macros[m]=50u;
 }
 static inline int fm1lab_insert_state_valid(const fm1lab_insert_state_t *v) {
     if (!v || v->amp_enabled>1u || v->drive>100u || v->tone>100u ||
         v->output>100u || v->eq_enabled>15u) return 0;
+    for (unsigned m=0;m<4u;m++) if(v->instrument_macros[m]>100u)return 0;
     for (unsigned b=0;b<FM1LAB_EQ_BAND_COUNT;b++)
         if(v->eq[b].frequency>100u || v->eq[b].gain>24u || v->eq[b].q>31u) return 0;
     return 1;
