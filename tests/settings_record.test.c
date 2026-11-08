@@ -80,6 +80,9 @@ int main(void)
     settings_t good, copy;
     make_valid(&good);
     assert(settings_valid(&good));
+    copy=good;copy.reserved=1u;settings_seal(&copy);
+    assert(settings_valid(&copy)&&copy.reserved==1u);
+    copy.reserved=2u;settings_seal(&copy);assert(!settings_valid(&copy));
 
     /* Every single-bit corruption of the persisted record must be rejected,
      * including corruption of either stored CRC byte. */
