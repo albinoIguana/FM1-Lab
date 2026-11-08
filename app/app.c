@@ -972,7 +972,13 @@ static void input(void)
             }
         } else if (k >= EN_K1 && k <= EN_K4) {
             uint32_t index = (uint32_t)k - EN_K1;
-            if (page == PAGE_SEQ) {
+            if (page == PAGE_GLOBAL) {
+                if(index==2u) {
+                    transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
+                    performance_publish(); set_dirty=1u;
+                    app_say("MASTER TEMPO","UPDATED");
+                }
+            } else if (page == PAGE_SEQ) {
                 uint8_t lane=seq_ui_lane, step=seq_ui_step;
                 if(index==0u) {
                     /* Each encoder detent toggles once; multi-detent reads
@@ -1535,7 +1541,7 @@ static void draw_compressor_panel(void)
 static void draw_global_panel(uint32_t pct)
 {
     char t[24];
-    const char *labels[4] = {"MASTER", "OCTAVE", "BLUETOOTH", "MIDI IN"};
+    const char *labels[4] = {"MASTER", "OCTAVE", "TEMPO", "MIDI / BLE"};
     uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
@@ -1551,12 +1557,13 @@ static void draw_global_panel(uint32_t pct)
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
             cv_text(x + 9, y + 67, &FONT_XS, "TRANSPOSE", C_GRAY);
         } else if (i == 2) {
-            cv_text(x + 9, y + 27, &FONT_B, set.ble_off ? "OFF" : "ON", colors[i]);
-            cv_text(x + 9, y + 67, &FONT_XS, plat_ble_connected() ? "CONNECTED" : "WAITING", C_GRAY);
+            int_text((int32_t)transport_ui_bpm, t); text_cat(t, " BPM");
+            cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text(x + 9, y + 67, &FONT_XS, "K3 MASTER CLOCK", C_GRAY);
         } else {
             int_text((int32_t)midi_count, t);
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
-            cv_text(x + 9, y + 67, &FONT_XS, "MESSAGES RECEIVED", C_GRAY);
+            cv_text(x + 9, y + 61, &FONT_XS, set.ble_off ? "BLE OFF" : (plat_ble_connected() ? "BLE CONNECTED" : "BLE WAITING"), C_GRAY);
         }
     }
 }
