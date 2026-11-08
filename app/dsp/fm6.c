@@ -395,7 +395,7 @@ static void fm6_arpeggiator_step(void)
     uint32_t gain=arp_step_gain[step],accent=arp_step_accent[step];
     if(arp_live){fm6_note_off_source(arp_live_note,0x0fu,3u);arp_live=0u;}
     if(!arp_mode||!count){
-        arp_amp_target_q15=32768;
+        arp_gate_left=0u;arp_amp_target_q15=32768;
         fm6_arp_macro_apply(0);
         return;
     }
@@ -863,7 +863,7 @@ void fm6_note_off(uint8_t note)
             break;
         }
         if(!arp_count && arp_live) { fm6_note_off_source(arp_live_note,0x0fu,3u); arp_live=0u; }
-        if(!arp_count){arp_amp_target_q15=32768;fm6_arp_macro_apply(0);}
+        if(!arp_count){arp_gate_left=0u;arp_amp_target_q15=32768;fm6_arp_macro_apply(0);}
         return;
     }
     fm6_note_off_source(note,(uint8_t)((1u<<PATCHES)-1u),0u);
