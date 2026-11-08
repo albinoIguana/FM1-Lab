@@ -110,7 +110,7 @@ static inline int settings_import_v5(settings_t *dst,const settings_v5_t *src) {
     dst->performance.tempo_bpm=src->performance.tempo_bpm;
     dst->performance.seq_length=src->performance.seq_length;dst->performance.arp_mode=src->performance.arp_mode;
     for(uint32_t lane=0;lane<2u;lane++){
-        dst->performance.lane_patch[lane]=src->performance.lane_patch[lane];
+        dst->performance.lane_instrument[lane]=src->performance.lane_patch[lane];
         for(uint32_t step=0;step<64u;step++){
             dst->performance.seq_enabled[lane][step]=src->performance.seq_enabled[lane][step];
             dst->performance.seq_note[lane][step]=src->performance.seq_note[lane][step];
@@ -173,7 +173,7 @@ static inline int settings_import_v3(settings_t *dst, const settings_v3_t *src) 
     dst->performance.seq_length=src->performance.seq_length;
     dst->performance.arp_mode=src->performance.arp_mode;
     for (uint32_t lane=0; lane<2u; ++lane) {
-        dst->performance.lane_patch[lane]=src->performance.lane_patch[lane];
+        dst->performance.lane_instrument[lane]=src->performance.lane_patch[lane];
         for (uint32_t step=0; step<64u; ++step) {
             dst->performance.seq_enabled[lane][step]=src->performance.seq_enabled[lane][step];
             dst->performance.seq_note[lane][step]=src->performance.seq_note[lane][step];
@@ -236,7 +236,7 @@ static inline int settings_import_v4(settings_t *dst,const settings_v4_t *src) {
     dst->performance.tempo_bpm=src->performance.tempo_bpm;
     dst->performance.seq_length=src->performance.seq_length;dst->performance.arp_mode=src->performance.arp_mode;
     for(uint32_t lane=0;lane<2u;lane++){
-        dst->performance.lane_patch[lane]=src->performance.lane_patch[lane];
+        dst->performance.lane_instrument[lane]=src->performance.lane_patch[lane];
         for(uint32_t step=0;step<64u;step++){
             dst->performance.seq_enabled[lane][step]=src->performance.seq_enabled[lane][step];
             dst->performance.seq_note[lane][step]=src->performance.seq_note[lane][step];
