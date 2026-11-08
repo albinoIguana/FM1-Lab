@@ -156,6 +156,15 @@ static void performance_publish(void)
     if (performance_update_pending) { performance_update_dirty=1u; return; }
     set.performance.tempo_bpm = transport_ui_bpm;
     set.performance.arp_mode = arp_ui_mode;
+    set.performance.arp_division=arp_ui_division;set.performance.arp_gate=arp_ui_gate;
+    set.performance.arp_octaves=arp_ui_octaves;set.performance.arp_length=arp_ui_length;
+    set.performance.arp_output=arp_ui_output;set.performance.arp_random=arp_ui_random;
+    set.performance.arp_macro_dest=arp_ui_macro_dest;set.performance.arp_depth=arp_ui_depth;
+    for(uint32_t step=0;step<16u;step++){
+        set.performance.arp_step_gain[step]=arp_ui_gain[step];
+        set.performance.arp_step_accent[step]=arp_ui_accent[step];
+        set.performance.arp_step_macro[step]=arp_ui_macro[step];
+    }
     for (uint32_t lane=0; lane<2u; ++lane) {
         set.performance.lane_patch[lane] = seq_ui_patch[lane];
         for (uint32_t step=0; step<64u; ++step) {
@@ -514,11 +523,20 @@ void app_init(void)
         settings_seal(&set);
     }
     page = PAGE_HOME;
-    for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=100u;arp_ui_accent[i]=50u;arp_ui_macro[i]=0u;}
+    for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_macro[i]=50u;}
     instrument_factory_capture();
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
-        arp_ui_mode = set.performance.arp_mode;
+        arp_ui_mode=set.performance.arp_mode;
+        arp_ui_division=set.performance.arp_division;arp_ui_gate=set.performance.arp_gate;
+        arp_ui_octaves=set.performance.arp_octaves;arp_ui_length=set.performance.arp_length;
+        arp_ui_output=set.performance.arp_output;arp_ui_random=set.performance.arp_random;
+        arp_ui_macro_dest=set.performance.arp_macro_dest;arp_ui_depth=set.performance.arp_depth;
+        for(uint32_t step=0;step<16u;step++){
+            arp_ui_gain[step]=set.performance.arp_step_gain[step];
+            arp_ui_accent[step]=set.performance.arp_step_accent[step];
+            arp_ui_macro[step]=set.performance.arp_step_macro[step];
+        }
         for (uint32_t lane = 0; lane < 2u; ++lane) {
             seq_ui_patch[lane] = set.performance.lane_patch[lane];
             for (uint32_t step = 0; step < 64u; ++step) {
@@ -927,6 +945,7 @@ static void input(void)
         } else if (k == EN_PRESET && page == PAGE_ARP_STEPS) {
             arp_ui_length=arp_ui_length==16u?8u:16u;
             if(arp_ui_step>=arp_ui_length)arp_ui_step=(uint8_t)(arp_ui_length-1u);
+            performance_publish();set_dirty=1u;
             app_say("ARP LENGTH",arp_ui_length==8u?"8 STEPS":"16 STEPS");
         } else if (k == EN_PRESET && page == PAGE_SEQ) {
             /* PRESET selects the visible sequencer lane here; it must not
@@ -1001,24 +1020,27 @@ static void input(void)
                     arp_ui_division=(uint8_t)(((int32_t)arp_ui_division+e+6)%6);
                     app_say("ARP DIVISION",arp_ui_division==0u?"1/1":arp_ui_division==1u?"1/2":arp_ui_division==2u?"1/4":arp_ui_division==3u?"1/8":arp_ui_division==4u?"1/16":"1/32");
                 } else if(index==2u) {
-                    arp_ui_gate=(uint8_t)clamp((int32_t)arp_ui_gate+e,10,200);
+                    arp_ui_gate=(uint8_t)clamp((int32_t)arp_ui_gate+e,10,100);
                     app_say("ARP GATE","UPDATED");
                 } else {
                     arp_ui_octaves=(uint8_t)clamp((int32_t)arp_ui_octaves+e,1,4);
                     app_say("ARP OCTAVES","UPDATED");
                 }
+                performance_publish();set_dirty=1u;
             } else if (page == PAGE_ARP_STEPS) {
                 uint8_t step=arp_ui_step;
                 if(index==0u) { int32_t next=((int32_t)step+e)%arp_ui_length; if(next<0)next+=arp_ui_length; arp_ui_step=(uint8_t)next; }
                 else if(index==1u) arp_ui_gain[step]=(uint8_t)clamp((int32_t)arp_ui_gain[step]+e,0,127);
                 else if(index==2u) arp_ui_accent[step]=(uint8_t)clamp((int32_t)arp_ui_accent[step]+e,0,100);
                 else arp_ui_macro[step]=(uint8_t)clamp((int32_t)arp_ui_macro[step]+e,0,100);
+                performance_publish();set_dirty=1u;
                 app_say("ARP STEP", "UPDATED");
             } else if (page == PAGE_ARP_MOD) {
                 if(index==0u) arp_ui_output=(uint8_t)(((int32_t)arp_ui_output+e+3)%3);
                 else if(index==1u) arp_ui_random=(uint8_t)clamp((int32_t)arp_ui_random+e,0,100);
                 else if(index==2u) arp_ui_macro_dest=(uint8_t)(((int32_t)arp_ui_macro_dest+e+4)%4);
                 else arp_ui_depth=(uint8_t)clamp((int32_t)arp_ui_depth+e,0,100);
+                performance_publish();set_dirty=1u;
                 app_say("ARP MODULATION","UPDATED");
             } else if (page == PAGE_FX_ROUTING) {
                 uint8_t fx=(uint8_t)index;
@@ -1718,11 +1740,11 @@ static void draw_arp_steps_panel(void)
 }
 static void draw_arp_mod_panel(void)
 {
-    static const char *const outputs[3]={"NOTES","AMP","MIDI CC"};
+    static const char *const outputs[3]={"NOTES","AMP","MACRO"};
     static const char *const destinations[4]={"BRIGHT","BODY","MOTION","EDGE"};
     static const uint16_t colors[4]={RGB(36,215,232),RGB(242,212,59),RGB(150,120,255),RGB(255,130,100)};
     char t[16];
-    draw_arp_card(0u,"K1  OUTPUT",outputs[arp_ui_output%3u],"NOTES / AMP / CC",RGB(227,75,210));
+    draw_arp_card(0u,"K1  OUTPUT",outputs[arp_ui_output%3u],"NOTES / AMP / MACRO",RGB(227,75,210));
     int_text(arp_ui_random,t); text_cat(t,"%");
     draw_arp_card(1u,"K2  RANDOMIZE",t,"PATTERN VARIATION",RGB(36,215,232));
     draw_arp_card(2u,"K3  DESTINATION",destinations[arp_ui_macro_dest%4u],"MACRO TARGET",colors[arp_ui_macro_dest%4u]);
