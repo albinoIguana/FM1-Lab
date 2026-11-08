@@ -9,6 +9,7 @@ _Static_assert(sizeof(fm6_performance_state_v3_t) == 542u, "legacy v3 performanc
 _Static_assert(sizeof(settings_v5_t) == 592u, "legacy v5 settings layout changed");
 _Static_assert(sizeof(settings_v6_t) == sizeof(settings_t), "legacy v6 settings layout changed");
 _Static_assert(sizeof(settings_v7_t) == sizeof(settings_t), "legacy v7 settings layout changed");
+_Static_assert(sizeof(settings_v8_t) == sizeof(settings_t), "legacy v8 settings layout changed");
 
 /* The record codec delegates performance-state validation to FM6. Keep this
  * unit test focused on the settings envelope and migration boundary. */
@@ -267,6 +268,29 @@ int main(void)
     for(unsigned step=0;step<16u;step++)assert(imported.performance.arp_step_gate[step]==0u);
     assert(imported.performance.arp_step_gain[1]==127u&&imported.performance.arp_step_accent[1]==0u);
     assert(imported.performance.arp_step_gain[2]==127u&&imported.performance.arp_step_accent[2]==0u);
+
+    /* V8 -> V9 repairs the known accidental ARP step-2 factory seed. */
+    settings_v8_t v8;
+    memset(&v8,0,sizeof v8);
+    v8.magic=SET_MAGIC_V8;v8.octave=good.octave;v8.patch=good.patch;
+    v8.enabled_mask=good.enabled_mask;v8.ble_off=good.ble_off;v8.reserved=1u;
+    memcpy(v8.macros,good.macros,sizeof v8.macros);
+    memcpy(v8.levels,good.levels,sizeof v8.levels);
+    v8.performance=good.performance;
+    v8.performance.arp_step_gain[1]=69u;v8.performance.arp_step_accent[1]=64u;
+    v8.performance.arp_step_gain[2]=88u;v8.performance.arp_step_accent[2]=23u;
+    v8.crc=settings_crc16(&v8,offsetof(settings_v8_t,crc));
+    assert(settings_v8_valid(&v8));
+    imported=good;
+    assert(settings_import_v8(&imported,&v8)==0);
+    assert(imported.performance.arp_step_gain[1]==127u&&imported.performance.arp_step_accent[1]==0u);
+    assert(imported.performance.arp_step_gain[2]==88u&&imported.performance.arp_step_accent[2]==23u);
+    assert(imported.reserved==1u);
+    v8.performance.arp_step_gain[1]=68u;
+    v8.crc=settings_crc16(&v8,offsetof(settings_v8_t,crc));
+    assert(settings_v8_valid(&v8));
+    assert(settings_import_v8(&imported,&v8)==0);
+    assert(imported.performance.arp_step_gain[1]==68u);
 
     settings_v5_t bad_v5=v5;bad_v5.performance.tempo_bpm=29u;
     assert(!settings_v5_valid(&bad_v5));
