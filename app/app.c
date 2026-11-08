@@ -2476,26 +2476,25 @@ static uint16_t page_accent(uint8_t current)
     }
 }
 
-/* Page counters are local to the active page family, not the full enum.
- * Keep each family contiguous so adding/removing a page updates the total. */
+/* Counters describe the actual navigation path, not enum adjacency.
+ * Standalone destinations remain 1/1; multi-page paths restart at 1. */
 static void page_counter(uint8_t current, char *out, uint32_t out_size)
 {
     uint32_t index = 1u, total = 1u;
     if (current >= PAGE_FX_AMP && current <= PAGE_FX_ROUTING) {
         index = (uint32_t)(current - PAGE_FX_AMP) + 1u;
         total = (uint32_t)(PAGE_FX_ROUTING - PAGE_FX_AMP) + 1u;
-    } else if (current >= PAGE_OPERATOR_MAP && current <= PAGE_LFO_MOD) {
-        index = (uint32_t)(current - PAGE_OPERATOR_MAP) + 1u;
-        total = (uint32_t)(PAGE_LFO_MOD - PAGE_OPERATOR_MAP) + 1u;
-    } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS) {
-        index=(uint32_t)(current-PAGE_SEQ)+1u;total=2u;
-    } else if (current == PAGE_SEQ_PIANO) {
-        index=1u;total=1u;
+    } else if (current == PAGE_LFO || current == PAGE_LFO_MOD) {
+        index = current == PAGE_LFO ? 1u : 2u;
+        total = 2u;
+    } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS ||
+               current == PAGE_SEQ_PIANO) {
+        index = current == PAGE_SEQ ? 1u :
+                current == PAGE_SEQ_OPTIONS ? 2u : 3u;
+        total = 3u;
     } else if (current >= PAGE_ARP && current <= PAGE_ARP_LATCH) {
-        index=(uint32_t)(current-PAGE_ARP)+1u;total=3u;
-    } else if (current <= PAGE_GLOBAL) {
-        index = (uint32_t)current + 1u;
-        total = (uint32_t)PAGE_GLOBAL + 1u;
+        index = (uint32_t)(current - PAGE_ARP) + 1u;
+        total = 3u;
     }
     int_text((int32_t)index, out);
     text_cat(out, "/");
