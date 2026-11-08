@@ -1727,22 +1727,56 @@ static void draw_arp_steps_panel(void)
 {
     char t[16];
     uint8_t playing=fm6_arpeggiator_playing_step();
+    uint8_t active=fm6_arpeggiator_active();
     uint16_t accent=RGB(227,75,210);
-    static const char *const labels[4]={"STEP","GAIN","ACCENT","MACRO"};
-    uint8_t values[4]={arp_ui_step+1u,arp_ui_gain[arp_ui_step],arp_ui_accent[arp_ui_step],arp_ui_macro[arp_ui_step]};
-    static const uint16_t colors[4]={RGB(227,75,210),RGB(36,215,232),RGB(242,212,59),RGB(150,120,255)};
-    for(uint32_t i=0;i<4u;i++) {
-        int32_t x=panel_grid_x(i), y=panel_grid_y(i,4,66);
-        instrument_card(x,y,UI_GRID_CARD_W,62,panel_fill(),colors[i],colors[i]);
-        cv_text(x+9,y+7,&FONT_XS,labels[i],C_GRAY);
-        int_text(values[i],t); cv_text(x+9,y+23,&FONT_B,t,colors[i]);
-        cv_text(x+9,y+45,&FONT_XS,i==0u?"K1 SELECT":i==1u?"K2 VELOCITY":i==2u?"K3 EMPHASIS":"K4 MACRO AMT",C_WHITE);
+    uint16_t play_color=RGB(255,112,255); /* approximately 50% brighter than the base magenta */
+    int32_t gap=2;
+    int32_t width=(224-(int32_t)(arp_ui_length-1u)*gap)/(int32_t)arp_ui_length;
+    int32_t top=28, height=100, bottom=top+height;
+
+    /* This is a step sequencer view, not a four-card settings page:
+     * every step gets a full-height lane and a readable level bar. */
+    cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP PATTERN":"16 STEP PATTERN",C_GRAY);
+    cv_text(155,2,&FONT_XS,active?"RUNNING":"READY",active?RGB(75,235,135):C_GRAY);
+
+    for(uint32_t i=0;i<arp_ui_length;i++) {
+        int32_t x=8+(int32_t)i*(width+gap);
+        uint8_t gain=arp_ui_gain[i], emphasis=arp_ui_accent[i];
+        int32_t bar_h=(int32_t)gain*(height-8)/127;
+        int32_t bar_w=width-4;
+        uint8_t is_playing=(uint8_t)(active && i==(uint32_t)(playing%arp_ui_length));
+        uint8_t is_selected=(uint8_t)(i==arp_ui_step);
+
+        int_text((int32_t)i+1,t);
+        cv_text(x+(width-text_w(&FONT_XS,t))/2,15,&FONT_XS,t,is_selected?C_WHITE:C_GRAY);
+        cv_rect(x,top,width,height,C_LINE);
+        cv_rect(x+1,top+1,width-2,height-2,RGB(13,20,29));
+        if(emphasis) bar_w=(width-4)/2+(int32_t)emphasis*((width-4)/2)/100;
+        if(bar_h<2 && gain)bar_h=2;
+        if(gain) cv_rect(x+(width-bar_w)/2,bottom-3-bar_h,bar_w,bar_h,
+                         is_playing?play_color:accent);
+        /* A thin bright cap makes the moving playhead obvious without
+         * painting a black block over the step's data. */
+        if(is_playing) cv_rect(x+1,top+1,width-2,2,play_color);
+        if(is_selected) {
+            cv_rect(x,top,width,1,C_WHITE);
+            cv_rect(x,bottom-1,width,1,C_WHITE);
+            cv_rect(x,top,1,height,C_WHITE);
+            cv_rect(x+width-1,top,1,height,C_WHITE);
+        }
     }
-    rounded_panel(2,137,236,40,3,panel_fill(),accent);
-    int_text(arp_ui_length,t); text_cat(t," STEPS"); cv_text(8,139,&FONT_XS,t,C_GRAY);
-    draw_step_columns(0u,0u,arp_ui_length,149,23,arp_ui_step,
-                      fm6_arpeggiator_active()?(uint8_t)(playing%arp_ui_length):255u,
-                      arp_ui_gain,0,arp_ui_accent,accent);
+
+    /* Compact, non-card parameter readout keeps the step graphic dominant. */
+    cv_text(5,137,&FONT_XS,"SELECT",C_GRAY);
+    int_text((int32_t)arp_ui_step+1,t); cv_text(42,137,&FONT_XS,t,C_WHITE);
+    cv_text(70,137,&FONT_XS,"GAIN",RGB(36,215,232));
+    int_text(arp_ui_gain[arp_ui_step],t); cv_text(101,137,&FONT_XS,t,C_WHITE);
+    cv_text(128,137,&FONT_XS,"ACC",RGB(242,212,59));
+    int_text(arp_ui_accent[arp_ui_step],t); cv_text(151,137,&FONT_XS,t,C_WHITE);
+    cv_text(177,137,&FONT_XS,"MACRO",RGB(150,120,255));
+    int_text(arp_ui_macro[arp_ui_step],t); cv_text(215-text_w(&FONT_XS,t),137,&FONT_XS,t,C_WHITE);
+    cv_text(5,158,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACCENT  K4 MACRO",C_GRAY);
+    cv_text(5,173,&FONT_XS,"PRESET: 8 / 16 STEPS",C_GRAY);
 }
 static void draw_arp_mod_panel(void)
 {
@@ -1962,7 +1996,7 @@ void app_ui_init(void)
 
 void app_frame(void)
 {
-    static uint32_t last_pct, lit_until, last_ble, last_midi;
+    static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     input();
     if (performance_update_dirty && !performance_update_pending) performance_publish();
@@ -1987,6 +2021,13 @@ void app_frame(void)
     }
     if (midi_count != last_midi) {
         last_midi = midi_count;
+        ui.redraw = 1;
+    }
+    /* The ARP playhead moves without encoder or key-state changes. Refresh
+     * this page independently so the highlighted step visibly follows time. */
+    if (page == PAGE_ARP_STEPS && fm6_arpeggiator_active() &&
+        (uint32_t)(now - last_arp_redraw) >= 30u) {
+        last_arp_redraw = now;
         ui.redraw = 1;
     }
     if (pct != last_pct || (uint32_t)(plat_ble_connected() | plat_ble_device() << 1) != last_ble ||
