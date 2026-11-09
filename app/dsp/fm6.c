@@ -167,7 +167,7 @@ static volatile uint8_t seq_play_position, arp_play_position;
 static volatile uint8_t seq_tick_position;
 static volatile uint32_t seq_tick_counter;
 static volatile uint8_t arp_capture_head, arp_capture_tail;
-static fm6_arp_capture_event_t arp_capture_queue[32];
+static fm6_arp_capture_event_t arp_capture_queue[64];
 static uint8_t seq_live_note[2], seq_live_mask[2];
 static uint32_t seq_gate_left[2];
 static volatile uint32_t transport_bpm=120u;
@@ -546,7 +546,7 @@ static uint32_t fm6_arp_step_period(void)
 static void fm6_arp_capture_push(uint8_t on,uint8_t note,uint8_t velocity,uint8_t patch_mask)
 {
     uint8_t head=arp_capture_head;
-    uint8_t next=(uint8_t)((head+1u)&31u);
+    uint8_t next=(uint8_t)((head+1u)&63u);
     uint8_t lane=(uint8_t)((patch_mask&0xf0u)?1u:0u);
     if(next==arp_capture_tail)return; /* drop newest; keep the SPSC indices single-writer */
     uint32_t tick=seq_tick_counter;
@@ -1442,7 +1442,7 @@ uint8_t fm6_arp_capture_pop(fm6_arp_capture_event_t *event)
     uint8_t tail=arp_capture_tail;
     if(!event || tail==arp_capture_head)return 0u;
     *event=arp_capture_queue[tail];
-    arp_capture_tail=(uint8_t)((tail+1u)&31u);
+    arp_capture_tail=(uint8_t)((tail+1u)&63u);
     return 1u;
 }
 uint8_t fm6_arpeggiator_playing_step(void) { return arp_play_position; }
