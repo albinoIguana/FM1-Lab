@@ -31,6 +31,34 @@ int main(void)
     assert(fm1lab_voice_global_set(voice, FM1LAB_GLOBAL_FEEDBACK, 8) == -1);
 
     assert(fm1lab_voice_operator_is_carrier(voice, 1) == 1);
+    /* Algorithm 0 has carrier OP1/OP3; patch ADSR updates both but leaves
+     * modulator envelopes untouched. */
+    assert(fm1lab_voice_global_set(voice, FM1LAB_GLOBAL_ALGORITHM, 1u) == 0);
+    uint8_t adsr[4] = {12u, 34u, 56u, 78u};
+    assert(fm1lab_voice_adsr_set(voice, adsr) == 0);
+    uint8_t read_adsr[4] = {0};
+    assert(fm1lab_voice_adsr_get(voice, read_adsr) == 0);
+    assert(memcmp(adsr, read_adsr, sizeof adsr) == 0);
+    for (unsigned op = 1; op <= 6; ++op) {
+        uint8_t r1, r2, r3, r4, l1, l2, l3, l4;
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_RATE_1, &r1);
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_RATE_2, &r2);
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_RATE_3, &r3);
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_RATE_4, &r4);
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_LEVEL_1, &l1);
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_LEVEL_2, &l2);
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_LEVEL_3, &l3);
+        fm1lab_voice_operator_get(voice, op, FM1LAB_OP_LEVEL_4, &l4);
+        if (op == 1u || op == 3u) {
+            assert(r1 == 12u && r2 == 99u && r3 == 34u && r4 == 78u);
+            assert(l1 == 99u && l2 == 99u && l3 == 56u && l4 == 0u);
+        } else {
+            assert(r1 == 0u && r2 == 0u && r3 == 0u && r4 == 0u);
+            assert(l1 == 0u && l2 == 0u && l3 == 0u && l4 == 0u);
+        }
+    }
+    adsr[2] = 100u;
+    assert(fm1lab_voice_adsr_set(voice, adsr) == -1);
     assert(fm1lab_voice_operator_depth(voice, 1) == fm1lab_operator_depth(31, 1));
     assert(fm1lab_voice_operator_modulates(voice, 1, 2) ==
            fm1lab_operator_modulates(31, 1, 2));
