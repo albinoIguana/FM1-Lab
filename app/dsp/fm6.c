@@ -171,6 +171,7 @@ static fm6_arp_capture_event_t arp_capture_queue[32];
 static uint8_t seq_live_note[2], seq_live_mask[2];
 static uint32_t seq_gate_left[2];
 static volatile uint32_t transport_bpm=120u;
+static volatile uint8_t transport_swing=50u;
 static uint32_t transport_phase;
 static volatile uint8_t arp_mode, arp_latch, arp_notes[16], arp_velocities[16], arp_count, arp_index, arp_direction=1u;
 static volatile uint8_t arp_division=3u, arp_gate=75u, arp_octaves=1u, arp_length=16u;
@@ -450,6 +451,11 @@ static int32_t fm6_sat_q23(int64_t x)
     return x > OUTPUT_LIMIT ? OUTPUT_LIMIT : x < -OUTPUT_LIMIT ? -OUTPUT_LIMIT : (int32_t)x;
 }
 static uint32_t fm6_step_period(void) { return (FM6_SAMPLE_RATE*60u)/((uint32_t)transport_bpm*4u); }
+static uint32_t fm6_transport_tick_threshold(void)
+{
+    uint32_t percent=(seq_tick_position&1u)?(100u-transport_swing)*2u:(uint32_t)transport_swing*2u;
+    return (FM6_SAMPLE_RATE*60u*percent)/100u;
+}
 static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint16_t source);
 static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint16_t source);
 static void fm6_seq_event_release_lane(uint32_t lane)
@@ -533,7 +539,9 @@ static uint32_t fm6_arp_step_period(void)
 {
     uint32_t denominator=1u<<(arp_division>5u?5u:arp_division);
     uint32_t bpm=transport_bpm<30u?30u:transport_bpm;
-    return (FM6_SAMPLE_RATE*60u*4u)/(bpm*denominator);
+    uint32_t period=(FM6_SAMPLE_RATE*60u*4u)/(bpm*denominator);
+    uint32_t percent=(arp_step_position&1u)?(100u-transport_swing)*2u:(uint32_t)transport_swing*2u;
+    return (period*percent)/100u;
 }
 static void fm6_arp_capture_push(uint8_t on,uint8_t note,uint8_t velocity)
 {
@@ -542,7 +550,8 @@ static void fm6_arp_capture_push(uint8_t on,uint8_t note,uint8_t velocity)
     uint8_t lane=(uint8_t)((arp_patch_mask&0xf0u)?1u:0u);
     if(next==arp_capture_tail)return; /* drop newest; keep the SPSC indices single-writer */
     uint32_t tick=seq_tick_counter;
-    if(transport_phase>=FM6_SAMPLE_RATE*30u)++tick; /* nearest 32nd-note grid position */
+    uint32_t threshold=fm6_transport_tick_threshold();
+    if(transport_phase*2u>=threshold)++tick; /* nearest swung 32nd-note grid position */
     arp_capture_queue[head]=(fm6_arp_capture_event_t){tick,lane,note,velocity,on};
     arp_capture_head=next;
 }
@@ -920,7 +929,7 @@ void fm6_init(void)
     arp_mode=0u; arp_latch=0u; arp_count=0u; arp_index=0u; arp_play_position=0u; arp_direction=1u; arp_live=0u;
     arp_division=3u;arp_gate=75u;arp_octaves=1u;arp_length=16u;arp_output=0u;arp_random=0u;arp_macro_dest=0u;arp_depth=50u;
     arp_step_position=0u;arp_phase=0u;arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;arp_macro_offset=0;
-    transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
+    transport_bpm=120u;transport_swing=50u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
     seq_event_mode=0u;seq_event_count[0]=seq_event_count[1]=0u;
     for(uint32_t lane=0;lane<2u;lane++)for(uint32_t i=0;i<FM6_SEQ_EVENTS_PER_LANE;i++)seq_event_active[lane][i]=0u;
     fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=fx_phaser_phase=0u;
@@ -1215,9 +1224,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 seq_clear_pending[lane]=0u;
             }
             transport_phase+=(uint32_t)transport_bpm*8u;
-            if(transport_phase>=FM6_SAMPLE_RATE*60u) { transport_phase-=FM6_SAMPLE_RATE*60u; fm6_transport_tick(); }
+            {uint32_t threshold=fm6_transport_tick_threshold();
+             if(transport_phase>=threshold) { transport_phase-=threshold; fm6_transport_tick(); }}
             arp_phase+=(uint32_t)transport_bpm*(1u<<(arp_division>5u?5u:arp_division));
-            if(arp_phase>=FM6_SAMPLE_RATE*60u*4u){arp_phase-=FM6_SAMPLE_RATE*60u*4u;fm6_arpeggiator_step();}
+            {uint32_t percent=(arp_step_position&1u)?(100u-transport_swing)*2u:(uint32_t)transport_swing*2u;
+             uint32_t threshold=(FM6_SAMPLE_RATE*60u*4u*percent)/100u;
+             if(arp_phase>=threshold){arp_phase-=threshold;fm6_arpeggiator_step();}}
             if(arp_gate_left && --arp_gate_left==0u) {
                 if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u);arp_live=0u;}
                 if(arp_output==1u)arp_amp_target_q15=0;
@@ -1339,6 +1351,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 
 
 void fm6_set_tempo(uint16_t bpm) { transport_bpm=bpm<30u?30u:bpm>300u?300u:bpm; }
+void fm6_set_swing(uint8_t percent) { transport_swing=percent<50u?50u:percent>75u?75u:percent; }
+uint8_t fm6_get_swing(void) { return transport_swing; }
 void fm6_sequencer_set_running(uint8_t running) {
     uint8_t next=(uint8_t)(running!=0u);
     if(next&&!seq_running) seq_start_pending=1u;
