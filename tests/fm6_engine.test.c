@@ -197,7 +197,7 @@ int main(void) {
     assert(fm1lab_recorded_note_duration(300u,0u,16u,0u)==16u);
     assert(fm1lab_recorded_note_duration(5000u,100u,16u,14u)==2u);
     assert(fm1lab_recorded_note_duration(100u,100u,16u,16u)==0u);
-    assert(fm1lab_recorded_note_duration(100u,100u,128u,0u)==64u);
+    assert(fm1lab_recorded_note_duration(10000u,100u,128u,0u)==64u);
     assert(fm6_patch_count() == FM6_ENGINE_PATCH_COUNT);
     fm6_init();
     assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 1u &&
