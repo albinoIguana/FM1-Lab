@@ -50,6 +50,7 @@ jobs:
         run: |
           node --check src/main-native.js
           node --check src/sequencer-model.js
+          node --check src/sequencer-events.js
           node --check src/sequencer-controls.js
           node --check src/instrument-session.js
           node --check src/ui/home-view.js
