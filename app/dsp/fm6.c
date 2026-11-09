@@ -336,11 +336,14 @@ static void fm6_chaos_rate_update(void)
 }
 static int32_t fm6_chaos_fold(int64_t sample)
 {
-    const int64_t period=(int64_t)Q24_ONE*2;
-    int64_t folded=sample%period;
+    /* PI32V2 has no 64-bit modulo helper. The drive stage is bounded to a
+     * small multiple of Q24, so fold safely in signed 32-bit. */
+    int32_t bounded=sample>INT32_MAX?INT32_MAX:sample<INT32_MIN?INT32_MIN:(int32_t)sample;
+    const int32_t period=Q24_ONE*2;
+    int32_t folded=bounded%period;
     if(folded>Q24_ONE)folded=period-folded;
     else if(folded< -Q24_ONE)folded=-period-folded;
-    return fm6_clamp_sample(folded);
+    return folded;
 }
 static int32_t fm6_chaos_wave(uint32_t phase)
 {
@@ -366,9 +369,15 @@ static void fm6_chaos_process_channel(unsigned channel,int64_t *sample,int32_t m
     shaped=(shaped*drive)/100;
     shaped=fm6_chaos_fold(shaped);
     unsigned crush=1u+(unsigned)fm6_chaos_amount/10u;
-    { int64_t quantum=(int64_t)1<<crush; shaped=(shaped/quantum)*quantum; }
-    int32_t noise_gain=(int32_t)((uint32_t)fm6_chaos_amount*fm6_chaos_tone*Q24_ONE/10000u);
-    shaped+=((int64_t)noise*noise_gain)>>15;
+    {
+        int32_t quantized=shaped>INT32_MAX?INT32_MAX:shaped<INT32_MIN?INT32_MIN:(int32_t)shaped;
+        uint32_t mask=~(((uint32_t)1u<<crush)-1u);
+        if(quantized>=0)quantized=(int32_t)((uint32_t)quantized&mask);
+        else quantized=-(int32_t)(((uint32_t)(-quantized))&mask);
+        shaped=quantized;
+    }
+    int64_t noise_q24=((int64_t)noise*Q24_ONE)>>15;
+    shaped+=(noise_q24*(int32_t)fm6_chaos_amount*(int32_t)fm6_chaos_tone)/10000;
     uint32_t alpha=80u+(uint32_t)fm6_chaos_tone*2800u/100u;
     fm6_chaos_filter[channel]=fm6_clamp_sample((int64_t)fm6_chaos_filter[channel]+
         (((shaped-fm6_chaos_filter[channel])*alpha)>>15));
