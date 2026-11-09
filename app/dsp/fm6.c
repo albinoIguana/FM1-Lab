@@ -1188,12 +1188,10 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             fm6_master_insert_process(&left,&right);
             fm6_master_comp_process(&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
-             * Keep the physical MASTER control at unity when it reaches 4096. */
-            /* Q24 mixer -> Q23 device samples is a linear >>1 conversion.
-             * Do not put the legacy tanh soft clip in front of the limiter:
-             * that changes the calibrated -12 dB reference level. */
-            int64_t out_l = ((left * output_gain_q12) >> 13);
-            int64_t out_r = ((right * output_gain_q12) >> 13);
+             * Add 6 dB to the physical MASTER range; the stereo-linked peak
+             * limiter below remains the final safety net. */
+            int64_t out_l = ((left * output_gain_q12) >> 12);
+            int64_t out_r = ((right * output_gain_q12) >> 12);
             uint64_t abs_l = fm6_abs_i64(out_l);
             uint64_t abs_r = fm6_abs_i64(out_r);
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
