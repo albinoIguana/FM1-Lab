@@ -187,7 +187,32 @@ static void render_compressor_stereo(uint8_t enabled,int32_t *destination)
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
 
+static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
+{
+    fm6_init();
+    for(unsigned patch=1u;patch<FM6_ENGINE_PATCH_COUNT;patch++)
+        fm6_patch_set_enabled(patch,0u);
+    assert(fm6_patch_set_pitch(0u,octave,fine_cents)==0);
+    fm6_patch_set_level(0u,31u);
+    fm6_note_on_mask(60u,110u,0x01u);
+    for(unsigned block=0u;block<16u;block++)
+        fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
+}
+
 int main(void) {
+    /* Whole-patch pitch is an independent frequency offset, not an operator
+     * ratio edit. Octaves and cents both alter the actual rendered note. */
+    render_patch_pitch(0,0,chunk_a);
+    render_patch_pitch(1,0,chunk_b);
+    assert(memcmp(chunk_a,chunk_b,16u*TEST_WORDS*sizeof(int32_t))!=0);
+    render_patch_pitch(0,25,chunk_b);
+    assert(memcmp(chunk_a,chunk_b,16u*TEST_WORDS*sizeof(int32_t))!=0);
+    fm6_init();
+    assert(fm6_patch_set_pitch(0u,-4,100)==0);
+    assert(fm6_patch_set_pitch(0u,4,-100)==0);
+    assert(fm6_patch_set_pitch(0u,5,0)==-1);
+    assert(fm6_patch_set_pitch(0u,0,101)==-1);
+
     /* The app uses this exact helper when committing a held key as a note.
      * Exercise taps, exact grid boundaries, round-up, zero tick, and loop edge. */
     assert(fm1lab_recorded_note_duration(0u,100u,16u,0u)==1u);
