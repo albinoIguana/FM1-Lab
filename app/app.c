@@ -3011,7 +3011,7 @@ static void draw(void)
     if (arp_ui_mode) cv_text(216, 1, &FONT_XS, "ARP", RGB(75,235,135));
 
     /* Page identity replaces the generic FACTORY instrument label. */
-    cv_text(8, 15, &FONT_B, page_title(page), accent);
+    cv_text(8, 15, &FONT_B, page == PAGE_HOME ? instrument_display_name() : page_title(page), accent);
     cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
     if(seq_record_armed)cv_text(205,16,&FONT_XS,"REC",RGB(255,80,90));
     if (page == PAGE_HOME) {
