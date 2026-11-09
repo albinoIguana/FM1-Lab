@@ -1565,6 +1565,7 @@ void app_init(void)
     settings_v7_t old_v7;
     settings_v8_t old_v8;
     settings_v9_t old_v9;
+    settings_v11_t old_v11;
     settings_v10_t old_v10;
     int performance_loaded = 0;
     int loaded;
@@ -1575,10 +1576,14 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v10, sizeof old_v10) == (int)sizeof old_v10 &&
+        if (plat_store_load(OBJ_SETTINGS, &old_v11, sizeof old_v11) == (int)sizeof old_v11 &&
+            settings_import_v11(&set, &old_v11) == 0) {
+            performance_loaded = 1;
+            set_dirty = 1u; /* V11 -> V12 converts sequencer event positions to 32nd-note ticks */
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v10, sizeof old_v10) == (int)sizeof old_v10 &&
             settings_import_v10(&set, &old_v10) == 0) {
             performance_loaded = 1;
-            set_dirty = 1u; /* V10 -> V11 adds persistent MAELSTROM controls */
+            set_dirty = 1u; /* V10 -> V12 adds persistent MAELSTROM controls and migrates event timing */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v9, sizeof old_v9) == (int)sizeof old_v9 &&
             settings_import_v9(&set, &old_v9) == 0) {
             performance_loaded = 1;
