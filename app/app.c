@@ -11,6 +11,7 @@
 #include "fm1lab_instrument.h"
 #include "fm1lab_voice_editor.h"
 #include "fm1lab_store_library.h"
+#include "fm1lab_digitone_data.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
@@ -584,51 +585,100 @@ static int fm1lab_is_untouched_factory(const fm1lab_instrument_t *in)
     }
     return 1;
 }
+static int fm1lab_digitone_z85_digit(char c)
+{
+    static const char alphabet[] =
+        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
+    for (unsigned i=0; i<85u; ++i) if (alphabet[i]==c) return (int)i;
+    return -1;
+}
+static int fm1lab_digitone_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
+{
+    if(voice_index>=FM1LAB_DIGITONE_VOICE_COUNT || !out) return -1;
+    const char *source=fm1lab_digitone_voice_z85+voice_index*FM1LAB_DIGITONE_Z85_BYTES;
+    for(uint32_t group=0;group<39u;group++) {
+        uint64_t value=0u;
+        for(uint32_t digit=0;digit<5u;digit++) {
+            int decoded=fm1lab_digitone_z85_digit(source[group*5u+digit]);
+            if(decoded<0) return -1;
+            value=value*85u+(uint32_t)decoded;
+        }
+        if(value>0xffffffffu) return -1;
+        out[group*4u]=(uint8_t)(value>>24);
+        out[group*4u+1u]=(uint8_t)(value>>16);
+        out[group*4u+2u]=(uint8_t)(value>>8);
+        out[group*4u+3u]=(uint8_t)value;
+    }
+    return 0;
+}
+static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *out)
+{
+    if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !out) return -1;
+    fm1lab_instrument_init(out,fm1lab_digitone_instrument_names[index]);
+    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice) ||
+           fm1lab_patch_set_voice(out,patch,voice)) return -1;
+        fm1lab_patch_set_pan(out,patch,voice[155]);
+        out->patches[patch].level=31u;
+        out->patches[patch].enabled=1u;
+        for(uint32_t macro=0;macro<FM1LAB_MACRO_COUNT;macro++)
+            out->patches[patch].macros[macro]=50u;
+    }
+    return fm1lab_instrument_valid(out)?0:-1;
+}
+static int fm1lab_same_library_instrument(const fm1lab_instrument_t *a,
+                                           const fm1lab_instrument_t *b)
+{
+    return memcmp(a->patches,b->patches,sizeof a->patches)==0 &&
+           fm1lab_strncmp(a->name,b->name,FM1LAB_INSTRUMENT_NAME_BYTES)==0;
+}
+static int fm1lab_is_previous_factory_instrument(uint32_t index,
+                                                  const fm1lab_instrument_t *existing)
+{
+    fm1lab_instrument_t previous;
+    if(index==24u) {
+        fm1lab_seed_pelagic(&previous);
+        if(fm1lab_same_library_instrument(existing,&previous)) return 1;
+        fm1lab_seed_instrument(index,&previous);
+        return fm1lab_same_library_instrument(existing,&previous);
+    }
+    if(index>=16u && index<20u) {
+        fm1lab_seed_beast(index,&previous);
+        if(fm1lab_same_library_instrument(existing,&previous)) return 1;
+        fm1lab_seed_beast_v1(index,&previous);
+        return fm1lab_same_library_instrument(existing,&previous);
+    }
+    if(index>=20u && index<24u) {
+        fm1lab_seed_industrial(index,&previous);
+        if(fm1lab_same_library_instrument(existing,&previous)) return 1;
+        fm1lab_seed_instrument(index,&previous);
+        return fm1lab_same_library_instrument(existing,&previous);
+    }
+    fm1lab_seed_instrument(index,&previous);
+    return fm1lab_same_library_instrument(existing,&previous);
+}
 static void fm1lab_seed_factory_library(void)
 {
-    for(uint32_t index=0;index<FM1LAB_STORE_INSTRUMENT_COUNT;index++) {
-        fm1lab_instrument_t existing, seed;
+    /* Replace factory-owned content with the Digitone collection. Custom or
+     * renamed Instruments remain in place; their flash data is never reset. */
+    for(uint32_t index=0;index<FM1LAB_DIGITONE_INSTRUMENT_COUNT;index++) {
+        fm1lab_instrument_t existing,seed;
         fm1lab_insert_state_t inserts;
         if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0) continue;
-        if(index==24u) {
-            fm1lab_instrument_t previous;
-            fm1lab_seed_instrument(index,&previous);
-            fm1lab_seed_pelagic(&seed);
-            /* Install the new layered pad in the next factory slot, while
-             * preserving any Instrument that has been renamed or edited. */
-            if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
-               fm1lab_strncmp(existing.name,seed.name,FM1LAB_INSTRUMENT_NAME_BYTES)==0) continue;
-            if(!fm1lab_is_untouched_factory(&existing) &&
-               memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
-        } else if(index>=16u && index<20u) {
-            fm1lab_instrument_t previous;
-            fm1lab_seed_beast_v1(index,&previous);
-            fm1lab_seed_beast(index,&seed);
-            /* Upgrade factory placeholders and the known V1 beast bank.
-             * Keep any other named/edited Instrument intact. */
-            if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
-               fm1lab_strncmp(existing.name,seed.name,FM1LAB_INSTRUMENT_NAME_BYTES)==0) continue;
-            if(!fm1lab_is_untouched_factory(&existing) &&
-               memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
-        } else if(index>=20u && index<24u) {
-            fm1lab_instrument_t previous;
-            fm1lab_seed_instrument(index,&previous);
-            fm1lab_seed_industrial(index,&seed);
-            /* Upgrade factory placeholders and the known previous industrial
-             * bank; custom Instruments are never replaced. */
-            if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
-               fm1lab_strncmp(existing.name,seed.name,FM1LAB_INSTRUMENT_NAME_BYTES)==0) continue;
-            if(!fm1lab_is_untouched_factory(&existing) &&
-               memcmp(existing.patches,previous.patches,sizeof existing.patches)!=0) continue;
-        } else {
-            if(!fm1lab_is_untouched_factory(&existing)) continue;
-            fm1lab_seed_instrument(index,&seed);
+        if(fm1lab_seed_digitone_instrument(index,&seed)!=0) {
+            app_say("DIGITONE DATA","DECODE FAILED");
+            return;
         }
-        if(fm1lab_store_library_save_full(index,&seed,&inserts)!=0)
-            app_say("LIBRARY SEED","SAVE FAILED");
+        if(fm1lab_same_library_instrument(&existing,&seed)) continue;
+        if(!fm1lab_is_untouched_factory(&existing) &&
+           !fm1lab_is_previous_factory_instrument(index,&existing)) continue;
+        if(fm1lab_store_library_save_full(index,&seed,&inserts)!=0) {
+            app_say("DIGITONE BANK","SAVE FAILED");
+            return;
+        }
     }
 }
-
 static uint8_t fm1lab_factory_preset_for_voice(const uint8_t *voice)
 {
     for(uint32_t p=0;p<FM1LAB_FACTORY_PRESET_COUNT;p++) {
