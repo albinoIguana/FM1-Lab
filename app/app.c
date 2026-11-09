@@ -51,6 +51,12 @@ static int16_t seq_clear_turn;
 static uint8_t seq_record_active[NKEYS+128u], seq_record_step[NKEYS+128u], seq_record_lane[NKEYS+128u], seq_record_note[NKEYS+128u];
 static uint32_t seq_record_started[NKEYS+128u];
 static uint8_t seq_record_redraw;
+#define APP_SEQ_EVENTS_PER_LANE 128u
+static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
+static uint8_t seq_event_count[2], seq_event_store_ready;
+static fm6_seq_event_t seq_event_snapshot[2][APP_SEQ_EVENTS_PER_LANE];
+static uint8_t seq_event_snapshot_count[2];
+static volatile uint8_t seq_events_update_pending;
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_latch, arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
@@ -69,7 +75,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN, EV_SEQ_EVENTS };
 static fm6_performance_state_t performance_update_snapshot;
 static volatile uint8_t performance_update_pending, performance_update_dirty;
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
@@ -990,6 +996,11 @@ static void ui_events_drain(void)
             performance_update_pending = 0u;
         } else if (type == EV_SEQ_RUN)
             fm6_sequencer_set_running(a);
+        else if (type == EV_SEQ_EVENTS) {
+            for(uint32_t lane=0;lane<2u;lane++)
+                (void)fm6_sequencer_set_events((uint8_t)lane,seq_event_snapshot[lane],seq_event_snapshot_count[lane]);
+            seq_events_update_pending=0u;
+        }
         else if (type == EV_PATCH_VOICE) {
             (void)fm6_patch_set_voice(a, voice_update_snapshot);
             fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a%FM1LAB_PATCH_COUNT));
@@ -1106,63 +1117,95 @@ static void sequencer_cache_instrument_name(uint8_t lane, const char *source)
         seq_ui_instrument_name[lane][out]='\0';
     }
 }
+static void sequencer_events_publish(void)
+{
+    for(uint32_t lane=0;lane<2u;lane++) {
+        seq_event_snapshot_count[lane]=seq_event_count[lane];
+        for(uint32_t i=0;i<seq_event_count[lane];i++)
+            seq_event_snapshot[lane][i]=seq_event_store[lane][i];
+    }
+    if(!seq_events_update_pending) {
+        seq_events_update_pending=1u;
+        ui_event_push(EV_SEQ_EVENTS,0u,0u,0u);
+    }
+}
+
+static void sequencer_events_import_legacy(void)
+{
+    if(seq_event_store_ready)return;
+    for(uint32_t lane=0;lane<2u;lane++) {
+        uint8_t previous_note=255u;
+        int previous_event=-1;
+        for(uint32_t step=0;step<set.performance.seq_length && step<64u;step++) {
+            if(!seq_ui_enabled[lane][step] || !seq_ui_velocity[lane][step]) {
+                previous_note=255u;previous_event=-1;continue;
+            }
+            uint8_t note=seq_ui_note[lane][step];
+            uint8_t tied=(uint8_t)(seq_ui_tie[lane][step] && previous_event>=0 && previous_note==note);
+            if(tied) {
+                if(seq_event_store[lane][previous_event].duration<64u)
+                    seq_event_store[lane][previous_event].duration++;
+            } else if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE) {
+                uint8_t duration=1u;
+                seq_event_store[lane][seq_event_count[lane]]=(fm6_seq_event_t){
+                    (uint8_t)step,duration,note,seq_ui_velocity[lane][step],seq_ui_accent[lane][step]
+                };
+                previous_event=(int)seq_event_count[lane]++;
+            } else {
+                previous_event=-1;
+            }
+            previous_note=note;
+        }
+    }
+    seq_event_store_ready=1u;
+}
+
 static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocity)
 {
-    if(!seq_record_armed)return;
+    if(!seq_record_armed || key>=NKEYS+128u)return;
+    sequencer_events_import_legacy();
     uint8_t lane=seq_ui_lane;
     uint8_t step=fm6_sequencer_running()?fm6_sequencer_playing_step():seq_ui_step;
-    seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;seq_ui_velocity[lane][step]=velocity;
-    if(!seq_ui_gate[lane][step])seq_ui_gate[lane][step]=75u;
-    seq_ui_tie[lane][step]=0u;
-    if(fm6_sequencer_running()) {
-        if(seq_record_active[key] && seq_record_note[key]==note)return;
-        seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
-        seq_record_note[key]=note;seq_record_started[key]=plat_ms();
-    } else seq_ui_step=(uint8_t)((step+1u)%(set.performance.seq_length<2u?2u:set.performance.seq_length));
-    performance_publish();set_dirty=1u;seq_record_redraw=1u;
+    if(seq_record_active[key] && seq_record_note[key]==note)return;
+    seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
+    seq_record_note[key]=note;seq_record_started[key]=plat_ms();
+    seq_ui_velocity[lane][step]=velocity;
+    seq_record_redraw=1u;
 }
 static void sequencer_record_release(uint32_t key, uint8_t note)
 {
-    if(!seq_record_active[key] || seq_record_note[key]!=note)return;
+    if(key>=NKEYS+128u || !seq_record_active[key] || seq_record_note[key]!=note)return;
     uint32_t elapsed=plat_ms()-seq_record_started[key];
     uint32_t step_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/4u;
     if(!step_ms)step_ms=1u;
     uint8_t lane=seq_record_lane[key], first=seq_record_step[key];
-    uint32_t full_steps=elapsed/step_ms, remainder=elapsed%step_ms;
     uint32_t loop_length=set.performance.seq_length;
     if(loop_length<2u)loop_length=2u;
     if(loop_length>64u)loop_length=64u;
-    /* Fill each complete step spanned by the held key, then store the
-     * remaining partial step. Exact-boundary releases add no extra step. */
-    for(uint32_t offset=0u;offset<full_steps && offset<loop_length;offset++) {
-        uint8_t step=(uint8_t)(((uint32_t)first+offset)%loop_length);
-        seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;
-        seq_ui_gate[lane][step]=100u;
-        seq_ui_tie[lane][step]=(uint8_t)(offset>0u);
-    }
-    if(remainder || !full_steps) {
-        uint8_t step=(uint8_t)(((uint32_t)first+full_steps)%loop_length);
-        uint8_t gate=(uint8_t)clamp((int32_t)(remainder*100u/step_ms),10,100);
-        seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;
-        seq_ui_velocity[lane][step]=seq_ui_velocity[lane][first];
-        seq_ui_gate[lane][step]=gate;
-        seq_ui_tie[lane][step]=(uint8_t)(full_steps>0u);
+    uint32_t duration=(elapsed+step_ms-1u)/step_ms;
+    if(duration<1u)duration=1u;
+    if(duration>loop_length-first)duration=loop_length-first;
+    if(duration>64u)duration=64u;
+    if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_length) {
+        seq_event_store[lane][seq_event_count[lane]++]=(fm6_seq_event_t){
+            first,(uint8_t)duration,note,seq_ui_velocity[lane][first]?seq_ui_velocity[lane][first]:100u,
+            seq_ui_accent[lane][first]
+        };
+        sequencer_events_publish();
     }
     seq_record_active[key]=0u;
-    performance_publish();set_dirty=1u;seq_record_redraw=1u;
+    set_dirty=1u;seq_record_redraw=1u;
+    if(!fm6_sequencer_running())
+        seq_ui_step=(uint8_t)((first+1u)%loop_length);
 }
 static void sequencer_record_step_advance(void)
 {
+    /* Step recording is additive: crossing an empty step must never erase
+     * existing notes or material recorded by another pass. */
     if(!seq_record_armed || !seq_record_mode || !fm6_sequencer_running()) {
         seq_record_last_step=255u;return;
     }
-    uint8_t step=fm6_sequencer_playing_step();
-    if(step==seq_record_last_step)return;
-    seq_record_last_step=step;
-    uint8_t lane=seq_ui_lane;
-    seq_ui_enabled[lane][step]=0u;seq_ui_note[lane][step]=60u;
-    seq_ui_velocity[lane][step]=100u;seq_ui_gate[lane][step]=75u;
-    performance_publish();set_dirty=1u;seq_record_redraw=1u;
+    seq_record_last_step=fm6_sequencer_playing_step();
 }
 static void note_on(int32_t note, uint32_t vel)
 {
