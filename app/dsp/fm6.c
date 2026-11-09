@@ -879,7 +879,7 @@ void fm6_init(void)
     fm6_comp_params_update();
     fm1lab_insert_state_init(&fm6_master_inserts);
     fm6_chaos_amount=0u;fm6_chaos_rate=42u;fm6_chaos_tone=55u;fm6_chaos_shape=0u;
-    fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_random_hold=0;fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;fm6_chaos_rate_update();
+    fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_random_hold=(int32_t)(fm6_chaos_random>>16)-32768;fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;fm6_chaos_rate_update();
     fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
     fm6_zero_bytes(fm6_eq_x1,sizeof(fm6_eq_x1));fm6_zero_bytes(fm6_eq_x2,sizeof(fm6_eq_x2));
     fm6_zero_bytes(fm6_eq_y1,sizeof(fm6_eq_y1));fm6_zero_bytes(fm6_eq_y2,sizeof(fm6_eq_y2));
@@ -1626,7 +1626,9 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
 
 void fm6_chaos_set(uint8_t amount,uint8_t rate,uint8_t tone,uint8_t shape)
 {
-    fm6_chaos_amount=amount>100u?100u:amount;
+    uint8_t next_amount=amount>100u?100u:amount;
+    if(!next_amount && fm6_chaos_amount)fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;
+    fm6_chaos_amount=next_amount;
     fm6_chaos_rate=rate>100u?100u:rate;
     fm6_chaos_tone=tone>100u?100u:tone;
     fm6_chaos_shape=shape>5u?5u:shape;
