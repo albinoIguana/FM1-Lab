@@ -140,7 +140,7 @@ static const char fm1lab_dx7_voice_z85[] =
 ;
 
 static const char fm1lab_dx7_instrument_names[FM1LAB_DX7_INSTRUMENT_COUNT][24] = {
-    "FM BASS 01",
+    "SUB FOUNDATION",
     "FM BASS 02",
     "FM BASS 03",
     "FM BASS 04",
