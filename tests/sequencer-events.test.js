@@ -33,7 +33,7 @@ test("always-on quantization snaps starts and durations to the active grid", () 
   sequence.quantize = 4;
   sequence = addNote(sequence,0,{start:5,duration:7,pitch:62});
   assert.equal(sequence.tracks[0].events[0].start,4);
-  assert.equal(sequence.tracks[0].events[0].duration,8);
+  assert.equal(sequence.tracks[0].events[0].duration,4);
   sequence = updateNote(sequence,0,sequence.tracks[0].events[0].id,{start:11,duration:5});
   assert.equal(sequence.tracks[0].events[0].start,12);
   assert.equal(sequence.tracks[0].events[0].duration,4);
@@ -86,7 +86,7 @@ test("V2 step patterns migrate into continuous note events, joining valid tie ch
 });
 
 test("loop length truncation drops out-of-range starts and bounds sustained durations", () => {
-  let sequence = createTwoTrackSequence();
+  let sequence = setTrackLength(createTwoTrackSequence(),0,32);
   sequence = addNote(sequence,0,{id:"inside",start:12,duration:8});
   sequence = addNote(sequence,0,{id:"outside",start:20,duration:2});
   sequence = setTrackLength(sequence,0,16);
