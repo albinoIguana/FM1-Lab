@@ -58,6 +58,8 @@ typedef struct {
     int32_t mod_level;
     int32_t detune[6];
     uint8_t feedback;
+    int8_t octave;
+    int8_t fine_cents;
     uint8_t ready;
 } fm1lab_patch_t;
 
@@ -1034,6 +1036,9 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 continue;
             patch = &instrument[voice->patch];
             pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16 + voice->tune16 + pitch_bend_16, 0);
+            /* Q24 log2-frequency offset: octave is exact; cents retain 1-cent resolution. */
+            pitch += (int32_t)patch->octave * (1 << 24);
+            pitch += (int32_t)(((int64_t)patch->fine_cents * (1LL << 24)) / 1200LL);
             fb = patch->feedback;
             if (fm6_note_compute(&voice->state, patch->effective, bus,
                                  patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
@@ -1628,6 +1633,19 @@ void fm6_patch_set_pan(uint32_t patch, uint8_t pan)
 uint8_t fm6_patch_pan(uint32_t patch)
 {
     return patch < PATCHES ? instrument[patch].pan : 64u;
+}
+int fm6_patch_set_pitch(uint32_t patch, int octave, int fine_cents)
+{
+    if (patch >= PATCHES || octave < -4 || octave > 4 ||
+        fine_cents < -100 || fine_cents > 100) return -1;
+    fm1lab_patch_t *part = &instrument[patch];
+    if (part->octave == octave && part->fine_cents == fine_cents) return 0;
+    part->octave = (int8_t)octave;
+    part->fine_cents = (int8_t)fine_cents;
+    /* Retire only this patch's held notes so note-offs cannot straddle tunings. */
+    for (uint32_t i = 0; i < VOICES; ++i)
+        if (voices[i].used && voices[i].patch == patch) voices[i].used = 0;
+    return 0;
 }
 void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
 {
