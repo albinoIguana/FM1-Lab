@@ -54,9 +54,9 @@ FM1 uses M-VAVE's expanded 156-byte DX7-compatible voice layout and a six-operat
 A practical conversion should:
 1. Decode the Digitone algorithm and identify its carrier/modulator graph.
 2. Map C, A, B1, and B2 ratios, envelopes, modulation levels, harmonics, detune, feedback, and X/Y mix into a suitable six-operator DX7 algorithm.
-3. Use the two extra FM1 operators deliberately for reinforcement, additional modulation, or spectral motion—not arbitrary filler.
+3. In this first pass, leave unmapped FM1 operators silent rather than inventing extra modulation paths. A later revision can use them for reinforcement or spectral motion after audition.
 4. Translate filter/amp/LFO and send parameters only where FM1 has a meaningful equivalent; keep unsupported source behavior documented.
 5. Group four related translated voices into each FM1 Instrument, set conservative patch levels, and preserve the source names/provenance in a separate manifest.
-6. Validate generated 156-byte voices and four-patch Instrument records before adding them to a bank.
+6. Validate every generated 156-byte voice and four-patch Instrument record; the converter performs these range and structure checks before writing JSON.
 
 Do not overwrite factory or user Instruments while the conversion is experimental. Keep the imported collection separate until it has been reviewed and tested on the emulator and physical FM1. The generated JSON is a portable library artifact; it is not yet a native flash-bank installer.
