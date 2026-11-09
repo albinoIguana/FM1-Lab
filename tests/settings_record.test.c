@@ -319,6 +319,14 @@ int main(void)
     memcpy(v9.levels,good.levels,sizeof v9.levels);
     memcpy(&v9.performance,&good.performance,sizeof v9.performance);
     v9.performance.seq_length=16u;
+    /* Start this migration fixture with an empty lane rather than inheriting
+     * the alternating notes used by the generic valid-record fixture. */
+    for(unsigned step=0u;step<64u;step++) {
+        v9.performance.seq_enabled[0][step]=0u;
+        v9.performance.seq_note[0][step]=60u;
+        v9.performance.seq_velocity[0][step]=0u;
+        v9.performance.seq_gate[0][step]=75u;
+    }
     v9.performance.seq_enabled[0][0]=1u;v9.performance.seq_note[0][0]=60u;
     v9.performance.seq_velocity[0][0]=110u;v9.performance.seq_gate[0][0]=100u;
     v9.performance.seq_enabled[0][1]=1u;v9.performance.seq_note[0][1]=60u;
@@ -329,10 +337,6 @@ int main(void)
     assert(settings_v9_valid(&v9));
     imported=good;
     assert(settings_import_v9(&imported,&v9)==0);
-    fprintf(stderr,"V9 migration debug: magic=%08x events=%u length=%u enabled=%u,%u,%u gates=%u,%u,%u\\n",
-            imported.magic,imported.performance.seq_event_count[0],imported.performance.seq_length,
-            imported.performance.seq_enabled[0][0],imported.performance.seq_enabled[0][1],imported.performance.seq_enabled[0][2],
-            imported.performance.seq_gate[0][0],imported.performance.seq_gate[0][1],imported.performance.seq_gate[0][2]);
     assert(imported.magic==SET_MAGIC&&imported.performance.seq_event_count[0]==2u);
     assert(imported.performance.seq_events[0][0].start==0u);
     assert(imported.performance.seq_events[0][0].duration==2u);
