@@ -625,9 +625,15 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
         instrument_name[i]=(c>=32 && c<=126)?c:' ';
     }
     instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
-    if(instrument_name[0]==' ' || instrument_name[0]=='\\0')
-        fm1lab_copy_string(instrument_name,sizeof instrument_name,
-                           fm1lab_digitone_instrument_names[index]);
+    if(instrument_name[0]==' ' || instrument_name[0]=='\\0') {
+        const char *fallback=fm1lab_digitone_instrument_names[index];
+        uint32_t i=0u;
+        while(i+1u<sizeof instrument_name && fallback[i]) {
+            instrument_name[i]=fallback[i];
+            ++i;
+        }
+        instrument_name[i]='\\0';
+    }
     fm1lab_instrument_init(out,instrument_name);
 
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
