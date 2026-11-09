@@ -84,9 +84,9 @@ typedef struct {
     uint8_t fx_depth[4];
     uint8_t compressor_enabled, compressor_threshold, compressor_ratio;
     uint8_t compressor_attack, compressor_release, compressor_makeup;
-    uint8_t chaos_amount, chaos_rate, chaos_tone, chaos_shape;
     uint8_t seq_event_count[2];
     fm6_seq_event_t seq_events[2][128];
+    uint8_t chaos_amount, chaos_rate, chaos_tone, chaos_shape;
 } fm6_performance_state_t;
 
 
