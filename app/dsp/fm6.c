@@ -541,7 +541,9 @@ static void fm6_arp_capture_push(uint8_t on,uint8_t note,uint8_t velocity)
     uint8_t next=(uint8_t)((head+1u)&31u);
     uint8_t lane=(uint8_t)((arp_patch_mask&0xf0u)?1u:0u);
     if(next==arp_capture_tail)arp_capture_tail=(uint8_t)((arp_capture_tail+1u)&31u);
-    arp_capture_queue[head]=(fm6_arp_capture_event_t){seq_tick_counter,lane,note,velocity,on};
+    uint32_t tick=seq_tick_counter;
+    if(transport_phase>=FM6_SAMPLE_RATE*30u)++tick; /* nearest 32nd-note grid position */
+    arp_capture_queue[head]=(fm6_arp_capture_event_t){tick,lane,note,velocity,on};
     arp_capture_head=next;
 }
 static uint32_t fm6_arp_random(void)
@@ -1367,7 +1369,9 @@ void fm6_sequencer_set_length(uint8_t steps) {
         seq_length=next;
         fm6_seq_event_trim(seq_length);
     }
-    if(seq_position>=seq_length)seq_position=0u;
+    uint16_t loop_ticks=(uint16_t)seq_length*2u;
+    if(seq_tick_position>=loop_ticks)seq_tick_position=0u;
+    seq_position=(uint8_t)(seq_tick_position/2u);
 }
 void fm6_sequencer_set_lane(uint8_t lane,uint8_t patch_base) { if(lane<2u&&(patch_base==0u||patch_base==4u)) seq_lane_base[lane]=patch_base; }
 void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t note,uint8_t velocity,uint8_t gate) {
