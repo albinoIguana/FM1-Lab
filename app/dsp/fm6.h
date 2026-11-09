@@ -139,10 +139,6 @@ int32_t fm6_test_macro_mod_level(uint32_t patch);
 uint8_t fm6_test_macro_feedback(uint32_t patch);
 int32_t fm6_test_macro_detune(uint32_t patch, uint32_t operator_index);
 uint8_t fm6_test_effective_byte(uint32_t patch, uint32_t byte_index);
-int32_t fm6_test_macro_mod_level(uint32_t patch);
-uint8_t fm6_test_macro_feedback(uint32_t patch);
-int32_t fm6_test_macro_detune(uint32_t patch, uint32_t operator_index);
-uint8_t fm6_test_effective_byte(uint32_t patch, uint32_t byte_index);
 uint32_t fm6_test_sequencer_active_events(uint8_t lane);
 #endif
 
