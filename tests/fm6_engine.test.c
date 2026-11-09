@@ -199,6 +199,26 @@ int main(void) {
     assert(fm1lab_recorded_note_duration(100u,100u,16u,16u)==0u);
     assert(fm1lab_recorded_note_duration(10000u,100u,128u,0u)==64u);
     assert(fm6_patch_count() == FM6_ENGINE_PATCH_COUNT);
+    /* Performance macros should make broad, measurable changes around neutral. */
+    fm6_init();
+    fm6_macro_set(0u, FM1LAB_MACRO_BRIGHTNESS, 50u);
+    assert(fm6_test_macro_mod_level(0u) == 0);
+    fm6_macro_set(0u, FM1LAB_MACRO_BRIGHTNESS, 100u);
+    assert(fm6_test_macro_mod_level(0u) > (12 << 24));
+    fm6_macro_set(0u, FM1LAB_MACRO_BRIGHTNESS, 0u);
+    assert(fm6_test_macro_mod_level(0u) < -(12 << 24));
+    fm6_macro_set(0u, FM1LAB_MACRO_BODY, 50u);
+    uint8_t body_neutral = fm6_test_effective_byte(0u, 18u);
+    fm6_macro_set(0u, FM1LAB_MACRO_BODY, 100u);
+    assert(fm6_test_effective_byte(0u, 18u) >= body_neutral);
+    fm6_macro_set(0u, FM1LAB_MACRO_MOTION, 50u);
+    uint8_t motion_neutral = fm6_test_effective_byte(0u, 137u);
+    fm6_macro_set(0u, FM1LAB_MACRO_MOTION, 100u);
+    assert(fm6_test_effective_byte(0u, 137u) >= motion_neutral);
+    fm6_macro_set(0u, FM1LAB_MACRO_EDGE, 50u);
+    assert(fm6_test_macro_detune(0u, 0u) == 0);
+    fm6_macro_set(0u, FM1LAB_MACRO_EDGE, 100u);
+    assert(fm6_test_macro_detune(0u, 5u) > 0);
     fm6_init();
     assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 1u &&
            fm6_patch_enabled(2) == 1u && fm6_patch_enabled(3) == 1u);
