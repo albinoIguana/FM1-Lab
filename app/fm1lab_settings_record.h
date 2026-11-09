@@ -505,11 +505,13 @@ static inline int settings_valid(const settings_t *v) {
 }
 static inline int settings_import_v2(settings_t *dst,const settings_v2_t *src) {
     if(!dst || !settings_v2_valid(src)) return -1;
+    dst->swing=50u;
     dst->octave=src->octave; dst->patch=src->patch; dst->enabled_mask=src->enabled_mask; dst->ble_off=src->ble_off;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p) { dst->levels[p]=src->levels[p]; for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m) dst->macros[p][m]=src->macros[p][m]; }
     return 0;
 }
 static inline int settings_import_v1(settings_t *dst,const settings_v1_t *src) {
     if(!dst || !settings_v1_valid(src)) return -1;
+    dst->swing=50u;
     dst->octave=src->octave; dst->patch=src->patch; dst->enabled_mask=src->enabled_mask; dst->ble_off=src->ble_off; return 0;
 }
