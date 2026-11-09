@@ -41,7 +41,7 @@ static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
 static uint8_t eq_ui_band = 1u;
-static uint8_t env_operator = 1u, env_mode;
+static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_tie[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
@@ -1880,7 +1880,6 @@ static void input(void)
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
         } else if (k == B_ENV) {
             page = PAGE_ENV;
-            env_mode = 0u;
             app_say("ENVELOPE", "PATCH ADSR");
         } else if (k == B_LFO) {
             if (page == PAGE_LFO || page == PAGE_LFO_MOD) lfo_view = (uint8_t)((lfo_view + 1u) % 5u);
@@ -3532,8 +3531,8 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         index = 1u;
         total = 1u;
     } else if (current == PAGE_ENV) {
-        index = env_mode == 0u ? 1u : 2u;
-        total = 2u;
+        index = 1u;
+        total = 1u;
     } else if (current == PAGE_OPERATOR_MAP || current == PAGE_MACRO) {
         index = current == PAGE_OPERATOR_MAP ? 1u : 2u;
         total = 2u;
