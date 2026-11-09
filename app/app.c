@@ -2790,17 +2790,17 @@ static void draw_sequencer_piano_panel(void)
 {
     char value[20];
     const uint8_t lane=seq_ui_lane, first=(uint8_t)((seq_ui_step/16u)*16u);
-    const uint8_t selected=(uint8_t)(seq_ui_step-first);
     const uint16_t accent=patch_color(seq_ui_patch[lane]);
     const int32_t gx=24, gy=28, gw=208, gh=72, cw=13, rh=3;
-    int32_t low=(int32_t)seq_ui_note[lane][seq_ui_step]-12;
+    const fm6_seq_event_t *selected=sequencer_selected_event();
+    int32_t focus_note=selected?selected->pitch:60;
+    int32_t low=focus_note-12;
     if(low<0)low=0;
     if(low>103)low=103;
     const int32_t high=low+23;
     instrument_card(4,2,232,154,panel_fill(),accent,accent);
     cv_text(12,8,&FONT_XS,lane?"TRACK 2  /  NOTES":"TRACK 1  /  NOTES",accent);
     cv_text(148,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE);
-    /* Sixteen-step, two-octave note grid modelled on established FM-1 piano-roll editors. */
     for(uint32_t row=0;row<24u;row++) {
         int32_t note=high-(int32_t)row, y=gy+(int32_t)row*rh;
         uint8_t pc=(uint8_t)(note%12);
@@ -2818,33 +2818,45 @@ static void draw_sequencer_piano_panel(void)
         if(step==seq_ui_step)rounded_panel(x,gy,cw,gh,1u,0u,C_WHITE);
         if(fm6_sequencer_running()&&step==fm6_sequencer_playing_step())
             cv_rect(x+5,gy,2,gh,RGB(242,212,59));
-        if(seq_ui_enabled[lane][step]) {
-            int32_t note=seq_ui_note[lane][step];
-            if(note>=low&&note<=high) {
-                int32_t y=gy+(high-note)*rh+1;
-                int32_t barw=(int32_t)(seq_ui_gate[lane][step]?seq_ui_gate[lane][step]:75u)*(cw-2)/100;
-                int32_t barh=2+(int32_t)seq_ui_velocity[lane][step]*2/127;
-                if(barw<2)barw=2;
-                if(barh>3)barh=3;
-                cv_rect(x+1,y,barw,barh,accent);
-                if(step==seq_ui_step)cv_rect(x+1,y,barw,1,C_WHITE);
-            }
-        }
         if((col%4u)==0u) {
             int_text((int32_t)step+1,value);
             cv_text(x+1,104,&FONT_XS,value,C_GRAY);
         }
     }
-    cv_text(12,116,&FONT_XS,"NOTE",C_GRAY);
-    int_text(seq_ui_enabled[lane][seq_ui_step]?seq_ui_note[lane][seq_ui_step]:0,value);
-    cv_text(43,116,&FONT_B,seq_ui_enabled[lane][seq_ui_step]?value:"--",accent);
-    cv_text(82,116,&FONT_XS,"VEL",C_GRAY);
-    int_text(seq_ui_velocity[lane][seq_ui_step],value);
-    cv_text(108,116,&FONT_B,value,C_WHITE);
-    cv_text(144,116,&FONT_XS,"GATE",C_GRAY);
-    int_text(seq_ui_gate[lane][seq_ui_step],value);
-    cv_text(177,116,&FONT_B,value,C_WHITE);
-    cv_text(8,137,&FONT_XS,"K1 STEP K2 PITCH K3 LEN K4 VEL EDIT DEL",C_GRAY);
+    for(uint32_t i=0;i<seq_event_count[lane];i++) {
+        const fm6_seq_event_t *event=&seq_event_store[lane][i];
+        int32_t event_start=event->start, event_end=event_start+event->duration;
+        int32_t visible_start=event_start>(int32_t)first?event_start:first;
+        int32_t visible_end=event_end<(int32_t)first+16?event_end:(int32_t)first+16;
+        if(visible_end<=visible_start || event->pitch<low || event->pitch>high)continue;
+        int32_t x=gx+(visible_start-(int32_t)first)*cw+1;
+        int32_t y=gy+(high-event->pitch)*rh+1;
+        int32_t barw=(visible_end-visible_start)*cw-2;
+        int32_t barh=2+(int32_t)event->velocity*2/127;
+        if(barw<2)barw=2;
+        if(barh>3)barh=3;
+        cv_rect(x,y,barw,barh,accent);
+        if(i==seq_selected_event[lane]) {
+            cv_rect(x,y,barw,1,C_WHITE);
+            cv_rect(x,y+barh-1,barw,1,C_WHITE);
+            cv_rect(x,y,1,barh,C_WHITE);
+            if(barw>1)cv_rect(x+barw-1,y,1,barh,C_WHITE);
+        }
+    }
+    cv_text(10,116,&FONT_XS,"NOTE",C_GRAY);
+    if(selected)int_text(selected->pitch,value);else text_copy(value,"--");
+    cv_text(36,116,&FONT_B,value,accent);
+    cv_text(68,116,&FONT_XS,"LEN",C_GRAY);
+    int_text(selected?selected->duration:0,value);
+    cv_text(91,116,&FONT_B,value,C_WHITE);
+    cv_text(122,116,&FONT_XS,"ACC",C_GRAY);
+    int_text(selected?selected->accent:0,value);
+    cv_text(145,116,&FONT_B,value,C_WHITE);
+    cv_text(177,116,&FONT_XS,"VEL",C_GRAY);
+    int_text(selected?selected->velocity:0,value);
+    cv_text(200,116,&FONT_B,value,C_WHITE);
+    cv_text(8,137,&FONT_XS,"K1 LENGTH   K2 PITCH   K3 ACCENT   K4 VELOCITY",C_GRAY);
+    cv_text(8,151,&FONT_XS,"SELECT NEXT NOTE   EDIT DELETE",C_WHITE);
 }
 
 static void draw_save_panel(void)
