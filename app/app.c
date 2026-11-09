@@ -858,17 +858,15 @@ static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro)
 
 static void instrument_factory_capture(void)
 {
-    /* Seed the first factory slot explicitly: it must never inherit a generic,
-     * silent template that requires a later PRESET action to become playable. */
-    uint8_t first_voice[FM1LAB_PATCH_BYTES];
-    fm1lab_factory_voice_build(first_voice, 0u);
-    (void)fm6_patch_set_voice(0u, first_voice);
+    /* Build all four factory voices explicitly. Never copy the engine's
+     * uninitialized PATCH 1..4 placeholders into the factory Instrument. */
     fm1lab_instrument_init(&factory_instrument, "FACTORY");
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-        const uint8_t *voice = fm6_patch_data(p);
-        if (voice) (void)fm1lab_patch_set_voice(&factory_instrument, p, voice);
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        fm1lab_factory_voice_build(voice,(uint8_t)p);
+        (void)fm1lab_patch_set_voice(&factory_instrument,p,voice);
         factory_instrument.patches[p].enabled = 1u;
-        factory_instrument.patches[p].level = 31u; /* safe factory level */
+        factory_instrument.patches[p].level = 31u;
     }
 }
 
@@ -892,6 +890,16 @@ static void instrument_sync_settings(void)
 
 static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
 
+static int instrument_patch_has_placeholder_name(const uint8_t *voice)
+{
+    if(!voice)return 1;
+    if(fm1lab_strncmp((const char *)voice+145u,"PATCH 1",7u)==0)return 1;
+    uint8_t blank=1u;
+    for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)
+        if(voice[145u+i]!=' ' && voice[145u+i]!=0u)blank=0u;
+    return blank;
+}
+
 static void instrument_load(uint32_t index, int from_audio)
 {
     fm1lab_instrument_t candidate;
@@ -906,7 +914,8 @@ static void instrument_load(uint32_t index, int from_audio)
     }
     /* Older valid library records can have an Instrument placeholder in patch 1:
      * valid metadata and CRC, but no carrier output. Repair just that slot. */
-    if (!fm1lab_voice_has_audible_carrier(current_instrument.patches[0].voice)) {
+    if (!fm1lab_voice_has_audible_carrier(current_instrument.patches[0].voice) ||
+        instrument_patch_has_placeholder_name(current_instrument.patches[0].voice)) {
         uint8_t playable[FM1LAB_PATCH_BYTES];
         uint8_t previous_level = current_instrument.patches[0].level;
         fm1lab_factory_voice_build(playable, 0u);
