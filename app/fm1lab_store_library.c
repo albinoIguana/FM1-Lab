@@ -41,7 +41,7 @@ static PLAT_POOL uint8_t bank_work[BANK_BYTES];
 _Static_assert(sizeof(fm1lab_insert_state_t)==26u, "Instrument tuning/insert state layout changed");
 _Static_assert(INSERTS_TOTAL_BYTES<=3840u, "Insert sidecar exceeds one store sector");
 /* Oversized read/scratch buffers intentionally accept the previous V1/V2
- * journal records before compacting them into the V3 global-Instrument form. */
+ * journal records before compacting them into the V5 tuning-aware form. */
 static PLAT_POOL uint8_t inserts_work[INSERTS_V2_TOTAL_BYTES];
 static PLAT_POOL uint8_t inserts_snapshot_work[INSERTS_V2_SNAPSHOT_BYTES];
 static PLAT_POOL uint8_t inserts_v4_snapshot_work[INSERTS_V4_SNAPSHOT_BYTES];
@@ -442,7 +442,12 @@ int fm1lab_store_library_format_bank(unsigned bank,const fm1lab_instrument_t *fa
  for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++)
   instrument_encode(record_at(bank_work,slot),factory);
  write16(bank_work+6u,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
- fm1lab_insert_state_init(&defaults);inserts_record_load(inserts_work);
+ fm1lab_insert_state_init(&defaults);
+ for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
+  defaults.patch_octave[p]=factory->patches[p].octave;
+  defaults.patch_fine_cents[p]=factory->patches[p].fine_cents;
+ }
+ inserts_record_load(inserts_work);
  if(inserts_record_prepare(inserts_work,inserts_bank_crc,inserts_bank_generation,bank,0u,
     read16(bank_work+6u),new_generation,&defaults))return -1;
  inserts_snapshot_resolve(inserts_snapshot_work,inserts_work,inserts_bank_crc,inserts_bank_generation);
