@@ -14,7 +14,8 @@
 #define SET_MAGIC_V8 0x4C314D4Du
 #define SET_MAGIC_V9 0x4C314D4Eu
 #define SET_MAGIC_V10 0x4C314D4Fu
-#define SET_MAGIC SET_MAGIC_V10
+#define SET_MAGIC_V11 0x4C314D50u
+#define SET_MAGIC SET_MAGIC_V11
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off, rsv[1]; } settings_v1_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; } settings_v2_t;
 typedef struct {
@@ -45,6 +46,7 @@ typedef struct {
     uint8_t compressor_attack,compressor_release,compressor_makeup;
 } fm6_performance_state_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v5_t performance; uint16_t reserved; uint16_t crc; } settings_v5_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v10_t performance; uint16_t reserved; uint16_t padding; uint16_t crc; } settings_v10_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t padding; uint16_t crc; } settings_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v6_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v7_t;
@@ -420,6 +422,34 @@ static inline int settings_import_v9(settings_t *dst,const settings_v9_t *src) {
     return 0;
 }
 
+static inline int settings_v10_valid(const settings_v10_t *v) {
+    if(!v || v->magic!=SET_MAGIC_V10 || v->octave < -2 || v->octave>2 ||
+       v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u ||
+       v->reserved>3u || v->padding!=0u ||
+       v->crc!=settings_crc16(v,offsetof(settings_v10_t,crc))) return 0;
+    settings_t migrated={0};
+    memcpy(&migrated.performance,&v->performance,sizeof v->performance);
+    migrated.performance.chaos_amount=0u;migrated.performance.chaos_rate=42u;
+    migrated.performance.chaos_tone=55u;migrated.performance.chaos_shape=0u;
+    if(!fm6_performance_state_valid(&migrated.performance))return 0;
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++){
+        if(v->levels[p]>127u)return 0;
+        for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)if(v->macros[p][m]>100u)return 0;
+    }
+    return 1;
+}
+static inline int settings_import_v10(settings_t *dst,const settings_v10_t *src) {
+    if(!dst || !settings_v10_valid(src))return -1;
+    dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
+    dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
+    memcpy(dst->macros,src->macros,sizeof dst->macros);
+    memcpy(dst->levels,src->levels,sizeof dst->levels);
+    memcpy(&dst->performance,&src->performance,sizeof src->performance);
+    dst->performance.chaos_amount=0u;dst->performance.chaos_rate=42u;
+    dst->performance.chaos_tone=55u;dst->performance.chaos_shape=0u;
+    dst->reserved=src->reserved;dst->padding=0u;dst->crc=0u;
+    return 0;
+}
 static inline int settings_valid(const settings_t *v) {
     if(!v || v->magic!=SET_MAGIC || v->octave < -2 || v->octave>2 || v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u || v->reserved>3u || v->padding!=0u || !fm6_performance_state_valid(&v->performance) || v->crc!=settings_crc16(v,offsetof(settings_t,crc))) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p) { if(v->levels[p]>127u) return 0; for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m) if(v->macros[p][m]>100u) return 0; }
