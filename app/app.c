@@ -1270,7 +1270,7 @@ static void sequencer_events_import_legacy(void)
             uint8_t note=seq_ui_note[lane][step];
             uint8_t tied=(uint8_t)(seq_ui_tie[lane][step] && previous_event>=0 && previous_note==note);
             if(tied) {
-                if(seq_event_store[lane][previous_event].duration<64u)
+                if(seq_event_store[lane][previous_event].duration<128u)
                     seq_event_store[lane][previous_event].duration+=2u;
             } else if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE) {
                 uint8_t duration=2u;
