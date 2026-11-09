@@ -187,6 +187,15 @@ static void render_compressor_stereo(uint8_t enabled,int32_t *destination)
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
 
+static void render_chaos(uint8_t amount,uint8_t rate,uint8_t tone,uint8_t shape,int32_t *destination)
+{
+    fm6_init();
+    fm6_chaos_set(amount,rate,tone,shape);
+    fm6_note_on_mask(60u,110u,0x0fu);
+    for(unsigned block=0u;block<32u;block++)
+        fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
+}
+
 static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
 {
     fm6_init();
@@ -200,6 +209,26 @@ static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
 }
 
 int main(void) {
+    /* MAELSTROM amount zero is a truly transparent bypass, independent of
+     * the parked modulation controls. Engaged settings must alter the mix. */
+    render_chaos(0u,0u,0u,0u,chunk_a);
+    render_chaos(0u,100u,100u,5u,chunk_b);
+    assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))==0);
+    render_chaos(100u,42u,80u,0u,chunk_b);
+    assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
+    render_chaos(100u,100u,100u,4u,chunk_a);
+    assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
+    fm6_init();
+    {
+        fm6_performance_state_t state,check;
+        fm6_performance_state_get(&state);
+        state.chaos_amount=73u;state.chaos_rate=88u;state.chaos_tone=29u;state.chaos_shape=5u;
+        assert(fm6_performance_state_valid(&state));
+        assert(fm6_performance_state_update(&state)==0);
+        fm6_performance_state_get(&check);
+        assert(check.chaos_amount==73u&&check.chaos_rate==88u&&check.chaos_tone==29u&&check.chaos_shape==5u);
+    }
+
     /* Whole-patch pitch is an independent frequency offset, not an operator
      * ratio edit. Octaves and cents both alter the actual rendered note. */
     render_patch_pitch(0,0,chunk_a);
