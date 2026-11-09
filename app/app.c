@@ -1202,6 +1202,8 @@ static void sequencer_select_event(int direction)
     if(seq_selected_event[lane]>=count)position=direction<0?0u:count-1u;
     else if(direction>0)position=(position+1u)%count;
     else if(direction<0)position=(position+count-1u)%count;
+    uint32_t detents=(uint32_t)(direction<0?-direction:direction);
+    if(detents>1u)position=(position+(direction<0?count-(detents%count):detents)%count)%count;
     seq_selected_event[lane]=order[position];
     seq_ui_step=seq_event_store[lane][seq_selected_event[lane]].start;
 }
@@ -2028,9 +2030,9 @@ static void input(void)
                     app_say("MASTER TEMPO","UPDATED");
                 }
             } else if (page == PAGE_SEQ_OPTIONS) {
-                if(index==0u && (e%2)!=0) {
-                    seq_record_mode^=1u;set.reserved=(uint16_t)((set.reserved&2u)|seq_record_mode);set_dirty=1u;
-                    app_say("LOOP RECORD",seq_record_mode?"OVERWRITE":"OVERDUB");
+                if(index==0u && e!=0) {
+                    seq_record_mode=0u;set.reserved=(uint16_t)(set.reserved&2u);set_dirty=1u;
+                    app_say("RECORD MODE","ADDITIVE ONLY");
                 } else if(index==1u && e!=0) {
                     uint8_t next=(uint8_t)clamp((int32_t)set.performance.seq_length+e,2,64);
                     if(next!=set.performance.seq_length) {
@@ -2844,7 +2846,7 @@ static void draw_sequencer_piano_panel(void)
         }
     }
     cv_text(10,116,&FONT_XS,"NOTE",C_GRAY);
-    if(selected)int_text(selected->pitch,value);else text_copy(value,"--");
+    if(selected)int_text(selected->pitch,value);else {value[0]='-';value[1]='-';value[2]='\0';}
     cv_text(36,116,&FONT_B,value,accent);
     cv_text(68,116,&FONT_XS,"LEN",C_GRAY);
     int_text(selected?selected->duration:0,value);
@@ -2899,9 +2901,9 @@ static void draw_sequencer_options_panel(void)
     const uint16_t yellow=RGB(242,212,59);
     const uint16_t cyan=RGB(36,215,232);
     const uint16_t red=RGB(255,105,115);
-    draw_sequencer_options_card(0u,"K1  RECORD MODE",
-        seq_record_mode?"OVERWRITE":"OVERDUB",
-        seq_record_mode?"CLEAR UNPLAYED STEPS":"KEEP UNPLAYED STEPS",yellow);
+    draw_sequencer_options_card(0u,"RECORD MODE",
+        "ADDITIVE",
+        "EXISTING NOTES ARE PRESERVED",yellow);
     int_text(set.performance.seq_length,value);text_cat(value," STEPS");
     draw_sequencer_options_card(1u,"K2  LOOP LENGTH",value,"TURN 2-64  /  DEFAULT 16",cyan);
     draw_sequencer_options_card(2u,"RECORD STATUS",
