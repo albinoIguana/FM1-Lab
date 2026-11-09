@@ -77,7 +77,8 @@ static inline void settings_clear_events(settings_t *dst) {
 }
 static inline void settings_migrate_step_events(settings_t *dst) {
     uint32_t length=dst->performance.seq_length;
-    if(length<2u)length=2u;if(length>64u)length=64u;
+    if(length<2u)length=2u;
+    if(length>64u)length=64u;
     settings_clear_events(dst);
     for(uint32_t lane=0;lane<2u;lane++) {
         int previous=-1;uint8_t previous_note=255u;
