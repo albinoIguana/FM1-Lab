@@ -111,6 +111,43 @@ int fm1lab_voice_global_set(uint8_t voice[FM1LAB_PATCH_BYTES],
     return 0;
 }
 
+int fm1lab_voice_adsr_get(const uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t adsr[4])
+{
+    if (!voice || !adsr) return -1;
+    for (unsigned op = 1; op <= 6; ++op) {
+        if (fm1lab_voice_operator_is_carrier(voice, op) == 1) {
+            if (fm1lab_voice_operator_get(voice, op, FM1LAB_OP_RATE_1, &adsr[0]) ||
+                fm1lab_voice_operator_get(voice, op, FM1LAB_OP_RATE_3, &adsr[1]) ||
+                fm1lab_voice_operator_get(voice, op, FM1LAB_OP_LEVEL_3, &adsr[2]) ||
+                fm1lab_voice_operator_get(voice, op, FM1LAB_OP_RATE_4, &adsr[3])) return -1;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int fm1lab_voice_adsr_set(uint8_t voice[FM1LAB_PATCH_BYTES], const uint8_t adsr[4])
+{
+    if (!voice || !adsr) return -1;
+    for (unsigned i = 0; i < 4; ++i) if (adsr[i] > 99u) return -1;
+    unsigned carriers = 0;
+    for (unsigned op = 1; op <= 6; ++op) {
+        if (fm1lab_voice_operator_is_carrier(voice, op) != 1) continue;
+        ++carriers;
+        /* R1->L1 is attack; R2->L2 is an immediate full-level transition;
+         * R3->L3 is decay to sustain; R4->L4 is release to silence. */
+        if (fm1lab_voice_operator_set(voice, op, FM1LAB_OP_RATE_1, adsr[0]) ||
+            fm1lab_voice_operator_set(voice, op, FM1LAB_OP_LEVEL_1, 99u) ||
+            fm1lab_voice_operator_set(voice, op, FM1LAB_OP_RATE_2, 99u) ||
+            fm1lab_voice_operator_set(voice, op, FM1LAB_OP_LEVEL_2, 99u) ||
+            fm1lab_voice_operator_set(voice, op, FM1LAB_OP_RATE_3, adsr[1]) ||
+            fm1lab_voice_operator_set(voice, op, FM1LAB_OP_LEVEL_3, adsr[2]) ||
+            fm1lab_voice_operator_set(voice, op, FM1LAB_OP_RATE_4, adsr[3]) ||
+            fm1lab_voice_operator_set(voice, op, FM1LAB_OP_LEVEL_4, 0u)) return -1;
+    }
+    return carriers ? 0 : -1;
+}
+
 int fm1lab_voice_operator_is_carrier(const uint8_t voice[FM1LAB_PATCH_BYTES],
                                      unsigned operator_number)
 {
