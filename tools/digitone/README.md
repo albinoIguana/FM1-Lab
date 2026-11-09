@@ -1,28 +1,45 @@
 # Digitone sound import research
 
-FM1-Lab now includes a conservative inspector for original Elektron Digitone sound SysEx messages:
+FM1-Lab includes an inspector for original Elektron Digitone sound SysEx dumps:
 
     python3 tools/digitone/inspect_syx.py path/to/digitone-sounds.syx -o digitone-sounds.json
 
-The inspector extracts the sound name and preserves each complete source message plus its parameter region as hex. It intentionally does not claim to convert a Digitone patch into an FM1 patch yet.
+The inspector:
+- Splits concatenated Digitone sound messages.
+- Validates the Elektron header, checksum, and length fields.
+- Decodes the Digitone 8-in-7 packed payload.
+- Extracts sound names and tag labels.
+- Preserves decoded synthesis bytes and original messages as hex.
 
-## Decoder reference
+It deliberately does **not** claim to convert Digitone synthesis parameters into FM1 voices yet.
 
-The parameter research is based on the public [d-huck/libdigitone](https://github.com/d-huck/libdigitone) project (MIT-licensed). That project documents Digitone's sound message layout and parameter byte locations. Its own README describes the decoder as work in progress and says it does not encode Digitone SysEx.
+## Verified source bank
 
-FM1 uses M-VAVE's expanded 156-byte DX7-compatible voice layout and a six-operator engine. Digitone's four-operator topology, algorithm routing, operator envelopes, modulation and performance destinations do not map one-to-one. A conversion must therefore be explicit and testable rather than copying bytes or inventing values.
+A user-provided copy of the public URRRS x Digitone bank was inspected locally:
+- 124 sound messages.
+- 361 bytes per message.
+- 302 decoded payload bytes per sound.
+- All 124 checksums and length fields valid.
+- Payload magic `BE EF BA CE`, payload version 4.
 
-## Conversion plan
+The source file itself is not included in this repository. The inventory and converter tooling should not redistribute the original sound bank.
 
-1. Inspect actual .syx sound dumps and validate message boundaries.
-2. Decode Digitone parameter values using the documented parameter map.
-3. Build a topology-aware mapping from Digitone's four operators to FM1's six operators, preserving carrier/modulator roles where possible.
-4. Generate four related FM1 patches per Instrument, with safe output levels and expressive Brightness / Body / Motion / Dirt macros.
-5. Render and audition against the original source demos; refine by ear.
-6. Keep source names and provenance in a separate manifest.
+## Decoder references
 
-Do not overwrite factory or user Instruments until the translated bank has passed structural checks and is explicitly reviewed.
+- [d-huck/libdigitone](https://github.com/d-huck/libdigitone) (MIT) documents Digitone sound parameter offsets and tag metadata. Its README describes the parser as work in progress; it predates the 8-in-7 correction documented below.
+- [NoiseAndMatter/DNX SysEx format notes](https://github.com/NoiseAndMatter/DNX/blob/main/docs/sysex-format.md) documents the Elektron container, checksum, length, and MSB-first 8-in-7 codec. Its notes distinguish Digitone sound payload versions and sizes.
+- [Elektron Digitone User Manual](https://www.elektron.se/wp-content/uploads/2024/09/Digitone_User_Manual_ENG_OS1.41_231108.pdf), Appendix A, documents the four-operator engine, eight algorithms, C/A/B1/B2 operator groups, two operator envelopes, ratios, harmonics, detune, feedback, and X/Y carrier mix.
 
-## What is needed for rtFM 2
+## Conversion considerations
 
-The free rtFM 2 demo or a user-provided full-pack .syx dump is needed to translate those exact sounds. The inspector can process the dump once it is available. Do not redistribute the original pack; the resulting FM1 patches should be independently recreated translations, with source attribution.
+FM1 uses M-VAVE's expanded 156-byte DX7-compatible voice layout and a six-operator engine. Digitone uses four operators grouped as C, A, B1, and B2, with two macro envelopes and two carrier outputs. The conversion therefore needs an explicit topology mapping; copying bytes or simply assigning ratios is not a faithful translation.
+
+A practical conversion should:
+1. Decode the Digitone algorithm and identify its carrier/modulator graph.
+2. Map C, A, B1, and B2 ratios, envelopes, modulation levels, harmonics, detune, feedback, and X/Y mix into a suitable six-operator DX7 algorithm.
+3. Use the two extra FM1 operators deliberately for reinforcement, additional modulation, or spectral motion—not arbitrary filler.
+4. Translate filter/amp/LFO and send parameters only where FM1 has a meaningful equivalent; keep unsupported source behavior documented.
+5. Group four related translated voices into each FM1 Instrument, set conservative patch levels, and preserve the source names/provenance in a separate manifest.
+6. Validate generated 156-byte voices and four-patch Instrument records before adding them to a bank.
+
+Do not overwrite factory or user Instruments while the conversion is experimental. Keep the imported collection separate until it has been reviewed and tested on the emulator and physical FM1.
