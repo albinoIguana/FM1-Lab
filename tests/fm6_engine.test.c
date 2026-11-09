@@ -1005,12 +1005,12 @@ int main(void) {
         fm6_patch_set_level(patch,31u);
     }
     const fm6_seq_event_t lane0[] = {
-        {0u,2u,60u,110u,0u},
-        {0u,4u,60u,100u,35u},
-        {0u,3u,64u,95u,0u}
+        {0u,4u,60u,110u,0u},
+        {0u,8u,60u,100u,35u},
+        {0u,6u,64u,95u,0u}
     };
     const fm6_seq_event_t lane1[] = {
-        {0u,1u,67u,95u,0u}
+        {0u,2u,67u,95u,0u}
     };
     fm6_sequencer_set_length(16u);
     assert(fm6_sequencer_set_events(0u,lane0,3u)==0);
