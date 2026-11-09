@@ -147,7 +147,7 @@ export function setTrackLength(sequence, trackIndex, length) {
     Math.abs(option - requested) < Math.abs(best - requested) ? option : best, 16);
   next.tracks[trackIndex].length = selected;
   next.tracks[trackIndex].events = next.tracks[trackIndex].events.filter(event => event.start < selected)
-    .map(event => ({ ...event, duration: Math.min(event.duration, selected) }));
+    .map(event => ({ ...event, duration: Math.min(event.duration, selected - event.start) }));
   return next;
 }
 
