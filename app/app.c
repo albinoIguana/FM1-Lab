@@ -56,10 +56,6 @@ static uint8_t seq_record_redraw;
 static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
 static uint8_t seq_event_count[2], seq_event_store_ready;
 static uint8_t seq_selected_event[2]={255u,255u};
-static fm6_seq_event_t seq_event_snapshot[2][APP_SEQ_EVENTS_PER_LANE];
-static uint8_t seq_event_snapshot_count[2];
-static volatile uint8_t seq_events_update_pending;
-static volatile uint8_t seq_events_update_dirty;
 static uint16_t transport_ui_bpm=120u;
 static uint8_t arp_ui_latch, arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
@@ -78,7 +74,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN, EV_SEQ_EVENTS };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN };
 static fm6_performance_state_t performance_update_snapshot;
 static volatile uint8_t performance_update_pending, performance_update_dirty;
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
@@ -783,6 +779,13 @@ static void performance_publish(void)
             set.performance.seq_velocity[lane][step] = seq_ui_velocity[lane][step];
             set.performance.seq_gate[lane][step] = (uint8_t)(seq_ui_gate[lane][step] | (seq_ui_tie[lane][step] ? 0x80u : 0u));
         }
+        if(seq_event_store_ready) {
+            set.performance.seq_event_count[lane]=seq_event_count[lane];
+            for(uint32_t i=0;i<APP_SEQ_EVENTS_PER_LANE;i++) {
+                if(i<seq_event_count[lane])set.performance.seq_events[lane][i]=seq_event_store[lane][i];
+                else set.performance.seq_events[lane][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
+            }
+        }
     }
     performance_update_snapshot = set.performance;
     performance_update_dirty = 0u;
@@ -967,11 +970,6 @@ static void ui_events_drain(void)
         performance_update_pending = 0u;
         performance_update_dirty = 0u;
         (void)fm6_performance_state_set(&set.performance);
-        if(seq_event_store_ready) {
-            for(uint32_t lane=0;lane<2u;lane++)
-                (void)fm6_sequencer_set_events((uint8_t)lane,seq_event_store[lane],seq_event_count[lane]);
-            seq_events_update_pending=0u;seq_events_update_dirty=0u;
-        }
         return;
     }
     while ((tail = ui_event_tail) != ui_event_head) {
@@ -1004,11 +1002,7 @@ static void ui_events_drain(void)
             performance_update_pending = 0u;
         } else if (type == EV_SEQ_RUN)
             fm6_sequencer_set_running(a);
-        else if (type == EV_SEQ_EVENTS) {
-            for(uint32_t lane=0;lane<2u;lane++)
-                (void)fm6_sequencer_set_events((uint8_t)lane,seq_event_snapshot[lane],seq_event_snapshot_count[lane]);
-            seq_events_update_pending=0u;
-        }
+
         else if (type == EV_PATCH_VOICE) {
             (void)fm6_patch_set_voice(a, voice_update_snapshot);
             fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a%FM1LAB_PATCH_COUNT));
@@ -1127,23 +1121,7 @@ static void sequencer_cache_instrument_name(uint8_t lane, const char *source)
 }
 static void sequencer_events_publish(void)
 {
-    if(seq_events_update_pending) {
-        seq_events_update_dirty=1u;
-        return;
-    }
-    for(uint32_t lane=0;lane<2u;lane++) {
-        seq_event_snapshot_count[lane]=seq_event_count[lane];
-        for(uint32_t i=0;i<seq_event_count[lane];i++)
-            seq_event_snapshot[lane][i]=seq_event_store[lane][i];
-    }
-    seq_events_update_dirty=0u;
-    seq_events_update_pending=1u;
-    ui_event_push(EV_SEQ_EVENTS,0u,0u,0u);
-}
-static void sequencer_events_flush(void)
-{
-    if(seq_events_update_dirty && !seq_events_update_pending)
-        sequencer_events_publish();
+    performance_publish();
 }
 
 static void sequencer_events_import_legacy(void)
@@ -1711,7 +1689,6 @@ static void input(void)
     touch_poll();                            /* the sensed keys' presses, velocities and pressure */
     keys = touch_keys();
     sequencer_record_step_advance();
-    sequencer_events_flush();
     for (k = 0; k < NKEYS; k++) {            /* key 0 is F3 (MIDI 53) */
         uint32_t bit = 1u << k, v;
         int32_t note = 53 + (int32_t)k + 12 * set.octave;
