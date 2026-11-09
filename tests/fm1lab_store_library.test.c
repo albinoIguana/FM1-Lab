@@ -27,7 +27,7 @@ static void make_legacy_insert_snapshot(uint8_t *dst,const uint8_t *src,int v2)
     memset(dst,0,snap);
     memcpy(dst,src,header);
     for(unsigned i=0;i<32u;i++){
-        const uint8_t *state=src+12u+i*18u;
+        const uint8_t *state=src+12u+i*26u;
         uint8_t *legacy=dst+header+i*56u;
         for(unsigned p=0;p<4u;p++)memcpy(legacy+p*14u,state,14u);
     }
@@ -37,8 +37,25 @@ static void make_legacy_insert_snapshot(uint8_t *dst,const uint8_t *src,int v2)
 static void make_v3_insert_snapshot(uint8_t *dst,const uint8_t *src)
 {
     memset(dst,0,462u);memcpy(dst,src,12u);
-    for(unsigned i=0;i<32u;i++)memcpy(dst+12u+i*14u,src+12u+i*18u,14u);
+    for(unsigned i=0;i<32u;i++)memcpy(dst+12u+i*14u,src+12u+i*26u,14u);
     uint16_t crc=test_crc16(dst,460u);dst[460]=(uint8_t)crc;dst[461]=(uint8_t)(crc>>8);
+}
+static void downgrade_insert_sidecar_to_v4(void)
+{
+    uint8_t old[1192];memset(old,0,sizeof old);
+    old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x34u;
+    old[4]=4u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
+    for(unsigned copy=0;copy<2u;copy++){
+        const uint8_t *src=objects[4]+12u+copy*846u;
+        uint8_t *dst=old+12u+copy*590u;
+        memcpy(dst,src,12u);
+        for(unsigned i=0;i<32u;i++)
+            memcpy(dst+12u+i*18u,src+12u+i*26u,18u);
+        uint16_t crc=test_crc16(dst,588u);
+        dst[588]=(uint8_t)crc;dst[589]=(uint8_t)(crc>>8);
+    }
+    uint16_t header_crc=test_crc16(old,8u);old[8]=(uint8_t)header_crc;old[9]=(uint8_t)(header_crc>>8);
+    memcpy(objects[4],old,sizeof old);object_len[4]=(uint16_t)sizeof old;
 }
 static void downgrade_insert_sidecar_to_v3(void)
 {
@@ -46,7 +63,7 @@ static void downgrade_insert_sidecar_to_v3(void)
     old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x33u;
     old[4]=3u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
     for(unsigned copy=0;copy<2u;copy++)
-        make_v3_insert_snapshot(old+12u+copy*462u,objects[4]+12u+copy*590u);
+        make_v3_insert_snapshot(old+12u+copy*462u,objects[4]+12u+copy*846u);
     uint16_t header_crc=test_crc16(old,8u);old[8]=(uint8_t)header_crc;old[9]=(uint8_t)(header_crc>>8);
     memcpy(objects[4],old,sizeof old);object_len[4]=(uint16_t)sizeof old;
 }
@@ -58,7 +75,7 @@ static void downgrade_insert_sidecar_to_v1(void)
     old[4]=1u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
     for(unsigned bank=0;bank<4u;bank++)objects[bank][5]=(uint8_t)bank;
     for(unsigned copy=0;copy<2u;copy++){
-        const uint8_t *src=objects[4]+12u+copy*590u;
+        const uint8_t *src=objects[4]+12u+copy*846u;
         make_legacy_insert_snapshot(old+12u+copy*1802u,src,0);
     }
     uint16_t header_crc=test_crc16(old,8u);
@@ -72,7 +89,7 @@ static void downgrade_insert_sidecar_to_v2(void)
     old[0]=0x49u;old[1]=0x4eu;old[2]=0x53u;old[3]=0x32u;
     old[4]=2u;old[6]=(uint8_t)sizeof old;old[7]=(uint8_t)(sizeof old>>8);
     for(unsigned copy=0;copy<2u;copy++){
-        const uint8_t *src=objects[4]+12u+copy*462u;
+        const uint8_t *src=objects[4]+12u+copy*846u;
         make_legacy_insert_snapshot(old+12u+copy*1806u,src,1);
     }
     uint16_t header_crc=test_crc16(old,8u);
@@ -121,6 +138,8 @@ int main(void) {
         assert(loaded.patches[0].voice[134]==2);
     }
     make_instrument(&source);
+    source.patches[0].octave=-2;source.patches[0].fine_cents=37;
+    source.patches[1].octave=2;source.patches[1].fine_cents=-70;
     assert(fm1lab_store_library_save(31,&source)==0);
     assert(fm1lab_store_library_load(31,&loaded)==0);
     assert(memcmp(loaded.name,"TEST QUAD V",11)==0);
@@ -129,12 +148,15 @@ int main(void) {
         assert(loaded.patches[p].voice[135]==source.patches[p].voice[135]);
         assert(loaded.patches[p].enabled==source.patches[p].enabled);
         assert(loaded.patches[p].level==source.patches[p].level);
+        assert(loaded.patches[p].octave==source.patches[p].octave);
+        assert(loaded.patches[p].fine_cents==source.patches[p].fine_cents);
         assert(fm1lab_patch_pan(&loaded,p)==fm1lab_patch_pan(&source,p));
         assert(memcmp(loaded.patches[p].macros,source.patches[p].macros,4)==0);
         for(unsigned i=0;i<156;i++) assert(loaded.patches[p].voice[i]==source.patches[p].voice[i]);
     }
     assert(fm1lab_store_library_load(30,&loaded)==0);
     assert(memcmp(loaded.name,factory.name,11)==0);
+    for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){source.patches[p].octave=0;source.patches[p].fine_cents=0;}
 
     /* A V1 bank has no pan bits. Loading it migrates all patches to center
      * without changing the 3,840-byte record layout; the next save seals V2. */
@@ -169,6 +191,12 @@ int main(void) {
     assert(fm1lab_store_library_save_full(0u,&source,&inserts)==0);
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
+    /* V4 has the original 18-byte insert state; V5 adds four independent
+     * octave and cents pairs while preserving both journal snapshots. */
+    downgrade_insert_sidecar_to_v4();
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+    assert(memcmp(&inserts,&restored,sizeof(inserts))==0);
+    assert(fm1lab_store_library_save_full(0u,&loaded,&restored)==0);
     /* V3 stores the original 14-byte insert state; migration adds four
      * neutral instrument macros while preserving the active/fallback journal. */
     downgrade_insert_sidecar_to_v3();
