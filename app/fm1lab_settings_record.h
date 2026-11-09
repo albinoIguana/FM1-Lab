@@ -45,7 +45,7 @@ typedef struct {
     uint8_t compressor_attack,compressor_release,compressor_makeup;
 } fm6_performance_state_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v5_t performance; uint16_t reserved; uint16_t crc; } settings_v5_t;
-typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t padding; uint16_t crc; } settings_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v6_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v7_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v8_t;
@@ -55,7 +55,7 @@ static inline uint16_t settings_crc16(const void *data, size_t length) {
     while(length--) { crc^=(uint16_t)*bytes++<<8; for(uint32_t bit=0;bit<8u;++bit) crc=(uint16_t)((crc&0x8000u)?(((uint32_t)crc<<1)^0x1021u):((uint32_t)crc<<1)); }
     return crc;
 }
-static inline void settings_seal(settings_t *v) { v->magic=SET_MAGIC; v->reserved&=3u; v->crc=settings_crc16(v,offsetof(settings_t,crc)); }
+static inline void settings_seal(settings_t *v) { v->magic=SET_MAGIC; v->reserved&=3u; v->padding=0u; v->crc=settings_crc16(v,offsetof(settings_t,crc)); }
 static inline int settings_v1_valid(const settings_v1_t *v) {
     return v && v->magic==SET_MAGIC_V1 && v->octave>=-2 && v->octave<=2 && v->patch<FM1LAB_PATCH_COUNT && !(v->enabled_mask&0xF0u) && v->ble_off<=1u;
 }
