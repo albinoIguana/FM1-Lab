@@ -1355,6 +1355,16 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
                 return 0;
         }
     }
+    for(uint32_t lane=0;lane<2u;lane++) {
+        if(s->seq_event_count[lane]>FM6_SEQ_EVENTS_PER_LANE)return 0;
+        for(uint32_t i=0;i<s->seq_event_count[lane];i++) {
+            const fm6_seq_event_t *event=&s->seq_events[lane][i];
+            if(event->start>=s->seq_length || !event->duration ||
+               event->duration>(uint32_t)s->seq_length-event->start ||
+               event->pitch>127u || !event->velocity || event->velocity>127u ||
+               event->accent>100u)return 0;
+        }
+    }
     for (uint32_t fx = 0; fx < 4u; ++fx) {
         if (s->fx_enabled[fx] > 1u || s->fx_mix[fx] > 100u ||
             s->fx_time[fx] > 100u || s->fx_depth[fx] > 100u ||
@@ -1374,6 +1384,13 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
     if (!s) return;
     s->tempo_bpm = (uint16_t)transport_bpm;
     s->seq_length = seq_length;
+    for(uint32_t lane=0;lane<2u;lane++) {
+        s->seq_event_count[lane]=seq_event_mode?seq_event_count[lane]:0u;
+        for(uint32_t i=0;i<FM6_SEQ_EVENTS_PER_LANE;i++) {
+            if(seq_event_mode && i<seq_event_count[lane])s->seq_events[lane][i]=seq_events[lane][i];
+            else s->seq_events[lane][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
+        }
+    }
     for (uint32_t lane = 0; lane < 2u; ++lane) {
         s->lane_instrument[lane]=seq_lane_instrument[lane];
         for (uint32_t step = 0; step < 64u; ++step) {
@@ -1424,6 +1441,24 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
             seq_pattern[lane][step].gate=s->seq_gate[lane][step];
             seq_pattern[lane][step].enabled=s->seq_enabled[lane][step];
         }
+    }
+    uint8_t any_events=(uint8_t)(s->seq_event_count[0]||s->seq_event_count[1]);
+    if(any_events) {
+        for(uint32_t lane=0;lane<2u;lane++) {
+            uint8_t changed=(uint8_t)(!seq_event_mode || seq_event_count[lane]!=s->seq_event_count[lane]);
+            if(!changed)for(uint32_t i=0;i<seq_event_count[lane];i++) {
+                const fm6_seq_event_t *a=&seq_events[lane][i],*b=&s->seq_events[lane][i];
+                if(a->start!=b->start||a->duration!=b->duration||a->pitch!=b->pitch||
+                   a->velocity!=b->velocity||a->accent!=b->accent){changed=1u;break;}
+            }
+            if(changed && fm6_sequencer_set_events((uint8_t)lane,s->seq_events[lane],s->seq_event_count[lane])!=0)return -1;
+        }
+    } else if(seq_event_mode) {
+        for(uint32_t lane=0;lane<2u;lane++) {
+            fm6_seq_event_release_lane(lane);
+            seq_event_count[lane]=0u;
+        }
+        seq_event_mode=0u;
     }
     if(arp_mode && !s->arp_mode)arp_clear_pending=1u;
     if(!arp_mode && s->arp_mode){arp_index=0u;arp_direction=1u;arp_step_position=0u;arp_phase=0u;}
