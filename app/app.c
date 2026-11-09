@@ -662,6 +662,24 @@ static int fm1lab_same_library_instrument(const fm1lab_instrument_t *a,
     return memcmp(a->patches,b->patches,sizeof a->patches)==0 &&
            fm1lab_strncmp(a->name,b->name,FM1LAB_INSTRUMENT_NAME_BYTES)==0;
 }
+static int fm1lab_is_previous_digitone_instrument(uint32_t index,
+                                                   const fm1lab_instrument_t *existing)
+{
+    if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !existing) return 0;
+    fm1lab_instrument_t previous;
+    fm1lab_instrument_init(&previous,fm1lab_digitone_instrument_names[index]);
+    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice) ||
+           fm1lab_patch_set_voice(&previous,patch,voice)) return 0;
+        fm1lab_patch_set_pan(&previous,patch,voice[155]);
+        previous.patches[patch].level=31u;
+        previous.patches[patch].enabled=1u;
+        for(uint32_t macro=0;macro<FM1LAB_MACRO_COUNT;macro++)
+            previous.patches[patch].macros[macro]=50u;
+    }
+    return fm1lab_same_library_instrument(existing,&previous);
+}
 static int fm1lab_is_previous_factory_instrument(uint32_t index,
                                                   const fm1lab_instrument_t *existing)
 {
@@ -701,7 +719,8 @@ static void fm1lab_seed_factory_library(void)
         }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
         if(!fm1lab_is_untouched_factory(&existing) &&
-           !fm1lab_is_previous_factory_instrument(index,&existing)) continue;
+           !fm1lab_is_previous_factory_instrument(index,&existing) &&
+           !fm1lab_is_previous_digitone_instrument(index,&existing)) continue;
         if(fm1lab_store_library_save_full(index,&seed,&inserts)!=0) {
             app_say("DIGITONE BANK","SAVE FAILED");
             return;
