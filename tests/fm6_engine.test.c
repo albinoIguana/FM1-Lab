@@ -195,6 +195,22 @@ int main(void) {
     for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
         assert(fm6_patch_level(patch) == 31u);
 
+    /* Repeated same-pitch sequencer events have independent release identity.
+     * Releasing one event must leave the other sustained voice alive. */
+    fm6_init();
+    for(unsigned patch=1u;patch<FM6_ENGINE_PATCH_COUNT;patch++)fm6_patch_set_enabled(patch,0u);
+    fm6_sequencer_note_on(60u,100u,0x01u,0x0101u);
+    fm6_sequencer_note_on(60u,100u,0x01u,0x0102u);
+    assert(fm6_active_voices_patch(0u)==2u);
+    fm6_sequencer_note_off(60u,0x01u,0x0101u);
+    for(unsigned block=0u;block<344u;block++)fm6_render(output,128u,4096u);
+    assert(fm6_active_voices_patch(0u)==1u);
+    fm6_sequencer_note_off(60u,0x01u,0x0102u);
+    for(unsigned block=0u;block<344u;block++)fm6_render(output,128u,4096u);
+    assert(fm6_active_voices_patch(0u)==0u);
+    fm6_sequencer_note_on(60u,100u,0x01u,2u); /* reserved source IDs are rejected */
+    assert(fm6_active_voices_patch(0u)==0u);
+
     /* A patch's gain must not fall as additional identical patches are
      * enabled. Four coherent patches should sum, not be normalized back
      * to the single-patch level. */
