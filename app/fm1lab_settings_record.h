@@ -13,7 +13,8 @@
 #define SET_MAGIC_V7 0x4C314D4Cu
 #define SET_MAGIC_V8 0x4C314D4Du
 #define SET_MAGIC_V9 0x4C314D4Eu
-#define SET_MAGIC SET_MAGIC_V9
+#define SET_MAGIC_V10 0x4C314D4Fu
+#define SET_MAGIC SET_MAGIC_V10
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off, rsv[1]; } settings_v1_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; } settings_v2_t;
 typedef struct {
@@ -45,9 +46,10 @@ typedef struct {
 } fm6_performance_state_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v5_t performance; uint16_t reserved; uint16_t crc; } settings_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_t;
-typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_v6_t;
-typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_v7_t;
-typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t crc; } settings_v8_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v6_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v7_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v8_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v9_t;
 static inline uint16_t settings_crc16(const void *data, size_t length) {
     const uint8_t *bytes=(const uint8_t *)data; uint16_t crc=0xFFFFu;
     while(length--) { crc^=(uint16_t)*bytes++<<8; for(uint32_t bit=0;bit<8u;++bit) crc=(uint16_t)((crc&0x8000u)?(((uint32_t)crc<<1)^0x1021u):((uint32_t)crc<<1)); }
@@ -61,6 +63,43 @@ static inline int settings_v2_valid(const settings_v2_t *v) {
     if(!v || v->magic!=SET_MAGIC_V2 || v->octave < -2 || v->octave>2 || v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p) { if(v->levels[p]>127u) return 0; for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m) if(v->macros[p][m]>100u) return 0; }
     return 1;
+}
+
+static inline int settings_legacy_performance_valid(const fm6_performance_state_v9_t *legacy) {
+    fm6_performance_state_t current;
+    memset(&current,0,sizeof current);
+    memcpy(&current,legacy,sizeof *legacy);
+    return fm6_performance_state_valid(&current);
+}
+static inline void settings_clear_events(settings_t *dst) {
+    memset(dst->performance.seq_event_count,0,sizeof dst->performance.seq_event_count);
+    memset(dst->performance.seq_events,0,sizeof dst->performance.seq_events);
+}
+static inline void settings_migrate_step_events(settings_t *dst) {
+    uint32_t length=dst->performance.seq_length;
+    if(length<2u)length=2u;if(length>64u)length=64u;
+    settings_clear_events(dst);
+    for(uint32_t lane=0;lane<2u;lane++) {
+        int previous=-1;uint8_t previous_note=255u;
+        for(uint32_t step=0;step<length;step++) {
+            if(!dst->performance.seq_enabled[lane][step]||!dst->performance.seq_velocity[lane][step]) {
+                previous=-1;previous_note=255u;continue;
+            }
+            uint8_t note=dst->performance.seq_note[lane][step];
+            uint8_t tied=(uint8_t)((dst->performance.seq_gate[lane][step]&0x80u)&&previous>=0&&previous_note==note);
+            if(tied) {
+                if(dst->performance.seq_events[lane][previous].duration<64u)
+                    dst->performance.seq_events[lane][previous].duration++;
+            } else if(dst->performance.seq_event_count[lane]<128u) {
+                uint8_t index=dst->performance.seq_event_count[lane]++;
+                dst->performance.seq_events[lane][index]=(fm6_seq_event_t){
+                    (uint8_t)step,1u,note,dst->performance.seq_velocity[lane][step],0u
+                };
+                previous=(int)index;
+            } else previous=-1;
+            previous_note=note;
+        }
+    }
 }
 
 static inline void settings_arp_defaults(settings_t *dst) {
