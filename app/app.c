@@ -1364,6 +1364,7 @@ void app_init(void)
     settings_v6_t old_v6;
     settings_v7_t old_v7;
     settings_v8_t old_v8;
+    settings_v9_t old_v9;
     int performance_loaded = 0;
     int loaded;
     fm6_init();
@@ -1373,10 +1374,14 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v8, sizeof old_v8) == (int)sizeof old_v8 &&
+        if (plat_store_load(OBJ_SETTINGS, &old_v9, sizeof old_v9) == (int)sizeof old_v9 &&
+            settings_import_v9(&set, &old_v9) == 0) {
+            performance_loaded = 1;
+            set_dirty = 1u; /* V9 -> V10 stores the migrated polyphonic event pattern */
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v8, sizeof old_v8) == (int)sizeof old_v8 &&
             settings_import_v8(&set, &old_v8) == 0) {
             performance_loaded = 1;
-            set_dirty = 1u; /* V8 -> V9 repairs the accidental ARP step-2 seed */
+            set_dirty = 1u; /* V8 -> V10 repairs the accidental ARP step-2 seed */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v7, sizeof old_v7) == (int)sizeof old_v7 &&
             settings_import_v7(&set, &old_v7) == 0) {
             performance_loaded = 1;
@@ -1453,6 +1458,13 @@ void app_init(void)
                 seq_ui_tie[lane][step] = (uint8_t)((set.performance.seq_gate[lane][step] & 0x80u) != 0u);
             }
         }
+        for(uint32_t lane=0;lane<2u;lane++) {
+            seq_event_count[lane]=set.performance.seq_event_count[lane];
+            for(uint32_t i=0;i<seq_event_count[lane];i++)
+                seq_event_store[lane][i]=set.performance.seq_events[lane][i];
+            seq_selected_event[lane]=seq_event_count[lane]?0u:255u;
+        }
+        seq_event_store_ready=1u;
         /* ARP is opt-in: do not resurrect a previously saved DOWN/UP mode. */
         if (set.performance.arp_mode != 0u) {
             set.performance.arp_mode = 0u;
