@@ -2513,14 +2513,17 @@ static void draw_sequencer_panel(void)
     if(count>64u)count=64u;
     rows=(uint8_t)((count+15u)/16u);
 
-    /* Each lane gets up to four rows; every row contains at most 16 steps. */
+    /* Each track owns a fixed 46px timeline area. Use up to four rows,
+     * but expand row height so short patterns fill the same vertical space. */
+    int32_t row_gap=2;
+    int32_t row_height=(46-(int32_t)(rows-1u)*row_gap)/(int32_t)rows;
     cv_text(6,0,&FONT_XS,"TRACK 1",patch_color(seq_ui_patch[0]));
     cv_text(78,0,&FONT_XS,seq_ui_instrument_name[0],C_WHITE);
     for(uint32_t row=0;row<rows;row++) {
         uint8_t first=(uint8_t)(row*16u);
         uint8_t n=(uint8_t)(count-first);
         if(n>16u)n=16u;
-        draw_step_columns(0u,first,n,15+(int32_t)row*12,10,
+        draw_step_columns(0u,first,n,15+(int32_t)row*(row_height+row_gap),row_height,
                           seq_ui_lane==0u?seq_ui_step:255u,
                           fm6_sequencer_running()?playing:255u,
                           seq_ui_velocity[0],seq_ui_enabled[0],
@@ -2533,7 +2536,7 @@ static void draw_sequencer_panel(void)
         uint8_t first=(uint8_t)(row*16u);
         uint8_t n=(uint8_t)(count-first);
         if(n>16u)n=16u;
-        draw_step_columns(1u,first,n,81+(int32_t)row*12,10,
+        draw_step_columns(1u,first,n,81+(int32_t)row*(row_height+row_gap),row_height,
                           seq_ui_lane==1u?seq_ui_step:255u,
                           fm6_sequencer_running()?playing:255u,
                           seq_ui_velocity[1],seq_ui_enabled[1],
