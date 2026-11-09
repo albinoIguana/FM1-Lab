@@ -53,7 +53,8 @@ int main(void)
             assert(r1 == 12u && r2 == 99u && r3 == 34u && r4 == 78u);
             assert(l1 == 99u && l2 == 99u && l3 == 56u && l4 == 0u);
         } else {
-            assert(r1 == 0u && r2 == 0u && r3 == 0u && r4 == 0u);
+            assert(r1 == 0u && r2 == 0u && r3 == 0u);
+            assert(r4 == (op == 2u ? 99u : 0u)); /* OP2 was pre-edited above. */
             assert(l1 == 0u && l2 == 0u && l3 == 0u && l4 == 0u);
         }
     }
