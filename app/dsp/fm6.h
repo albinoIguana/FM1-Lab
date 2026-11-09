@@ -132,6 +132,7 @@ void fm6_sequencer_set_step(uint8_t lane, uint8_t step, uint8_t enabled, uint8_t
 int fm6_sequencer_set_events(uint8_t lane, const fm6_seq_event_t *events, uint16_t count);
 uint8_t fm6_sequencer_step(void);
 uint8_t fm6_sequencer_playing_step(void);
+uint8_t fm6_sequencer_tick_position(void);
 uint8_t fm6_sequencer_running(void);
 uint8_t fm6_arp_capture_pop(fm6_arp_capture_event_t *event);
 uint8_t fm6_arpeggiator_playing_step(void);
