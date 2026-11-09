@@ -201,6 +201,18 @@ int main(void) {
     assert(fm6_patch_count() == FM6_ENGINE_PATCH_COUNT);
     /* Performance macros should make broad, measurable changes around neutral. */
     fm6_init();
+    uint8_t macro_voice[156] = {0};
+    macro_voice[134] = 0u; /* algorithm 1: OP1/OP3 carriers */
+    macro_voice[135] = 0u;
+    macro_voice[137] = 20u;
+    macro_voice[139] = 20u;
+    macro_voice[140] = 20u;
+    for (unsigned op=1u; op<=6u; ++op) {
+        unsigned offset=(6u-op)*21u;
+        macro_voice[offset+16u]=70u;
+        macro_voice[offset+18u]=1u;
+    }
+    assert(fm6_patch_set_voice(0u,macro_voice)==0);
     fm6_macro_set(0u, FM1LAB_MACRO_BRIGHTNESS, 50u);
     assert(fm6_test_macro_mod_level(0u) == 0);
     fm6_macro_set(0u, FM1LAB_MACRO_BRIGHTNESS, 100u);
@@ -208,18 +220,21 @@ int main(void) {
     fm6_macro_set(0u, FM1LAB_MACRO_BRIGHTNESS, 0u);
     assert(fm6_test_macro_mod_level(0u) < -(12 << 24));
     fm6_macro_set(0u, FM1LAB_MACRO_BODY, 50u);
-    uint8_t body_neutral = fm6_test_effective_byte(0u, 18u);
+    uint8_t body_neutral = fm6_test_effective_byte(0u, (6u-2u)*21u+18u);
     fm6_macro_set(0u, FM1LAB_MACRO_BODY, 100u);
-    assert(fm6_test_effective_byte(0u, 18u) >= body_neutral);
+    assert(fm6_test_effective_byte(0u, (6u-2u)*21u+18u) > body_neutral);
     fm6_macro_set(0u, FM1LAB_MACRO_MOTION, 50u);
     uint8_t motion_neutral = fm6_test_effective_byte(0u, 137u);
     fm6_macro_set(0u, FM1LAB_MACRO_MOTION, 100u);
-    assert(fm6_test_effective_byte(0u, 137u) >= motion_neutral);
+    assert(fm6_test_effective_byte(0u, 137u) == motion_neutral * 3u);
     fm6_macro_set(0u, FM1LAB_MACRO_EDGE, 50u);
-    assert(fm6_test_macro_detune(0u, 0u) == 0);
+    assert(fm6_test_macro_feedback(0u) == 0u);
     fm6_macro_set(0u, FM1LAB_MACRO_EDGE, 100u);
-    assert(fm6_test_macro_detune(0u, 5u) > 0);
-    fm6_init();
+    assert(fm6_test_macro_feedback(0u) == 7u);
+    uint8_t edge_detune_seen = 0u;
+    for (unsigned op=0u; op<6u; ++op)
+        if (fm6_test_macro_detune(0u,op) != 0) edge_detune_seen=1u;
+    assert(edge_detune_seen);
     assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 1u &&
            fm6_patch_enabled(2) == 1u && fm6_patch_enabled(3) == 1u);
     /* New factory patches start at <=25% linear amplitude. */
