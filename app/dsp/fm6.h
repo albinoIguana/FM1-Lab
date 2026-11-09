@@ -112,6 +112,7 @@ uint64_t fm6_test_fx_send_peak(uint32_t effect, uint32_t channel);
 uint32_t fm6_test_fx_saturations(void);
 uint32_t fm6_test_limiter_events(void);
 uint64_t fm6_test_output_peak(void);
+uint32_t fm6_test_sequencer_active_events(uint8_t lane);
 #endif
 
 uint32_t fm6_patch_count(void);
