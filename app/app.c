@@ -2297,6 +2297,13 @@ static void input(void)
                     compressor_edit(field,(uint8_t)clamp((int32_t)compressor_value(field)+e,0,100));
                     app_say(index==1u?"COMP RATIO":index==2u?"COMP THRESHOLD":"COMP ATTACK","UPDATED");
                 }
+            } else if (page == PAGE_CHAOS) {
+                if(index==0u)set.performance.chaos_amount=(uint8_t)clamp((int32_t)set.performance.chaos_amount+e,0,100);
+                else if(index==1u)set.performance.chaos_rate=(uint8_t)clamp((int32_t)set.performance.chaos_rate+e,0,100);
+                else if(index==2u)set.performance.chaos_tone=(uint8_t)clamp((int32_t)set.performance.chaos_tone+e,0,100);
+                else {int32_t shape=((int32_t)set.performance.chaos_shape+e)%6;if(shape<0)shape+=6;set.performance.chaos_shape=(uint8_t)shape;}
+                performance_publish();set_dirty=1u;
+                app_say("MAELSTROM","UPDATED");
             } else if (page == PAGE_OPERATOR_MAP) {
                 if(index==0u){patch_pitch_edit(0u,e);app_say("PATCH OCTAVE","UPDATED");}
                 else if(index==1u){patch_pitch_edit(1u,e);app_say("PATCH FINE TUNE","UPDATED");}
@@ -2657,6 +2664,31 @@ static void draw_instrument_macro_panel(void)
         cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
     }
 }
+static void draw_chaos_panel(void)
+{
+    static const char *const labels[4]={"K1  AMOUNT","K2  RATE","K3  TONE","K4  SHAPE"};
+    static const char *const shapes[6]={"SINE","TRIANGLE","PULSE","STEPPED","RANDOM","UNSTABLE"};
+    const uint8_t values[3]={set.performance.chaos_amount,set.performance.chaos_rate,set.performance.chaos_tone};
+    char t[20];uint16_t accent=RGB(255,85,65);
+    for(uint32_t i=0;i<4u;i++){
+        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
+        cv_text(x+9,y+8,&FONT_XS,labels[i],C_WHITE);
+        if(i<3u){
+            int_text(values[i],t);text_cat(t,i==0u?"%":i==1u?"":"%");
+            cv_text(x+9,y+27,&FONT_B,t,accent);
+            cv_rect(x+9,y+49,94,6,C_LINE);
+            cv_rect(x+9,y+49,(int32_t)values[i]*94/100,6,accent);
+            cv_text(x+9,y+64,&FONT_XS,i==0u?"DRY  TO  DESTROY":i==1u?"SLOW  TO  AUDIO RATE":"DARK  TO  ABRASIVE",C_GRAY);
+        }else{
+            cv_text(x+9,y+27,&FONT_B,shapes[set.performance.chaos_shape],accent);
+            cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_GRAY);
+        }
+    }
+    cv_text(8,154,&FONT_XS,set.performance.chaos_amount?"MAELSTROM ACTIVE":"BYPASS  /  SIGNAL UNTOUCHED",
+        set.performance.chaos_amount?accent:C_GRAY);
+}
+
 /* Whole-patch pitch: every note from this layer shares the same octave/cents offset. */
 static void draw_operator_map(void)
 {
