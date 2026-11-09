@@ -1472,6 +1472,12 @@ void app_init(void)
     if(performance_loaded) {
         for(uint32_t step=0;step<16u;step++)
             set.performance.arp_step_gate[step]=set.performance.arp_step_gate[step]?1u:0u;
+        if(!set.performance.seq_event_count[0]&&!set.performance.seq_event_count[1]) {
+            uint8_t has_legacy=0u;
+            for(uint32_t lane=0;lane<2u;lane++)for(uint32_t step=0;step<set.performance.seq_length;step++)
+                has_legacy=(uint8_t)(has_legacy||set.performance.seq_enabled[lane][step]);
+            if(has_legacy){settings_migrate_step_events(&set);set_dirty=1u;}
+        }
     }
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
@@ -1497,15 +1503,6 @@ void app_init(void)
                 seq_ui_tie[lane][step] = (uint8_t)((set.performance.seq_gate[lane][step] & 0x80u) != 0u);
             }
         }
-        if(!set.performance.seq_event_count[0]&&!set.performance.seq_event_count[1]) {
-            uint8_t has_legacy=(uint8_t)(set.performance.seq_enabled[0][0]||set.performance.seq_enabled[1][0]);
-            for(uint32_t lane=0;lane<2u;lane++)for(uint32_t step=0;step<set.performance.seq_length;step++)
-                has_legacy=(uint8_t)(has_legacy||set.performance.seq_enabled[lane][step]);
-            if(has_legacy) {
-                settings_migrate_step_events(&set);
-                set_dirty=1u;
-            }
-        }
         for(uint32_t lane=0;lane<2u;lane++) {
             seq_event_count[lane]=set.performance.seq_event_count[lane];
             for(uint32_t i=0;i<seq_event_count[lane];i++)
@@ -1513,6 +1510,7 @@ void app_init(void)
             seq_selected_event[lane]=seq_event_count[lane]?0u:255u;
         }
         seq_event_store_ready=1u;
+        sequencer_events_sync_legacy();
         /* ARP is opt-in: do not resurrect a previously saved DOWN/UP mode. */
         if (set.performance.arp_mode != 0u) {
             set.performance.arp_mode = 0u;
