@@ -1426,6 +1426,7 @@ int fm6_sequencer_set_events(uint8_t lane,const fm6_seq_event_t *events,uint16_t
 }
 uint8_t fm6_sequencer_step(void) { return seq_position; }
 uint8_t fm6_sequencer_playing_step(void) { return seq_play_position; }
+uint8_t fm6_sequencer_tick_position(void) { return seq_tick_position; }
 uint8_t fm6_sequencer_running(void) { return seq_running; }
 uint8_t fm6_arp_capture_pop(fm6_arp_capture_event_t *event)
 {
