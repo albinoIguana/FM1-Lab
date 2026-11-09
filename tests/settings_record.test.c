@@ -377,9 +377,9 @@ int main(void)
     assert(settings_import_v9(&imported,&v9)==0);
     assert(imported.magic==SET_MAGIC&&imported.performance.seq_event_count[0]==2u);
     assert(imported.performance.seq_events[0][0].start==0u);
-    assert(imported.performance.seq_events[0][0].duration==2u);
+    assert(imported.performance.seq_events[0][0].duration==4u);
     assert(imported.performance.seq_events[0][0].pitch==60u);
-    assert(imported.performance.seq_events[0][1].start==2u);
+    assert(imported.performance.seq_events[0][1].start==4u);
     assert(imported.performance.seq_events[0][1].pitch==64u);
     settings_seal(&imported);
     assert(settings_valid(&imported));
@@ -387,6 +387,25 @@ int main(void)
     settings_v5_t bad_v5=v5;bad_v5.performance.tempo_bpm=29u;
     assert(!settings_v5_valid(&bad_v5));
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7/V8/V9/V10 -> V11 migration tests passed");
+    /* V11 event starts and durations are migrated from sixteenth steps. */
+    settings_v11_t v11;
+    memset(&v11,0,sizeof v11);
+    v11.magic=SET_MAGIC_V11;v11.octave=good.octave;v11.patch=good.patch;
+    v11.enabled_mask=good.enabled_mask;v11.ble_off=good.ble_off;
+    memcpy(v11.macros,good.macros,sizeof v11.macros);
+    memcpy(v11.levels,good.levels,sizeof v11.levels);
+    memcpy(&v11.performance,&good.performance,sizeof v11.performance);
+    v11.performance.seq_event_count[0]=1u;
+    v11.performance.seq_events[0][0]=(fm6_seq_event_t){3u,2u,61u,99u,0u};
+    v11.reserved=good.reserved;v11.padding=0u;
+    v11.crc=settings_crc16(&v11,offsetof(settings_v11_t,crc));
+    assert(settings_v11_valid(&v11));
+    imported=good;
+    assert(settings_import_v11(&imported,&v11)==0);
+    assert(imported.performance.seq_events[0][0].start==6u);
+    assert(imported.performance.seq_events[0][0].duration==4u);
+    settings_seal(&imported);assert(settings_valid(&imported));
+
+    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7/V8/V9/V10/V11 -> V12 migration tests passed");
     return 0;
 }
