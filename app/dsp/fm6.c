@@ -1642,9 +1642,7 @@ int fm6_patch_set_pitch(uint32_t patch, int octave, int fine_cents)
     if (part->octave == octave && part->fine_cents == fine_cents) return 0;
     part->octave = (int8_t)octave;
     part->fine_cents = (int8_t)fine_cents;
-    /* Retire only this patch's held notes so note-offs cannot straddle tunings. */
-    for (uint32_t i = 0; i < VOICES; ++i)
-        if (voices[i].used && voices[i].patch == patch) voices[i].used = 0;
+    /* Pitch is part of the live patch state, so held notes follow the control. */
     return 0;
 }
 void fm6_patch_set_byte(uint32_t patch, uint32_t byte_index, uint8_t value)
