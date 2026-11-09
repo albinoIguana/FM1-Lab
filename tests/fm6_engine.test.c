@@ -1080,14 +1080,14 @@ int main(void) {
         fm6_sequencer_set_length(4u);
         assert(fm6_sequencer_set_events(0u,offbeat,1u)==0);
         fm6_sequencer_set_running(1u);
-        for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
-        fm6_render(output,9u,4096u);
+        for(unsigned block=0u;block<21u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,69u,4096u); /* first 32nd tick: event is still ahead */
         assert(fm6_test_sequencer_active_events(0u)==0u);
-        for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
-        fm6_render(output,9u,4096u);
+        for(unsigned block=0u;block<21u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,69u,4096u); /* second 32nd tick starts the offbeat note */
         assert(fm6_test_sequencer_active_events(0u)==1u);
-        for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
-        fm6_render(output,9u,4096u);
+        for(unsigned block=0u;block<21u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,69u,4096u);
         assert(fm6_test_sequencer_active_events(0u)==0u);
     }
 
