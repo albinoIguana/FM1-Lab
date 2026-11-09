@@ -150,6 +150,8 @@ int fm6_patch_set_voice(uint32_t patch, const uint8_t *voice);
 void fm6_patch_set_level(uint32_t patch, uint8_t level);
 uint8_t fm6_patch_level(uint32_t patch);
 void fm6_patch_set_pan(uint32_t patch, uint8_t pan);
+/* Whole-patch tuning is applied after the DX7 note lookup, independently of operator ratios. */
+int fm6_patch_set_pitch(uint32_t patch, int octave, int fine_cents);
 uint8_t fm6_patch_pan(uint32_t patch);
 void fm6_master_insert_set(uint32_t field, uint8_t value);
 void fm6_master_insert_reset_state(void);
