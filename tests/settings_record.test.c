@@ -10,7 +10,8 @@ _Static_assert(sizeof(settings_v5_t) == 592u, "legacy v5 settings layout changed
 _Static_assert(sizeof(settings_v6_t) == sizeof(settings_v9_t), "legacy v6 settings layout changed");
 _Static_assert(sizeof(settings_v7_t) == sizeof(settings_v9_t), "legacy v7 settings layout changed");
 _Static_assert(sizeof(settings_v8_t) == sizeof(settings_v9_t), "legacy v8 settings layout changed");
-_Static_assert(sizeof(settings_v9_t) < sizeof(settings_t), "V10 event record must extend V9");
+_Static_assert(sizeof(settings_v9_t) < sizeof(settings_v10_t), "V10 event record must extend V9");
+_Static_assert(sizeof(settings_v10_t) < sizeof(settings_t), "V11 MAELSTROM record must extend V10");
 
 /* The record codec delegates performance-state validation to FM6. Keep this
  * unit test focused on the settings envelope and migration boundary. */
@@ -48,7 +49,8 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p)
         for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
             if (s->fx_send[p][fx] > 100u) return 0;
-    if (s->compressor_enabled > 1u || s->compressor_threshold > 100u ||
+    if(s->chaos_amount>100u||s->chaos_rate>100u||s->chaos_tone>100u||s->chaos_shape>5u)return 0;
+    if (s->compressor_enabled > 1u ||
         s->compressor_ratio > 100u || s->compressor_attack > 100u ||
         s->compressor_release > 100u || s->compressor_makeup > 100u) return 0;
     return 1;
@@ -63,6 +65,8 @@ static void make_valid(settings_t *s)
         for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             s->macros[p][m] = (uint8_t)(40u + p + m);
     }
+    s->performance.chaos_amount=0u;s->performance.chaos_rate=42u;
+    s->performance.chaos_tone=55u;s->performance.chaos_shape=0u;
     s->performance.tempo_bpm = 123u;
     s->performance.seq_length = 64u;
     s->performance.arp_division=3u;s->performance.arp_gate=75u;
@@ -327,6 +331,23 @@ int main(void)
     assert(settings_import_v8(&imported,&v8)==0);
     assert(imported.performance.arp_step_gain[1]==68u);
 
+    /* V10 records upgrade to V11 with the effect safely bypassed. */
+    settings_v10_t v10;
+    memset(&v10,0,sizeof v10);
+    v10.magic=SET_MAGIC_V10;v10.octave=good.octave;v10.patch=good.patch;
+    v10.enabled_mask=good.enabled_mask;v10.ble_off=good.ble_off;v10.reserved=good.reserved;
+    memcpy(v10.macros,good.macros,sizeof v10.macros);
+    memcpy(v10.levels,good.levels,sizeof v10.levels);
+    memcpy(&v10.performance,&good.performance,sizeof v10.performance);
+    v10.crc=settings_crc16(&v10,offsetof(settings_v10_t,crc));
+    assert(settings_v10_valid(&v10));
+    imported=good;
+    assert(settings_import_v10(&imported,&v10)==0);
+    assert(imported.magic==SET_MAGIC&&imported.performance.chaos_amount==0u);
+    assert(imported.performance.chaos_rate==42u&&imported.performance.chaos_tone==55u);
+    assert(imported.performance.chaos_shape==0u);
+    settings_seal(&imported);assert(settings_valid(&imported));
+
     /* V9 -> V10 converts tie-cell chains into one continuous event. */
     settings_v9_t v9;
     memset(&v9,0,sizeof v9);
@@ -366,6 +387,6 @@ int main(void)
     settings_v5_t bad_v5=v5;bad_v5.performance.tempo_bpm=29u;
     assert(!settings_v5_valid(&bad_v5));
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7/V8/V9 -> V10 migration tests passed");
+    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7/V8/V9/V10 -> V11 migration tests passed");
     return 0;
 }
