@@ -11,6 +11,8 @@
 #define FM1LAB_VOICE_LIMIT 8u /* voices per patch; eight independent pools */
 enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUNT };
 
+/* Event positions and durations are measured in 32nd-note ticks:
+ * two ticks per displayed sixteenth step, up to 128 ticks per 64-step loop. */
 typedef struct {
     uint8_t start;
     uint8_t duration;
@@ -18,6 +20,11 @@ typedef struct {
     uint8_t velocity;
     uint8_t accent;
 } fm6_seq_event_t;
+
+typedef struct {
+    uint32_t tick;
+    uint8_t lane, note, velocity, on;
+} fm6_arp_capture_event_t;
 
 /* Persistent musical/effect controls. Transport playback state and delay buffers
  * are intentionally not serialized; a restored pattern always boots stopped. */
@@ -124,6 +131,7 @@ int fm6_sequencer_set_events(uint8_t lane, const fm6_seq_event_t *events, uint16
 uint8_t fm6_sequencer_step(void);
 uint8_t fm6_sequencer_playing_step(void);
 uint8_t fm6_sequencer_running(void);
+uint8_t fm6_arp_capture_pop(fm6_arp_capture_event_t *event);
 uint8_t fm6_arpeggiator_playing_step(void);
 uint8_t fm6_arpeggiator_active(void);
 void fm6_arpeggiator_set_mode(uint8_t mode);
