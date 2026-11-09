@@ -764,7 +764,7 @@ static void performance_publish(void)
     for(uint32_t step=0;step<16u;step++){
         set.performance.arp_step_gain[step]=arp_ui_gain[step];
         set.performance.arp_step_accent[step]=arp_ui_accent[step];
-        set.performance.arp_step_gate[step]=arp_ui_step_gate[step];
+        set.performance.arp_step_gate[step]=arp_ui_step_gate[step]?1u:0u;
     }
     for (uint32_t lane=0; lane<2u; ++lane) {
         set.performance.lane_instrument[lane] = seq_ui_instrument[lane];
@@ -1303,7 +1303,7 @@ void app_init(void)
     seq_ui_patch[0] = 0u;
     seq_ui_patch[1] = 0u;
     patch_focus = 0u;
-    for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_step_gate[i]=100u;}
+    for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_step_gate[i]=1u;}
     instrument_factory_capture();
     seq_record_mode=(uint8_t)(set.reserved&1u);
     arp_ui_latch=(uint8_t)((set.reserved>>1)&1u);
@@ -1311,6 +1311,13 @@ void app_init(void)
     if(set.performance.seq_length<2u) {
         set.performance.seq_length=16u;
         set_dirty=1u;
+    }
+    /* Older UI defaults wrote 100 into this boolean field. Normalize before
+     * validating/restoring so one stale ARP flag cannot reject every live
+     * performance update, including all four send effects. */
+    if(performance_loaded) {
+        for(uint32_t step=0;step<16u;step++)
+            set.performance.arp_step_gate[step]=set.performance.arp_step_gate[step]?1u:0u;
     }
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
