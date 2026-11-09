@@ -578,6 +578,7 @@ static int fm1lab_is_untouched_factory(const fm1lab_instrument_t *in)
 {
     if(!in || !fm1lab_instrument_valid(in) ||
        fm1lab_strncmp(in->name,"FACTORY",7u)!=0) return 0;
+    if(memcmp(in->patches,factory_instrument.patches,sizeof in->patches)!=0) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
         if(in->patches[p].level!=31u || !in->patches[p].enabled) return 0;
         for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)
