@@ -2714,10 +2714,7 @@ static void draw_operator_map(void)
             if(value<0)cv_rect(x+56-width,y+48,width,5,accent);
             else if(value>0)cv_rect(x+56,y+48,width,5,accent);
             cv_text(x+9,y+63,&FONT_XS,i==0u?"-4  /  0  /  +4":"-100c  /  0  /  +100c",C_GRAY);
-        }else{
-            cv_text(x+9,y+29,&FONT_B,i==2u?"ALL SIX OPS":"PER PATCH",accent);
-            cv_text(x+9,y+51,&FONT_XS,i==2u?"ONE PITCH OFFSET":"FOUR TUNINGS",C_GRAY);
-        }
+        } /* Reserved cards intentionally left blank until they have useful controls. */
     }
 }
 
