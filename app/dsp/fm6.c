@@ -540,7 +540,7 @@ static void fm6_arp_capture_push(uint8_t on,uint8_t note,uint8_t velocity)
     uint8_t head=arp_capture_head;
     uint8_t next=(uint8_t)((head+1u)&31u);
     uint8_t lane=(uint8_t)((arp_patch_mask&0xf0u)?1u:0u);
-    if(next==arp_capture_tail)arp_capture_tail=(uint8_t)((arp_capture_tail+1u)&31u);
+    if(next==arp_capture_tail)return; /* drop newest; keep the SPSC indices single-writer */
     uint32_t tick=seq_tick_counter;
     if(transport_phase>=FM6_SAMPLE_RATE*30u)++tick; /* nearest 32nd-note grid position */
     arp_capture_queue[head]=(fm6_arp_capture_event_t){tick,lane,note,velocity,on};
