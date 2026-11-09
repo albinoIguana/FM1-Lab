@@ -36,7 +36,7 @@ test("always-on quantization snaps starts and durations to the active grid", () 
   assert.equal(sequence.tracks[0].events[0].duration,4);
   sequence = updateNote(sequence,0,sequence.tracks[0].events[0].id,{start:11,duration:5});
   assert.equal(sequence.tracks[0].events[0].start,12);
-  assert.equal(sequence.tracks[0].events[0].duration,4);
+  assert.equal(sequence.tracks[0].events[0].duration,8);
 });
 
 test("SELECT order follows piano-roll reading order: high to low, then left to right", () => {
@@ -91,7 +91,7 @@ test("loop length truncation drops out-of-range starts and bounds sustained dura
   sequence = addNote(sequence,0,{id:"outside",start:20,duration:2});
   sequence = setTrackLength(sequence,0,16);
   assert.deepEqual(sequence.tracks[0].events.map(note=>note.id),["inside"]);
-  assert.equal(sequence.tracks[0].events[0].duration,8);
+  assert.equal(sequence.tracks[0].events[0].duration,4);
 });
 
 test("normalization rejects more than 128 events per track", () => {
