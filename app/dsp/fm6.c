@@ -720,12 +720,12 @@ static void fm6_rebuild_patch(uint32_t index)
                                         : 100 + (motion - 50) * 200 / 50;
     uint32_t carriers, k, j, carrier_n = 0;
     static const int8_t spread[6] = {0, 1, -1, 2, -2, 3};
-    int32_t cents_step = dirt * 590900 / 50; /* up to +/-100 cents per carrier spread step */
+    int32_t cents_step = dirt * 1398101 / 50; /* +/-100 cents per carrier spread step */
     fm6_copy_bytes(e, b, FP_SIZE + 1u);
     carriers = fm6_carriers(e[FP_ALG]);
 
-    /* BRIGHT is a broad FM-index sweep: +/-18 semitones around neutral.
-     * Use 64-bit arithmetic; the full-range product exceeds signed 32-bit. */
+    /* BRIGHT is a full-depth FM-index sweep: the core clamps modulator levels
+     * to 0..17 Q24 log2 units. Use 64-bit arithmetic for the full-range offset. */
     p->mod_level = (int32_t)(((int64_t)(macro_values[FM1LAB_MACRO_BRIGHTNESS] - 50) * (18LL << 24)) / 50);
     p->feedback = (uint8_t)clamp_i32((int32_t)b[FP_FB] + dirt * 7 / 50, 0, 7);
 
