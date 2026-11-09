@@ -1055,6 +1055,25 @@ int main(void) {
     }
     fm6_sequencer_set_running(0u);
 
-    puts("Felucca FM6 engine: voice pools, sequencing, lane clear, stereo FX, Instrument-wide Amp/Drive, parametric EQ and linked master compressor passed");
+    /* A note at the second half of a sixteenth must wait for the 32nd-note
+     * subdivision, then release one tick later. */
+    fm6_init();
+    {
+        const fm6_seq_event_t offbeat[]={{1u,1u,60u,100u,0u}};
+        fm6_sequencer_set_length(4u);
+        assert(fm6_sequencer_set_events(0u,offbeat,1u)==0);
+        fm6_sequencer_set_running(1u);
+        for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,9u,4096u);
+        assert(fm6_test_sequencer_active_events(0u)==0u);
+        for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,9u,4096u);
+        assert(fm6_test_sequencer_active_events(0u)==1u);
+        for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,9u,4096u);
+        assert(fm6_test_sequencer_active_events(0u)==0u);
+    }
+
+    puts("Felucca FM6 engine: voice pools, 32nd-note sequencing, ARP capture, lane clear, stereo FX, Instrument-wide Amp/Drive, parametric EQ and linked master compressor passed");
     return 0;
 }
