@@ -3002,48 +3002,68 @@ static void draw_operator_workbench(uint8_t view)
         (void)fm1lab_voice_operator_get(voice,env_operator,FM1LAB_OP_FINE,&fine);
         (void)fm1lab_voice_operator_get(voice,env_operator,FM1LAB_OP_OUTPUT,&output);
         (void)fm1lab_voice_operator_get(voice,env_operator,FM1LAB_OP_DETUNE,&detune);
-        cv_text(8,128,&FONT_XS,env_operator==1u?"OP 1":env_operator==2u?"OP 2":
+        cv_text(8,126,&FONT_XS,env_operator==1u?"OP 1":env_operator==2u?"OP 2":
             env_operator==3u?"OP 3":env_operator==4u?"OP 4":env_operator==5u?"OP 5":"OP 6",accent);
-        cv_text(42,128,&FONT_XS,fm1lab_voice_operator_is_carrier(voice,env_operator)?
-            "CARRIER / SOUND SOURCE":"MODULATOR / TONE SHAPER",C_WHITE);
-        cv_text(8,145,&FONT_XS,"K1 COARSE",C_GRAY);int_text(coarse,t);cv_text(66,145,&FONT_B,t,accent);
-        cv_text(118,145,&FONT_XS,"K2 FINE",C_GRAY);int_text(fine,t);cv_text(169,145,&FONT_B,t,accent);
-        cv_text(8,160,&FONT_XS,"K3 OUTPUT",C_GRAY);int_text(output,t);cv_text(66,160,&FONT_B,t,accent);
-        cv_text(118,160,&FONT_XS,"K4 DETUNE",C_GRAY);int_text(detune,t);cv_text(169,160,&FONT_B,t,accent);
-        cv_text(8,174,&FONT_XS,"ALGO: ROUTING   SELECT: CHOOSE OP",C_GRAY);
+        cv_text(42,126,&FONT_XS,fm1lab_voice_operator_is_carrier(voice,env_operator)?
+            "CARRIER / SOURCE":"MODULATOR / TONE",C_WHITE);
+        cv_text(8,143,&FONT_XS,"K1 COARSE",C_GRAY);int_text(coarse,t);cv_text(66,143,&FONT_B,t,accent);
+        cv_text(118,143,&FONT_XS,"K2 FINE",C_GRAY);int_text(fine,t);cv_text(169,143,&FONT_B,t,accent);
+        cv_text(8,158,&FONT_XS,"K3 OUTPUT",C_GRAY);int_text(output,t);cv_text(66,158,&FONT_B,t,accent);
+        cv_text(118,158,&FONT_XS,"K4 TUNE",C_GRAY);int_text(detune,t);cv_text(169,158,&FONT_B,t,accent);
+        cv_text(8,174,&FONT_XS,"ALGO: ROUTE   SELECT: OP",C_GRAY);
     } else {
         static const char *const stages[4]={"ATTACK","DECAY 1","DECAY 2","RELEASE"};
         uint8_t rates[4]={0u},levels[4]={0u};
-        int32_t px[4]={14,76,143,226},py[4];
+        int32_t px[5],py[5];
+        uint32_t duration[4],total=0u;
+        const int32_t left=12,right=228,top=35,bottom=103;
         for(uint32_t i=0;i<4u;i++) {
             (void)fm1lab_voice_operator_get(voice,env_operator,(fm1lab_operator_field_t)(FM1LAB_OP_RATE_1+i),&rates[i]);
             (void)fm1lab_voice_operator_get(voice,env_operator,(fm1lab_operator_field_t)(FM1LAB_OP_LEVEL_1+i),&levels[i]);
-            py[i]=105-(int32_t)levels[i]*66/99;
+            /* DX7 rates are durations, not target heights: 99 is fastest.
+             * Give slow stages more horizontal room so rate edits animate the
+             * correct segment of the envelope. */
+            duration[i]=100u+(99u-(uint32_t)rates[i])*9u;
+            total+=duration[i];
         }
+        px[0]=left;
+        for(uint32_t i=0;i<4u;i++)
+            px[i+1u]=px[i]+(int32_t)((uint64_t)(right-left)*duration[i]/total);
+        px[4]=right;
+        /* DX7 EG order is L4(initial) -> L1(attack) -> L2(decay 1)
+         * -> L3(decay 2/sustain) -> L4(release). */
+        py[0]=bottom-(int32_t)levels[3]*(bottom-top)/99;
+        py[1]=bottom-(int32_t)levels[0]*(bottom-top)/99;
+        py[2]=bottom-(int32_t)levels[1]*(bottom-top)/99;
+        py[3]=bottom-(int32_t)levels[2]*(bottom-top)/99;
+        py[4]=py[0];
         cv_text(8,4,&FONT_XS,view==1u?"OPERATOR EG  /  RATE":"OPERATOR EG  /  TARGET LEVEL",C_GRAY);
         cv_text(8,20,&FONT_B,fm1lab_voice_operator_is_carrier(voice,env_operator)?"CARRIER: OUTPUT":"MODULATOR: HARMONICS",accent);
-        cv_rect(12,105,216,1,C_GRAY);
-        cv_rect(12,35,1,71,C_DIM);
-        fm1lab_plot_line(px[0],py[3],px[1],py[0],accent);
-        fm1lab_plot_line(px[1],py[0],px[2],py[1],accent);
-        fm1lab_plot_line(px[2],py[1],px[3],py[2],accent);
+        cv_rect(left,bottom,right-left,1,C_GRAY);
+        cv_rect(left,top,1,bottom-top,C_DIM);
+        for(uint32_t i=0;i<4u;i++)
+            fm1lab_plot_line(px[i],py[i],px[i+1u],py[i+1u],accent);
+        for(uint32_t i=0;i<5u;i++)
+            cv_rect(px[i]-2,py[i]-2,5,5,C_WHITE);
         for(uint32_t i=0;i<4u;i++) {
-            int32_t label_x=px[i]-text_w(&FONT_XS,stages[i])/2;
+            int32_t cx=(px[i]+px[i+1u])/2;
+            int32_t label_x=cx-text_w(&FONT_XS,stages[i])/2;
             if(label_x<2)label_x=2;
             if(label_x+text_w(&FONT_XS,stages[i])>238)
                 label_x=238-text_w(&FONT_XS,stages[i]);
-            cv_rect(px[i]-3,py[i]-3,7,7,(view==1u?C_WHITE:accent));
-            cv_text(label_x,116,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
+            cv_text(label_x,115,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
             int_text(view==2u?levels[i]:rates[i],t);
-            cv_text(px[i]-5,132,&FONT_B,t,accent);
-            cv_text(px[i]-5,148,&FONT_XS,view==2u?"LEVEL":"RATE",C_GRAY);
+            cv_text(cx-text_w(&FONT_B,t)/2,132,&FONT_B,t,accent);
+            cv_text(cx-(view==2u?15:12),147,&FONT_XS,view==2u?"TARGET":"RATE",C_GRAY);
             if(view==1u) {
-                cv_rect(px[i]-10,162,28,3,C_LINE);
-                cv_rect(px[i]-10,162,(int32_t)rates[i]*28/99,3,accent);
+                cv_rect(cx-13,161,26,3,C_LINE);
+                cv_rect(cx-13,161,(int32_t)rates[i]*26/99,3,accent);
+            } else {
+                cv_rect(cx-13,161,26,3,C_LINE);
+                cv_rect(cx-13,161,(int32_t)levels[i]*26/99,3,accent);
             }
         }
-        cv_text(8,175,&FONT_XS,view==2u?"SELECT KNOB: CHOOSE OP  |  K1-4 EDIT TARGET":"SELECT KNOB: CHOOSE OP  |  K1-4 EDIT RATE",C_GRAY);
-        
+        cv_text(8,174,&FONT_XS,view==2u?"K1-4: TARGET LEVELS   SELECT: OP":"K1-4: STAGE RATES   SELECT: OP",C_GRAY);
     }
 }
 
