@@ -1358,9 +1358,10 @@ static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocit
     if(!seq_record_armed || arp_ui_mode || key>=NKEYS+128u)return;
     sequencer_events_import_legacy();
     uint8_t lane=seq_ui_lane;
-    uint8_t step=fm6_sequencer_running()?fm6_sequencer_playing_step():seq_ui_step;
+    uint8_t tick=fm6_sequencer_running()?fm6_sequencer_tick_position():(uint8_t)(seq_ui_step*2u);
+    uint8_t step=(uint8_t)(tick/2u);
     if(seq_record_active[key] && seq_record_note[key]==note)return;
-    seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
+    seq_record_active[key]=1u;seq_record_step[key]=tick;seq_record_lane[key]=lane;
     seq_record_note[key]=note;seq_record_started[key]=plat_ms();
     seq_record_velocity[key]=velocity;seq_ui_velocity[lane][step]=velocity;
     seq_record_redraw=1u;
@@ -1371,7 +1372,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     uint32_t elapsed=plat_ms()-seq_record_started[key];
     uint32_t tick_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/8u;
     if(!tick_ms)tick_ms=1u;
-    uint8_t lane=seq_record_lane[key], first=(uint8_t)(seq_record_step[key]*2u);
+    uint8_t lane=seq_record_lane[key], first=seq_record_step[key];
     uint32_t loop_ticks=(uint32_t)set.performance.seq_length*2u;
     uint32_t duration=fm1lab_recorded_note_duration(elapsed,tick_ms,loop_ticks,first);
     if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_ticks) {
