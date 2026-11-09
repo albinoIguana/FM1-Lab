@@ -863,18 +863,19 @@ int main(void) {
     }
     const fm6_seq_event_t lane0[] = {
         {0u,2u,60u,110u,0u},
-        {0u,4u,64u,100u,35u}
+        {0u,4u,60u,100u,35u},
+        {0u,3u,64u,95u,0u}
     };
     const fm6_seq_event_t lane1[] = {
         {0u,1u,67u,95u,0u}
     };
     fm6_sequencer_set_length(16u);
-    assert(fm6_sequencer_set_events(0u,lane0,2u)==0);
+    assert(fm6_sequencer_set_events(0u,lane0,3u)==0);
     assert(fm6_sequencer_set_events(1u,lane1,1u)==0);
     fm6_sequencer_set_running(1u);
     for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
     fm6_render(output,9u,4096u); /* step zero fires */
-    assert(fm6_test_sequencer_active_events(0u)==2u);
+    assert(fm6_test_sequencer_active_events(0u)==3u);
     assert(fm6_test_sequencer_active_events(1u)==1u);
     for(unsigned step=0u;step<1u;step++) {
         for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
@@ -884,7 +885,7 @@ int main(void) {
     assert(fm6_test_sequencer_active_events(1u)==0u);
     for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
     fm6_render(output,9u,4096u);
-    assert(fm6_test_sequencer_active_events(0u)==1u);
+    assert(fm6_test_sequencer_active_events(0u)==2u);
     for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
     fm6_render(output,9u,4096u);
     assert(fm6_test_sequencer_active_events(0u)==1u);
