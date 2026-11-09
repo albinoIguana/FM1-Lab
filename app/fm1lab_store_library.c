@@ -209,6 +209,7 @@ static void instrument_encode(uint8_t *r, const fm1lab_instrument_t *in)
 
 
 static uint16_t inserts_snapshot_crc(const uint8_t *s){return crc16(s,INSERTS_SNAPSHOT_DATA_BYTES);}
+static void inserts_snapshot_seal(uint8_t *s);
 static int inserts_v4_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_V4_SNAPSHOT_DATA_BYTES)==crc16(s,INSERTS_V4_SNAPSHOT_DATA_BYTES);}
 static void inserts_v4_snapshot_seal(uint8_t *s){write16(s+INSERTS_V4_SNAPSHOT_DATA_BYTES,crc16(s,INSERTS_V4_SNAPSHOT_DATA_BYTES));}
 static void inserts_snapshot_convert_v4_to_v5(uint8_t *dst,const uint8_t *src){
@@ -326,10 +327,7 @@ static void inserts_upgrade_record(uint8_t *r,const uint8_t *active,const uint8_
 static void inserts_snapshot_copy_v4(uint8_t *dst,const uint8_t *src){bytes_copy(dst,src,INSERTS_V4_SNAPSHOT_BYTES);}
 static void inserts_record_load(uint8_t *r){
  int n=plat_store_load(OBJ_INSERTS,r,INSERTS_V2_TOTAL_BYTES);
- if(n==(int)INSERTS_TOTAL_BYTES&&read32(r)==INSERTS_MAGIC&&read16(r+4u)==INSERTS_VERSION&&
-    read16(r+6u)==INSERTS_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)&&
-    (inserts_snapshot_valid(r+INSERTS_HEADER_BYTES)||
-     inserts_snapshot_valid(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES))) return;
+ if(n==(int)INSERTS_TOTAL_BYTES&&inserts_record_valid(r)) return;
  if(n==(int)INSERTS_V4_TOTAL_BYTES&&read32(r)==INSERTS_V4_MAGIC&&read16(r+4u)==INSERTS_V4_VERSION&&
     read16(r+6u)==INSERTS_V4_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)){
   const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_V4_SNAPSHOT_BYTES;
