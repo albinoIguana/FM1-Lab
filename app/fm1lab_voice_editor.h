@@ -45,6 +45,10 @@ int fm1lab_voice_global_get(const uint8_t voice[FM1LAB_PATCH_BYTES],
                             fm1lab_global_field_t field, uint8_t *value);
 int fm1lab_voice_global_set(uint8_t voice[FM1LAB_PATCH_BYTES],
                             fm1lab_global_field_t field, unsigned value);
+/* Patch-level ADSR: shape all carrier EGs while preserving modulator envelopes.
+ * Values are 0..99 in DX7 rate/level units: attack, decay, sustain, release. */
+int fm1lab_voice_adsr_get(const uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t adsr[4]);
+int fm1lab_voice_adsr_set(uint8_t voice[FM1LAB_PATCH_BYTES], const uint8_t adsr[4]);
 int fm1lab_voice_operator_is_carrier(const uint8_t voice[FM1LAB_PATCH_BYTES],
                                      unsigned operator_number);
 unsigned fm1lab_voice_operator_depth(const uint8_t voice[FM1LAB_PATCH_BYTES],
