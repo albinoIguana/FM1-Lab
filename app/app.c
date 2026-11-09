@@ -13,6 +13,7 @@
 #include "fm1lab_voice_editor.h"
 #include "fm1lab_store_library.h"
 #include "fm1lab_digitone_data.h"
+#include "fm1lab_dx7_data.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
@@ -618,6 +619,26 @@ static int fm1lab_digitone_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_
     }
     return 0;
 }
+
+static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
+{
+    if(voice_index>=FM1LAB_DX7_VOICE_COUNT || !out) return -1;
+    const char *source=fm1lab_dx7_voice_z85+voice_index*FM1LAB_DX7_Z85_BYTES;
+    for(uint32_t group=0;group<39u;group++) {
+        uint64_t value=0u;
+        for(uint32_t digit=0;digit<5u;digit++) {
+            int decoded=fm1lab_digitone_z85_digit(source[group*5u+digit]);
+            if(decoded<0) return -1;
+            value=value*85u+(uint32_t)decoded;
+        }
+        if(value>0xffffffffu) return -1;
+        out[group*4u]=(uint8_t)(value>>24);
+        out[group*4u+1u]=(uint8_t)(value>>16);
+        out[group*4u+2u]=(uint8_t)(value>>8);
+        out[group*4u+3u]=(uint8_t)value;
+    }
+    return 0;
+}
 static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !out) return -1;
@@ -662,6 +683,22 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
     }
     return fm1lab_instrument_valid(out)?0:-1;
 }
+static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out)
+{
+    if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !out) return -1;
+    fm1lab_instrument_init(out,fm1lab_dx7_instrument_names[index]);
+    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
+        if(fm1lab_patch_set_voice(out,patch,voice)) return -1;
+        out->patches[patch].level=31u;
+        out->patches[patch].enabled=1u;
+        for(uint32_t macro=0;macro<FM1LAB_MACRO_COUNT;macro++)
+            out->patches[patch].macros[macro]=50u;
+    }
+    return fm1lab_instrument_valid(out)?0:-1;
+}
+
 static int fm1lab_same_library_instrument(const fm1lab_instrument_t *a,
                                            const fm1lab_instrument_t *b)
 {
@@ -673,18 +710,16 @@ static int fm1lab_is_previous_digitone_instrument(uint32_t index,
 {
     if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !existing) return 0;
     fm1lab_instrument_t previous;
-    fm1lab_instrument_init(&previous,fm1lab_digitone_instrument_names[index]);
-    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice) ||
-           fm1lab_patch_set_voice(&previous,patch,voice)) return 0;
-        fm1lab_patch_set_pan(&previous,patch,voice[155]);
-        previous.patches[patch].level=31u;
-        previous.patches[patch].enabled=1u;
-        for(uint32_t macro=0;macro<FM1LAB_MACRO_COUNT;macro++)
-            previous.patches[patch].macros[macro]=50u;
-    }
-    return fm1lab_same_library_instrument(existing,&previous);
+    return fm1lab_seed_digitone_instrument(index,&previous)==0 &&
+           fm1lab_same_library_instrument(existing,&previous);
+}
+static int fm1lab_is_previous_dx7_instrument(uint32_t index,
+                                              const fm1lab_instrument_t *existing)
+{
+    if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !existing) return 0;
+    fm1lab_instrument_t previous;
+    return fm1lab_seed_dx7_instrument(index,&previous)==0 &&
+           fm1lab_same_library_instrument(existing,&previous);
 }
 static int fm1lab_is_previous_factory_instrument(uint32_t index,
                                                   const fm1lab_instrument_t *existing)
@@ -713,37 +748,28 @@ static int fm1lab_is_previous_factory_instrument(uint32_t index,
 }
 static void fm1lab_seed_factory_library(void)
 {
-    /* Replace factory-owned content with the Digitone collection. Custom or
-     * renamed Instruments remain in place; their flash data is never reset. */
-    for(uint32_t index=0;index<FM1LAB_DIGITONE_INSTRUMENT_COUNT;index++) {
+    /* Curated CC0 six-operator DX7 library: 8 bass/sub Instruments, 8
+     * choral layers, 8 FM rhythm Instruments and 8 synth-percussion sets.
+     * Replace untouched factory or old Digitone content; preserve user edits. */
+    for(uint32_t index=0;index<FM1LAB_DX7_INSTRUMENT_COUNT;index++) {
         fm1lab_instrument_t existing,seed;
         fm1lab_insert_state_t inserts;
         if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0) continue;
-        if(fm1lab_seed_digitone_instrument(index,&seed)!=0) {
-            app_say("DIGITONE DATA","DECODE FAILED");
+        if(fm1lab_seed_dx7_instrument(index,&seed)!=0) {
+            app_say("DX7 LIBRARY","DECODE FAILED");
             return;
         }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
         if(!fm1lab_is_untouched_factory(&existing) &&
            !fm1lab_is_previous_factory_instrument(index,&existing) &&
-           !fm1lab_is_previous_digitone_instrument(index,&existing)) continue;
+           !fm1lab_is_previous_digitone_instrument(index,&existing) &&
+           !fm1lab_is_previous_dx7_instrument(index,&existing)) continue;
         if(fm1lab_store_library_save_full(index,&seed,&inserts)!=0) {
-            app_say("DIGITONE BANK","SAVE FAILED");
+            app_say("DX7 LIBRARY","SAVE FAILED");
             return;
         }
     }
 }
-static uint8_t fm1lab_factory_preset_for_voice(const uint8_t *voice)
-{
-    for(uint32_t p=0;p<FM1LAB_FACTORY_PRESET_COUNT;p++) {
-        uint8_t name_matches=1u;
-        for(uint32_t i=0;i<10u;i++)
-            if(voice[145u+i]!=(uint8_t)fm1lab_factory_names[p][i]) name_matches=0u;
-        if(name_matches) return (uint8_t)p;
-    }
-    return 0u;
-}
-
 static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 {
     uint8_t head = ui_event_head, next = (uint8_t)((head + 1u) & 63u);
@@ -2107,36 +2133,23 @@ static void input(void)
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             app_say("PATCH PITCH", "K1 OCTAVE / K2 FINE");
         } else if (k == EN_PRESET) {
-            if (page == PAGE_HOME && patch_focus) {
-                uint8_t voice[FM1LAB_PATCH_BYTES];
-                uint8_t *selected = current_instrument.patches[set.patch].voice;
-                int32_t next = ((int32_t)fm1lab_factory_preset_for_voice(selected) + e) %
-                    (int32_t)FM1LAB_FACTORY_PRESET_COUNT;
-                if (next < 0) next += (int32_t)FM1LAB_FACTORY_PRESET_COUNT;
-                fm1lab_factory_voice_build(voice, (uint8_t)next);
-                voice[155] = selected[155]; /* keep this patch's pan */
-                if (fm1lab_patch_set_voice(&current_instrument, set.patch, voice) == 0) {
-                    voice_edit_changed();
-                    app_say("PATCH PRESET", fm1lab_factory_names[next]);
-                } else {
-                    app_say("PRESET ERROR", "PATCH UNCHANGED");
-                }
-            } else if (instrument_apply_pending) {
-                app_say("INSTRUMENT", "LOADING");
+            /* PRESET always browses the 32 four-patch Instruments, even when
+             * one layer is focused. The old 16 M-VAVE recipes hid the library. */
+            if(instrument_apply_pending) {
+                app_say("INSTRUMENT","LOADING");
             } else {
-                /* PRESET must never appear inert: preserve edits before
-                 * moving to another Instrument slot. */
-                if (instrument_dirty && instrument_save() != 0) {
-                    app_say("SAVE FAILED", "PRESET NOT CHANGED");
+                if(instrument_dirty && instrument_save()!=0) {
+                    app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
                 }
-                int32_t next = ((int32_t)seq_ui_instrument[seq_ui_lane] + e) % (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
-                if (next < 0) next += (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
-                if ((uint32_t)next != instrument_index) {
-                    instrument_load((uint32_t)next, 1);
+                int32_t next=((int32_t)seq_ui_instrument[seq_ui_lane]+e)%
+                    (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
+                if(next<0)next+=(int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
+                if((uint32_t)next!=instrument_index) {
+                    instrument_load((uint32_t)next,1);
                     performance_publish();set_dirty=1u;
-                    int_text(next + 1, t);
-                    app_say("INSTRUMENT", t);
+                    int_text(next+1,t);
+                    app_say("INSTRUMENT",t);
                 }
             }
         } else if (k >= EN_K1 && k <= EN_K4) {
@@ -2591,6 +2604,16 @@ static const char *patch_display_name(uint32_t patch)
     return fallback[patch];
 }
 
+static const char *patch_description(uint32_t patch)
+{
+    if(patch>=FM1LAB_PATCH_COUNT || instrument_index>=FM1LAB_DX7_INSTRUMENT_COUNT)
+        return "USER PATCH";
+    if(fm1lab_strcmp(instrument_display_name(),
+                     fm1lab_dx7_instrument_names[instrument_index])!=0)
+        return "USER PATCH";
+    return fm1lab_dx7_patch_descriptions[(uint32_t)instrument_index*FM1LAB_PATCH_COUNT+patch];
+}
+
 static void draw_home_panel(void)
 {
     char t[24];
@@ -2619,6 +2642,7 @@ static void draw_home_panel(void)
             short_name[n]='\0';
             cv_text(x + 12, y + 23, &FONT_B, short_name, C_WHITE);
         }
+        cv_text(x + 12, y + 37, &FONT_XS, patch_description(p), C_GRAY);
         cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_GRAY);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
         cv_text(x + 34, y + 49, &FONT_XS, t, accent);
