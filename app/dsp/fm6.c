@@ -1506,6 +1506,8 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
     s->compressor_enabled=fm6_comp_enabled; s->compressor_threshold=fm6_comp_threshold;
     s->compressor_ratio=fm6_comp_ratio; s->compressor_attack=fm6_comp_attack;
     s->compressor_release=fm6_comp_release; s->compressor_makeup=fm6_comp_makeup;
+    s->chaos_amount=fm6_chaos_amount;s->chaos_rate=fm6_chaos_rate;
+    s->chaos_tone=fm6_chaos_tone;s->chaos_shape=fm6_chaos_shape;
     for (uint32_t fx = 0; fx < 4u; ++fx) {
         s->fx_enabled[fx] = fx_enabled[fx];
         s->fx_mix[fx] = fx_mix[fx];
