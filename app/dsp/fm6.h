@@ -11,6 +11,14 @@
 #define FM1LAB_VOICE_LIMIT 8u /* voices per patch; eight independent pools */
 enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUNT };
 
+typedef struct {
+    uint8_t start;
+    uint8_t duration;
+    uint8_t pitch;
+    uint8_t velocity;
+    uint8_t accent;
+} fm6_seq_event_t;
+
 /* Persistent musical/effect controls. Transport playback state and delay buffers
  * are intentionally not serialized; a restored pattern always boots stopped. */
 typedef struct {
@@ -65,6 +73,7 @@ void fm6_sequencer_clear_lane(uint8_t lane);
 void fm6_sequencer_set_length(uint8_t steps);
 void fm6_sequencer_set_lane(uint8_t lane, uint8_t patch_base); /* 0 for T1 bank, 4 for T2 bank */
 void fm6_sequencer_set_step(uint8_t lane, uint8_t step, uint8_t enabled, uint8_t note, uint8_t velocity, uint8_t gate);
+int fm6_sequencer_set_events(uint8_t lane, const fm6_seq_event_t *events, uint16_t count);
 uint8_t fm6_sequencer_step(void);
 uint8_t fm6_sequencer_playing_step(void);
 uint8_t fm6_sequencer_running(void);
