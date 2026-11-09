@@ -16,6 +16,7 @@ enum {
     CMD_SET_PATCH,
     CMD_SET_ENABLED,
     CMD_SET_LEVEL,
+    CMD_SET_PITCH,
     CMD_MIDI
 };
 
@@ -56,6 +57,8 @@ static FM1_AUDIO_CODE int dequeue(fm1lab_audio_engine_t *engine,
     command->patch_mask = source->patch_mask;
     command->enabled = source->enabled;
     command->level = source->level;
+    command->octave = source->octave;
+    command->fine_cents = source->fine_cents;
     command->midi_bytes = source->midi_bytes;
     for (unsigned i = 0; i < sizeof command->midi; ++i)
         command->midi[i] = source->midi[i];
@@ -78,31 +81,49 @@ static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
     uint8_t message[3];
     switch (command->type) {
     case CMD_NOTE_ON:
-        message[0] = 0x90u; message[1] = command->note; message[2] = command->velocity;
-        for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
-            if ((command->patch_mask & (1u << p)) && engine->enabled[p] && engine->level[p] &&
-                synth_dx7_midi(engine->synth[p], engine->voice[p],
-                           message, sizeof message) != 0)
-                engine->errors++;
+        message[0] = 0x90u; message[2] = command->velocity;
+        for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p) {
+            if (!(command->patch_mask & (1u << p)) || !engine->enabled[p] || !engine->level[p]) continue;
+            int note=(int)command->note+(int)engine->octave[p]*12;
+            if(note<0)note=0;else if(note>127)note=127;
+            message[1]=(uint8_t)note;
+            if(synth_dx7_midi_tuned(engine->synth[p],engine->voice[p],
+                    message,sizeof message,engine->fine_cents[p])!=0)engine->errors++;
+        }
         break;
     case CMD_NOTE_OFF:
-        message[0] = 0x80u; message[1] = command->note; message[2] = 0u;
-        for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
-            if (command->patch_mask & (1u << p))
-                if (synth_dx7_midi(engine->synth[p], engine->voice[p],
-                               message, sizeof message) != 0)
-                    engine->errors++;
+        message[0] = 0x80u; message[2] = 0u;
+        for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p) {
+            if (!(command->patch_mask & (1u << p))) continue;
+            int note=(int)command->note+(int)engine->octave[p]*12;
+            if(note<0)note=0;else if(note>127)note=127;
+            message[1]=(uint8_t)note;
+            if(synth_dx7_midi(engine->synth[p],engine->voice[p],message,sizeof message)!=0)
+                engine->errors++;
+        }
         break;
     case CMD_ALL_NOTES_OFF:
         panic_all(engine);
         break;
-    case CMD_MIDI:
-        for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
-            if ((command->patch_mask & (1u << p)) && engine->enabled[p] && engine->level[p] &&
-                synth_dx7_midi(engine->synth[p], engine->voice[p],
-                               command->midi, command->midi_bytes) != 0)
-                engine->errors++;
+    case CMD_MIDI: {
+        uint8_t status=(uint8_t)(command->midi[0]&0xf0u);
+        int note_on=(status==0x90u && command->midi_bytes==3u && command->midi[2]>0u);
+        int note_event=(status==0x80u || status==0x90u) && command->midi_bytes==3u;
+        for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p) {
+            if (!(command->patch_mask & (1u << p)) || !engine->enabled[p] || !engine->level[p]) continue;
+            message[0]=command->midi[0];message[1]=command->midi[1];message[2]=command->midi[2];
+            if(note_event){
+                int note=(int)message[1]+(int)engine->octave[p]*12;
+                if(note<0)note=0;else if(note>127)note=127;
+                message[1]=(uint8_t)note;
+            }
+            int result=note_on
+                ? synth_dx7_midi_tuned(engine->synth[p],engine->voice[p],message,command->midi_bytes,engine->fine_cents[p])
+                : synth_dx7_midi(engine->synth[p],engine->voice[p],note_event?message:command->midi,command->midi_bytes);
+            if(result!=0)engine->errors++;
+        }
         break;
+    }
     case CMD_SET_PATCH: {
         unsigned p = command->patch;
         fm1_dx7_panic(engine->synth[p]);
@@ -130,6 +151,14 @@ static FM1_AUDIO_CODE void apply_command(fm1lab_audio_engine_t *engine,
             fm1_dx7_panic(engine->synth[command->patch]);
         engine->level[command->patch] = command->level;
         break;
+    case CMD_SET_PITCH: {
+        unsigned p=command->patch;
+        if(engine->octave[p]!=command->octave || engine->fine_cents[p]!=command->fine_cents)
+            fm1_dx7_panic(engine->synth[p]);
+        engine->octave[p]=command->octave;
+        engine->fine_cents[p]=command->fine_cents;
+        break;
+    }
     default:
         engine->errors++;
         break;
@@ -213,6 +242,19 @@ int fm1lab_audio_engine_set_level(fm1lab_audio_engine_t *engine,
     command.type = CMD_SET_LEVEL;
     command.patch = (uint8_t)patch;
     command.level = (uint8_t)level;
+    return enqueue(engine, &command);
+}
+int fm1lab_audio_engine_set_pitch(fm1lab_audio_engine_t *engine,
+                                  unsigned patch, int octave, int fine_cents)
+{
+    if (!engine || !engine->ready || patch >= FM1LAB_AUDIO_PATCHES ||
+        octave < -4 || octave > 4 || fine_cents < -100 || fine_cents > 100)
+        return -1;
+    fm1lab_audio_command_t command = {0};
+    command.type = CMD_SET_PITCH;
+    command.patch = (uint8_t)patch;
+    command.octave = (int8_t)octave;
+    command.fine_cents = (int8_t)fine_cents;
     return enqueue(engine, &command);
 }
 
