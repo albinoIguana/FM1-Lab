@@ -621,7 +621,7 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
     char instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
     if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT,first_voice)) return -1;
     for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++) {
-        char c=(char)first_voice[145u+i];
+        char c=i<10u?(char)first_voice[145u+i]:' ';
         instrument_name[i]=(c>=32 && c<=126)?c:' ';
     }
     instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
