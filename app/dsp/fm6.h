@@ -50,6 +50,10 @@ void fm6_overload(void); /* gracefully shed one oldest voice after an audio dead
 uint32_t fm6_overload_shed_count(void);
 void fm6_note_on(uint8_t note, uint8_t velocity);
 void fm6_note_on_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask);
+/* Sequencer events use unique nonzero tokens (>3), so releasing one repeated
+ * pitch cannot release another overlapping event on the same lane. */
+void fm6_sequencer_note_on(uint8_t note, uint8_t velocity, uint8_t patch_mask, uint16_t event_token);
+void fm6_sequencer_note_off(uint8_t note, uint8_t patch_mask, uint16_t event_token);
 void fm6_note_on_tuned_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask, int16_t tune16);
 void fm6_note_off(uint8_t note);
 void fm6_note_off_mask(uint8_t note, uint8_t patch_mask);
