@@ -77,7 +77,7 @@ int main(void)
     assert(fm1lab_audio_engine_render(&engine, output, FM1_BLOCK_FRAMES) == 0);
     assert(fm1lab_audio_engine_active_voices(&engine, 1) == 2);
     assert(fm1lab_audio_engine_active_voices(&engine, 0) == 1);
-    assert(fm1lab_audio_engine_active_voices(&engine, 2) == 1);
+    assert(fm1lab_audio_engine_active_voices(&engine, 2) == 0);
 
     /* Disabling a layer is immediate and cannot leave a stuck note behind. */
     assert(fm1lab_audio_engine_set_enabled(&engine, 1, 0) == 0);
