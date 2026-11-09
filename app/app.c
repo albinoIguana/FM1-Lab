@@ -3023,8 +3023,12 @@ static void draw_operator_workbench(uint8_t view)
         fm1lab_plot_line(px[1],py[0],px[2],py[1],accent);
         fm1lab_plot_line(px[2],py[1],px[3],py[2],accent);
         for(uint32_t i=0;i<4u;i++) {
+            int32_t label_x=px[i]-text_w(&FONT_XS,stages[i])/2;
+            if(label_x<2)label_x=2;
+            if(label_x+text_w(&FONT_XS,stages[i])>238)
+                label_x=238-text_w(&FONT_XS,stages[i]);
             cv_rect(px[i]-3,py[i]-3,7,7,(env_mode==0u?C_WHITE:accent));
-            cv_text(px[i]-text_w(&FONT_XS,stages[i])/2,116,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
+            cv_text(label_x,116,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
             int_text(env_mode?levels[i]:rates[i],t);
             cv_text(px[i]-5,132,&FONT_B,t,accent);
             cv_text(px[i]-5,148,&FONT_XS,env_mode?"LEVEL":"RATE",C_GRAY);
