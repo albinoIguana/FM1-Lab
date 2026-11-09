@@ -93,7 +93,7 @@ static inline void settings_migrate_step_events(settings_t *dst) {
             uint8_t note=dst->performance.seq_note[lane][step];
             uint8_t tied=(uint8_t)((dst->performance.seq_gate[lane][step]&0x80u)&&previous>=0&&previous_note==note);
             if(tied) {
-                if(dst->performance.seq_events[lane][previous].duration<128u)
+                if(dst->performance.seq_events[lane][previous].duration<127u)
                     dst->performance.seq_events[lane][previous].duration+=2u;
             } else if(dst->performance.seq_event_count[lane]<128u) {
                 uint8_t index=dst->performance.seq_event_count[lane]++;
