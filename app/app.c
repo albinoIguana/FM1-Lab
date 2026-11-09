@@ -1875,6 +1875,8 @@ static void input(void)
                 sequencer_event_delete_selected();
             } else if(page==PAGE_INSTRUMENT_MACRO) {
                 page=PAGE_HOME;app_say("HOME","ALL FOUR PATCHES");
+            } else if(page==PAGE_CHAOS) {
+                page=PAGE_INSTRUMENT_MACRO;app_say("INSTRUMENT MACROS","EDIT ACCESS");
             } else if(!patch_focus && page==PAGE_HOME) {
                 page=PAGE_INSTRUMENT_MACRO;app_say("INSTRUMENT MACROS","EDIT ACCESS");
             } else {
