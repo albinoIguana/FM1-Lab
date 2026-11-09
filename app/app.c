@@ -1043,8 +1043,11 @@ static void ui_events_drain(void)
         else if (type == EV_PATCH_PITCH)
             (void)fm6_patch_set_pitch(a,(int8_t)b,(int8_t)c);
         else if (type == EV_PATCH_VOICE) {
+            unsigned patch=(unsigned)a%FM1LAB_PATCH_COUNT;
             (void)fm6_patch_set_voice(a, voice_update_snapshot);
-            fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a%FM1LAB_PATCH_COUNT));
+            fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, patch));
+            (void)fm6_patch_set_pitch(a,current_instrument.patches[patch].octave,
+                current_instrument.patches[patch].fine_cents);
             voice_update_pending = 0u;
         }
     }
