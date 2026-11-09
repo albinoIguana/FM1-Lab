@@ -48,6 +48,8 @@ int fm1lab_voice_global_set(uint8_t voice[FM1LAB_PATCH_BYTES],
 /* Patch-level ADSR shapes all carrier EGs and preserves modulator envelopes. */
 int fm1lab_voice_adsr_get(const uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t adsr[4]);
 int fm1lab_voice_adsr_set(uint8_t voice[FM1LAB_PATCH_BYTES], const uint8_t adsr[4]);
+/* True when at least one algorithm carrier can produce audible output. */
+int fm1lab_voice_has_audible_carrier(const uint8_t voice[FM1LAB_PATCH_BYTES]);
 int fm1lab_voice_operator_is_carrier(const uint8_t voice[FM1LAB_PATCH_BYTES],
                                      unsigned operator_number);
 unsigned fm1lab_voice_operator_depth(const uint8_t voice[FM1LAB_PATCH_BYTES],
