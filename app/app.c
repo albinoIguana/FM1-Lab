@@ -34,7 +34,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_SAVE, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -1862,17 +1862,21 @@ static void input(void)
                 page = PAGE_SEQ;
                 seq_clear_prompt=0u;seq_clear_turn=0;
                 app_say("SEQUENCER","TWO LANES");
-            } else if (page == PAGE_MACRO || page == PAGE_INSTRUMENT_MACRO) {
+            } else if (page == PAGE_MACRO || page == PAGE_INSTRUMENT_MACRO || page == PAGE_CHAOS) {
                 page = PAGE_HOME;
                 app_say("HOME", "ALL FOUR PATCHES");
             } else {
-                page = patch_focus ? PAGE_MACRO : PAGE_INSTRUMENT_MACRO;
-                app_say(page == PAGE_MACRO ? "PATCH MACROS" : "INSTRUMENT MACROS",
-                        page == PAGE_MACRO ? patch_display_name(set.patch) : "FOUR-PATCH CONTROL");
+                page = patch_focus ? PAGE_MACRO : PAGE_CHAOS;
+                app_say(page == PAGE_MACRO ? "PATCH MACROS" : "MAELSTROM",
+                        page == PAGE_MACRO ? patch_display_name(set.patch) : "SHIPWRECK v0.1");
             }
         } else if (k == B_EDIT) {
             if(page==PAGE_SEQ_PIANO) {
                 sequencer_event_delete_selected();
+            } else if(page==PAGE_INSTRUMENT_MACRO) {
+                page=PAGE_HOME;app_say("HOME","ALL FOUR PATCHES");
+            } else if(!patch_focus && page==PAGE_HOME) {
+                page=PAGE_INSTRUMENT_MACRO;app_say("INSTRUMENT MACROS","EDIT ACCESS");
             } else {
                 page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
                 app_say("PATCH PITCH", patch_display_name(set.patch));
@@ -3313,6 +3317,7 @@ static const char *page_title(uint8_t current)
     case PAGE_FX_PHASER: return "PHASER";
     case PAGE_FX_ROUTING: return "PATCH SENDS";
     case PAGE_INSTRUMENT_MACRO: return "INSTRUMENT MACROS";
+    case PAGE_CHAOS: return "MAELSTROM";
     case PAGE_SAVE: return "SAVE INSTRUMENT";
     default: return "FM1-LAB";
     }
@@ -3324,6 +3329,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_HOME: return patch_color(set.patch);
     case PAGE_MACRO: return patch_color(set.patch);
     case PAGE_INSTRUMENT_MACRO: return RGB(150,120,255);
+    case PAGE_CHAOS: return RGB(255,85,65);
     case PAGE_GLOBAL: return RGB(85,190,255);
     case PAGE_OPERATOR_MAP: return RGB(36,215,232);
     case PAGE_ENV: return RGB(255,170,75);
@@ -3412,6 +3418,7 @@ static void draw(void)
     if (page == PAGE_HOME) draw_home_panel();
     else if (page == PAGE_MACRO) draw_macro_panel();
     else if (page == PAGE_INSTRUMENT_MACRO) draw_instrument_macro_panel();
+    else if (page == PAGE_CHAOS) draw_chaos_panel();
     else if (page == PAGE_FX_AMP) draw_amp_panel();
     else if (page == PAGE_FX_EQ) draw_eq_panel();
     else if (page == PAGE_FX_COMPRESSOR) draw_compressor_panel();
