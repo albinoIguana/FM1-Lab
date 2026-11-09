@@ -15,7 +15,8 @@
 #define SET_MAGIC_V9 0x4C314D4Eu
 #define SET_MAGIC_V10 0x4C314D4Fu
 #define SET_MAGIC_V11 0x4C314D50u
-#define SET_MAGIC SET_MAGIC_V11
+#define SET_MAGIC_V12 0x4C314D51u
+#define SET_MAGIC SET_MAGIC_V12
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off, rsv[1]; } settings_v1_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; } settings_v2_t;
 typedef struct {
@@ -47,6 +48,7 @@ typedef struct {
 } fm6_performance_state_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v5_t performance; uint16_t reserved; uint16_t crc; } settings_v5_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v10_t performance; uint16_t reserved; uint16_t padding; uint16_t crc; } settings_v10_t;
+typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t padding; uint16_t crc; } settings_v11_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_t performance; uint16_t reserved; uint16_t padding; uint16_t crc; } settings_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v6_t;
 typedef struct { uint32_t magic; int8_t octave; uint8_t patch, enabled_mask, ble_off; uint8_t macros[FM1LAB_PATCH_COUNT][FM1LAB_MACRO_COUNT]; uint8_t levels[FM1LAB_PATCH_COUNT]; fm6_performance_state_v9_t performance; uint16_t reserved; uint16_t crc; } settings_v7_t;
@@ -91,12 +93,12 @@ static inline void settings_migrate_step_events(settings_t *dst) {
             uint8_t note=dst->performance.seq_note[lane][step];
             uint8_t tied=(uint8_t)((dst->performance.seq_gate[lane][step]&0x80u)&&previous>=0&&previous_note==note);
             if(tied) {
-                if(dst->performance.seq_events[lane][previous].duration<64u)
-                    dst->performance.seq_events[lane][previous].duration++;
+                if(dst->performance.seq_events[lane][previous].duration<128u)
+                    dst->performance.seq_events[lane][previous].duration+=2u;
             } else if(dst->performance.seq_event_count[lane]<128u) {
                 uint8_t index=dst->performance.seq_event_count[lane]++;
                 dst->performance.seq_events[lane][index]=(fm6_seq_event_t){
-                    (uint8_t)step,1u,note,dst->performance.seq_velocity[lane][step],0u
+                    (uint8_t)(step*2u),2u,note,dst->performance.seq_velocity[lane][step],0u
                 };
                 previous=(int)index;
             } else previous=-1;
@@ -450,6 +452,37 @@ static inline int settings_import_v10(settings_t *dst,const settings_v10_t *src)
     dst->reserved=src->reserved;dst->padding=0u;dst->crc=0u;
     return 0;
 }
+static inline int settings_v11_valid(const settings_v11_t *v) {
+    if(!v || v->magic!=SET_MAGIC_V11 || v->octave < -2 || v->octave>2 ||
+       v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u ||
+       v->reserved>3u || v->padding!=0u ||
+       v->crc!=settings_crc16(v,offsetof(settings_v11_t,crc)) ||
+       !fm6_performance_state_valid(&v->performance)) return 0;
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++){
+        if(v->levels[p]>127u)return 0;
+        for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)if(v->macros[p][m]>100u)return 0;
+    }
+    return 1;
+}
+static inline int settings_import_v11(settings_t *dst,const settings_v11_t *src) {
+    if(!dst || !settings_v11_valid(src))return -1;
+    dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
+    dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
+    memcpy(dst->macros,src->macros,sizeof dst->macros);
+    memcpy(dst->levels,src->levels,sizeof dst->levels);
+    memcpy(&dst->performance,&src->performance,sizeof src->performance);
+    /* V11 stored positions in sixteenth steps. V12 stores 32nd-note ticks. */
+    for(uint32_t lane=0;lane<2u;lane++) {
+        for(uint32_t i=0;i<dst->performance.seq_event_count[lane];i++) {
+            fm6_seq_event_t *event=&dst->performance.seq_events[lane][i];
+            event->start=(uint8_t)(event->start*2u);
+            event->duration=(uint8_t)(event->duration*2u);
+        }
+    }
+    dst->reserved=src->reserved;dst->padding=0u;dst->crc=0u;
+    return 0;
+}
+
 static inline int settings_valid(const settings_t *v) {
     if(!v || v->magic!=SET_MAGIC || v->octave < -2 || v->octave>2 || v->patch>=FM1LAB_PATCH_COUNT || (v->enabled_mask&0xF0u) || v->ble_off>1u || v->reserved>3u || v->padding!=0u || !fm6_performance_state_valid(&v->performance) || v->crc!=settings_crc16(v,offsetof(settings_t,crc))) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p) { if(v->levels[p]>127u) return 0; for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m) if(v->macros[p][m]>100u) return 0; }
