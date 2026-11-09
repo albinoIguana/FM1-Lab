@@ -2999,7 +2999,6 @@ static void draw_operator_workbench(uint8_t view)
     const uint8_t *voice=current_instrument.patches[set.patch].voice;
     uint16_t accent=patch_color(set.patch);
     char t[20];
-    uint8_t value=0u;
     if(view==0u) {
         draw_algorithm_diagram();
         cv_text(8,151,&FONT_XS,"SELECTED OPERATOR",C_GRAY);
@@ -3011,12 +3010,10 @@ static void draw_operator_workbench(uint8_t view)
         static const char *const stages[4]={"ATTACK","DECAY 1","DECAY 2","RELEASE"};
         uint8_t rates[4]={0u},levels[4]={0u};
         int32_t px[4]={14,76,143,226},py[4];
-        int32_t widths[4];
         for(uint32_t i=0;i<4u;i++) {
             (void)fm1lab_voice_operator_get(voice,env_operator,(fm1lab_operator_field_t)(FM1LAB_OP_RATE_1+i),&rates[i]);
             (void)fm1lab_voice_operator_get(voice,env_operator,(fm1lab_operator_field_t)(FM1LAB_OP_LEVEL_1+i),&levels[i]);
             py[i]=105-(int32_t)levels[i]*66/99;
-            widths[i]=12+(99-(int32_t)rates[i])*3/10;
         }
         cv_text(8,4,&FONT_XS,"OPERATOR EG  /  LEVEL OVER TIME",C_GRAY);
         cv_text(8,20,&FONT_B,fm1lab_voice_operator_is_carrier(voice,env_operator)?"CARRIER: OUTPUT":"MODULATOR: HARMONICS",accent);
