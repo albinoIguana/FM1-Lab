@@ -1205,12 +1205,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 seq_position=0u;seq_tick_position=0u;seq_tick_counter=0u; transport_phase=0u; seq_start_pending=0u;
             }
             if(arp_clear_pending) {
-                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u);}
+                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u,arp_live_patch_mask);fm6_note_off_source(arp_live_note,arp_live_patch_mask,3u);}
                 arp_live=0u; arp_count=0u; arp_index=0u; arp_gate_left=0u;
                 arp_amp_target_q15=32768;fm6_arp_macro_apply(0);arp_clear_pending=0u;
             }
             if(arp_reset_pending) {
-                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u);}
+                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u,arp_live_patch_mask);fm6_note_off_source(arp_live_note,arp_live_patch_mask,3u);}
                 arp_live=0u;arp_index=0u;arp_direction=1u;arp_step_position=0u;
                 arp_play_position=0u;arp_phase=0u;arp_gate_left=0u;
                 arp_amp_target_q15=32768;fm6_arp_macro_apply(0);arp_reset_pending=0u;
@@ -1232,7 +1232,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
              uint32_t threshold=(FM6_SAMPLE_RATE*60u*4u*percent)/100u;
              if(arp_phase>=threshold){arp_phase-=threshold;fm6_arpeggiator_step();}}
             if(arp_gate_left && --arp_gate_left==0u) {
-                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u);arp_live=0u;}
+                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u,arp_live_patch_mask);fm6_note_off_source(arp_live_note,arp_live_patch_mask,3u);arp_live=0u;}
                 if(arp_output==1u)arp_amp_target_q15=0;
                 fm6_arp_macro_apply(0);
             }
