@@ -55,6 +55,8 @@ static int16_t seq_clear_turn;
 static uint8_t seq_record_active[NKEYS+128u], seq_record_step[NKEYS+128u], seq_record_lane[NKEYS+128u], seq_record_note[NKEYS+128u];
 static uint32_t seq_record_started[NKEYS+128u];
 static uint8_t seq_record_velocity[NKEYS+128u];
+static uint8_t seq_arp_record_active[2],seq_arp_record_note[2],seq_arp_record_velocity[2];
+static uint32_t seq_arp_record_tick[2];
 static uint8_t seq_record_redraw;
 #define APP_SEQ_EVENTS_PER_LANE 128u
 static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
@@ -808,8 +810,8 @@ static void performance_publish(void)
             uint32_t write=0u;
             for(uint32_t i=0;i<seq_event_count[lane];i++) {
                 fm6_seq_event_t event=seq_event_store[lane][i];
-                if(event.start>=length)continue;
-                uint32_t max_duration=length-event.start;
+                if(event.start>=length*2u)continue;
+                uint32_t max_duration=length*2u-event.start;
                 if(event.duration>max_duration)event.duration=(uint8_t)max_duration;
                 if(event.duration)seq_event_store[lane][write++]=event;
             }
@@ -1239,7 +1241,7 @@ static void sequencer_events_sync_legacy(void)
         for(uint32_t i=0;i<seq_event_count[lane];i++) {
             const fm6_seq_event_t *event=&seq_event_store[lane][i];
             for(uint32_t offset=0;offset<event->duration;offset++) {
-                uint32_t step=(uint32_t)event->start+offset;
+                uint32_t step=((uint32_t)event->start+offset)/2u;
                 if(step>=64u || seq_ui_enabled[lane][step])continue;
                 seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=event->pitch;
                 seq_ui_velocity[lane][step]=event->velocity;
@@ -1269,11 +1271,11 @@ static void sequencer_events_import_legacy(void)
             uint8_t tied=(uint8_t)(seq_ui_tie[lane][step] && previous_event>=0 && previous_note==note);
             if(tied) {
                 if(seq_event_store[lane][previous_event].duration<64u)
-                    seq_event_store[lane][previous_event].duration++;
+                    seq_event_store[lane][previous_event].duration+=2u;
             } else if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE) {
-                uint8_t duration=1u;
+                uint8_t duration=2u;
                 seq_event_store[lane][seq_event_count[lane]]=(fm6_seq_event_t){
-                    (uint8_t)step,duration,note,seq_ui_velocity[lane][step],seq_ui_accent[lane][step]
+                    (uint8_t)(step*2u),duration,note,seq_ui_velocity[lane][step],seq_ui_accent[lane][step]
                 };
                 previous_event=(int)seq_event_count[lane]++;
             } else {
@@ -1314,7 +1316,7 @@ static void sequencer_select_event(int direction)
     uint32_t detents=(uint32_t)(direction<0?-direction:direction);
     if(detents>1u)position=(position+(direction<0?count-(detents%count):detents)%count)%count;
     seq_selected_event[lane]=order[position];
-    seq_ui_step=seq_event_store[lane][seq_selected_event[lane]].start;
+    seq_ui_step=(uint8_t)(seq_event_store[lane][seq_selected_event[lane]].start/2u);
 }
 static fm6_seq_event_t *sequencer_selected_event(void)
 {
@@ -1328,7 +1330,7 @@ static void sequencer_event_edit(uint8_t field,int delta)
     if(!event || !delta)return;
     uint8_t lane=seq_ui_lane;
     if(field==0u) {
-        int32_t max=(int32_t)set.performance.seq_length-event->start;
+        int32_t max=(int32_t)set.performance.seq_length*2-event->start;
         event->duration=(uint8_t)clamp((int32_t)event->duration+delta,1,max);
     } else if(field==1u)event->pitch=(uint8_t)clamp((int32_t)event->pitch+delta,0,127);
     else if(field==2u)event->accent=(uint8_t)clamp((int32_t)event->accent+delta,0,100);
@@ -1345,7 +1347,7 @@ static void sequencer_event_delete_selected(void)
         seq_event_store[lane][i-1u]=seq_event_store[lane][i];
     seq_event_count[lane]--;
     seq_selected_event[lane]=seq_event_count[lane]?(index<seq_event_count[lane]?index:(uint8_t)(seq_event_count[lane]-1u)):255u;
-    if(seq_selected_event[lane]<seq_event_count[lane])seq_ui_step=seq_event_store[lane][seq_selected_event[lane]].start;
+    if(seq_selected_event[lane]<seq_event_count[lane])seq_ui_step=(uint8_t)(seq_event_store[lane][seq_selected_event[lane]].start/2u);
     sequencer_events_publish();
     set_dirty=1u;seq_record_redraw=1u;
     app_say("NOTE DELETED","EVENT REMOVED");
@@ -1353,7 +1355,7 @@ static void sequencer_event_delete_selected(void)
 
 static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocity)
 {
-    if(!seq_record_armed || key>=NKEYS+128u)return;
+    if(!seq_record_armed || arp_ui_mode || key>=NKEYS+128u)return;
     sequencer_events_import_legacy();
     uint8_t lane=seq_ui_lane;
     uint8_t step=fm6_sequencer_running()?fm6_sequencer_playing_step():seq_ui_step;
@@ -1367,16 +1369,16 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
 {
     if(key>=NKEYS+128u || !seq_record_active[key] || seq_record_note[key]!=note)return;
     uint32_t elapsed=plat_ms()-seq_record_started[key];
-    uint32_t step_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/4u;
-    if(!step_ms)step_ms=1u;
-    uint8_t lane=seq_record_lane[key], first=seq_record_step[key];
-    uint32_t loop_length=set.performance.seq_length;
-    uint32_t duration=fm1lab_recorded_note_duration(elapsed,step_ms,loop_length,first);
-    if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_length) {
+    uint32_t tick_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/8u;
+    if(!tick_ms)tick_ms=1u;
+    uint8_t lane=seq_record_lane[key], first=(uint8_t)(seq_record_step[key]*2u);
+    uint32_t loop_ticks=(uint32_t)set.performance.seq_length*2u;
+    uint32_t duration=fm1lab_recorded_note_duration(elapsed,tick_ms,loop_ticks,first);
+    if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_ticks) {
         uint8_t new_index=seq_event_count[lane];
         seq_event_store[lane][seq_event_count[lane]++]=(fm6_seq_event_t){
             first,(uint8_t)duration,note,seq_record_velocity[key]?seq_record_velocity[key]:100u,
-            seq_ui_accent[lane][first]
+            seq_ui_accent[lane][first/2u]
         };
         if(seq_selected_event[lane]>=seq_event_count[lane]-1u)
             seq_selected_event[lane]=new_index;
@@ -1385,7 +1387,57 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     seq_record_active[key]=0u;
     set_dirty=1u;seq_record_redraw=1u;
     if(!fm6_sequencer_running())
-        seq_ui_step=(uint8_t)((first+1u)%loop_length);
+        seq_ui_step=(uint8_t)(((first/2u)+1u)%set.performance.seq_length);
+}
+static void sequencer_arp_capture_poll(void)
+{
+    fm6_arp_capture_event_t capture;
+    uint32_t loop_ticks=(uint32_t)set.performance.seq_length*2u;
+    if(loop_ticks<4u)loop_ticks=4u;
+    while(fm6_arp_capture_pop(&capture)) {
+        uint8_t lane=capture.lane<2u?capture.lane:0u;
+        if(capture.on) {
+            if(!seq_record_armed || !fm6_sequencer_running())continue;
+            if(seq_arp_record_active[lane]) {
+                uint32_t old_tick=seq_arp_record_tick[lane];
+                uint32_t start=old_tick%loop_ticks;
+                uint32_t duration=capture.tick>old_tick?capture.tick-old_tick:1u;
+                if(duration>loop_ticks-start)duration=loop_ticks-start;
+                if(!duration)duration=1u;
+                if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE) {
+                    uint8_t index=seq_event_count[lane]++;
+                    seq_event_store[lane][index]=(fm6_seq_event_t){
+                        (uint8_t)start,(uint8_t)duration,seq_arp_record_note[lane],
+                        seq_arp_record_velocity[lane]?seq_arp_record_velocity[lane]:100u,0u
+                    };
+                    seq_selected_event[lane]=index;
+                    sequencer_events_publish();
+                }
+            }
+            seq_arp_record_active[lane]=1u;
+            seq_arp_record_tick[lane]=capture.tick;
+            seq_arp_record_note[lane]=capture.note;
+            seq_arp_record_velocity[lane]=capture.velocity;
+        } else if(seq_arp_record_active[lane] && seq_arp_record_note[lane]==capture.note) {
+            uint32_t start=seq_arp_record_tick[lane]%loop_ticks;
+            uint32_t duration=capture.tick>seq_arp_record_tick[lane]?
+                capture.tick-seq_arp_record_tick[lane]:1u;
+            if(duration>loop_ticks-start)duration=loop_ticks-start;
+            if(!duration)duration=1u;
+            if(seq_record_armed && seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE) {
+                uint8_t index=seq_event_count[lane]++;
+                seq_event_store[lane][index]=(fm6_seq_event_t){
+                    (uint8_t)start,(uint8_t)duration,seq_arp_record_note[lane],
+                    seq_arp_record_velocity[lane]?seq_arp_record_velocity[lane]:100u,0u
+                };
+                seq_selected_event[lane]=index;
+                sequencer_events_publish();
+                seq_ui_step=(uint8_t)(start/2u);
+                set_dirty=1u;seq_record_redraw=1u;
+            }
+            seq_arp_record_active[lane]=0u;
+        }
+    }
 }
 static void sequencer_record_step_advance(void)
 {
@@ -1858,6 +1910,7 @@ static void input(void)
     int32_t e;
     touch_poll();                            /* the sensed keys' presses, velocities and pressure */
     keys = touch_keys();
+    sequencer_arp_capture_poll();
     sequencer_record_step_advance();
     for (k = 0; k < NKEYS; k++) {            /* key 0 is F3 (MIDI 53) */
         uint32_t bit = 1u << k, v;
@@ -3240,12 +3293,13 @@ static void draw_sequencer_piano_panel(void)
     for(uint32_t i=0;i<seq_event_count[lane];i++) {
         const fm6_seq_event_t *event=&seq_event_store[lane][i];
         int32_t event_start=event->start, event_end=event_start+event->duration;
-        int32_t visible_start=event_start>(int32_t)first?event_start:first;
-        int32_t visible_end=event_end<(int32_t)first+16?event_end:(int32_t)first+16;
+        int32_t window_start=(int32_t)first*2,window_end=window_start+32;
+        int32_t visible_start=event_start>window_start?event_start:window_start;
+        int32_t visible_end=event_end<window_end?event_end:window_end;
         if(visible_end<=visible_start || event->pitch<low || event->pitch>high)continue;
-        int32_t x=gx+(visible_start-(int32_t)first)*cw+1;
+        int32_t x=gx+(visible_start-window_start)*cw/2+1;
         int32_t y=gy+(high-event->pitch)*rh+1;
-        int32_t barw=(visible_end-visible_start)*cw-2;
+        int32_t barw=(visible_end-visible_start)*cw/2-2;
         int32_t barh=2+(int32_t)event->velocity*2/127;
         if(barw<2)barw=2;
         if(barh>3)barh=3;
