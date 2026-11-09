@@ -45,6 +45,8 @@ int fm1lab_library_load(unsigned index, fm1lab_instrument_t *out)
                metadata.instruments[slot].patches[patch].macros, FM1LAB_MACRO_COUNT);
         out->patches[patch].enabled = metadata.instruments[slot].patches[patch].enabled;
         out->patches[patch].level = metadata.instruments[slot].patches[patch].level;
+        out->patches[patch].octave = metadata.instruments[slot].patches[patch].octave;
+        out->patches[patch].fine_cents = metadata.instruments[slot].patches[patch].fine_cents;
     }
     return fm1lab_instrument_valid(out) ? 0 : GROOVE_PROJECT_INVALID;
 }
@@ -74,6 +76,8 @@ int fm1lab_library_save(unsigned index, const fm1lab_instrument_t *instrument)
                source->macros, FM1LAB_MACRO_COUNT);
         metadata.instruments[slot].patches[patch].enabled = source->enabled;
         metadata.instruments[slot].patches[patch].level = source->level;
+        metadata.instruments[slot].patches[patch].octave = source->octave;
+        metadata.instruments[slot].patches[patch].fine_cents = source->fine_cents;
     }
 
     if (fm1lab_bank_metadata_encode(&metadata, encoded)) return GROOVE_PROJECT_INVALID;
