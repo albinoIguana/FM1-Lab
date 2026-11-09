@@ -2754,7 +2754,7 @@ static void draw_chaos_panel(void)
     static const char *const shapes[6]={"SINE","TRIANGLE","PULSE","STAIRS","SAMPLE&HOLD","S&H 4-BIT"};
     static const char *const divisions[8]={"1 BAR","1/2","1/4","1/8","1/16","1/32","1/8T","1/16T"};
     uint8_t slot=(uint8_t)((uint32_t)set.performance.chaos_rate*7u/100u);
-    uint8_t bits=(uint8_t)(24u-(uint32_t)set.performance.chaos_tone*16u/100u);
+    uint8_t bits=(uint8_t)(16u-(uint32_t)set.performance.chaos_tone*14u/100u);
     char t[20];uint16_t accent=RGB(255,85,65);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
@@ -2774,7 +2774,7 @@ static void draw_chaos_panel(void)
             cv_text(x+9,y+27,&FONT_B,t,accent);
             cv_rect(x+9,y+49,94,6,C_LINE);
             cv_rect(x+9,y+49,(int32_t)set.performance.chaos_tone*94/100,6,accent);
-            cv_text(x+9,y+64,&FONT_XS,"24-BIT  TO  8-BIT",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"16-BIT  TO  2-BIT",C_GRAY);
         }else{
             cv_text(x+9,y+27,&FONT_B,shapes[set.performance.chaos_shape],accent);
             cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_GRAY);
