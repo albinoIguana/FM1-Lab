@@ -39,7 +39,7 @@ static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
 static uint8_t eq_ui_band = 1u;
-static uint8_t env_operator = 1u, env_mode, operator_detune_mode;
+static uint8_t env_operator = 1u, env_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_tie[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
 static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A','C','T','O','R','Y',0},{'F','A','C','T','O','R','Y',0}};
@@ -75,7 +75,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN };
+enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN, EV_PATCH_PITCH };
 static fm6_performance_state_t performance_update_snapshot;
 static volatile uint8_t performance_update_pending, performance_update_dirty;
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
@@ -831,6 +831,7 @@ static void instrument_apply_engine_bank(uint8_t lane,const fm1lab_instrument_t 
         fm6_patch_set_enabled(engine_patch,1u);
         fm6_patch_set_level(engine_patch,part->level);
         fm6_patch_set_pan(engine_patch,fm1lab_patch_pan(source,p));
+        (void)fm6_patch_set_pitch(engine_patch,part->octave,part->fine_cents);
         for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;++m)
             fm6_macro_set(engine_patch,m,instrument_macro_effective_from(source,inserts,p,m));
     }
@@ -1039,6 +1040,8 @@ static void ui_events_drain(void)
         } else if (type == EV_SEQ_RUN)
             fm6_sequencer_set_running(a);
 
+        else if (type == EV_PATCH_PITCH)
+            (void)fm6_patch_set_pitch(a,(int8_t)b,(int8_t)c);
         else if (type == EV_PATCH_VOICE) {
             (void)fm6_patch_set_voice(a, voice_update_snapshot);
             fm6_patch_set_pan(a, fm1lab_patch_pan(&current_instrument, a%FM1LAB_PATCH_COUNT));
@@ -1064,6 +1067,22 @@ static void voice_edit_changed(void)
     instrument_dirty = 1u;
     set_dirty = 1u;
     voice_dirty = 1u;
+}
+
+static void patch_pitch_edit(unsigned control,int delta)
+{
+    if(control>1u || !delta || !instrument_loaded)return;
+    fm1lab_patch_t *patch=&current_instrument.patches[set.patch];
+    int value=control==0u?patch->octave:patch->fine_cents;
+    int next=value+delta;
+    if(control==0u){if(next < -4)next=-4;if(next>4)next=4;}
+    else {if(next < -100)next=-100;if(next>100)next=100;}
+    if(next==value)return;
+    if(control==0u)patch->octave=(int8_t)next;
+    else patch->fine_cents=(int8_t)next;
+    instrument_dirty=1u;set_dirty=1u;
+    ui_event_push(EV_PATCH_PITCH,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT+set.patch),
+        (uint8_t)patch->octave,(uint8_t)patch->fine_cents);
 }
 
 static void instrument_insert_edit(uint32_t field,uint8_t value)
@@ -1848,7 +1867,7 @@ static void input(void)
                 sequencer_event_delete_selected();
             } else {
                 page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
-                app_say("OPERATOR ROLES", patch_display_name(set.patch));
+                app_say("PATCH PITCH", patch_display_name(set.patch));
             }
         } else if (k == B_SEQ) {
             ui.seq_hold_t=plat_ms();ui.seq_hold_fired=0u;
@@ -1998,12 +2017,6 @@ static void input(void)
                 FM1LAB_GLOBAL_ALGORITHM, &algorithm);
             int_text(algorithm, t);
             app_say("FM ALGORITHM", t);
-        } else if (k == EN_SELECT && page == PAGE_OPERATOR_MAP) {
-            int32_t next = ((int32_t)env_operator - 1 + e) % 6;
-            if (next < 0) next += 6;
-            env_operator = (uint8_t)(next + 1);
-            app_say("OPERATOR", fm1lab_voice_operator_is_carrier(
-                current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
         } else if (k == EN_ALGO && page == PAGE_FX_EQ) {
             uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+2u);
             uint8_t value=fm1lab_insert_state_get(&current_inserts,field);
@@ -2068,11 +2081,6 @@ static void input(void)
             instrument_load((uint32_t)next,1);
             performance_publish();set_dirty=1u;
             app_say("TRACK INSTRUMENT","LOADING");
-        } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
-            int32_t mode = ((int32_t)operator_detune_mode + e) % 2;
-            if (mode < 0) mode += 2;
-            operator_detune_mode = (uint8_t)mode;
-            app_say("OPERATOR PITCH", operator_detune_mode ? "DETUNE" : "FINE");
         } else if (k == EN_PRESET) {
             if (page == PAGE_HOME && patch_focus) {
                 uint8_t voice[FM1LAB_PATCH_BYTES];
@@ -2276,13 +2284,8 @@ static void input(void)
                     app_say(index==1u?"COMP RATIO":index==2u?"COMP THRESHOLD":"COMP ATTACK","UPDATED");
                 }
             } else if (page == PAGE_OPERATOR_MAP) {
-                static const fm1lab_operator_field_t fields[4] = {
-                    FM1LAB_OP_OUTPUT, FM1LAB_OP_MODE, FM1LAB_OP_COARSE, FM1LAB_OP_FINE
-                };
-                voice_edit_operator(index == 3u && operator_detune_mode ?
-                    FM1LAB_OP_DETUNE : fields[index], e);
-                app_say(index == 0u ? "OPERATOR OUTPUT" : index == 1u ? "OSCILLATOR MODE" :
-                    index == 2u ? "COARSE FREQUENCY" : operator_detune_mode ? "OPERATOR DETUNE" : "FINE FREQUENCY", "UPDATED");
+                if(index==0u){patch_pitch_edit(0u,e);app_say("PATCH OCTAVE","UPDATED");}
+                else if(index==1u){patch_pitch_edit(1u,e);app_say("PATCH FINE TUNE","UPDATED");}
             } else if (page == PAGE_ENV) {
                 if (env_mode == 0u) {
                     voice_edit_adsr(index, e);
@@ -2640,33 +2643,32 @@ static void draw_instrument_macro_panel(void)
         cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
     }
 }
-/* Four operator quadrants; roles come from the selected algorithm's actual data. */
+/* Whole-patch pitch: every note from this layer shares the same octave/cents offset. */
 static void draw_operator_map(void)
 {
-    static const char *const labels[4] = {"OUTPUT", "MODE", "COARSE", "FINE"};
-    const fm1lab_operator_field_t fields[4] = {
-        FM1LAB_OP_OUTPUT, FM1LAB_OP_MODE, FM1LAB_OP_COARSE, FM1LAB_OP_FINE
-    };
-    uint8_t maxima[4] = {99u, 1u, 31u, operator_detune_mode ? 14u : 99u};
-    const uint8_t *voice = current_instrument.patches[set.patch].voice;
-    uint8_t values[4] = {0u, 0u, 0u, 0u};
-    char t[16];
-    uint16_t accent = patch_color(set.patch);
-    for (uint32_t i = 0; i < 4u; ++i) {
-        int32_t x = panel_grid_x(i);
-        int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
-        (void)fm1lab_voice_operator_get(voice, env_operator,
-            i == 3u && operator_detune_mode ? FM1LAB_OP_DETUNE : fields[i], &values[i]);
-        panel_grid_card(i, UI_GRID_TOP, UI_GRID_ROW_STEP, accent);
-        cv_text(x + 9, y + 8, &FONT_XS,
-            i == 3u && operator_detune_mode ? "DETUNE" : labels[i], C_WHITE);
-        if (i == 1u) {
-            cv_text(x + 9, y + 27, &FONT_B, values[i] ? "FIXED" : "RATIO", accent);
-        } else {
-            int_text(values[i], t);
-            cv_text(x + 9, y + 27, &FONT_B, t, accent);
-            cv_rect(x + 9, y + 46, 94, 5, C_LINE);
-            cv_rect(x + 9, y + 46, (int32_t)values[i] * 94 / maxima[i], 5, accent);
+    const fm1lab_patch_t *patch=&current_instrument.patches[set.patch];
+    const int values[2]={(int)patch->octave,(int)patch->fine_cents};
+    const char *labels[4]={"K1  OCTAVE","K2  FINE","WHOLE PATCH","INDEPENDENT"};
+    char t[20];
+    uint16_t accent=patch_color(set.patch);
+    for(uint32_t i=0;i<4u;i++){
+        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
+        cv_text(x+9,y+8,&FONT_XS,labels[i],C_WHITE);
+        if(i<2u){
+            int value=values[i];
+            if(value>0){t[0]='+';int_text(value,t+1);}else int_text(value,t);
+            text_cat(t,i==0u?" OCT":" CENTS");
+            cv_text(x+9,y+25,&FONT_B,t,accent);
+            cv_rect(x+9,y+48,94,5,C_LINE);
+            cv_rect(x+9+47,y+45,1,11,C_GRAY);
+            int width=i==0u?((value<0?-value:value)*47/4):((value<0?-value:value)*47/100);
+            if(value<0)cv_rect(x+56-width,y+48,width,5,accent);
+            else if(value>0)cv_rect(x+56,y+48,width,5,accent);
+            cv_text(x+9,y+63,&FONT_XS,i==0u?"-4  /  0  /  +4":"-100c  /  0  /  +100c",C_GRAY);
+        }else{
+            cv_text(x+9,y+29,&FONT_B,i==2u?"ALL SIX OPS":"PER PATCH",accent);
+            cv_text(x+9,y+51,&FONT_XS,i==2u?"ONE PITCH OFFSET":"FOUR TUNINGS",C_GRAY);
         }
     }
 }
@@ -3282,7 +3284,7 @@ static const char *page_title(uint8_t current)
     case PAGE_HOME: return "HOME";
     case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
     case PAGE_GLOBAL: return "GLOBAL";
-    case PAGE_OPERATOR_MAP: return "OPERATOR MAP";
+    case PAGE_OPERATOR_MAP: return "PATCH PITCH";
     case PAGE_ENV: return env_mode == 0u ? "PATCH ADSR" : env_mode == 1u ? "OP EG RATES" : "OP EG LEVELS";
     case PAGE_LFO: return "LFO / MOTION";
     case PAGE_LFO_MOD: return "LFO SYNC";
