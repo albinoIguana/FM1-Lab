@@ -369,8 +369,10 @@ static void fm6_chaos_process_channel(int64_t *sample,int32_t modulation)
     int64_t shaped=dry+((ring-dry)*fm6_chaos_amount)/100;
     int64_t drive=100+(int64_t)fm6_chaos_amount*5;
     shaped=fm6_chaos_fold((shaped*drive)/100);
-    /* Q24 signal: reduce up to sixteen low bits for an 8-24 bit range. */
-    uint32_t crush_bits=(uint32_t)fm6_chaos_tone*16u/100u;
+    /* Q24 signal: the control spans 16-bit down to deliberately brutal 2-bit.
+     * Keep eight fractional bits at the lightest setting, up to twenty-two
+     * at maximum reduction. */
+    uint32_t crush_bits=8u+(uint32_t)fm6_chaos_tone*14u/100u;
     if(crush_bits) {
         int32_t q=shaped>INT32_MAX?INT32_MAX:shaped<INT32_MIN?INT32_MIN:(int32_t)shaped;
         uint32_t mask=~(((uint32_t)1u<<crush_bits)-1u);
