@@ -1058,6 +1058,23 @@ int main(void) {
     /* A note at the second half of a sixteenth must wait for the 32nd-note
      * subdivision, then release one tick later. */
     fm6_init();
+    assert(fm6_get_swing()==50u);
+    fm6_set_swing(49u);assert(fm6_get_swing()==50u);
+    fm6_set_swing(90u);assert(fm6_get_swing()==75u);
+    {
+        const fm6_seq_event_t offbeat[]={{1u,1u,60u,100u,0u}};
+        fm6_sequencer_set_length(4u);
+        assert(fm6_sequencer_set_events(0u,offbeat,1u)==0);
+        fm6_sequencer_set_running(1u);
+        for(unsigned block=0u;block<32u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,39u,4096u); /* swung first 32nd interval: 3:1 */
+        assert(fm6_test_sequencer_active_events(0u)==0u);
+        for(unsigned block=0u;block<10u;block++)fm6_render(output,128u,4096u);
+        fm6_render(output,99u,4096u); /* short return interval */
+        assert(fm6_test_sequencer_active_events(0u)==1u);
+        fm6_sequencer_set_running(0u);
+    }
+    fm6_init();
     {
         const fm6_seq_event_t offbeat[]={{1u,1u,60u,100u,0u}};
         fm6_sequencer_set_length(4u);
