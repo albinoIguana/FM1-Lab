@@ -8,7 +8,7 @@ static void test_sector_layout(void)
 {
     assert(FM1LAB_BANK_VOICE_AREA_BYTES == 3604u);
     assert(FM1LAB_BANK_META_OFFSET == 3604u);
-    assert(FM1LAB_BANK_META_END == 4004u);
+    assert(FM1LAB_BANK_META_END == 4068u);
     assert(FM1LAB_BANK_META_END <= FM1LAB_BANK_SECTOR_BYTES);
     assert(FM1LAB_BANK_INSTRUMENTS * FM1LAB_BANK_PATCHES == FM1LAB_BANK_VOICE_COUNT);
 }
@@ -24,6 +24,8 @@ static void test_round_trip(void)
     source.instruments[7].patches[3].macros[2] = 83;
     source.instruments[7].patches[3].enabled = 0;
     source.instruments[7].patches[3].level = 91;
+    source.instruments[7].patches[3].octave = -2;
+    source.instruments[7].patches[3].fine_cents = 37;
 
     assert(fm1lab_bank_metadata_encode(&source, bytes) == 0);
     memset(&decoded, 0xa5, sizeof decoded);
@@ -42,6 +44,9 @@ static void test_corruption_and_invalid_values(void)
     assert(fm1lab_bank_metadata_decode(&decoded, bytes) == -1);
 
     metadata.instruments[0].patches[0].macros[0] = 101;
+    assert(fm1lab_bank_metadata_encode(&metadata, bytes) == -1);
+    metadata.instruments[0].patches[0].macros[0] = 50;
+    metadata.instruments[0].patches[0].octave = -5;
     assert(fm1lab_bank_metadata_encode(&metadata, bytes) == -1);
 }
 
