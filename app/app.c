@@ -2081,6 +2081,8 @@ static void input(void)
             instrument_load((uint32_t)next,1);
             performance_publish();set_dirty=1u;
             app_say("TRACK INSTRUMENT","LOADING");
+        } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
+            app_say("PATCH PITCH", "K1 OCTAVE / K2 FINE");
         } else if (k == EN_PRESET) {
             if (page == PAGE_HOME && patch_focus) {
                 uint8_t voice[FM1LAB_PATCH_BYTES];
