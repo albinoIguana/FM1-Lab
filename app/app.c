@@ -78,6 +78,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
+static uint8_t touch_note[NKEYS];              /* pitch captured at key-down; octave shifts must not orphan note-off */
 enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN, EV_PATCH_PITCH };
 static fm6_performance_state_t performance_update_snapshot;
 static volatile uint8_t performance_update_pending, performance_update_dirty;
@@ -1802,8 +1803,8 @@ static void octave_step(int32_t d)
     char t[4];
     if (o == set.octave)
         return;
-    voice_note = -1;                         /* a key held across the change would not find its note off */
-    ui_event_push(EV_PANIC, 0, 0, 0);
+    /* Do not panic the synth here: that also kills sequencer voices. Held keys
+     * retain their original pitch in touch_note[] until their matching release. */
     set.octave = (int8_t)o;
     set_dirty = 1;
     octave_text(t);
@@ -1846,18 +1847,19 @@ static void input(void)
             ui.vel[k] = (uint8_t)v;
             ui.prs[k] = 0;
             ui.last_key = (int32_t)k;
-            sequencer_record_capture(k,(uint8_t)note,(uint8_t)v);
-            note_on(note, v);
-            plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
+            touch_note[k] = (uint8_t)note;
+            sequencer_record_capture(k,touch_note[k],(uint8_t)v);
+            note_on(touch_note[k], v);
+            plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)touch_note[k] << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
         } else if (!(keys & bit) && (ui.keys & bit)) {
             ui.prs[k] = 0;
-            sequencer_record_release(k,(uint8_t)note);
-            note_off(note);
-            plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note << 16, TO_USB | TO_BLE);
+            sequencer_record_release(k,touch_note[k]);
+            note_off(touch_note[k]);
+            plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)touch_note[k] << 16, TO_USB | TO_BLE);
         } else if ((keys & bit) && touch_pressure(k) != ui.prs[k]) {   /* pressure: poly aftertouch */
             ui.prs[k] = touch_pressure(k);
             ui.redraw = 1;
-            plat_midi_send(0x0Au | 0xA0u << 8 | (uint32_t)note << 16 | (uint32_t)ui.prs[k] << 24, TO_USB | TO_BLE);
+            plat_midi_send(0x0Au | 0xA0u << 8 | (uint32_t)touch_note[k] << 16 | (uint32_t)ui.prs[k] << 24, TO_USB | TO_BLE);
         }
     }
     for (k = 0; k < NB; k++) {               /* a button pressed: its name, and what it does here */
