@@ -12,10 +12,10 @@
 #define FM1LAB_BANK_PATCHES 4u
 #define FM1LAB_BANK_NAME_BYTES 24u
 #define FM1LAB_BANK_MACROS 4u
-#define FM1LAB_BANK_META_RECORD_BYTES 48u
-#define FM1LAB_BANK_META_PAYLOAD_BYTES 384u
+#define FM1LAB_BANK_META_RECORD_BYTES 56u
+#define FM1LAB_BANK_META_PAYLOAD_BYTES 448u
 #define FM1LAB_BANK_META_HEADER_BYTES 16u
-#define FM1LAB_BANK_META_BYTES 400u
+#define FM1LAB_BANK_META_BYTES 464u
 #define FM1LAB_BANK_META_OFFSET FM1LAB_BANK_VOICE_AREA_BYTES
 #define FM1LAB_BANK_META_END (FM1LAB_BANK_META_OFFSET + FM1LAB_BANK_META_BYTES)
 
@@ -23,6 +23,8 @@ typedef struct {
     uint8_t macros[FM1LAB_BANK_MACROS]; /* 0..100, neutral at 50 */
     uint8_t enabled;                    /* 0 = muted, 1 = active */
     uint8_t level;                      /* 0..127 */
+    int8_t octave;                       /* -4..+4 */
+    int8_t fine_cents;                   /* -100..+100 */
 } fm1lab_bank_patch_meta_t;
 
 typedef struct {
