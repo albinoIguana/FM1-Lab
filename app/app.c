@@ -1453,11 +1453,13 @@ static void sequencer_record_step_advance(void)
      * head. Remove notes beginning here and trim notes that cross this step. */
     uint8_t lane=seq_ui_lane;
     uint32_t write=0u;
+    uint32_t step_start=(uint32_t)step*2u,step_end=step_start+2u;
     for(uint32_t i=0;i<seq_event_count[lane];i++) {
         fm6_seq_event_t event=seq_event_store[lane][i];
         uint32_t end=(uint32_t)event.start+event.duration;
-        if(event.start==step)continue;
-        if(event.start<step && end>step)event.duration=(uint8_t)(step-event.start);
+        if(event.start>=step_start && event.start<step_end)continue;
+        if(event.start<step_start && end>step_start)
+            event.duration=(uint8_t)(step_start-event.start);
         if(event.duration)seq_event_store[lane][write++]=event;
     }
     if(write!=seq_event_count[lane]) {
@@ -3278,6 +3280,7 @@ static void draw_sequencer_piano_panel(void)
     for(uint32_t col=0;col<=16u;col++) {
         int32_t x=gx+(int32_t)col*cw;
         cv_rect(x,gy,1,gh,((col%4u)==0u)?RGB(86,98,112):RGB(49,61,75));
+        if(col<16u)cv_rect(x+cw/2,gy,1,gh,RGB(40,52,66));
     }
     for(uint32_t col=0;col<16u;col++) {
         uint8_t step=(uint8_t)(first+col);
