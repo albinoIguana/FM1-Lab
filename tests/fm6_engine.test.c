@@ -887,6 +887,9 @@ int main(void) {
     assert(fm6_test_sequencer_active_events(0u)==1u);
     for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
     fm6_render(output,9u,4096u);
+    assert(fm6_test_sequencer_active_events(0u)==1u);
+    for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
+    fm6_render(output,9u,4096u);
     assert(fm6_test_sequencer_active_events(0u)==0u);
     fm6_sequencer_set_running(0u);
 
