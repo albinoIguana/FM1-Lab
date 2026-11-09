@@ -521,6 +521,7 @@ static void fm6_transport_step(void)
 static void fm6_transport_tick(void)
 {
     if(!seq_running)return;
+    seq_play_position=(uint8_t)(seq_tick_position/2u);
     if(seq_event_mode)fm6_seq_event_tick();
     else if((seq_tick_position&1u)==0u)fm6_transport_step();
     seq_tick_position=(uint8_t)(seq_tick_position+1u);
@@ -1082,7 +1083,7 @@ void fm6_note_off(uint8_t note)
             if(arp_output==1u)fm6_note_off_source(note,(uint8_t)((1u<<PATCHES)-1u),0u);
             break;
         }
-        if(!arp_count && arp_live) { fm6_note_off_source(arp_live_note,arp_patch_mask,3u); arp_live=0u; }
+        if(!arp_count && arp_live) { fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u); arp_live=0u; }
         if(!arp_count){arp_gate_left=0u;arp_amp_target_q15=32768;fm6_arp_macro_apply(0);}
         return;
     }
