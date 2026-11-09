@@ -8,6 +8,7 @@
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
 #include "fm1lab_settings_record.h"
+#include "fm1lab_sequencer_record.h"
 #include "fm1lab_instrument.h"
 #include "fm1lab_voice_editor.h"
 #include "fm1lab_store_library.h"
@@ -1279,12 +1280,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     if(!step_ms)step_ms=1u;
     uint8_t lane=seq_record_lane[key], first=seq_record_step[key];
     uint32_t loop_length=set.performance.seq_length;
-    if(loop_length<2u)loop_length=2u;
-    if(loop_length>64u)loop_length=64u;
-    uint32_t duration=(elapsed+step_ms-1u)/step_ms;
-    if(duration<1u)duration=1u;
-    if(duration>loop_length-first)duration=loop_length-first;
-    if(duration>64u)duration=64u;
+    uint32_t duration=fm1lab_recorded_note_duration(elapsed,step_ms,loop_length,first);
     if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_length) {
         uint8_t new_index=seq_event_count[lane];
         seq_event_store[lane][seq_event_count[lane]++]=(fm6_seq_event_t){
