@@ -395,7 +395,10 @@ static void fm6_seq_event_step(void)
             const fm6_seq_event_t *event=&seq_events[lane][i];
             if(event->start==seq_position && event->velocity && !seq_event_active[lane][i]) {
                 uint16_t token=(uint16_t)(4u+lane*FM6_SEQ_EVENTS_PER_LANE+i);
-                fm6_note_start_tuned_mask(event->pitch,event->velocity,mask,0,token);
+                uint32_t accented=(uint32_t)event->velocity+
+                    ((127u-(uint32_t)event->velocity)*event->accent)/100u;
+                if(accented>127u)accented=127u;
+                fm6_note_start_tuned_mask(event->pitch,(uint8_t)accented,mask,0,token);
                 seq_event_active[lane][i]=1u;
             }
         }
