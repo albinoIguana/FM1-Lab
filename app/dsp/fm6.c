@@ -100,7 +100,6 @@ static uint32_t fm6_comp_makeup_gain_q15;
 static uint8_t fm6_chaos_amount, fm6_chaos_rate, fm6_chaos_tone, fm6_chaos_shape;
 static uint32_t fm6_chaos_phase, fm6_chaos_phase_inc, fm6_chaos_random=0x6d2b79f5u;
 static int32_t fm6_chaos_random_hold;
-static int32_t fm6_chaos_filter[2];
 
 
 #ifdef FM6_TEST
@@ -331,8 +330,11 @@ static uint32_t fm6_chaos_next_random(void)
 }
 static void fm6_chaos_rate_update(void)
 {
-    /* 0.03 Hz at the bottom, about 80 Hz at the top. */
-    fm6_chaos_phase_inc=3000u+(uint32_t)fm6_chaos_rate*fm6_chaos_rate*780u;
+    /* Bar, half, quarter, eighth, sixteenth, thirty-second and triplet clocks. */
+    static const uint16_t scale[8]={406u,812u,1624u,3248u,6496u,12992u,4872u,9744u};
+    uint32_t slot=(uint32_t)fm6_chaos_rate*7u/100u;
+    uint32_t bpm=transport_bpm<30u?30u:transport_bpm>300u?300u:transport_bpm;
+    fm6_chaos_phase_inc=bpm*scale[slot];
 }
 static int32_t fm6_chaos_fold(int64_t sample)
 {
@@ -357,54 +359,38 @@ static int32_t fm6_chaos_wave(uint32_t phase)
     if(fm6_chaos_shape==2u)return (phase&0x80000000u)?-32768:32767;
     if(fm6_chaos_shape==3u)return (tri/8192)*8192;
     if(fm6_chaos_shape==4u)return fm6_chaos_random_hold;
-    if(fm6_chaos_shape==5u)return tri;
+    if(fm6_chaos_shape==5u)return (fm6_chaos_random_hold/4096)*4096;
     return tri;
 }
-static void fm6_chaos_process_channel(unsigned channel,int64_t *sample,int32_t modulation,int32_t noise)
+static void fm6_chaos_process_channel(int64_t *sample,int32_t modulation)
 {
     int64_t dry=*sample;
     int64_t ring=(dry*modulation)>>15;
     int64_t shaped=dry+((ring-dry)*fm6_chaos_amount)/100;
     int64_t drive=100+(int64_t)fm6_chaos_amount*5;
-    shaped=(shaped*drive)/100;
-    shaped=fm6_chaos_fold(shaped);
-    unsigned crush=1u+(unsigned)fm6_chaos_amount/10u;
-    {
-        int32_t quantized=shaped>INT32_MAX?INT32_MAX:shaped<INT32_MIN?INT32_MIN:(int32_t)shaped;
-        uint32_t mask=~(((uint32_t)1u<<crush)-1u);
-        if(quantized>=0)quantized=(int32_t)((uint32_t)quantized&mask);
-        else quantized=-(int32_t)(((uint32_t)(-quantized))&mask);
-        shaped=quantized;
+    shaped=fm6_chaos_fold((shaped*drive)/100);
+    /* Q24 signal: reduce up to sixteen low bits for an 8-24 bit range. */
+    uint32_t crush_bits=(uint32_t)fm6_chaos_tone*16u/100u;
+    if(crush_bits) {
+        int32_t q=shaped>INT32_MAX?INT32_MAX:shaped<INT32_MIN?INT32_MIN:(int32_t)shaped;
+        uint32_t mask=~(((uint32_t)1u<<crush_bits)-1u);
+        if(q>=0)q=(int32_t)((uint32_t)q&mask);
+        else q=-(int32_t)(((uint32_t)(-(int64_t)q))&mask);
+        shaped=q;
     }
-    int64_t noise_q24=((int64_t)noise*Q24_ONE)>>15;
-    shaped+=(noise_q24*(int32_t)fm6_chaos_amount*(int32_t)fm6_chaos_tone)/10000;
-    uint32_t alpha=80u+(uint32_t)fm6_chaos_tone*2800u/100u;
-    fm6_chaos_filter[channel]=fm6_clamp_sample((int64_t)fm6_chaos_filter[channel]+
-        (((shaped-fm6_chaos_filter[channel])*alpha)>>15));
-    /* Tone sweeps from filtered sub/low-mid grit to bright, noisy edges. */
-    int64_t wet=fm6_chaos_filter[channel]+
-        ((shaped-fm6_chaos_filter[channel])*(int32_t)fm6_chaos_tone)/100;
-    *sample=dry+((wet-dry)*fm6_chaos_amount)/100;
+    *sample=dry+((shaped-dry)*fm6_chaos_amount)/100;
 }
 static void fm6_chaos_process(int64_t *left,int64_t *right)
 {
     if(!fm6_chaos_amount)return; /* true transparent bypass */
     uint32_t old_phase=fm6_chaos_phase;
     fm6_chaos_phase+=fm6_chaos_phase_inc;
+    if(fm6_chaos_phase<old_phase)
+        fm6_chaos_random_hold=(int32_t)(fm6_chaos_next_random()>>16)-32768;
     int32_t wave=fm6_chaos_wave(fm6_chaos_phase);
-    int32_t noise=(int32_t)(fm6_chaos_next_random()>>16)-32768;
-    if(fm6_chaos_shape==4u) {
-        if(fm6_chaos_phase<old_phase)fm6_chaos_random_hold=noise;
-        wave=fm6_chaos_random_hold;
-    } else if(fm6_chaos_shape==5u) {
-        wave=(wave*2+noise)/3;
-        if((fm6_chaos_phase&0x000fffffu)<fm6_chaos_phase_inc)wave=-wave;
-    }
-    int32_t right_noise=(int32_t)(fm6_chaos_next_random()>>16)-32768;
-    fm6_chaos_process_channel(0u,left,wave,noise);
-    fm6_chaos_process_channel(1u,right,wave,right_noise);
+    fm6_chaos_process_channel(left,wave);
+    fm6_chaos_process_channel(right,wave);
 }
-
 static uint32_t fm6_comp_makeup_q15(uint8_t value)
 {
     static const uint32_t gain[13] = {32768u,34716u,36781u,38968u,41285u,43739u,46341u,
@@ -879,7 +865,7 @@ void fm6_init(void)
     fm6_comp_params_update();
     fm1lab_insert_state_init(&fm6_master_inserts);
     fm6_chaos_amount=0u;fm6_chaos_rate=42u;fm6_chaos_tone=55u;fm6_chaos_shape=0u;
-    fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_random_hold=(int32_t)(fm6_chaos_random>>16)-32768;fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;fm6_chaos_rate_update();
+    fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_random_hold=(int32_t)(fm6_chaos_random>>16)-32768;fm6_chaos_rate_update();
     fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
     fm6_zero_bytes(fm6_eq_x1,sizeof(fm6_eq_x1));fm6_zero_bytes(fm6_eq_x2,sizeof(fm6_eq_x2));
     fm6_zero_bytes(fm6_eq_y1,sizeof(fm6_eq_y1));fm6_zero_bytes(fm6_eq_y2,sizeof(fm6_eq_y2));
@@ -1537,6 +1523,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
      * Cold boot starts in legacy mode; event mode is entered explicitly by
      * fm6_sequencer_set_events after migration or recording. */
     transport_bpm=s->tempo_bpm;
+    fm6_chaos_rate_update();
     uint8_t next_length=s->seq_length<2u?2u:s->seq_length>64u?64u:s->seq_length;
     if(next_length!=seq_length) {
         seq_length=next_length;
@@ -1627,7 +1614,6 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
 void fm6_chaos_set(uint8_t amount,uint8_t rate,uint8_t tone,uint8_t shape)
 {
     uint8_t next_amount=amount>100u?100u:amount;
-    if(!next_amount && fm6_chaos_amount)fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;
     fm6_chaos_amount=next_amount;
     fm6_chaos_rate=rate>100u?100u:rate;
     fm6_chaos_tone=tone>100u?100u:tone;
