@@ -1136,8 +1136,30 @@ static void sequencer_cache_instrument_name(uint8_t lane, const char *source)
         seq_ui_instrument_name[lane][out]='\0';
     }
 }
+static void sequencer_events_sync_legacy(void)
+{
+    for(uint32_t lane=0;lane<2u;lane++) {
+        for(uint32_t step=0;step<64u;step++) {
+            seq_ui_enabled[lane][step]=0u;seq_ui_tie[lane][step]=0u;
+            seq_ui_note[lane][step]=60u;seq_ui_velocity[lane][step]=100u;
+            seq_ui_gate[lane][step]=75u;seq_ui_accent[lane][step]=0u;
+        }
+        for(uint32_t i=0;i<seq_event_count[lane];i++) {
+            const fm6_seq_event_t *event=&seq_event_store[lane][i];
+            for(uint32_t offset=0;offset<event->duration;offset++) {
+                uint32_t step=(uint32_t)event->start+offset;
+                if(step>=64u || seq_ui_enabled[lane][step])continue;
+                seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=event->pitch;
+                seq_ui_velocity[lane][step]=event->velocity;
+                seq_ui_gate[lane][step]=100u;seq_ui_tie[lane][step]=(uint8_t)(offset>0u);
+                seq_ui_accent[lane][step]=event->accent;
+            }
+        }
+    }
+}
 static void sequencer_events_publish(void)
 {
+    sequencer_events_sync_legacy();
     performance_publish();
 }
 
@@ -1473,6 +1495,15 @@ void app_init(void)
                 seq_ui_velocity[lane][step] = set.performance.seq_velocity[lane][step];
                 seq_ui_gate[lane][step] = (uint8_t)(set.performance.seq_gate[lane][step] & 0x7fu);
                 seq_ui_tie[lane][step] = (uint8_t)((set.performance.seq_gate[lane][step] & 0x80u) != 0u);
+            }
+        }
+        if(!set.performance.seq_event_count[0]&&!set.performance.seq_event_count[1]) {
+            uint8_t has_legacy=(uint8_t)(set.performance.seq_enabled[0][0]||set.performance.seq_enabled[1][0]);
+            for(uint32_t lane=0;lane<2u;lane++)for(uint32_t step=0;step<set.performance.seq_length;step++)
+                has_legacy=(uint8_t)(has_legacy||set.performance.seq_enabled[lane][step]);
+            if(has_legacy) {
+                settings_migrate_step_events(&set);
+                set_dirty=1u;
             }
         }
         for(uint32_t lane=0;lane<2u;lane++) {
