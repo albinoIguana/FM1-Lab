@@ -1424,7 +1424,7 @@ static void sequencer_arp_capture_poll(void)
                 capture.tick-seq_arp_record_tick[lane]:1u;
             if(duration>loop_ticks-start)duration=loop_ticks-start;
             if(!duration)duration=1u;
-            if(seq_record_armed && seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE) {
+            if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE) {
                 uint8_t index=seq_event_count[lane]++;
                 seq_event_store[lane][index]=(fm6_seq_event_t){
                     (uint8_t)start,(uint8_t)duration,seq_arp_record_note[lane],
