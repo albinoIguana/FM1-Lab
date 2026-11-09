@@ -97,6 +97,9 @@ static int32_t fm6_comp_envelope;
 static uint32_t fm6_comp_threshold_q24, fm6_comp_ratio_recip_q15;
 static uint32_t fm6_comp_attack_alpha_q15, fm6_comp_release_alpha_q15;
 static uint32_t fm6_comp_makeup_gain_q15;
+static uint8_t fm6_chaos_amount, fm6_chaos_rate, fm6_chaos_tone, fm6_chaos_shape;
+static uint32_t fm6_chaos_phase, fm6_chaos_phase_inc, fm6_chaos_random=0x6d2b79f5u;
+static int32_t fm6_chaos_filter[2];
 
 
 #ifdef FM6_TEST
@@ -317,6 +320,78 @@ static void fm6_master_insert_process(int64_t *left,int64_t *right)
 {
     *left=fm6_master_insert_channel(0u,*left);
     *right=fm6_master_insert_channel(1u,*right);
+}
+static uint32_t fm6_chaos_next_random(void)
+{
+    uint32_t x=fm6_chaos_random;
+    x^=x<<13;x^=x>>17;x^=x<<5;
+    fm6_chaos_random=x?x:0x6d2b79f5u;
+    return fm6_chaos_random;
+}
+static void fm6_chaos_rate_update(void)
+{
+    /* 0.03 Hz at the bottom, about 80 Hz at the top. */
+    fm6_chaos_phase_inc=3000u+(uint32_t)fm6_chaos_rate*fm6_chaos_rate*780u;
+}
+static int32_t fm6_chaos_fold(int64_t sample)
+{
+    const int64_t period=(int64_t)Q24_ONE*2;
+    int64_t folded=sample%period;
+    if(folded>Q24_ONE)folded=period-folded;
+    else if(folded< -Q24_ONE)folded=-period-folded;
+    return fm6_clamp_sample(folded);
+}
+static int32_t fm6_chaos_wave(uint32_t phase)
+{
+    uint32_t p=phase>>16;
+    int32_t tri=p<32768u?(int32_t)p*2-32768:98303-(int32_t)p*2;
+    if(fm6_chaos_shape==0u) {
+        int32_t abs_tri=tri<0?-tri:tri;
+        return (int32_t)(((int64_t)tri*41722>>15)-((int64_t)tri*abs_tri*13280>>30));
+    }
+    if(fm6_chaos_shape==1u)return tri;
+    if(fm6_chaos_shape==2u)return (phase&0x80000000u)?-32768:32767;
+    if(fm6_chaos_shape==3u)return (tri/8192)*8192;
+    if(fm6_chaos_shape==4u)return (int32_t)(fm6_chaos_random>>16)-32768;
+    if(fm6_chaos_shape==5u)return tri;
+    return tri;
+}
+static void fm6_chaos_process_channel(unsigned channel,int64_t *sample,int32_t modulation,int32_t noise)
+{
+    int64_t dry=*sample;
+    int64_t ring=(dry*modulation)>>15;
+    int64_t shaped=dry+((ring-dry)*fm6_chaos_amount)/100;
+    int64_t drive=100+(int64_t)fm6_chaos_amount*5;
+    shaped=(shaped*drive)/100;
+    shaped=fm6_chaos_fold(shaped);
+    unsigned crush=1u+(unsigned)fm6_chaos_amount/10u;
+    shaped=(shaped>>crush)<<crush;
+    int32_t noise_gain=(int32_t)((uint32_t)fm6_chaos_amount*fm6_chaos_tone*Q24_ONE/10000u);
+    shaped+=((int64_t)noise*noise_gain)>>15;
+    uint32_t alpha=80u+(uint32_t)fm6_chaos_tone*2800u/100u;
+    fm6_chaos_filter[channel]=fm6_clamp_sample((int64_t)fm6_chaos_filter[channel]+
+        (((shaped-fm6_chaos_filter[channel])*alpha)>>15));
+    /* Tone sweeps from filtered sub/low-mid grit to bright, noisy edges. */
+    int64_t wet=fm6_chaos_filter[channel]+
+        ((shaped-fm6_chaos_filter[channel])*(int32_t)fm6_chaos_tone)/100;
+    *sample=dry+((wet-dry)*fm6_chaos_amount)/100;
+}
+static void fm6_chaos_process(int64_t *left,int64_t *right)
+{
+    if(!fm6_chaos_amount)return; /* true transparent bypass */
+    uint32_t old_phase=fm6_chaos_phase;
+    fm6_chaos_phase+=fm6_chaos_phase_inc;
+    int32_t wave=fm6_chaos_wave(fm6_chaos_phase);
+    int32_t noise=(int32_t)(fm6_chaos_next_random()>>16)-32768;
+    if(fm6_chaos_shape==4u) {
+        if(fm6_chaos_phase<old_phase)wave=noise;
+    } else if(fm6_chaos_shape==5u) {
+        wave=(wave*2+noise)/3;
+        if((fm6_chaos_phase&0x000fffffu)<fm6_chaos_phase_inc)wave=-wave;
+    }
+    int32_t right_noise=(int32_t)(fm6_chaos_next_random()>>16)-32768;
+    fm6_chaos_process_channel(0u,left,wave,noise);
+    fm6_chaos_process_channel(1u,right,wave,right_noise);
 }
 
 static uint32_t fm6_comp_makeup_q15(uint8_t value)
@@ -792,6 +867,8 @@ void fm6_init(void)
     fm6_comp_attack=20u; fm6_comp_release=40u; fm6_comp_makeup=0u; fm6_comp_envelope=0;
     fm6_comp_params_update();
     fm1lab_insert_state_init(&fm6_master_inserts);
+    fm6_chaos_amount=0u;fm6_chaos_rate=42u;fm6_chaos_tone=55u;fm6_chaos_shape=0u;
+    fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;fm6_chaos_rate_update();
     fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
     fm6_zero_bytes(fm6_eq_x1,sizeof(fm6_eq_x1));fm6_zero_bytes(fm6_eq_x2,sizeof(fm6_eq_x2));
     fm6_zero_bytes(fm6_eq_y1,sizeof(fm6_eq_y1));fm6_zero_bytes(fm6_eq_y2,sizeof(fm6_eq_y2));
@@ -1190,6 +1267,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             int64_t left=0,right=0;
             fm6_fx_process(trimmed_dry_l,trimmed_dry_r,sends,&left,&right);
             /* One Instrument-wide post-mix chain: Amp/Drive -> parametric EQ -> stereo-linked compressor. */
+            fm6_chaos_process(&left,&right);
             fm6_master_insert_process(&left,&right);
             fm6_master_comp_process(&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
@@ -1392,6 +1470,7 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         for (uint32_t patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
             if (s->fx_send[patch][fx] > 100u) return 0;
     }
+    if (s->chaos_amount>100u || s->chaos_rate>100u || s->chaos_tone>100u || s->chaos_shape>5u) return 0;
     if (s->compressor_enabled > 1u || s->compressor_threshold > 100u ||
         s->compressor_ratio > 100u || s->compressor_attack > 100u ||
         s->compressor_release > 100u || s->compressor_makeup > 100u) return 0;
@@ -1504,6 +1583,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
     fm6_comp_ratio=s->compressor_ratio;fm6_comp_attack=s->compressor_attack;
     fm6_comp_release=s->compressor_release;fm6_comp_makeup=s->compressor_makeup;
     fm6_comp_params_update();
+    fm6_chaos_set(s->chaos_amount,s->chaos_rate,s->chaos_tone,s->chaos_shape);
     for(uint32_t fx=0;fx<4u;fx++){
         fx_enabled[fx]=s->fx_enabled[fx];fx_mix[fx]=s->fx_mix[fx];
         fx_time[fx]=s->fx_time[fx];fx_feedback[fx]=s->fx_feedback[fx];
@@ -1531,6 +1611,21 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
 }
 
 
+void fm6_chaos_set(uint8_t amount,uint8_t rate,uint8_t tone,uint8_t shape)
+{
+    fm6_chaos_amount=amount>100u?100u:amount;
+    fm6_chaos_rate=rate>100u?100u:rate;
+    fm6_chaos_tone=tone>100u?100u:tone;
+    fm6_chaos_shape=shape>5u?5u:shape;
+    fm6_chaos_rate_update();
+}
+void fm6_chaos_get(uint8_t *amount,uint8_t *rate,uint8_t *tone,uint8_t *shape)
+{
+    if(amount)*amount=fm6_chaos_amount;
+    if(rate)*rate=fm6_chaos_rate;
+    if(tone)*tone=fm6_chaos_tone;
+    if(shape)*shape=fm6_chaos_shape;
+}
 void fm6_master_insert_reset_state(void)
 {
     fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
