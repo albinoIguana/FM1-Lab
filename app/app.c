@@ -256,7 +256,8 @@ static void draw_eq_panel(void)
             if(band==2u && x>center)distance=0;
             if(distance<width)db+=((int32_t)b->gain-12)*(width-distance)/width;
         }
-        if(db>12)db=12; if(db< -12)db=-12;
+        if(db>12)db=12;
+        if(db< -12)db=-12;
         response[i]=zero-db*4;
         if(response[i]<top)response[i]=top;
         if(response[i]>bottom)response[i]=bottom;
@@ -342,11 +343,7 @@ static void draw_envelope_panel(void)
     uint8_t adsr[4] = {0u,0u,0u,0u};
     if (env_mode == 0u) {
         int32_t left=12,right=228,top=18,baseline=124;
-        int32_t aw=8+(99-(int32_t)adsr[0])*5/9;
-        int32_t dw=10+(99-(int32_t)adsr[1])*4/9;
-        int32_t rw=10+(99-(int32_t)adsr[3])*4/9;
-        int32_t sw=42,total=aw+dw+rw+sw,scale=(right-left)*100/total;
-        int32_t x1,x2,x3,x4,sy;
+        int32_t aw,dw,rw,sw=42,total,scale,x1,x2,x3,x4,sy;
         (void)fm1lab_voice_adsr_get(voice,adsr);
         aw=8+(99-(int32_t)adsr[0])*5/9;
         dw=10+(99-(int32_t)adsr[1])*4/9;
