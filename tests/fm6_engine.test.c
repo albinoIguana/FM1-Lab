@@ -196,6 +196,19 @@ static void render_chaos(uint8_t amount,uint8_t rate,uint8_t tone,uint8_t shape,
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
 
+static void render_chaos_tempo(uint16_t bpm,int32_t *destination)
+{
+    fm6_performance_state_t state;
+    fm6_init();
+    fm6_performance_state_get(&state);
+    state.tempo_bpm=bpm;
+    assert(fm6_performance_state_update(&state)==0);
+    fm6_chaos_set(100u,42u,50u,0u);
+    fm6_note_on_mask(60u,110u,0x0fu);
+    for(unsigned block=0u;block<32u;block++)
+        fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
+}
+
 static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
 {
     fm6_init();
@@ -220,6 +233,9 @@ int main(void) {
     render_chaos(100u,42u,100u,0u,chunk_b);
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
     render_chaos(100u,100u,100u,4u,chunk_a);
+    assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
+    render_chaos_tempo(90u,chunk_a);
+    render_chaos_tempo(150u,chunk_b);
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
     fm6_init();
     {
