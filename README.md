@@ -18,7 +18,7 @@ The pinned submodule vendor/m-vave-fm1 points to [M-VAVE's official FM1 open-sou
 ## Current implementation
 
 - Four-patch Instrument data model with import/export.
-- M-VAVE's official DX7 factory voices as the starting library.
+- A curated 128-voice, six-operator DX7 library from a CC0-1.0 archive: dedicated sub/bass, choral layers, FM rhythm and synth percussion.
 - Native 156-byte voice editing: algorithm, feedback, operator mode/coarse/fine, output, and four-stage envelopes.
 - Algorithm-aware macro transforms.
 - Browser audio powered by the official M-VAVE simulator and its own WASM audio worklet.
@@ -27,7 +27,7 @@ The browser workshop is a development and audition surface. The active native fm
 
 ## Native firmware core
 
-The active `app/app.c` build connects the four-patch Instrument model to the Felucca FM6 voice engine. ALGO edits the selected patch's actual six-operator FM algorithm on the Home and Operator Map pages; PRESET selects across all 32 Instrument slots; SELECT chooses one of the four patches inside the active Instrument. Empty factory slots are visibly numbered rather than presented as a populated sound library. Each Instrument stores four packed DX7 voices plus per-patch macro, enable and level state. The four bank records use the platform's existing pooled, CRC-protected A/B object store (four 3,840-byte objects in the 12-sector pool), not the upstream FM1 synth engine or reserved factory/system sectors. The bank payload has its own version and CRC16. The on-device label shows the current bank and Instrument index.
+The active `app/app.c` build connects the four-patch Instrument model to the Felucca FM6 voice engine. ALGO edits the selected patch's actual six-operator FM algorithm on the Home and Operator Map pages; PRESET always browses all 32 four-patch Instruments, including while a patch is focused; SELECT chooses one of the four patches inside the active Instrument. The factory library is seeded with 128 named DX7-compatible voices, with short role descriptions on the Home cards. Each Instrument stores four packed DX7 voices plus per-patch macro, enable and level state. The four bank records use the platform's existing pooled, CRC-protected A/B object store (four 3,840-byte objects in the 12-sector pool), not the upstream FM1 synth engine or reserved factory/system sectors. The bank payload has its own version and CRC16. The on-device label shows the current bank and Instrument index.
 
 The bank format uses 11-character persisted Instrument names to fit all 32 voices and their per-patch state inside the platform's 3,840-byte object limit. Existing three-slot Instrument objects are migrated into the first three Instrument positions when the bank format is initialized. Instrument loading is handed to the audio task through the app event queue so the UI thread does not write live FM voice state.
 
