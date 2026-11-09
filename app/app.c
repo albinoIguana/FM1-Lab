@@ -1269,10 +1269,13 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     if(duration>loop_length-first)duration=loop_length-first;
     if(duration>64u)duration=64u;
     if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_length) {
+        uint8_t new_index=seq_event_count[lane];
         seq_event_store[lane][seq_event_count[lane]++]=(fm6_seq_event_t){
             first,(uint8_t)duration,note,seq_record_velocity[key]?seq_record_velocity[key]:100u,
             seq_ui_accent[lane][first]
         };
+        if(seq_selected_event[lane]>=seq_event_count[lane]-1u)
+            seq_selected_event[lane]=new_index;
         sequencer_events_publish();
     }
     seq_record_active[key]=0u;
