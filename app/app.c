@@ -1882,8 +1882,15 @@ static void input(void)
                 for(uint32_t step=0;step<64u;step++){
                     seq_ui_enabled[lane][step]=0u;seq_ui_note[lane][step]=60u;
                     seq_ui_velocity[lane][step]=100u;seq_ui_gate[lane][step]=75u;
+                    seq_ui_tie[lane][step]=0u;seq_ui_accent[lane][step]=0u;
                 }
-                performance_publish();set_dirty=1u;fm6_sequencer_clear_lane(lane);
+                /* The piano roll is drawn from the event store, not the legacy
+                 * step cache. Clear both representations before publishing. */
+                seq_event_count[lane]=0u;
+                seq_selected_event[lane]=255u;
+                for(uint32_t i=0;i<APP_SEQ_EVENTS_PER_LANE;i++)
+                    seq_event_store[lane][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
+                sequencer_events_publish();set_dirty=1u;fm6_sequencer_clear_lane(lane);
                 ui.seq_hold_fired=1u;ui.delete_kind=2u;ui.delete_index=(uint8_t)(lane+1u);
                 ui.delete_until=plat_ms()+2100u;
                 app_say("SEQUENCE CLEARED",lane?"SEQUENCE 2":"SEQUENCE 1");
