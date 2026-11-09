@@ -25,7 +25,7 @@ if (!library.includes('#include "fm1lab_bank_metadata.h"')) {
     "bank layout");
   library = replaceOnce(library,
     '    return ~groove_crc32(crc,b->voice,sizeof b->voice);\n}',
-    '    crc=groove_crc32(crc,b->voice,sizeof b->voice);\n    if (b->version>=2) crc=groove_crc32(crc,b->metadata,sizeof b->metadata);\n    return ~crc;\n}',
+    '    crc=groove_crc32(crc,b->voice,sizeof b->voice);\n    if (b->version>=2) {\n        unsigned metadata_bytes=(b->metadata[4]==2u && b->metadata[5]==0u)?META_BYTES:400u;\n        crc=groove_crc32(crc,b->metadata,metadata_bytes);\n    }\n    return ~crc;\n}',
     "versioned bank checksum");
   library = replaceOnce(library,
     'if (!b || b->magic!=BANK_MAGIC || b->version!=1 || b->index>=4 || b->commit || b->crc!=checksum(b)) return NULL;',
@@ -54,7 +54,7 @@ let instrument = fs.readFileSync(instrumentPath, "utf8");
 if (!instrument.includes("GROOVE_FM_METADATA_BYTES")) {
   instrument = replaceOnce(instrument,
     'enum { GROOVE_PROJECT_SLOTS = 16, GROOVE_PROJECT_BYTES = 4064,\n       GROOVE_PROJECT_LEGACY_BYTES = 4048 };',
-    'enum { GROOVE_PROJECT_SLOTS = 16, GROOVE_PROJECT_BYTES = 4064,\n       GROOVE_PROJECT_LEGACY_BYTES = 4048, GROOVE_FM_METADATA_BYTES = 400 };\n/* Eight four-patch Instrument records live in the unused tail of each DX7 bank sector. */\nint groove_fm_library_metadata_read(unsigned index, uint8_t metadata[GROOVE_FM_METADATA_BYTES]);\nint groove_fm_library_metadata_write(unsigned index, const uint8_t metadata[GROOVE_FM_METADATA_BYTES]);\nint groove_fm_library_instrument_write(unsigned index, const uint8_t raw[4096], const uint8_t metadata[GROOVE_FM_METADATA_BYTES]);',
+    'enum { GROOVE_PROJECT_SLOTS = 16, GROOVE_PROJECT_BYTES = 4064,\n       GROOVE_PROJECT_LEGACY_BYTES = 4048, GROOVE_FM_METADATA_BYTES = 464 };\n/* Eight four-patch Instrument records live in the unused tail of each DX7 bank sector. */\nint groove_fm_library_metadata_read(unsigned index, uint8_t metadata[GROOVE_FM_METADATA_BYTES]);\nint groove_fm_library_metadata_write(unsigned index, const uint8_t metadata[GROOVE_FM_METADATA_BYTES]);\nint groove_fm_library_instrument_write(unsigned index, const uint8_t raw[4096], const uint8_t metadata[GROOVE_FM_METADATA_BYTES]);',
     "public storage declarations");
   fs.writeFileSync(instrumentPath, instrument);
 }
