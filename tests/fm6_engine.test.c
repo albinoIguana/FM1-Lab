@@ -240,7 +240,10 @@ int main(void) {
     printf("FM6 calibrated reference: one-patch=%llu four-patch=%llu output=%llu\n",
            (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak,
            (unsigned long long)fm6_test_output_peak());
-    /* The master trim is now unity. Four factory layers at their safe 24.4%\n     * patch level should approach the final limiter ceiling, not sit 12 dB low. */\n    assert(fm6_test_output_peak() > 8388607u * 86u / 100u);\n    assert(fm6_test_output_peak() <= 7470000u);
+    /* The master trim is now unity. Four factory layers at their safe 24.4%
+     * patch level should approach the final limiter ceiling, not sit 12 dB low. */
+    assert(fm6_test_output_peak() > 8388607u * 86u / 100u);
+    assert(fm6_test_output_peak() <= 7470000u);
 
     /* At the reference level, all four parallel FX buses must retain their
      * headroom over sustained feedback without any internal Q23 saturation. */
