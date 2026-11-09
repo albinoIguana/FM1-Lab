@@ -74,7 +74,7 @@ def split_messages(blob: bytes) -> list[bytes]:
 
 def decode_name(payload: bytes) -> str:
     # Digitone names are 16 bytes; Latin-1 preserves the extended character set.
-    return payload[12:28].split(b"\\x00", 1)[0].decode("latin-1").strip()
+    return payload[12:28].split(b"\x00", 1)[0].decode("latin-1").strip()
 
 
 def decode_tags(message: bytes) -> tuple[list[str], str]:
