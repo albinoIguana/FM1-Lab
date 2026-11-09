@@ -24,6 +24,8 @@ typedef struct {
     uint8_t macros[FM1LAB_MACRO_COUNT]; /* 0..100; 50 is neutral */
     uint8_t enabled;                    /* 0 = muted, 1 = active */
     uint8_t level;                      /* 0..127; mixer gain, not DX7 voice data */
+    int8_t octave;                       /* whole-patch transpose, -4..+4 octaves */
+    int8_t fine_cents;                   /* whole-patch tuning, -100..+100 cents */
 } fm1lab_patch_t;
 
 typedef struct {
