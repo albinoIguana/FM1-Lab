@@ -39,7 +39,7 @@ static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
 static uint8_t eq_ui_band = 1u;
-static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
+static uint8_t env_operator = 1u, env_mode, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_note[2][64], seq_ui_velocity[2][64],
                seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_tie[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
 static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A','C','T','O','R','Y',0},{'F','A','C','T','O','R','Y',0}};
@@ -1096,6 +1096,19 @@ static void voice_edit_global(fm1lab_global_field_t field, int delta)
         voice_edit_changed();
 }
 
+static void voice_edit_adsr(uint32_t control, int delta)
+{
+    uint8_t *voice = current_instrument.patches[set.patch].voice;
+    uint8_t adsr[4];
+    if (control >= 4u || !delta || fm1lab_voice_adsr_get(voice, adsr)) return;
+    int next = (int)adsr[control] + delta;
+    if (next < 0) next = 0;
+    if (next > 99) next = 99;
+    if ((uint8_t)next == adsr[control]) return;
+    adsr[control] = (uint8_t)next;
+    if (!fm1lab_voice_adsr_set(voice, adsr)) voice_edit_changed();
+}
+
 static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
 {
     uint8_t *voice = current_instrument.patches[set.patch].voice;
@@ -1784,9 +1797,9 @@ static void input(void)
             page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
         } else if (k == B_ENV) {
-            if (page == PAGE_ENV) env_levels ^= 1u;
-            else page = PAGE_ENV;
-            app_say("ENVELOPE", env_levels ? "LEVELS" : "RATES");
+            if (page == PAGE_ENV) env_mode = (uint8_t)((env_mode + 1u) % 3u);
+            else { page = PAGE_ENV; env_mode = 0u; }
+            app_say("ENVELOPE", env_mode == 0u ? "PATCH ADSR" : env_mode == 1u ? "OPERATOR RATES" : "OPERATOR LEVELS");
         } else if (k == B_LFO) {
             page = page == PAGE_LFO ? PAGE_LFO_MOD :
                 page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
@@ -2253,8 +2266,13 @@ static void input(void)
                 app_say(index == 0u ? "OPERATOR OUTPUT" : index == 1u ? "OSCILLATOR MODE" :
                     index == 2u ? "COARSE FREQUENCY" : operator_detune_mode ? "OPERATOR DETUNE" : "FINE FREQUENCY", "UPDATED");
             } else if (page == PAGE_ENV) {
-                voice_edit_operator((fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
-                app_say(env_levels ? "ENVELOPE LEVEL" : "ENVELOPE RATE", "UPDATED");
+                if (env_mode == 0u) {
+                    voice_edit_adsr(index, e);
+                    app_say(index == 0u ? "ADSR ATTACK" : index == 1u ? "ADSR DECAY" : index == 2u ? "ADSR SUSTAIN" : "ADSR RELEASE", "UPDATED");
+                } else {
+                    voice_edit_operator((fm1lab_operator_field_t)((env_mode == 2u ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
+                    app_say(env_mode == 2u ? "OPERATOR LEVEL" : "OPERATOR RATE", "UPDATED");
+                }
             } else if (page == PAGE_LFO) {
                 static const fm1lab_global_field_t fields[4] = {
                     FM1LAB_GLOBAL_LFO_WAVE, FM1LAB_GLOBAL_LFO_SPEED,
@@ -2720,29 +2738,48 @@ static void draw_envelope_panel(void)
 {
     static const char *const rates[4] = {"RATE 1", "RATE 2", "RATE 3", "RATE 4"};
     static const char *const levels[4] = {"LEVEL 1", "LEVEL 2", "LEVEL 3", "LEVEL 4"};
+    static const char *const adsr_names[4] = {"K1  ATTACK", "K2  DECAY", "K3  SUSTAIN", "K4  RELEASE"};
     char t[16];
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint16_t accent = patch_color(set.patch);
+    uint8_t adsr[4] = {0u,0u,0u,0u};
+    if (env_mode == 0u) {
+        (void)fm1lab_voice_adsr_get(voice, adsr);
+        for (uint32_t i = 0; i < 4u; ++i) {
+            int32_t x = 4 + (int32_t)(i & 1u) * 118;
+            int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
+            instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), accent, accent);
+            cv_text(x + 9, y + 10, &FONT_XS, adsr_names[i], C_WHITE);
+            int_text(adsr[i], t); cv_text(x + 88, y + 10, &FONT_XS, t, accent);
+            cv_rect(x + 9, y + 39, 98, 6, C_LINE);
+            cv_rect(x + 9, y + 39, (int32_t)adsr[i] * 98 / 99, 6, accent);
+            cv_text(x + 9, y + 64, &FONT_XS,
+                    i == 2u ? "0=OFF  99=FULL" : "0=SLOW  99=FAST", C_GRAY);
+        }
+        cv_text(8, 170, &FONT_XS, "ALL CARRIERS  /  MODULATOR EGs UNCHANGED", C_GRAY);
+        return;
+    }
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
         uint8_t value = 0;
         (void)fm1lab_voice_operator_get(voice, env_operator,
-            (fm1lab_operator_field_t)((env_levels ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + i), &value);
+            (fm1lab_operator_field_t)((env_mode == 2u ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + i), &value);
         instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), accent, accent);
-        cv_text(x + 9, y + 10, &FONT_XS, env_levels ? levels[i] : rates[i], C_WHITE);
+        cv_text(x + 9, y + 10, &FONT_XS, env_mode == 2u ? levels[i] : rates[i], C_WHITE);
         int_text(value, t); cv_text(x + 88, y + 10, &FONT_XS, t, accent);
         cv_rect(x + 9, y + 39, 98, 6, C_LINE);
         cv_rect(x + 9, y + 39, (int32_t)value * 98 / 99, 6, accent);
-        cv_text(x + 9, y + 64, &FONT_XS, env_levels ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
+        cv_text(x + 9, y + 64, &FONT_XS, env_mode == 2u ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
     }
+    cv_text(8, 170, &FONT_XS, env_operator <= 6u ? "SELECT OP  /  EDIT INDIVIDUAL EG" : "OPERATOR ENVELOPE", C_GRAY);
 }
 
 static void draw_lfo_panel(uint32_t modulation)
 {
     static const char *const labels[2][4] = {
-        {"WAVEFORM", "SPEED", "PITCH DEPTH", "AMP DEPTH"},
-        {"DELAY", "PITCH SENS", "LFO KEY SYNC", "OSC KEY SYNC"}
+        {"K1  SHAPE", "K2  RATE", "K3  PITCH", "K4  VOLUME"},
+        {"K1  DELAY", "K2  PITCH SENS", "K3  LFO RESET", "K4  PHASE RESET"}
     };
     static const char *const waves[6] = {"TRIANGLE", "SAW DOWN", "SAW UP", "SQUARE", "SINE", "S/HOLD"};
     static const fm1lab_global_field_t fields[2][4] = {
@@ -2762,6 +2799,7 @@ static void draw_lfo_panel(uint32_t modulation)
         cv_text(x + 9, y + 8, &FONT_XS, labels[modulation][i], C_WHITE);
         if (!modulation && i == 0u) {
             cv_text(x + 9, y + 26, &FONT_B, waves[value % 6u], accent);
+            cv_text(x + 9, y + 64, &FONT_XS, "PER-PATCH WAVE", C_GRAY);
         } else {
             if (modulation && i >= 2u) cv_text(x + 9, y + 26, &FONT_B, value ? "ON" : "OFF", accent);
             else {
@@ -2769,6 +2807,10 @@ static void draw_lfo_panel(uint32_t modulation)
                 cv_rect(x + 9, y + 46, 94, 5, C_LINE);
                 cv_rect(x + 9, y + 46, (int32_t)value * 94 / maxima[modulation][i], 5, accent);
             }
+            if (!modulation) cv_text(x + 9, y + 64, &FONT_XS,
+                i == 1u ? "SLOW  >  FAST" : i == 2u ? "PITCH WOBBLE" : "VOLUME TREMOLO", C_GRAY);
+            else cv_text(x + 9, y + 64, &FONT_XS,
+                i == 0u ? "FADE-IN TIME" : i == 1u ? "KEY RESPONSE" : i == 2u ? "RESET LFO" : "RESET OSC", C_GRAY);
         }
     }
 }
@@ -3159,9 +3201,9 @@ static const char *page_title(uint8_t current)
     case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
     case PAGE_GLOBAL: return "GLOBAL";
     case PAGE_OPERATOR_MAP: return "OPERATOR MAP";
-    case PAGE_ENV: return "ENVELOPE";
-    case PAGE_LFO: return "LFO";
-    case PAGE_LFO_MOD: return "LFO MODULATION";
+    case PAGE_ENV: return env_mode == 0u ? "PATCH ADSR" : env_mode == 1u ? "OP EG RATES" : "OP EG LEVELS";
+    case PAGE_LFO: return "LFO / MOTION";
+    case PAGE_LFO_MOD: return "LFO SYNC";
     case PAGE_SEQ: return "SEQUENCER";
     case PAGE_SEQ_OPTIONS: return "SEQ OPTIONS";
     case PAGE_SEQ_PIANO: return "PIANO ROLL";
@@ -3224,8 +3266,8 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         index = 1u;
         total = 1u;
     } else if (current == PAGE_ENV) {
-        index = env_levels ? 2u : 1u;
-        total = 2u;
+        index = (uint32_t)env_mode + 1u;
+        total = 3u;
     } else if (current == PAGE_OPERATOR_MAP || current == PAGE_MACRO) {
         index = current == PAGE_OPERATOR_MAP ? 1u : 2u;
         total = 2u;
