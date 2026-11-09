@@ -894,6 +894,24 @@ int main(void) {
     assert(fm6_test_sequencer_active_events(0u)==0u);
     fm6_sequencer_set_running(0u);
 
-    puts("Felucca FM6 engine: voice pools, sequencing, stereo FX, Instrument-wide Amp/Drive, parametric EQ and linked master compressor passed");
+    /* Clearing a lane must remove both sounding events and persisted/display
+     * event data, not merely silence the currently active voices. */
+    assert(fm6_sequencer_set_events(0u,lane0,3u)==0);
+    fm6_sequencer_set_running(1u);
+    for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
+    fm6_render(output,9u,4096u);
+    assert(fm6_test_sequencer_active_events(0u)==3u);
+    fm6_sequencer_clear_lane(0u);
+    fm6_render(output,128u,4096u); /* audio-owner applies the clear request */
+    assert(fm6_test_sequencer_active_events(0u)==0u);
+    {
+        fm6_performance_state_t cleared;
+        fm6_performance_state_get(&cleared);
+        assert(cleared.seq_event_count[0]==0u);
+        for(unsigned step=0u;step<64u;step++)assert(cleared.seq_enabled[0][step]==0u);
+    }
+    fm6_sequencer_set_running(0u);
+
+    puts("Felucca FM6 engine: voice pools, sequencing, lane clear, stereo FX, Instrument-wide Amp/Drive, parametric EQ and linked master compressor passed");
     return 0;
 }
