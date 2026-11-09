@@ -146,6 +146,7 @@ static inline int settings_v5_valid(const settings_v5_t *v) {
 }
 static inline int settings_import_v5(settings_t *dst,const settings_v5_t *src) {
     if(!dst||!settings_v5_valid(src))return -1;
+    dst->swing=50u;
     dst->octave=src->octave;dst->patch=src->patch;dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++){
         dst->levels[p]=src->levels[p];
@@ -273,6 +274,7 @@ static inline int settings_v4_valid(const settings_v4_t *v) {
 }
 static inline int settings_import_v4(settings_t *dst,const settings_v4_t *src) {
     if(!dst||!settings_v4_valid(src))return -1;
+    dst->swing=50u;
     dst->octave=src->octave;dst->patch=src->patch;dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++){
         dst->levels[p]=src->levels[p];
@@ -323,6 +325,7 @@ static inline int settings_v6_valid(const settings_v6_t *v) {
 }
 static inline int settings_import_v6(settings_t *dst,const settings_v6_t *src) {
     if(!dst||!settings_v6_valid(src))return -1;
+    dst->swing=50u;
     dst->octave=src->octave;dst->patch=src->patch;dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){
         dst->levels[patch]=src->levels[patch];
@@ -353,6 +356,7 @@ static inline int settings_v7_valid(const settings_v7_t *v) {
 }
 static inline int settings_import_v7(settings_t *dst,const settings_v7_t *src) {
     if(!dst||!settings_v7_valid(src))return -1;
+    dst->swing=50u;
     dst->octave=src->octave;dst->patch=src->patch;dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){
         dst->levels[patch]=src->levels[patch];
@@ -385,6 +389,7 @@ static inline int settings_v8_valid(const settings_v8_t *v) {
 }
 static inline int settings_import_v8(settings_t *dst,const settings_v8_t *src) {
     if(!dst||!settings_v8_valid(src))return -1;
+    dst->swing=50u;
     dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
     dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     memcpy(dst->macros,src->macros,sizeof dst->macros);
@@ -414,6 +419,7 @@ static inline int settings_v9_valid(const settings_v9_t *v) {
 }
 static inline int settings_import_v9(settings_t *dst,const settings_v9_t *src) {
     if(!dst||!settings_v9_valid(src))return -1;
+    dst->swing=50u;
     dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
     dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     memcpy(dst->macros,src->macros,sizeof dst->macros);
@@ -442,6 +448,7 @@ static inline int settings_v10_valid(const settings_v10_t *v) {
 }
 static inline int settings_import_v10(settings_t *dst,const settings_v10_t *src) {
     if(!dst || !settings_v10_valid(src))return -1;
+    dst->swing=50u;
     dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
     dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     memcpy(dst->macros,src->macros,sizeof dst->macros);
@@ -473,6 +480,7 @@ static inline int settings_v11_valid(const settings_v11_t *v) {
 }
 static inline int settings_import_v11(settings_t *dst,const settings_v11_t *src) {
     if(!dst || !settings_v11_valid(src))return -1;
+    dst->swing=50u;
     dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
     dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
     memcpy(dst->macros,src->macros,sizeof dst->macros);
