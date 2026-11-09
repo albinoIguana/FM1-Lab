@@ -146,6 +146,18 @@ int fm1lab_voice_adsr_set(uint8_t voice[FM1LAB_PATCH_BYTES], const uint8_t adsr[
     return carriers ? 0 : -1;
 }
 
+int fm1lab_voice_has_audible_carrier(const uint8_t voice[FM1LAB_PATCH_BYTES])
+{
+    if (!voice) return 0;
+    for (unsigned op = 1; op <= 6; ++op) {
+        uint8_t level = 0u;
+        if (fm1lab_voice_operator_is_carrier(voice, op) == 1 &&
+            fm1lab_voice_operator_get(voice, op, FM1LAB_OP_OUTPUT, &level) == 0 &&
+            level != 0u) return 1;
+    }
+    return 0;
+}
+
 int fm1lab_voice_operator_is_carrier(const uint8_t voice[FM1LAB_PATCH_BYTES],
                                      unsigned operator_number)
 {
