@@ -31,6 +31,12 @@ int main(void)
     assert(fm1lab_voice_global_set(voice, FM1LAB_GLOBAL_FEEDBACK, 8) == -1);
 
     assert(fm1lab_voice_operator_is_carrier(voice, 1) == 1);
+    assert(fm1lab_voice_has_audible_carrier(voice) == 1);
+    uint8_t silent_voice[FM1LAB_PATCH_BYTES] = {0};
+    silent_voice[134] = 0u; /* algorithm 1 has OP1/OP3 carriers */
+    assert(fm1lab_voice_has_audible_carrier(silent_voice) == 0);
+    silent_voice[5u * 21u + 16u] = 50u;
+    assert(fm1lab_voice_has_audible_carrier(silent_voice) == 1);
     /* Algorithm 0 has carrier OP1/OP3; patch ADSR updates both but leaves
      * modulator envelopes untouched. */
     assert(fm1lab_voice_global_set(voice, FM1LAB_GLOBAL_ALGORITHM, 1u) == 0);
