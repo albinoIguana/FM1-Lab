@@ -94,6 +94,7 @@ int main(void)
 {
     settings_t good, copy;
     make_valid(&good);
+    good.swing=66u;settings_seal(&good);assert(settings_valid(&good));
     /* A sealed V10 settings record must round-trip the complete event model
      * for both tracks, including overlapping notes and long sustained notes. */
     good.performance.seq_event_count[0]=2u;
@@ -402,6 +403,7 @@ int main(void)
     assert(settings_v11_valid(&v11));
     imported=good;
     assert(settings_import_v11(&imported,&v11)==0);
+    assert(imported.swing==50u);
     assert(imported.performance.seq_events[0][0].start==6u);
     assert(imported.performance.seq_events[0][0].duration==4u);
     settings_seal(&imported);assert(settings_valid(&imported));
