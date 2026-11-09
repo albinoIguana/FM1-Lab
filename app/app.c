@@ -771,6 +771,23 @@ static void performance_publish(void)
         set.performance.arp_step_accent[step]=arp_ui_accent[step];
         set.performance.arp_step_gate[step]=arp_ui_step_gate[step]?1u:0u;
     }
+    if(seq_event_store_ready) {
+        uint32_t length=set.performance.seq_length;
+        if(length<2u)length=2u;if(length>64u)length=64u;
+        for(uint32_t lane=0;lane<2u;lane++) {
+            uint32_t write=0u;
+            for(uint32_t i=0;i<seq_event_count[lane];i++) {
+                fm6_seq_event_t event=seq_event_store[lane][i];
+                if(event.start>=length)continue;
+                uint32_t max_duration=length-event.start;
+                if(event.duration>max_duration)event.duration=(uint8_t)max_duration;
+                if(event.duration)seq_event_store[lane][write++]=event;
+            }
+            seq_event_count[lane]=(uint8_t)write;
+            if(seq_selected_event[lane]>=seq_event_count[lane])
+                seq_selected_event[lane]=seq_event_count[lane]?(uint8_t)(seq_event_count[lane]-1u):255u;
+        }
+    }
     for (uint32_t lane=0; lane<2u; ++lane) {
         set.performance.lane_instrument[lane] = seq_ui_instrument[lane];
         for (uint32_t step=0; step<64u; ++step) {
