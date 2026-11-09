@@ -2990,7 +2990,7 @@ static void draw_envelope_panel(void)
         cv_text(129,167,&FONT_XS,"LEVEL",C_GRAY);
         int_text(adsr[3],t); cv_text(190,149,&FONT_B,t,accent);
         cv_text(190,167,&FONT_XS,env_rate_word(adsr[3]),C_GRAY);
-        cv_text(10,188,&FONT_XS,"99 = FAST   0 = SLOW / LONG",C_GRAY);
+        cv_text(10,174,&FONT_XS,"99 = FAST   0 = SLOW / LONG",C_GRAY);
     }
 }
 
@@ -3006,7 +3006,7 @@ static void draw_operator_workbench(uint8_t view)
         cv_text(8,166,&FONT_B,env_operator==1u?"OP 1":env_operator==2u?"OP 2":
             env_operator==3u?"OP 3":env_operator==4u?"OP 4":env_operator==5u?"OP 5":"OP 6",accent);
         cv_text(65,151,&FONT_XS,fm1lab_voice_operator_is_carrier(voice,env_operator)?"CARRIER / SOUND SOURCE":"MODULATOR / TONE SHAPER",C_WHITE);
-        cv_text(8,183,&FONT_XS,"ALGO KNOB: SELECT OP   SELECT: CHANGE ALGORITHM",C_GRAY);
+        cv_text(8,174,&FONT_XS,"ALGO: SELECT OP   SELECT: CHANGE ALGORITHM",C_GRAY);
     } else {
         static const char *const stages[4]={"ATTACK","DECAY 1","DECAY 2","RELEASE"};
         uint8_t rates[4]={0u},levels[4]={0u};
@@ -3015,7 +3015,7 @@ static void draw_operator_workbench(uint8_t view)
         for(uint32_t i=0;i<4u;i++) {
             (void)fm1lab_voice_operator_get(voice,env_operator,(fm1lab_operator_field_t)(FM1LAB_OP_RATE_1+i),&rates[i]);
             (void)fm1lab_voice_operator_get(voice,env_operator,(fm1lab_operator_field_t)(FM1LAB_OP_LEVEL_1+i),&levels[i]);
-            py[i]=132-(int32_t)levels[i]*86/99;
+            py[i]=105-(int32_t)levels[i]*66/99;
             widths[i]=12+(99-(int32_t)rates[i])*3/10;
         }
         cv_text(8,4,&FONT_XS,"OPERATOR EG  /  LEVEL OVER TIME",C_GRAY);
@@ -3027,10 +3027,10 @@ static void draw_operator_workbench(uint8_t view)
         fm1lab_plot_line(px[2],py[1],px[3],py[2],accent);
         for(uint32_t i=0;i<4u;i++) {
             cv_rect(px[i]-3,py[i]-3,7,7,(env_mode==0u?C_WHITE:accent));
-            cv_text(px[i]-12,141,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
+            cv_text(px[i]-text_w(&FONT_XS,stages[i])/2,116,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
             int_text(env_mode?levels[i]:rates[i],t);
-            cv_text(px[i]-5,158,&FONT_B,t,accent);
-            cv_text(px[i]-5,173,&FONT_XS,env_mode?"LEVEL":"RATE",C_GRAY);
+            cv_text(px[i]-5,132,&FONT_B,t,accent);
+            cv_text(px[i]-5,148,&FONT_XS,env_mode?"LEVEL":"RATE",C_GRAY);
             if(!env_mode) {
                 cv_rect(px[i]-10,190,28,3,C_LINE);
                 cv_rect(px[i]-10,190,(int32_t)rates[i]*28/99,3,accent);
