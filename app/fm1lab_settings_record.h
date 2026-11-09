@@ -172,6 +172,7 @@ static inline int settings_import_v5(settings_t *dst,const settings_v5_t *src) {
     dst->performance.compressor_release=src->performance.compressor_release;
     dst->performance.compressor_makeup=src->performance.compressor_makeup;
     settings_arp_defaults(dst);
+    settings_migrate_step_events(dst);
     return 0;
 }
 static inline int settings_v3_valid(const settings_v3_t *v) {
