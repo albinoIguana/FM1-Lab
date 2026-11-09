@@ -44,7 +44,7 @@ class DigitoneConverterTests(unittest.TestCase):
         self.assertEqual(len(voice), 156)
         self.assertTrue(all(0 <= value <= 127 for value in voice))
         self.assertEqual(voice[134], TOPOLOGIES[params["algorithm"]]["dx7"])
-        self.assertEqual(voice[145:155], [ord(c) for c in "TEST VOICE "])
+        self.assertEqual(voice[145:155], [ord(c) for c in "TEST VOICE"])
         self.assertEqual(voice[155], 0)
 
     def test_digitone_time_is_inverted_for_dx7_rate(self):
