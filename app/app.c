@@ -1453,6 +1453,7 @@ void app_init(void)
     settings_v7_t old_v7;
     settings_v8_t old_v8;
     settings_v9_t old_v9;
+    settings_v10_t old_v10;
     int performance_loaded = 0;
     int loaded;
     fm6_init();
@@ -1462,10 +1463,14 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v9, sizeof old_v9) == (int)sizeof old_v9 &&
+        if (plat_store_load(OBJ_SETTINGS, &old_v10, sizeof old_v10) == (int)sizeof old_v10 &&
+            settings_import_v10(&set, &old_v10) == 0) {
+            performance_loaded = 1;
+            set_dirty = 1u; /* V10 -> V11 adds persistent MAELSTROM controls */
+        } else if (plat_store_load(OBJ_SETTINGS, &old_v9, sizeof old_v9) == (int)sizeof old_v9 &&
             settings_import_v9(&set, &old_v9) == 0) {
             performance_loaded = 1;
-            set_dirty = 1u; /* V9 -> V10 stores the migrated polyphonic event pattern */
+            set_dirty = 1u; /* V9 -> V11 stores the migrated polyphonic event pattern and MAELSTROM defaults */
         } else if (plat_store_load(OBJ_SETTINGS, &old_v8, sizeof old_v8) == (int)sizeof old_v8 &&
             settings_import_v8(&set, &old_v8) == 0) {
             performance_loaded = 1;
