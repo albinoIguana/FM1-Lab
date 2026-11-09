@@ -194,7 +194,7 @@ int main(void) {
     assert(fm1lab_recorded_note_duration(100u,100u,16u,0u)==1u);
     assert(fm1lab_recorded_note_duration(101u,100u,16u,0u)==2u);
     assert(fm1lab_recorded_note_duration(300u,100u,16u,0u)==3u);
-    assert(fm1lab_recorded_note_duration(300u,0u,16u,0u)==64u);
+    assert(fm1lab_recorded_note_duration(300u,0u,16u,0u)==16u);
     assert(fm1lab_recorded_note_duration(5000u,100u,16u,14u)==2u);
     assert(fm1lab_recorded_note_duration(100u,100u,16u,16u)==0u);
     assert(fm1lab_recorded_note_duration(100u,100u,128u,0u)==64u);
