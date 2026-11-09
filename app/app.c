@@ -55,6 +55,7 @@ static uint8_t seq_record_redraw;
 #define APP_SEQ_EVENTS_PER_LANE 128u
 static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
 static uint8_t seq_event_count[2], seq_event_store_ready;
+static uint8_t seq_selected_event[2]={255u,255u};
 static fm6_seq_event_t seq_event_snapshot[2][APP_SEQ_EVENTS_PER_LANE];
 static uint8_t seq_event_snapshot_count[2];
 static volatile uint8_t seq_events_update_pending;
@@ -1173,6 +1174,70 @@ static void sequencer_events_import_legacy(void)
         }
     }
     seq_event_store_ready=1u;
+    seq_selected_event[0]=seq_event_count[0]?0u:255u;
+    seq_selected_event[1]=seq_event_count[1]?0u:255u;
+}
+
+static void sequencer_select_event(int direction)
+{
+    uint8_t lane=seq_ui_lane,count=seq_event_count[lane];
+    if(!count){seq_selected_event[lane]=255u;return;}
+    uint8_t order[APP_SEQ_EVENTS_PER_LANE];
+    for(uint32_t i=0;i<count;i++)order[i]=(uint8_t)i;
+    for(uint32_t i=1;i<count;i++) {
+        uint8_t item=order[i];uint32_t j=i;
+        while(j>0u) {
+            const fm6_seq_event_t *a=&seq_event_store[lane][order[j-1u]];
+            const fm6_seq_event_t *b=&seq_event_store[lane][item];
+            uint8_t before=(uint8_t)(a->pitch<b->pitch ||
+                (a->pitch==b->pitch && a->start>b->start) ||
+                (a->pitch==b->pitch && a->start==b->start && order[j-1u]>item));
+            if(!before)break;
+            order[j]=order[j-1u];--j;
+        }
+        order[j]=item;
+    }
+    uint32_t position=0u;
+    for(uint32_t i=0;i<count;i++)if(order[i]==seq_selected_event[lane]){position=i;break;}
+    if(seq_selected_event[lane]>=count)position=direction<0?0u:count-1u;
+    else if(direction>0)position=(position+1u)%count;
+    else if(direction<0)position=(position+count-1u)%count;
+    seq_selected_event[lane]=order[position];
+    seq_ui_step=seq_event_store[lane][seq_selected_event[lane]].start;
+}
+static fm6_seq_event_t *sequencer_selected_event(void)
+{
+    uint8_t lane=seq_ui_lane,index=seq_selected_event[lane];
+    if(index>=seq_event_count[lane])return 0;
+    return &seq_event_store[lane][index];
+}
+static void sequencer_event_edit(uint8_t field,int delta)
+{
+    fm6_seq_event_t *event=sequencer_selected_event();
+    if(!event || !delta)return;
+    uint8_t lane=seq_ui_lane;
+    if(field==0u) {
+        int32_t max=(int32_t)set.performance.seq_length-event->start;
+        event->duration=(uint8_t)clamp((int32_t)event->duration+delta,1,max);
+    } else if(field==1u)event->pitch=(uint8_t)clamp((int32_t)event->pitch+delta,0,127);
+    else if(field==2u)event->accent=(uint8_t)clamp((int32_t)event->accent+delta,0,100);
+    else event->velocity=(uint8_t)clamp((int32_t)event->velocity+delta,1,127);
+    sequencer_events_publish();
+    set_dirty=1u;seq_record_redraw=1u;
+    app_say(field==0u?"NOTE LENGTH":field==1u?"NOTE PITCH":field==2u?"NOTE ACCENT":"NOTE VELOCITY","UPDATED");
+}
+static void sequencer_event_delete_selected(void)
+{
+    uint8_t lane=seq_ui_lane,index=seq_selected_event[lane];
+    if(index>=seq_event_count[lane])return;
+    for(uint32_t i=index+1u;i<seq_event_count[lane];i++)
+        seq_event_store[lane][i-1u]=seq_event_store[lane][i];
+    seq_event_count[lane]--;
+    seq_selected_event[lane]=seq_event_count[lane]?(index<seq_event_count[lane]?index:(uint8_t)(seq_event_count[lane]-1u)):255u;
+    if(seq_selected_event[lane]<seq_event_count[lane])seq_ui_step=seq_event_store[lane][seq_selected_event[lane]].start;
+    sequencer_events_publish();
+    set_dirty=1u;seq_record_redraw=1u;
+    app_say("NOTE DELETED","EVENT REMOVED");
 }
 
 static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocity)
@@ -1692,6 +1757,10 @@ static void input(void)
             app_say("LFO", page == PAGE_LFO_MOD ? "MODULATION" : "OSCILLATOR");
         } else if (k == B_SEL) {
             if (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS) {
+                sequencer_events_import_legacy();
+                sequencer_events_publish();
+                if(seq_event_count[seq_ui_lane] && seq_selected_event[seq_ui_lane]>=seq_event_count[seq_ui_lane])
+                    seq_selected_event[seq_ui_lane]=0u;
                 page = PAGE_SEQ_PIANO;
                 seq_clear_prompt=0u;seq_clear_turn=0;
                 app_say("PIANO ROLL",seq_ui_lane?"TRACK 2":"TRACK 1");
@@ -1709,14 +1778,7 @@ static void input(void)
             }
         } else if (k == B_EDIT) {
             if(page==PAGE_SEQ_PIANO) {
-                uint8_t lane=seq_ui_lane, step=seq_ui_step;
-                seq_ui_enabled[lane][step]=0u;
-                seq_ui_note[lane][step]=60u;
-                seq_ui_velocity[lane][step]=100u;
-                seq_ui_gate[lane][step]=75u;
-                seq_ui_accent[lane][step]=0u;
-                performance_publish();set_dirty=1u;
-                app_say("NOTE DELETED","STEP CLEARED");
+                sequencer_event_delete_selected();
             } else {
                 page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
                 app_say("OPERATOR ROLES", patch_display_name(set.patch));
@@ -1866,7 +1928,10 @@ static void input(void)
             env_operator = (uint8_t)(next + 1);
             app_say("ENVELOPE OPERATOR", fm1lab_voice_operator_is_carrier(
                 current_instrument.patches[set.patch].voice, env_operator) ? "CARRIER" : "MODULATOR");
-        } else if (k == EN_SELECT && (page == PAGE_SEQ || page == PAGE_SEQ_PIANO)) {
+        } else if (k == EN_SELECT && page == PAGE_SEQ_PIANO) {
+            sequencer_select_event(e);
+            app_say("NOTE","SELECTED");
+        } else if (k == EN_SELECT && page == PAGE_SEQ) {
             if(instrument_apply_pending)continue;
             if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","TRACK NOT CHANGED");continue;}
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
@@ -1975,7 +2040,9 @@ static void input(void)
                         app_say("LOOP LENGTH",next==64u?"64 STEPS":"UPDATED");
                     }
                 }
-            } else if (page == PAGE_SEQ || page == PAGE_SEQ_PIANO) {
+            } else if (page == PAGE_SEQ_PIANO) {
+                sequencer_event_edit((uint8_t)index,e);
+            } else if (page == PAGE_SEQ) {
                 uint8_t lane=seq_ui_lane, step=seq_ui_step;
                 if(index==0u) {
                     int32_t next=((int32_t)step+e)%64;
