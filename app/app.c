@@ -50,6 +50,7 @@ static uint8_t seq_clear_prompt;
 static int16_t seq_clear_turn;
 static uint8_t seq_record_active[NKEYS+128u], seq_record_step[NKEYS+128u], seq_record_lane[NKEYS+128u], seq_record_note[NKEYS+128u];
 static uint32_t seq_record_started[NKEYS+128u];
+static uint8_t seq_record_velocity[NKEYS+128u];
 static uint8_t seq_record_redraw;
 #define APP_SEQ_EVENTS_PER_LANE 128u
 static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
@@ -1169,7 +1170,7 @@ static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocit
     if(seq_record_active[key] && seq_record_note[key]==note)return;
     seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
     seq_record_note[key]=note;seq_record_started[key]=plat_ms();
-    seq_ui_velocity[lane][step]=velocity;
+    seq_record_velocity[key]=velocity;seq_ui_velocity[lane][step]=velocity;
     seq_record_redraw=1u;
 }
 static void sequencer_record_release(uint32_t key, uint8_t note)
@@ -1188,7 +1189,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     if(duration>64u)duration=64u;
     if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_length) {
         seq_event_store[lane][seq_event_count[lane]++]=(fm6_seq_event_t){
-            first,(uint8_t)duration,note,seq_ui_velocity[lane][first]?seq_ui_velocity[lane][first]:100u,
+            first,(uint8_t)duration,note,seq_record_velocity[key]?seq_record_velocity[key]:100u,
             seq_ui_accent[lane][first]
         };
         sequencer_events_publish();
