@@ -1396,11 +1396,9 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
 int fm6_performance_state_update(const fm6_performance_state_t *s)
 {
     if(!fm6_performance_state_valid(s))return -1;
-    seq_event_mode=0u;
-    for(uint32_t lane=0;lane<2u;lane++) {
-        fm6_seq_event_release_lane(lane);
-        seq_event_count[lane]=0u;
-    }
+    /* A performance/UI refresh must not silently discard the event sequencer.
+     * Cold boot starts in legacy mode; event mode is entered explicitly by
+     * fm6_sequencer_set_events after migration or recording. */
     transport_bpm=s->tempo_bpm;
     seq_length=s->seq_length<2u?2u:s->seq_length>64u?64u:s->seq_length;
     if(seq_position>=seq_length)seq_position=0u;
