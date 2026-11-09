@@ -866,7 +866,7 @@ void fm6_note_on(uint8_t note, uint8_t velocity)
     fm6_note_on_mask(note, velocity, (uint8_t)((1u << PATCHES) - 1u));
 }
 
-static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint8_t source)
+static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint16_t source)
 {
     for(uint32_t i=0;i<VOICES;i++) {
         fm1lab_voice_t *v=&voices[i];
