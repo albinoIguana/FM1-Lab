@@ -40,7 +40,7 @@ static uint8_t patch_focus;
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u, env_levels, operator_detune_mode;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_note[2][64], seq_ui_velocity[2][64],
-               seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
+               seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_tie[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
 static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A','C','T','O','R','Y',0},{'F','A','C','T','O','R','Y',0}};
 static fm1lab_instrument_t instrument_apply_snapshot;
 static fm1lab_insert_state_t inserts_apply_snapshot;
@@ -772,7 +772,7 @@ static void performance_publish(void)
             set.performance.seq_enabled[lane][step] = seq_ui_enabled[lane][step];
             set.performance.seq_note[lane][step] = seq_ui_note[lane][step];
             set.performance.seq_velocity[lane][step] = seq_ui_velocity[lane][step];
-            set.performance.seq_gate[lane][step] = seq_ui_gate[lane][step];
+            set.performance.seq_gate[lane][step] = (uint8_t)(seq_ui_gate[lane][step] | (seq_ui_tie[lane][step] ? 0x80u : 0u));
         }
     }
     performance_update_snapshot = set.performance;
@@ -1113,7 +1113,9 @@ static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocit
     uint8_t step=fm6_sequencer_running()?fm6_sequencer_playing_step():seq_ui_step;
     seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;seq_ui_velocity[lane][step]=velocity;
     if(!seq_ui_gate[lane][step])seq_ui_gate[lane][step]=75u;
+    seq_ui_tie[lane][step]=0u;
     if(fm6_sequencer_running()) {
+        if(seq_record_active[key] && seq_record_note[key]==note)return;
         seq_record_active[key]=1u;seq_record_step[key]=step;seq_record_lane[key]=lane;
         seq_record_note[key]=note;seq_record_started[key]=plat_ms();
     } else seq_ui_step=(uint8_t)((step+1u)%(set.performance.seq_length<2u?2u:set.performance.seq_length));
@@ -1136,6 +1138,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
         uint8_t step=(uint8_t)(((uint32_t)first+offset)%loop_length);
         seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;
         seq_ui_gate[lane][step]=100u;
+        seq_ui_tie[lane][step]=(uint8_t)(offset>0u);
     }
     if(remainder || !full_steps) {
         uint8_t step=(uint8_t)(((uint32_t)first+full_steps)%loop_length);
@@ -1143,6 +1146,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
         seq_ui_enabled[lane][step]=1u;seq_ui_note[lane][step]=note;
         seq_ui_velocity[lane][step]=seq_ui_velocity[lane][first];
         seq_ui_gate[lane][step]=gate;
+        seq_ui_tie[lane][step]=(uint8_t)(full_steps>0u);
     }
     seq_record_active[key]=0u;
     performance_publish();set_dirty=1u;seq_record_redraw=1u;
@@ -1339,7 +1343,8 @@ void app_init(void)
                  seq_ui_accent[lane][step] = 50u;
                 seq_ui_note[lane][step] = set.performance.seq_note[lane][step];
                 seq_ui_velocity[lane][step] = set.performance.seq_velocity[lane][step];
-                seq_ui_gate[lane][step] = set.performance.seq_gate[lane][step];
+                seq_ui_gate[lane][step] = (uint8_t)(set.performance.seq_gate[lane][step] & 0x7fu);
+                seq_ui_tie[lane][step] = (uint8_t)((set.performance.seq_gate[lane][step] & 0x80u) != 0u);
             }
         }
         /* ARP is opt-in: do not resurrect a previously saved DOWN/UP mode. */
