@@ -630,6 +630,23 @@ int main(void) {
     }
     fm6_panic();
 
+    /* Regression: the old UI wrote 100 into the boolean ARP step-gate
+     * field. That made the complete performance snapshot invalid, silently
+     * rejecting FX-page edits as well as ARP/sequencer updates. */
+    fm6_init();
+    fm6_performance_state_t gate_state, gate_check;
+    fm6_performance_state_get(&gate_state);
+    gate_state.arp_step_gate[0]=100u;
+    assert(!fm6_performance_state_valid(&gate_state));
+    gate_state.arp_step_gate[0]=1u;
+    gate_state.fx_enabled[FM6_FX_CHORUS]=1u;
+    gate_state.fx_mix[FM6_FX_CHORUS]=73u;
+    assert(fm6_performance_state_valid(&gate_state));
+    assert(fm6_performance_state_update(&gate_state)==0);
+    fm6_performance_state_get(&gate_check);
+    assert(gate_check.fx_enabled[FM6_FX_CHORUS]==1u);
+    assert(gate_check.fx_mix[FM6_FX_CHORUS]==73u);
+
     /* Performance state snapshot/restore covers every sequencer step, lane
      * assignment, tempo, arp mode, effect control and per-patch send. */
     fm6_performance_state_t saved, restored;
