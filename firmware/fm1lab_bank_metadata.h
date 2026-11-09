@@ -39,7 +39,7 @@ typedef struct {
 /* Initialize metadata for an empty or legacy v1 bank. */
 void fm1lab_bank_metadata_init(fm1lab_bank_metadata_t *metadata);
 
-/* Encode/decode the fixed 400-byte v2 metadata block, including CRC. */
+/* Encode the expanded v2 metadata block; decode both legacy v1 and current v2 layouts. */
 int fm1lab_bank_metadata_encode(const fm1lab_bank_metadata_t *metadata,
                                 uint8_t output[FM1LAB_BANK_META_BYTES]);
 int fm1lab_bank_metadata_decode(fm1lab_bank_metadata_t *metadata,
