@@ -1876,9 +1876,9 @@ static void input(void)
             } else if(page==PAGE_INSTRUMENT_MACRO) {
                 page=PAGE_HOME;app_say("HOME","ALL FOUR PATCHES");
             } else if(page==PAGE_CHAOS) {
-                page=PAGE_INSTRUMENT_MACRO;app_say("INSTRUMENT MACROS","EDIT ACCESS");
+                page=PAGE_HOME;app_say("HOME","ALL FOUR PATCHES");
             } else if(!patch_focus && page==PAGE_HOME) {
-                page=PAGE_INSTRUMENT_MACRO;app_say("INSTRUMENT MACROS","EDIT ACCESS");
+                /* Instrument-wide macro editor is intentionally dormant. */
             } else {
                 page = page == PAGE_OPERATOR_MAP ? PAGE_MACRO : PAGE_OPERATOR_MAP;
                 app_say("PATCH PITCH", patch_display_name(set.patch));
@@ -2668,20 +2668,31 @@ static void draw_instrument_macro_panel(void)
 }
 static void draw_chaos_panel(void)
 {
-    static const char *const labels[4]={"K1  AMOUNT","K2  RATE","K3  TONE","K4  SHAPE"};
-    static const char *const shapes[6]={"SINE","TRIANGLE","PULSE","STEPPED","RANDOM","UNSTABLE"};
-    const uint8_t values[3]={set.performance.chaos_amount,set.performance.chaos_rate,set.performance.chaos_tone};
+    static const char *const labels[4]={"K1  AMOUNT","K2  TEMPO SYNC","K3  BIT DEPTH","K4  SHAPE"};
+    static const char *const shapes[6]={"SINE","TRIANGLE","PULSE","STAIRS","SAMPLE&HOLD","S&H 4-BIT"};
+    static const char *const divisions[8]={"1 BAR","1/2","1/4","1/8","1/16","1/32","1/8T","1/16T"};
+    uint8_t slot=(uint8_t)((uint32_t)set.performance.chaos_rate*7u/100u);
+    uint8_t bits=(uint8_t)(24u-(uint32_t)set.performance.chaos_tone*16u/100u);
     char t[20];uint16_t accent=RGB(255,85,65);
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
         cv_text(x+9,y+8,&FONT_XS,labels[i],C_WHITE);
-        if(i<3u){
-            int_text(values[i],t);text_cat(t,i==0u?"%":i==1u?"":"%");
+        if(i==0u){
+            int_text(set.performance.chaos_amount,t);text_cat(t,"%");
             cv_text(x+9,y+27,&FONT_B,t,accent);
             cv_rect(x+9,y+49,94,6,C_LINE);
-            cv_rect(x+9,y+49,(int32_t)values[i]*94/100,6,accent);
-            cv_text(x+9,y+64,&FONT_XS,i==0u?"DRY  TO  DESTROY":i==1u?"SLOW  TO  AUDIO RATE":"DARK  TO  ABRASIVE",C_GRAY);
+            cv_rect(x+9,y+49,(int32_t)set.performance.chaos_amount*94/100,6,accent);
+            cv_text(x+9,y+64,&FONT_XS,"DRY  TO  DESTROY",C_GRAY);
+        }else if(i==1u){
+            cv_text(x+9,y+27,&FONT_B,divisions[slot],accent);
+            cv_text(x+9,y+64,&FONT_XS,"LOCKED TO MASTER BPM",C_GRAY);
+        }else if(i==2u){
+            int_text(bits,t);text_cat(t," BIT");
+            cv_text(x+9,y+27,&FONT_B,t,accent);
+            cv_rect(x+9,y+49,94,6,C_LINE);
+            cv_rect(x+9,y+49,(int32_t)set.performance.chaos_tone*94/100,6,accent);
+            cv_text(x+9,y+64,&FONT_XS,"24-BIT  TO  8-BIT",C_GRAY);
         }else{
             cv_text(x+9,y+27,&FONT_B,shapes[set.performance.chaos_shape],accent);
             cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_GRAY);
