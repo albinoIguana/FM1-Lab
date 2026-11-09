@@ -4,7 +4,7 @@
 
 enum {
     META_MAGIC = 0x324d4c46u, /* "FLM2" little-endian */
-    META_VERSION = 1u
+    META_VERSION = 2u
 };
 
 static void put_u16(uint8_t *p, uint16_t value)
@@ -73,7 +73,9 @@ int fm1lab_bank_metadata_valid(const fm1lab_bank_metadata_t *metadata)
         }
         for (unsigned p = 0; p < FM1LAB_BANK_PATCHES; ++p) {
             const fm1lab_bank_patch_meta_t *patch = &instrument->patches[p];
-            if (patch->enabled > 1 || patch->level > 127) return 0;
+            if (patch->enabled > 1 || patch->level > 127 ||
+                patch->octave < -4 || patch->octave > 4 ||
+                patch->fine_cents < -100 || patch->fine_cents > 100) return 0;
             for (unsigned m = 0; m < FM1LAB_BANK_MACROS; ++m)
                 if (patch->macros[m] > 100) return 0;
         }
@@ -96,10 +98,12 @@ int fm1lab_bank_metadata_encode(const fm1lab_bank_metadata_t *metadata,
         uint8_t *record = payload + i * FM1LAB_BANK_META_RECORD_BYTES;
         memcpy(record, instrument->name, FM1LAB_BANK_NAME_BYTES);
         for (unsigned p = 0; p < FM1LAB_BANK_PATCHES; ++p) {
-            uint8_t *patch = record + FM1LAB_BANK_NAME_BYTES + p * 6u;
+            uint8_t *patch = record + FM1LAB_BANK_NAME_BYTES + p * 8u;
             memcpy(patch, instrument->patches[p].macros, FM1LAB_BANK_MACROS);
             patch[4] = instrument->patches[p].enabled;
             patch[5] = instrument->patches[p].level;
+            patch[6] = (uint8_t)instrument->patches[p].octave;
+            patch[7] = (uint8_t)instrument->patches[p].fine_cents;
         }
     }
     put_u32(output + 8, crc32(payload, FM1LAB_BANK_META_PAYLOAD_BYTES));
@@ -111,25 +115,35 @@ int fm1lab_bank_metadata_decode(fm1lab_bank_metadata_t *metadata,
                                 const uint8_t input[FM1LAB_BANK_META_BYTES])
 {
     if (!metadata || !input || get_u32(input) != META_MAGIC ||
-        get_u16(input + 4) != META_VERSION ||
-        get_u16(input + 6) != FM1LAB_BANK_META_PAYLOAD_BYTES ||
-        get_u32(input + 12) != 0u ||
-        get_u32(input + 8) != crc32(input + FM1LAB_BANK_META_HEADER_BYTES,
-                                   FM1LAB_BANK_META_PAYLOAD_BYTES))
+        get_u32(input + 12) != 0u) return -1;
+    uint16_t version = get_u16(input + 4);
+    uint16_t payload_bytes = get_u16(input + 6);
+    unsigned record_bytes, patch_bytes;
+    if (version == 1u && payload_bytes == 384u) {
+        record_bytes = 48u; patch_bytes = 6u;
+    } else if (version == META_VERSION && payload_bytes == FM1LAB_BANK_META_PAYLOAD_BYTES) {
+        record_bytes = FM1LAB_BANK_META_RECORD_BYTES; patch_bytes = 8u;
+    } else return -1;
+    if (get_u32(input + 8) != crc32(input + FM1LAB_BANK_META_HEADER_BYTES,payload_bytes))
         return -1;
 
     fm1lab_bank_metadata_t decoded;
+    memset(&decoded, 0, sizeof decoded);
     const uint8_t *payload = input + FM1LAB_BANK_META_HEADER_BYTES;
     for (unsigned i = 0; i < FM1LAB_BANK_INSTRUMENTS; ++i) {
         fm1lab_bank_instrument_meta_t *instrument = &decoded.instruments[i];
-        const uint8_t *record = payload + i * FM1LAB_BANK_META_RECORD_BYTES;
+        const uint8_t *record = payload + i * record_bytes;
         memcpy(instrument->name, record, FM1LAB_BANK_NAME_BYTES);
         for (unsigned p = 0; p < FM1LAB_BANK_PATCHES; ++p) {
             fm1lab_bank_patch_meta_t *patch = &instrument->patches[p];
-            const uint8_t *source = record + FM1LAB_BANK_NAME_BYTES + p * 6u;
+            const uint8_t *source = record + FM1LAB_BANK_NAME_BYTES + p * patch_bytes;
             memcpy(patch->macros, source, FM1LAB_BANK_MACROS);
             patch->enabled = source[4];
             patch->level = source[5];
+            if (patch_bytes == 8u) {
+                patch->octave = (int8_t)source[6];
+                patch->fine_cents = (int8_t)source[7];
+            }
         }
     }
     if (!fm1lab_bank_metadata_valid(&decoded)) return -1;
