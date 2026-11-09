@@ -7,9 +7,10 @@
 _Static_assert(offsetof(settings_v3_t, performance) == 28u, "legacy v3 settings prefix changed");
 _Static_assert(sizeof(fm6_performance_state_v3_t) == 542u, "legacy v3 performance layout changed");
 _Static_assert(sizeof(settings_v5_t) == 592u, "legacy v5 settings layout changed");
-_Static_assert(sizeof(settings_v6_t) == sizeof(settings_t), "legacy v6 settings layout changed");
-_Static_assert(sizeof(settings_v7_t) == sizeof(settings_t), "legacy v7 settings layout changed");
-_Static_assert(sizeof(settings_v8_t) == sizeof(settings_t), "legacy v8 settings layout changed");
+_Static_assert(sizeof(settings_v6_t) == sizeof(settings_v9_t), "legacy v6 settings layout changed");
+_Static_assert(sizeof(settings_v7_t) == sizeof(settings_v9_t), "legacy v7 settings layout changed");
+_Static_assert(sizeof(settings_v8_t) == sizeof(settings_v9_t), "legacy v8 settings layout changed");
+_Static_assert(sizeof(settings_v9_t) < sizeof(settings_t), "V10 event record must extend V9");
 
 /* The record codec delegates performance-state validation to FM6. Keep this
  * unit test focused on the settings envelope and migration boundary. */
@@ -28,13 +29,22 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         if (s->lane_instrument[lane] >= 32u) return 0;
         for (unsigned step = 0; step < 64u; ++step)
             if (s->seq_enabled[lane][step] > 1u || s->seq_velocity[lane][step] > 127u ||
-                s->seq_gate[lane][step] > 100u || s->seq_note[lane][step] > 127u)
+                (s->seq_gate[lane][step] & 0x7fu) > 100u || s->seq_note[lane][step] > 127u)
                 return 0;
     }
     for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
         if (s->fx_enabled[fx] > 1u || s->fx_mix[fx] > 100u ||
             s->fx_time[fx] > 100u || s->fx_feedback[fx] > 100u || s->fx_depth[fx] > 100u)
             return 0;
+    for(unsigned lane=0;lane<2u;lane++) {
+        if(s->seq_event_count[lane]>128u)return 0;
+        for(unsigned i=0;i<s->seq_event_count[lane];i++) {
+            const fm6_seq_event_t *event=&s->seq_events[lane][i];
+            if(event->start>=s->seq_length||!event->duration||
+               event->duration>(unsigned)s->seq_length-event->start||
+               event->pitch>127u||!event->velocity||event->velocity>127u||event->accent>100u)return 0;
+        }
+    }
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p)
         for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
             if (s->fx_send[p][fx] > 100u) return 0;
@@ -246,7 +256,7 @@ int main(void)
     v6.enabled_mask=good.enabled_mask;v6.ble_off=good.ble_off;
     memcpy(v6.macros,good.macros,sizeof v6.macros);
     memcpy(v6.levels,good.levels,sizeof v6.levels);
-    v6.performance=good.performance;
+    memcpy(&v6.performance,&good.performance,sizeof v6.performance);
     for(unsigned step=0;step<16u;step++)v6.performance.arp_step_gate[step]=(uint8_t)(step*6u);
     v6.crc=settings_crc16(&v6,offsetof(settings_v6_t,crc));
     assert(settings_v6_valid(&v6));
@@ -264,7 +274,7 @@ int main(void)
     v7.enabled_mask=good.enabled_mask;v7.ble_off=good.ble_off;
     memcpy(v7.macros,good.macros,sizeof v7.macros);
     memcpy(v7.levels,good.levels,sizeof v7.levels);
-    v7.performance=good.performance;
+    memcpy(&v7.performance,&good.performance,sizeof v7.performance);
     for(unsigned step=0;step<16u;step++)v7.performance.arp_step_gate[step]=(uint8_t)(step%2u?100u:75u);
     v7.performance.arp_step_gain[1]=69u;v7.performance.arp_step_accent[1]=64u;
     v7.crc=settings_crc16(&v7,offsetof(settings_v7_t,crc));
@@ -283,7 +293,7 @@ int main(void)
     v8.enabled_mask=good.enabled_mask;v8.ble_off=good.ble_off;v8.reserved=1u;
     memcpy(v8.macros,good.macros,sizeof v8.macros);
     memcpy(v8.levels,good.levels,sizeof v8.levels);
-    v8.performance=good.performance;
+    memcpy(&v8.performance,&good.performance,sizeof v8.performance);
     v8.performance.arp_step_gain[1]=69u;v8.performance.arp_step_accent[1]=64u;
     v8.performance.arp_step_gain[2]=88u;v8.performance.arp_step_accent[2]=23u;
     v8.crc=settings_crc16(&v8,offsetof(settings_v8_t,crc));
@@ -300,9 +310,36 @@ int main(void)
     assert(settings_import_v8(&imported,&v8)==0);
     assert(imported.performance.arp_step_gain[1]==68u);
 
+    /* V9 -> V10 converts tie-cell chains into one continuous event. */
+    settings_v9_t v9;
+    memset(&v9,0,sizeof v9);
+    v9.magic=SET_MAGIC_V9;v9.octave=good.octave;v9.patch=good.patch;
+    v9.enabled_mask=good.enabled_mask;v9.ble_off=good.ble_off;v9.reserved=good.reserved;
+    memcpy(v9.macros,good.macros,sizeof v9.macros);
+    memcpy(v9.levels,good.levels,sizeof v9.levels);
+    memcpy(&v9.performance,&good.performance,sizeof v9.performance);
+    v9.performance.seq_length=16u;
+    v9.performance.seq_enabled[0][0]=1u;v9.performance.seq_note[0][0]=60u;
+    v9.performance.seq_velocity[0][0]=110u;v9.performance.seq_gate[0][0]=100u;
+    v9.performance.seq_enabled[0][1]=1u;v9.performance.seq_note[0][1]=60u;
+    v9.performance.seq_velocity[0][1]=110u;v9.performance.seq_gate[0][1]=0x80u|100u;
+    v9.performance.seq_enabled[0][2]=1u;v9.performance.seq_note[0][2]=64u;
+    v9.performance.seq_velocity[0][2]=90u;v9.performance.seq_gate[0][2]=75u;
+    v9.crc=settings_crc16(&v9,offsetof(settings_v9_t,crc));
+    assert(settings_v9_valid(&v9));
+    imported=good;
+    assert(settings_import_v9(&imported,&v9)==0);
+    assert(imported.magic==SET_MAGIC&&imported.performance.seq_event_count[0]==2u);
+    assert(imported.performance.seq_events[0][0].start==0u);
+    assert(imported.performance.seq_events[0][0].duration==2u);
+    assert(imported.performance.seq_events[0][0].pitch==60u);
+    assert(imported.performance.seq_events[0][1].start==2u);
+    assert(imported.performance.seq_events[0][1].pitch==64u);
+    assert(settings_valid((const settings_t *)&imported)==0 || imported.magic==SET_MAGIC);
+
     settings_v5_t bad_v5=v5;bad_v5.performance.tempo_bpm=29u;
     assert(!settings_v5_valid(&bad_v5));
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7 migration tests passed");
+    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7/V8/V9 -> V10 migration tests passed");
     return 0;
 }
