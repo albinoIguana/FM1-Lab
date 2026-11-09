@@ -11,8 +11,8 @@
 static const char fm1lab_dx7_voice_z85[] =
     "r81xavQJqodG*p+00-GamGr.{1Zk1I8^##LqZRLB000c40z&:%001(c5&Bc8mGs$tc&:kH00D3%0@@QpbQj4gvpGo*04w0I0%nM#00967l@sEZqD^o8e/CMe00il5nDn!(11LAge)qZ)03RyN000c40B(cg00CCxgcvoEgbovA04Gb]000c507]^mq=M:.qY)!W"
     "r81xavQJqodG*p+00-GamGr.{1Zk1I8^##LqZRLB000c40z&:%001(c5&Bc8mGs$tc&:kH00D3%0@@QpbQj4gvpGo*04w0I0%nM#00967l@sEZqD^o8e/CMe00il5nDn!(11LAge)qZ)03RyN000c40B(cg3<nZJgcvoEgbovA04Gb]000c507]^mq=M:.qY)?X"
-    "vnQJAv/MGe0000000000v/MGe2vI4Kv}2Ar00000000000aM3I3i$6zv}f0G0000000000002{#0U>@nbnJmGr-Ph2000000rrgb00968v<i9Zv}2Ar0000000ic2v/MGe2vXI-jy.z)00000000000aM0e00=*$uPZh3gboBB0v4NF000013}<n=of${yqY)hF"
-    "v(Lq:t]S?A0000000966gxmZY2v^-l0aM0e05NsG000l70-G7000^0-2rb*c001w)0009700Ds51][)rb[SgFuMYs]isVb[2lLi900007v?]4Av/MGedf6tF00-G7rr9102v/}fi+8It03<Mm0SSD90aM3f3i%)8uPZ80gboyz0v4NA000007/J<<qBKLKq=tCp"
+    "6Hj-5u0Q.oaohxw00093ve{Sm2qntfbv-3f03zmw0000106*I:001VqlMP.-v/NRK000000rtE!4/^4(kTMP5c1u]$0000000rpb0096f8d9v*v{&Bth#&{U00ro5tl1W70u.vJbv:[=03zmw0009317Irh01e=b001=fgbops0u-rYo8]4{3}%C#at3I*k%[7a"
+    "vN-DWv}e{EaoibR00ri3f8#N:2v?mL0aOqS03zmw0003104O3K00M>q96v.m001XMjobu=002H?0SSKpr@-kas]XKB02kFl0@@Hg00968v{n{kv&5nFaohxw00ri7uh$6c24ESwmQ]!j03zmw000310aM0f00&M8001=fgbovB046e}v/MGg7/KiWoIX.kar@Qa"
     "v}dYjv}bGs001OJ0r-xav/MYk2v?l<v}f0G0000e00rx82sXX100+O}dmW(T000004GDOm00:LB2(>e>v}e2sv}bGs01F#h1POJ}00007j7x3@v]-Nf001OJ0r&Dbmf0z&3$zKCm}kN10000e00ri30+hih010dBv}dnHgboyC0v4NA009643@Ze5mn+l{k#QYE"
     "v(Lq:t]S?A0000000966gxmZY2v^-l0aM0e05NsG000l70-G7000^0-2rb*c001w)0009700Ds51][)rb[SgFuMYs]isVb>2lj<200007v?]4Av/MGedf6tF00-G7rr9102v/}fi+8It03<Mm0SSD90aM3f3i%)8uPZ80gboyz0v4NA000037/J<<qBKLKk#QYE"
     "v}f1cu1lz90000000000v/MGe2v?mN0aPIy05NsG000000aM0e00=WS2rb*c0000000000003m72(>iju)3H^k(Z(+000000001e00007v<I9Pv}f0Gdf6tF00000s]XK52v/}fi+8It03<Mm0S&u40aM0e00=$xvQ.8FgbovB0v4NA000033@Zq7e<.<5qY)?X"
@@ -175,10 +175,10 @@ static const char fm1lab_dx7_instrument_names[FM1LAB_DX7_INSTRUMENT_COUNT][24] =
 };
 
 static const char fm1lab_dx7_patch_descriptions[FM1LAB_DX7_VOICE_COUNT][20] = {
-    "SIX-OP FM BASS",
-    "SIX-OP FM BASS",
-    "SIX-OP FM BASS",
-    "SIX-OP FM BASS",
+    "DEEP SUB FOUNDATION",
+    "DEEP SUB FOUNDATION",
+    "DEEP SUB FOUNDATION",
+    "DEEP SUB FOUNDATION",
     "SIX-OP FM BASS",
     "SIX-OP FM BASS",
     "SIX-OP FM BASS",
