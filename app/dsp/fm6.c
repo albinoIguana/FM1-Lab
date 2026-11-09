@@ -805,6 +805,8 @@ void fm6_init(void)
     arp_division=3u;arp_gate=75u;arp_octaves=1u;arp_length=16u;arp_output=0u;arp_random=0u;arp_macro_dest=0u;arp_depth=50u;
     arp_step_position=0u;arp_phase=0u;arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;arp_macro_offset=0;
     transport_bpm=120u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
+    seq_event_mode=0u;seq_event_count[0]=seq_event_count[1]=0u;
+    for(uint32_t lane=0;lane<2u;lane++)for(uint32_t i=0;i<FM6_SEQ_EVENTS_PER_LANE;i++)seq_event_active[lane][i]=0u;
     fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=fx_phaser_phase=0u;
     for (i = 0; i < PATCHES; i++) {
         fm6_unpack(FM6_FACTORY[i % FM1LAB_PATCH_COUNT], instrument[i].base);
@@ -1253,13 +1255,22 @@ void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t no
 int fm6_sequencer_set_events(uint8_t lane,const fm6_seq_event_t *events,uint16_t count)
 {
     if(lane>=2u || count>FM6_SEQ_EVENTS_PER_LANE || (count && !events)) return -1;
+    /* Validate the entire replacement before touching the currently sounding pattern. */
+    for(uint32_t i=0;i<count;i++) {
+        const fm6_seq_event_t *event=&events[i];
+        if(event->start>=seq_length || !event->duration || event->pitch>127u ||
+           !event->velocity || event->velocity>127u || event->accent>100u) return -1;
+    }
     fm6_seq_event_release_lane(lane);
+    if(seq_live_mask[lane]) {
+        fm6_note_off_source(seq_live_note[lane],seq_live_mask[lane],(uint16_t)(lane+1u));
+        seq_live_mask[lane]=0u;
+    }
+    seq_gate_left[lane]=0u;
     for(uint32_t i=0;i<FM6_SEQ_EVENTS_PER_LANE;i++) {
         seq_event_active[lane][i]=0u;
         if(i<count) {
             fm6_seq_event_t event=events[i];
-            if(event.start>=seq_length || !event.duration || event.pitch>127u ||
-               !event.velocity || event.velocity>127u || event.accent>100u) return -1;
             uint32_t max_duration=(uint32_t)seq_length-event.start;
             if(event.duration>max_duration) event.duration=(uint8_t)max_duration;
             seq_events[lane][i]=event;
