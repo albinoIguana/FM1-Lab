@@ -302,7 +302,7 @@ static inline int settings_v6_valid(const settings_v6_t *v) {
     if(!v||v->magic!=SET_MAGIC_V6||v->octave < -2||v->octave>2||v->patch>=FM1LAB_PATCH_COUNT||
        (v->enabled_mask&0xF0u)||v->ble_off>1u||v->reserved!=0u||
        v->crc!=settings_crc16(v,offsetof(settings_v6_t,crc)))return 0;
-    fm6_performance_state_t p=v->performance;
+    fm6_performance_state_t p={0}; memcpy(&p,&v->performance,sizeof v->performance);
     /* V6's final per-step byte was macro amount; initialize the new tie flag off. */
     for(uint32_t step=0;step<16u;step++){
         if(p.arp_step_gate[step]>100u)return 0;
@@ -322,7 +322,7 @@ static inline int settings_import_v6(settings_t *dst,const settings_v6_t *src) {
         dst->levels[patch]=src->levels[patch];
         for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)dst->macros[patch][m]=src->macros[patch][m];
     }
-    dst->performance=src->performance;
+    memcpy(&dst->performance,&src->performance,sizeof src->performance); settings_clear_events(dst);
     dst->performance.lane_instrument[0]=dst->performance.lane_instrument[1]=0u;
     for(uint32_t step=0;step<16u;step++)dst->performance.arp_step_gate[step]=0u;
     return 0;
@@ -367,7 +367,7 @@ static inline int settings_import_v7(settings_t *dst,const settings_v7_t *src) {
 static inline int settings_v8_valid(const settings_v8_t *v) {
     if(!v||v->magic!=SET_MAGIC_V8||v->octave < -2||v->octave>2||v->patch>=FM1LAB_PATCH_COUNT||
        (v->enabled_mask&0xF0u)||v->ble_off>1u||v->reserved>3u||
-       !fm6_performance_state_valid(&v->performance)||
+       !settings_legacy_performance_valid(&v->performance)||
        v->crc!=settings_crc16(v,offsetof(settings_v8_t,crc)))return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++){
         if(v->levels[p]>127u)return 0;
@@ -377,13 +377,42 @@ static inline int settings_v8_valid(const settings_v8_t *v) {
 }
 static inline int settings_import_v8(settings_t *dst,const settings_v8_t *src) {
     if(!dst||!settings_v8_valid(src))return -1;
-    memcpy(dst,src,sizeof *dst);
+    dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
+    dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
+    memcpy(dst->macros,src->macros,sizeof dst->macros);
+    memcpy(dst->levels,src->levels,sizeof dst->levels);
+    memcpy(&dst->performance,&src->performance,sizeof src->performance);
+    dst->reserved=src->reserved;dst->crc=0u;
     /* V8 lane_patch values selected individual patches, not library Instruments. */
     dst->performance.lane_instrument[0]=dst->performance.lane_instrument[1]=0u;
     if(dst->performance.arp_step_gain[1]==69u&&dst->performance.arp_step_accent[1]==64u){
         dst->performance.arp_step_gain[1]=127u;
         dst->performance.arp_step_accent[1]=0u;
     }
+    settings_migrate_step_events(dst);
+    return 0;
+}
+
+static inline int settings_v9_valid(const settings_v9_t *v) {
+    if(!v||v->magic!=SET_MAGIC_V9||v->octave < -2||v->octave>2||v->patch>=FM1LAB_PATCH_COUNT||
+       (v->enabled_mask&0xF0u)||v->ble_off>1u||v->reserved>3u||
+       !settings_legacy_performance_valid(&v->performance)||
+       v->crc!=settings_crc16(v,offsetof(settings_v9_t,crc)))return 0;
+    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
+        if(v->levels[p]>127u)return 0;
+        for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)if(v->macros[p][m]>100u)return 0;
+    }
+    return 1;
+}
+static inline int settings_import_v9(settings_t *dst,const settings_v9_t *src) {
+    if(!dst||!settings_v9_valid(src))return -1;
+    dst->magic=SET_MAGIC;dst->octave=src->octave;dst->patch=src->patch;
+    dst->enabled_mask=src->enabled_mask;dst->ble_off=src->ble_off;
+    memcpy(dst->macros,src->macros,sizeof dst->macros);
+    memcpy(dst->levels,src->levels,sizeof dst->levels);
+    memcpy(&dst->performance,&src->performance,sizeof src->performance);
+    dst->reserved=src->reserved;dst->crc=0u;
+    settings_migrate_step_events(dst);
     return 0;
 }
 
