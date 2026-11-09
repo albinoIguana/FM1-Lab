@@ -1878,9 +1878,11 @@ static void input(void)
             page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
         } else if (k == B_ENV) {
-            if (page == PAGE_ENV) env_mode = (uint8_t)((env_mode + 1u) % 3u);
-            else { page = PAGE_ENV; env_mode = 0u; }
-            app_say("ENVELOPE", env_mode == 0u ? "PATCH ADSR" : env_mode == 1u ? "OPERATOR RATES" : "OPERATOR LEVELS");
+            if (page == PAGE_ENV) {
+                env_mode = env_mode == 0u ? 1u : env_mode == 1u ? 2u : 0u;
+            } else { page = PAGE_ENV; env_mode = 0u; }
+            app_say("ENVELOPE", env_mode == 0u ? "PATCH ADSR" :
+                env_mode == 1u ? "OP EG RATE EDIT" : "OP EG TARGET EDIT");
         } else if (k == B_LFO) {
             page = page == PAGE_LFO ? PAGE_LFO_MOD :
                 page == PAGE_LFO_MOD ? PAGE_LFO : PAGE_LFO;
@@ -2353,7 +2355,7 @@ static void input(void)
                     app_say(index == 0u ? "ADSR ATTACK" : index == 1u ? "ADSR DECAY" : index == 2u ? "ADSR SUSTAIN" : "ADSR RELEASE", "UPDATED");
                 } else {
                     voice_edit_operator((fm1lab_operator_field_t)((env_mode == 2u ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + index), e);
-                    app_say(env_mode == 2u ? "OPERATOR LEVEL" : "OPERATOR RATE", "UPDATED");
+                    app_say(env_mode == 2u ? "EG TARGET LEVEL" : "EG STAGE RATE", "UPDATED");
                 }
             } else if (page == PAGE_LFO) {
                 static const fm1lab_global_field_t fields[4] = {
@@ -2910,12 +2912,18 @@ static void draw_global_panel(uint32_t pct)
     }
 }
 
+static const char *env_rate_word(uint8_t value)
+{
+    if (value >= 85u) return "FAST";
+    if (value >= 55u) return "BRISK";
+    if (value >= 25u) return "SLOW";
+    return "VERY SLOW";
+}
+
 static void draw_envelope_panel(void)
 {
-    static const char *const rates[4] = {"RATE 1", "RATE 2", "RATE 3", "RATE 4"};
-    static const char *const levels[4] = {"LEVEL 1", "LEVEL 2", "LEVEL 3", "LEVEL 4"};
-    static const char *const adsr_names[4] = {"K1  ATTACK", "K2  DECAY", "K3  SUSTAIN", "K4  RELEASE"};
-    char t[16];
+    static const char *const stage_names[4] = {"ATTACK", "DECAY 1", "DECAY 2", "RELEASE"};
+    char t[16], rate_text[16], level_text[16];
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint16_t accent = patch_color(set.patch);
     uint8_t adsr[4] = {0u,0u,0u,0u};
@@ -2923,6 +2931,7 @@ static void draw_envelope_panel(void)
         int32_t left=12,right=228,top=18,baseline=124;
         int32_t aw,dw,rw,sw=42,total,scale,x1,x2,x3,x4,sy;
         (void)fm1lab_voice_adsr_get(voice,adsr);
+        /* DX7 rates run in the intuitive direction: 99 is fastest, 0 slowest. */
         aw=8+(99-(int32_t)adsr[0])*5/9;
         dw=10+(99-(int32_t)adsr[1])*4/9;
         rw=10+(99-(int32_t)adsr[3])*4/9;
@@ -2942,27 +2951,38 @@ static void draw_envelope_panel(void)
         cv_rect(x1-2,top-2,5,5,C_WHITE); cv_rect(x2-2,sy-2,5,5,accent);
         cv_text(12,132,&FONT_XS,"ATTACK",C_GRAY); cv_text(67,132,&FONT_XS,"DECAY",C_GRAY);
         cv_text(119,132,&FONT_XS,"SUSTAIN",C_GRAY); cv_text(180,132,&FONT_XS,"RELEASE",C_GRAY);
-        int_text(adsr[0],t); cv_text(12,151,&FONT_B,t,accent);
-        int_text(adsr[1],t); cv_text(67,151,&FONT_B,t,accent);
-        int_text(adsr[2],t); cv_text(129,151,&FONT_B,t,accent);
-        int_text(adsr[3],t); cv_text(190,151,&FONT_B,t,accent);
-        cv_text(12,169,&FONT_XS,"K1 ATTACK  K2 DECAY  K3 SUSTAIN  K4 RELEASE",C_GRAY);
+        int_text(adsr[0],t); cv_text(12,149,&FONT_B,t,accent);
+        cv_text(12,167,&FONT_XS,env_rate_word(adsr[0]),C_GRAY);
+        int_text(adsr[1],t); cv_text(67,149,&FONT_B,t,accent);
+        cv_text(67,167,&FONT_XS,env_rate_word(adsr[1]),C_GRAY);
+        int_text(adsr[2],t); cv_text(129,149,&FONT_B,t,accent);
+        cv_text(129,167,&FONT_XS,"LEVEL",C_GRAY);
+        int_text(adsr[3],t); cv_text(190,149,&FONT_B,t,accent);
+        cv_text(190,167,&FONT_XS,env_rate_word(adsr[3]),C_GRAY);
+        cv_text(10,188,&FONT_XS,"99 = FAST   0 = SLOW / LONG",C_GRAY);
         return;
     }
+    cv_text(8,3,&FONT_XS,env_operator <= 6u ? "SELECT OP / RATE + TARGET PER STAGE" : "OPERATOR ENVELOPE",C_GRAY);
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = 4 + (int32_t)(i & 1u) * 118;
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
-        uint8_t value = 0;
+        uint8_t rate=0u, level=0u;
         (void)fm1lab_voice_operator_get(voice, env_operator,
-            (fm1lab_operator_field_t)((env_mode == 2u ? FM1LAB_OP_LEVEL_1 : FM1LAB_OP_RATE_1) + i), &value);
+            (fm1lab_operator_field_t)(FM1LAB_OP_RATE_1 + i), &rate);
+        (void)fm1lab_voice_operator_get(voice, env_operator,
+            (fm1lab_operator_field_t)(FM1LAB_OP_LEVEL_1 + i), &level);
         instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), accent, accent);
-        cv_text(x + 9, y + 10, &FONT_XS, env_mode == 2u ? levels[i] : rates[i], C_WHITE);
-        int_text(value, t); cv_text(x + 88, y + 10, &FONT_XS, t, accent);
-        cv_rect(x + 9, y + 39, 98, 6, C_LINE);
-        cv_rect(x + 9, y + 39, (int32_t)value * 98 / 99, 6, accent);
-        cv_text(x + 9, y + 64, &FONT_XS, env_mode == 2u ? "0=OFF  99=MAX" : "0=SLOW  99=FAST", C_GRAY);
+        cv_text(x + 9, y + 7, &FONT_XS, stage_names[i], C_WHITE);
+        int_text(rate, t); cv_text(x + 9, y + 25, &FONT_B, "R", env_mode == 1u ? accent : C_GRAY);
+        cv_text(x + 21, y + 25, &FONT_B, t, env_mode == 1u ? accent : C_GRAY);
+        cv_rect(x + 9, y + 42, 98, 4, C_LINE);
+        cv_rect(x + 9, y + 42, (int32_t)rate * 98 / 99, 4, env_mode == 1u ? accent : C_DIM);
+        int_text(level, t); cv_text(x + 62, y + 25, &FONT_B, "T", env_mode == 2u ? accent : C_GRAY);
+        cv_text(x + 74, y + 25, &FONT_B, t, env_mode == 2u ? accent : C_GRAY);
+        cv_text(x + 9, y + 55, &FONT_XS, env_mode == 1u ? env_rate_word(rate) : "TARGET LEVEL", C_GRAY);
     }
-    cv_text(8, 170, &FONT_XS, env_operator <= 6u ? "SELECT OP  /  EDIT INDIVIDUAL EG" : "OPERATOR ENVELOPE", C_GRAY);
+    cv_text(8, 170, &FONT_XS, env_mode == 1u ? "K1-4 EDIT RATE  /  ENV TOGGLE: TARGET" :
+        "K1-4 EDIT TARGET  /  ENV TOGGLE: RATE", C_GRAY);
 }
 
 static void draw_lfo_panel(uint32_t modulation)
@@ -3391,7 +3411,7 @@ static const char *page_title(uint8_t current)
     case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
     case PAGE_GLOBAL: return "GLOBAL";
     case PAGE_OPERATOR_MAP: return "PATCH PITCH";
-    case PAGE_ENV: return env_mode == 0u ? "PATCH ADSR" : env_mode == 1u ? "OP EG RATES" : "OP EG LEVELS";
+    case PAGE_ENV: return env_mode == 0u ? "PATCH ADSR" : "OPERATOR EG";
     case PAGE_LFO: return "LFO / MOTION";
     case PAGE_LFO_MOD: return "LFO SYNC";
     case PAGE_SEQ: return "SEQUENCER";
@@ -3458,8 +3478,8 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         index = 1u;
         total = 1u;
     } else if (current == PAGE_ENV) {
-        index = (uint32_t)env_mode + 1u;
-        total = 3u;
+        index = env_mode == 0u ? 1u : 2u;
+        total = 2u;
     } else if (current == PAGE_OPERATOR_MAP || current == PAGE_MACRO) {
         index = current == PAGE_OPERATOR_MAP ? 1u : 2u;
         total = 2u;
