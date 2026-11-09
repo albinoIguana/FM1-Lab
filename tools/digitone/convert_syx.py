@@ -230,6 +230,10 @@ def convert_voice(payload: bytes, source_name: str):
         if operator not in topology["ops"].values():
             set_operator(voice, operator, 1.0, 0, [0, 0, 0, 0], [0, 0, 0, 0])
 
+    # DX pitch-EG levels are centered at 50. A zero-filled EG pulls every note
+    # far below its played key, so keep this unused envelope explicitly neutral.
+    voice[126:130] = [99, 99, 99, 99]
+    voice[130:134] = [50, 50, 50, 50]
     voice[134] = topology["dx7"]
     voice[135] = clamp(p["feedback"] * 7.0 / 120.0, 0, 7)
     voice[136] = 0
