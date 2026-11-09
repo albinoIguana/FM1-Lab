@@ -54,11 +54,23 @@ int main(void)
 
     assert(fm1lab_audio_engine_init(&engine, voices, enabled, levels, 4,
                                     FM1_SAMPLE_RATE) == 0);
+    assert(fm1lab_audio_engine_set_pitch(&engine,0u,1,25)==0);
+    assert(fm1lab_audio_engine_set_pitch(&engine,1u,-4,-100)==0);
+    assert(fm1lab_audio_engine_set_pitch(&engine,2u,5,0)==-1);
+    assert(fm1lab_audio_engine_set_pitch(&engine,2u,0,101)==-1);
     assert(fm1lab_audio_engine_note_on(&engine, 60, 120) == 0);
     assert(fm1lab_audio_engine_render(&engine, output, FM1_BLOCK_FRAMES) == 0);
     assert(peak(output, FM1_BLOCK_FRAMES) > 0);
     for (unsigned p = 0; p < FM1LAB_AUDIO_PATCHES; ++p)
         assert(fm1lab_audio_engine_active_voices(&engine, p) == 1);
+    assert(engine.octave[0]==1 && engine.fine_cents[0]==25);
+    assert(engine.octave[1]==-4 && engine.fine_cents[1]==-100);
+    /* Changing one patch's tuning releases only that patch's notes. */
+    assert(fm1lab_audio_engine_set_pitch(&engine,0u,-1,-50)==0);
+    assert(fm1lab_audio_engine_render(&engine,output,FM1_BLOCK_FRAMES)==0);
+    assert(engine.octave[0]==-1 && engine.fine_cents[0]==-50);
+    assert(fm1lab_audio_engine_active_voices(&engine,0u)==0);
+    assert(fm1lab_audio_engine_active_voices(&engine,1u)==1);
 
     /* The sequencer can address one patch without triggering the other layers. */
     assert(fm1lab_audio_engine_note_on_mask(&engine, 64, 100, 0x02u) == 0);
