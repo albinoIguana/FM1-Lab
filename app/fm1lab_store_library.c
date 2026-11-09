@@ -23,21 +23,30 @@ static PLAT_POOL uint8_t bank_work[BANK_BYTES];
 #define INSERTS_V3_SNAPSHOT_DATA_BYTES 460u
 #define INSERTS_V3_SNAPSHOT_BYTES 462u
 #define INSERTS_V3_TOTAL_BYTES 936u
-#define INSERTS_MAGIC 0x34534e49u
-#define INSERTS_VERSION 4u
+#define INSERTS_V4_MAGIC 0x34534e49u
+#define INSERTS_V4_VERSION 4u
+#define INSERTS_V4_SNAPSHOT_DATA_BYTES 588u
+#define INSERTS_V4_SNAPSHOT_BYTES 590u
+#define INSERTS_V4_TOTAL_BYTES 1192u
+#define INSERTS_MAGIC 0x35534e49u
+#define INSERTS_VERSION 5u
 #define INSERTS_HEADER_BYTES 12u
-#define INSERTS_SNAPSHOT_DATA_BYTES 588u
-#define INSERTS_SNAPSHOT_BYTES 590u
-#define INSERTS_TOTAL_BYTES 1192u
+#define INSERTS_SNAPSHOT_DATA_BYTES 844u
+#define INSERTS_SNAPSHOT_BYTES 846u
+#define INSERTS_TOTAL_BYTES 1704u
 #define INSERTS_STATE_OFFSET 12u
+#define INSERTS_V4_STATE_BYTES 18u
 #define INSERTS_LEGACY_PATCH_BYTES 14u
 #define INSERTS_LEGACY_INSTRUMENT_BYTES (4u * INSERTS_LEGACY_PATCH_BYTES)
-_Static_assert(sizeof(fm1lab_insert_state_t)==18u, "Instrument macro/insert state layout changed");
+_Static_assert(sizeof(fm1lab_insert_state_t)==26u, "Instrument tuning/insert state layout changed");
 _Static_assert(INSERTS_TOTAL_BYTES<=3840u, "Insert sidecar exceeds one store sector");
 /* Oversized read/scratch buffers intentionally accept the previous V1/V2
  * journal records before compacting them into the V3 global-Instrument form. */
 static PLAT_POOL uint8_t inserts_work[INSERTS_V2_TOTAL_BYTES];
 static PLAT_POOL uint8_t inserts_snapshot_work[INSERTS_V2_SNAPSHOT_BYTES];
+static PLAT_POOL uint8_t inserts_v4_snapshot_work[INSERTS_V4_SNAPSHOT_BYTES];
+static PLAT_POOL uint8_t inserts_old_active_work[INSERTS_V2_SNAPSHOT_BYTES];
+static PLAT_POOL uint8_t inserts_old_fallback_work[INSERTS_V2_SNAPSHOT_BYTES];
 static uint16_t inserts_bank_crc[FM1LAB_STORE_BANK_COUNT];
 static uint8_t inserts_bank_generation[FM1LAB_STORE_BANK_COUNT];
 
@@ -200,6 +209,17 @@ static void instrument_encode(uint8_t *r, const fm1lab_instrument_t *in)
 
 
 static uint16_t inserts_snapshot_crc(const uint8_t *s){return crc16(s,INSERTS_SNAPSHOT_DATA_BYTES);}
+static int inserts_v4_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_V4_SNAPSHOT_DATA_BYTES)==crc16(s,INSERTS_V4_SNAPSHOT_DATA_BYTES);}
+static void inserts_v4_snapshot_seal(uint8_t *s){write16(s+INSERTS_V4_SNAPSHOT_DATA_BYTES,crc16(s,INSERTS_V4_SNAPSHOT_DATA_BYTES));}
+static void inserts_snapshot_convert_v4_to_v5(uint8_t *dst,const uint8_t *src){
+ bytes_zero(dst,INSERTS_SNAPSHOT_BYTES);bytes_copy(dst,src,12u);
+ for(unsigned i=0;i<FM1LAB_STORE_INSTRUMENT_COUNT;i++){
+  uint8_t *to=dst+INSERTS_STATE_OFFSET+i*sizeof(fm1lab_insert_state_t);
+  const uint8_t *from=src+INSERTS_STATE_OFFSET+i*INSERTS_V4_STATE_BYTES;
+  bytes_copy(to,from,INSERTS_V4_STATE_BYTES);
+ }
+ inserts_snapshot_seal(dst);
+}
 static int inserts_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_SNAPSHOT_DATA_BYTES)==inserts_snapshot_crc(s);}
 static void inserts_snapshot_seal(uint8_t *s){write16(s+INSERTS_SNAPSHOT_DATA_BYTES,inserts_snapshot_crc(s));}
 static void inserts_header_seal(uint8_t *r){write32(r,INSERTS_MAGIC);write16(r+4,INSERTS_VERSION);write16(r+6,INSERTS_TOTAL_BYTES);write16(r+8,crc16(r,8));write16(r+10,0);}
@@ -212,13 +232,13 @@ static int inserts_v1_snapshot_valid(const uint8_t *s){return read16(s+1800u)==c
 static int inserts_v2_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_V2_SNAPSHOT_DATA_BYTES)==crc16(s,INSERTS_V2_SNAPSHOT_DATA_BYTES);}
 static int inserts_v3_snapshot_valid(const uint8_t *s){return read16(s+INSERTS_V3_SNAPSHOT_DATA_BYTES)==crc16(s,INSERTS_V3_SNAPSHOT_DATA_BYTES);}
 static void inserts_snapshot_convert_v3(uint8_t *dst,const uint8_t *src){
- bytes_zero(dst,INSERTS_SNAPSHOT_BYTES);bytes_copy(dst,src,12u);
+ bytes_zero(dst,INSERTS_V4_SNAPSHOT_BYTES);bytes_copy(dst,src,12u);
  for(unsigned i=0;i<FM1LAB_STORE_INSTRUMENT_COUNT;i++){
-  uint8_t *to=dst+INSERTS_STATE_OFFSET+i*sizeof(fm1lab_insert_state_t);
+  uint8_t *to=dst+INSERTS_STATE_OFFSET+i*INSERTS_V4_STATE_BYTES;
   const uint8_t *from=src+INSERTS_STATE_OFFSET+i*14u;
   bytes_copy(to,from,14u);for(unsigned m=0;m<4u;m++)to[14u+m]=50u;
  }
- inserts_snapshot_seal(dst);
+ inserts_v4_snapshot_seal(dst);
 }
 
 /* Old V1/V2 stored four independent patch inserts. Collapse to a single
@@ -259,23 +279,23 @@ static void inserts_legacy_collapse(fm1lab_insert_state_t *dst,const uint8_t *sr
  }
 }
 static void inserts_snapshot_convert_v1(uint8_t *dst,const uint8_t *src){
- bytes_zero(dst,INSERTS_SNAPSHOT_BYTES);bytes_copy(dst,src,8u);
+ bytes_zero(dst,INSERTS_V4_SNAPSHOT_BYTES);bytes_copy(dst,src,8u);
  for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++)dst[8u+b]=0u;
  for(unsigned i=0;i<FM1LAB_STORE_INSTRUMENT_COUNT;i++){
   fm1lab_insert_state_t v;
   inserts_legacy_collapse(&v,src+8u+i*INSERTS_LEGACY_INSTRUMENT_BYTES);
-  bytes_copy(dst+INSERTS_STATE_OFFSET+i*sizeof(v),&v,sizeof(v));
+  bytes_copy(dst+INSERTS_STATE_OFFSET+i*INSERTS_V4_STATE_BYTES,&v,INSERTS_V4_STATE_BYTES);
  }
- inserts_snapshot_seal(dst);
+ inserts_v4_snapshot_seal(dst);
 }
 static void inserts_snapshot_convert_v2(uint8_t *dst,const uint8_t *src){
- bytes_zero(dst,INSERTS_SNAPSHOT_BYTES);bytes_copy(dst,src,12u);
+ bytes_zero(dst,INSERTS_V4_SNAPSHOT_BYTES);bytes_copy(dst,src,12u);
  for(unsigned i=0;i<FM1LAB_STORE_INSTRUMENT_COUNT;i++){
   fm1lab_insert_state_t v;
   inserts_legacy_collapse(&v,src+12u+i*INSERTS_LEGACY_INSTRUMENT_BYTES);
-  bytes_copy(dst+INSERTS_STATE_OFFSET+i*sizeof(v),&v,sizeof(v));
+  bytes_copy(dst+INSERTS_STATE_OFFSET+i*INSERTS_V4_STATE_BYTES,&v,INSERTS_V4_STATE_BYTES);
  }
- inserts_snapshot_seal(dst);
+ inserts_v4_snapshot_seal(dst);
 }
 static int inserts_current_bank_crcs(void){
  for(unsigned b=0;b<FM1LAB_STORE_BANK_COUNT;b++){
@@ -285,39 +305,56 @@ static int inserts_current_bank_crcs(void){
  }
  return 0;
 }
+static void inserts_upgrade_record(uint8_t *r,const uint8_t *active,const uint8_t *fallback,
+ unsigned old_bytes,int active_ok,int fallback_ok,
+ void (*convert_v4)(uint8_t *,const uint8_t *))
+{
+ bytes_copy(inserts_old_active_work,active,old_bytes);
+ bytes_copy(inserts_old_fallback_work,fallback,old_bytes);
+ if(fallback_ok){
+  convert_v4(inserts_v4_snapshot_work,inserts_old_fallback_work);
+  inserts_snapshot_convert_v4_to_v5(inserts_snapshot_work,inserts_v4_snapshot_work);
+  bytes_copy(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ }else bytes_zero(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,INSERTS_SNAPSHOT_BYTES);
+ if(active_ok){
+  convert_v4(inserts_v4_snapshot_work,inserts_old_active_work);
+  inserts_snapshot_convert_v4_to_v5(inserts_snapshot_work,inserts_v4_snapshot_work);
+  bytes_copy(r+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);
+ }else bytes_zero(r+INSERTS_HEADER_BYTES,INSERTS_SNAPSHOT_BYTES);
+ inserts_header_seal(r);
+}
+static void inserts_snapshot_copy_v4(uint8_t *dst,const uint8_t *src){bytes_copy(dst,src,INSERTS_V4_SNAPSHOT_BYTES);}
 static void inserts_record_load(uint8_t *r){
  int n=plat_store_load(OBJ_INSERTS,r,INSERTS_V2_TOTAL_BYTES);
+ if(n==(int)INSERTS_TOTAL_BYTES&&read32(r)==INSERTS_MAGIC&&read16(r+4u)==INSERTS_VERSION&&
+    read16(r+6u)==INSERTS_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)&&
+    (inserts_snapshot_valid(r+INSERTS_HEADER_BYTES)||
+     inserts_snapshot_valid(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES))) return;
+ if(n==(int)INSERTS_V4_TOTAL_BYTES&&read32(r)==INSERTS_V4_MAGIC&&read16(r+4u)==INSERTS_V4_VERSION&&
+    read16(r+6u)==INSERTS_V4_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)){
+  const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_V4_SNAPSHOT_BYTES;
+  inserts_upgrade_record(r,a,f,INSERTS_V4_SNAPSHOT_BYTES,
+    inserts_v4_snapshot_valid(a),inserts_v4_snapshot_valid(f),inserts_snapshot_copy_v4);return;
+ }
  if(n==(int)INSERTS_V1_TOTAL_BYTES&&read32(r)==INSERTS_V1_MAGIC&&read16(r+4u)==1u&&
     read16(r+6u)==INSERTS_V1_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)){
-  uint8_t *old_active=r+INSERTS_HEADER_BYTES,*old_fallback=old_active+INSERTS_V1_SNAPSHOT_BYTES;
-  int active_ok=inserts_v1_snapshot_valid(old_active),fallback_ok=inserts_v1_snapshot_valid(old_fallback);
-  if(fallback_ok){inserts_snapshot_convert_v1(inserts_snapshot_work,old_fallback);bytes_copy(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
-  else bytes_zero(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,INSERTS_SNAPSHOT_BYTES);
-  if(active_ok){inserts_snapshot_convert_v1(inserts_snapshot_work,old_active);bytes_copy(r+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
-  else bytes_zero(r+INSERTS_HEADER_BYTES,INSERTS_SNAPSHOT_BYTES);
-  inserts_header_seal(r);return;
+  const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_V1_SNAPSHOT_BYTES;
+  inserts_upgrade_record(r,a,f,INSERTS_V1_SNAPSHOT_BYTES,
+    inserts_v1_snapshot_valid(a),inserts_v1_snapshot_valid(f),inserts_snapshot_convert_v1);return;
  }
  if(n==(int)INSERTS_V3_TOTAL_BYTES&&read32(r)==INSERTS_V3_MAGIC&&read16(r+4u)==INSERTS_V3_VERSION&&
     read16(r+6u)==INSERTS_V3_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)){
-  uint8_t *old_active=r+INSERTS_HEADER_BYTES,*old_fallback=old_active+INSERTS_V3_SNAPSHOT_BYTES;
-  int active_ok=inserts_v3_snapshot_valid(old_active),fallback_ok=inserts_v3_snapshot_valid(old_fallback);
-  if(fallback_ok){inserts_snapshot_convert_v3(inserts_snapshot_work,old_fallback);bytes_copy(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
-  else bytes_zero(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,INSERTS_SNAPSHOT_BYTES);
-  if(active_ok){inserts_snapshot_convert_v3(inserts_snapshot_work,old_active);bytes_copy(r+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
-  else bytes_zero(r+INSERTS_HEADER_BYTES,INSERTS_SNAPSHOT_BYTES);
-  inserts_header_seal(r);return;
+  const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_V3_SNAPSHOT_BYTES;
+  inserts_upgrade_record(r,a,f,INSERTS_V3_SNAPSHOT_BYTES,
+    inserts_v3_snapshot_valid(a),inserts_v3_snapshot_valid(f),inserts_snapshot_convert_v3);return;
  }
  if(n==(int)INSERTS_V2_TOTAL_BYTES&&read32(r)==INSERTS_V2_MAGIC&&read16(r+4u)==2u&&
     read16(r+6u)==INSERTS_V2_TOTAL_BYTES&&read16(r+8u)==crc16(r,8u)){
-  uint8_t *old_active=r+INSERTS_HEADER_BYTES,*old_fallback=old_active+INSERTS_V2_SNAPSHOT_BYTES;
-  int active_ok=inserts_v2_snapshot_valid(old_active),fallback_ok=inserts_v2_snapshot_valid(old_fallback);
-  if(fallback_ok){inserts_snapshot_convert_v2(inserts_snapshot_work,old_fallback);bytes_copy(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
-  else bytes_zero(r+INSERTS_HEADER_BYTES+INSERTS_SNAPSHOT_BYTES,INSERTS_SNAPSHOT_BYTES);
-  if(active_ok){inserts_snapshot_convert_v2(inserts_snapshot_work,old_active);bytes_copy(r+INSERTS_HEADER_BYTES,inserts_snapshot_work,INSERTS_SNAPSHOT_BYTES);}
-  else bytes_zero(r+INSERTS_HEADER_BYTES,INSERTS_SNAPSHOT_BYTES);
-  inserts_header_seal(r);return;
+  const uint8_t *a=r+INSERTS_HEADER_BYTES,*f=a+INSERTS_V2_SNAPSHOT_BYTES;
+  inserts_upgrade_record(r,a,f,INSERTS_V2_SNAPSHOT_BYTES,
+    inserts_v2_snapshot_valid(a),inserts_v2_snapshot_valid(f),inserts_snapshot_convert_v2);return;
  }
- if(n!=(int)INSERTS_TOTAL_BYTES||!inserts_record_valid(r))bytes_zero(r,INSERTS_TOTAL_BYTES);
+ bytes_zero(r,INSERTS_TOTAL_BYTES);
 }
 static void inserts_snapshot_resolve(uint8_t *dst,const uint8_t *r,
  const uint16_t crc[FM1LAB_STORE_BANK_COUNT],const uint8_t generation[FM1LAB_STORE_BANK_COUNT]){
@@ -362,7 +399,12 @@ int fm1lab_store_library_load_full(unsigned index,fm1lab_instrument_t *out,fm1la
  if(inserts_current_bank_crcs())return -1;
  inserts_snapshot_resolve(inserts_snapshot_work,inserts_work,inserts_bank_crc,inserts_bank_generation);
  bytes_copy(inserts,inserts_snapshot_work+INSERTS_STATE_OFFSET+index*sizeof(*inserts),sizeof(*inserts));
- return fm1lab_insert_state_valid(inserts)?0:-1;
+ if(!fm1lab_insert_state_valid(inserts))return -1;
+ for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
+  out->patches[p].octave=inserts->patch_octave[p];
+  out->patches[p].fine_cents=inserts->patch_fine_cents[p];
+ }
+ return 0;
 }
 int fm1lab_store_library_load(unsigned index,fm1lab_instrument_t *out){
  fm1lab_insert_state_t ignored;return fm1lab_store_library_load_full(index,out,&ignored);
@@ -376,8 +418,13 @@ int fm1lab_store_library_save_full(unsigned index,const fm1lab_instrument_t *in,
  instrument_encode(record_at(bank_work,slot),in);
  write16(bank_work+6u,crc16(bank_work+BANK_HEADER,BANK_BYTES-BANK_HEADER));
  inserts_record_load(inserts_work);
+ fm1lab_insert_state_t saved_state=*inserts;
+ for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
+  saved_state.patch_octave[p]=in->patches[p].octave;
+  saved_state.patch_fine_cents[p]=in->patches[p].fine_cents;
+ }
  if(inserts_record_prepare(inserts_work,inserts_bank_crc,inserts_bank_generation,bank,slot,
-    read16(bank_work+6u),new_generation,inserts))return -1;
+    read16(bank_work+6u),new_generation,&saved_state))return -1;
  /* Journal first. CRC plus generation detects insert-only changes even when
   * the 479-byte voice bank itself would otherwise be byte-identical. */
  if(inserts_record_save())return -1;
