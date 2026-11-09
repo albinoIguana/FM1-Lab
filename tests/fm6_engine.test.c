@@ -673,6 +673,15 @@ int main(void) {
     saved.seq_length = 48u;
     saved.lane_instrument[0] = 2u;
     saved.lane_instrument[1] = 3u;
+    /* V10 event data is part of the performance snapshot: preserve both
+     * lanes, polyphony, pitch, velocity, accent, and sustained durations. */
+    saved.seq_event_count[0] = 3u;
+    saved.seq_events[0][0] = (fm6_seq_event_t){0u,8u,60u,112u,25u};
+    saved.seq_events[0][1] = (fm6_seq_event_t){0u,8u,64u,96u,0u};
+    saved.seq_events[0][2] = (fm6_seq_event_t){12u,4u,67u,88u,50u};
+    saved.seq_event_count[1] = 2u;
+    saved.seq_events[1][0] = (fm6_seq_event_t){4u,2u,48u,100u,10u};
+    saved.seq_events[1][1] = (fm6_seq_event_t){20u,12u,55u,104u,35u};
     for (unsigned lane = 0; lane < 2u; ++lane)
         for (unsigned step = 0; step < 64u; ++step) {
             saved.seq_enabled[lane][step] = (uint8_t)((step % 3u) == lane);
@@ -708,6 +717,12 @@ int main(void) {
     assert(fm6_sequencer_running() == 0u);
     fm6_performance_state_get(&restored);
     assert(memcmp(&saved, &restored, sizeof saved) == 0);
+    restored.seq_events[0][0].duration = 0u;
+    assert(!fm6_performance_state_valid(&restored));
+    restored.seq_events[0][0] = saved.seq_events[0][0];
+    restored.seq_event_count[1] = 129u;
+    assert(!fm6_performance_state_valid(&restored));
+    restored.seq_event_count[1] = saved.seq_event_count[1];
     restored.fx_depth[FM6_FX_PHASER] = 101u;
     assert(!fm6_performance_state_valid(&restored));
     restored.fx_depth[FM6_FX_PHASER] = saved.fx_depth[FM6_FX_PHASER];
