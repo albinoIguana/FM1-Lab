@@ -296,7 +296,7 @@ def convert_bank(input_path: Path) -> dict:
             "format": "fm1lab-instrument",
             "version": 1,
             "id": f"digitone-{instrument_number:02d}",
-            "name": f"DIGITONE {instrument_number:02d}",
+            "name": re.sub(r"[^A-Z0-9 _-]", " ", group[0]["sourceName"].upper()).strip()[:16] or f"DN {instrument_number:02d}",
             "patches": patches,
         })
 
