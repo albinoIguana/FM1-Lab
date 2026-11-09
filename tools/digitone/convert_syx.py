@@ -334,7 +334,7 @@ def convert_bank(input_path: Path) -> dict:
                 "sourceName": sound["sourceName"],
                 "sourceTags": sound["sourceTags"],
                 "sourceAlgorithm": sound["sourceAlgorithm"],
-                "instrumentIndex": sound["sourceIndex"] // 4,
+                "instrumentIndex": (sound["sourceIndex"] - 1) // 4,
                 "patchIndex": (sound["sourceIndex"] - 1) % 4,
                 "sourceParameters": sound["sourceParameters"],
             }
