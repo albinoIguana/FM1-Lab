@@ -12,6 +12,7 @@ static void test_four_patch_contract(void)
     assert(fm1lab_instrument_valid(&instrument));
     assert(instrument.patches[0].enabled == 1);
     assert(instrument.patches[0].level == 31);
+    assert(instrument.patches[0].octave == 0 && instrument.patches[0].fine_cents == 0);
     assert(fm1lab_patch_pan(&instrument, 0u) == 64u);
     fm1lab_patch_set_pan(&instrument, 2u, 17u);
     assert(fm1lab_patch_pan(&instrument, 2u) == 17u);
@@ -100,6 +101,12 @@ static void test_validation_rejects_bad_state(void)
     instrument.patches[2].enabled = 2;
     assert(!fm1lab_instrument_valid(&instrument));
     instrument.patches[2].enabled = 1;
+    instrument.patches[2].octave = 5;
+    assert(!fm1lab_instrument_valid(&instrument));
+    instrument.patches[2].octave = 0;
+    instrument.patches[2].fine_cents = 101;
+    assert(!fm1lab_instrument_valid(&instrument));
+    instrument.patches[2].fine_cents = 0;
     instrument.version++;
     assert(!fm1lab_instrument_valid(&instrument));
 }
