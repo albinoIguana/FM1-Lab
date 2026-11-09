@@ -1284,7 +1284,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
             seq_pattern[lane][step].enabled=0u;
             seq_pattern[lane][step].note=s->seq_note[lane][step];
             seq_pattern[lane][step].velocity=s->seq_velocity[lane][step];
-            seq_pattern[lane][step].gate=(uint8_t)(s->seq_gate[lane][step] & 0x7fu);
+            seq_pattern[lane][step].gate=s->seq_gate[lane][step];
             seq_pattern[lane][step].enabled=s->seq_enabled[lane][step];
         }
     }
