@@ -329,6 +329,10 @@ int main(void)
     assert(settings_v9_valid(&v9));
     imported=good;
     assert(settings_import_v9(&imported,&v9)==0);
+    fprintf(stderr,"V9 migration debug: magic=%08x events=%u length=%u enabled=%u,%u,%u gates=%u,%u,%u\\n",
+            imported.magic,imported.performance.seq_event_count[0],imported.performance.seq_length,
+            imported.performance.seq_enabled[0][0],imported.performance.seq_enabled[0][1],imported.performance.seq_enabled[0][2],
+            imported.performance.seq_gate[0][0],imported.performance.seq_gate[0][1],imported.performance.seq_gate[0][2]);
     assert(imported.magic==SET_MAGIC&&imported.performance.seq_event_count[0]==2u);
     assert(imported.performance.seq_events[0][0].start==0u);
     assert(imported.performance.seq_events[0][0].duration==2u);
