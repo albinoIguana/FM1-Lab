@@ -449,6 +449,13 @@ static inline int settings_import_v10(settings_t *dst,const settings_v10_t *src)
     memcpy(&dst->performance,&src->performance,sizeof src->performance);
     dst->performance.chaos_amount=0u;dst->performance.chaos_rate=42u;
     dst->performance.chaos_tone=55u;dst->performance.chaos_shape=0u;
+    for(uint32_t lane=0;lane<2u;lane++) {
+        for(uint32_t i=0;i<dst->performance.seq_event_count[lane];i++) {
+            fm6_seq_event_t *event=&dst->performance.seq_events[lane][i];
+            event->start=(uint8_t)(event->start*2u);
+            event->duration=(uint8_t)(event->duration*2u);
+        }
+    }
     dst->reserved=src->reserved;dst->padding=0u;dst->crc=0u;
     return 0;
 }
