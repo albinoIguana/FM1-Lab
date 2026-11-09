@@ -49,6 +49,13 @@ int fm1lab_audio_init(void)
                                  FM1LAB_AUDIO_VOICES_PER_PATCH,
                                  FM1_SAMPLE_RATE) != 0)
         return -1;
+    for(unsigned p=0;p<FM1LAB_AUDIO_PATCHES;p++)
+        if(fm1lab_audio_engine_set_pitch(&audio_engine,p,
+            runtime.instrument.patches[p].octave,
+            runtime.instrument.patches[p].fine_cents)!=0){
+            fm1lab_audio_engine_destroy(&audio_engine);
+            return -1;
+        }
 
     audio_shadow = runtime.instrument;
     memcpy(live_voice, voices, sizeof live_voice);
@@ -90,6 +97,16 @@ int fm1lab_audio_sync_instrument(const fm1lab_instrument_t *instrument)
                 &audio_engine, p, instrument->patches[p].level);
             if (r) result = r;
             else audio_shadow.patches[p].level = instrument->patches[p].level;
+        }
+        if (instrument->patches[p].octave != audio_shadow.patches[p].octave ||
+            instrument->patches[p].fine_cents != audio_shadow.patches[p].fine_cents) {
+            int r = fm1lab_audio_engine_set_pitch(&audio_engine,p,
+                instrument->patches[p].octave,instrument->patches[p].fine_cents);
+            if (r) result = r;
+            else {
+                audio_shadow.patches[p].octave = instrument->patches[p].octave;
+                audio_shadow.patches[p].fine_cents = instrument->patches[p].fine_cents;
+            }
         }
     }
     memcpy(audio_shadow.name, instrument->name, sizeof audio_shadow.name);
