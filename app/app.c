@@ -1389,12 +1389,32 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
 }
 static void sequencer_record_step_advance(void)
 {
-    /* Step recording is additive: crossing an empty step must never erase
-     * existing notes or material recorded by another pass. */
-    if(!seq_record_armed || !seq_record_mode || !fm6_sequencer_running()) {
+    if(!seq_record_armed || !fm6_sequencer_running()) {
         seq_record_last_step=255u;return;
     }
-    seq_record_last_step=fm6_sequencer_playing_step();
+    uint8_t step=fm6_sequencer_playing_step();
+    if(step==seq_record_last_step)return;
+    seq_record_last_step=step;
+    if(!seq_record_mode)return; /* OVERDUB keeps every existing event. */
+
+    /* OVERWRITE clears only the portion of this lane reached by the record
+     * head. Remove notes beginning here and trim notes that cross this step. */
+    uint8_t lane=seq_ui_lane;
+    uint32_t write=0u;
+    for(uint32_t i=0;i<seq_event_count[lane];i++) {
+        fm6_seq_event_t event=seq_event_store[lane][i];
+        uint32_t end=(uint32_t)event.start+event.duration;
+        if(event.start==step)continue;
+        if(event.start<step && end>step)event.duration=(uint8_t)(step-event.start);
+        if(event.duration)seq_event_store[lane][write++]=event;
+    }
+    if(write!=seq_event_count[lane]) {
+        seq_event_count[lane]=(uint8_t)write;
+        if(seq_selected_event[lane]>=seq_event_count[lane])
+            seq_selected_event[lane]=seq_event_count[lane]?(uint8_t)(seq_event_count[lane]-1u):255u;
+        sequencer_events_publish();
+        set_dirty=1u;seq_record_redraw=1u;
+    }
 }
 static void note_on(int32_t note, uint32_t vel)
 {
@@ -2189,8 +2209,10 @@ static void input(void)
                 }
             } else if (page == PAGE_SEQ_OPTIONS) {
                 if(index==0u && e!=0) {
-                    seq_record_mode=0u;set.reserved=(uint16_t)(set.reserved&2u);set_dirty=1u;
-                    app_say("RECORD MODE","ADDITIVE ONLY");
+                    seq_record_mode^=1u;
+                    set.reserved=(uint16_t)((set.reserved&2u)|seq_record_mode);
+                    set_dirty=1u;
+                    app_say("RECORD MODE",seq_record_mode?"OVERWRITE":"OVERDUB");
                 } else if(index==1u && e!=0) {
                     uint8_t next=(uint8_t)clamp((int32_t)set.performance.seq_length+e,2,64);
                     if(next!=set.performance.seq_length) {
@@ -3291,9 +3313,9 @@ static void draw_sequencer_options_panel(void)
     const uint16_t yellow=RGB(242,212,59);
     const uint16_t cyan=RGB(36,215,232);
     const uint16_t red=RGB(255,105,115);
-    draw_sequencer_options_card(0u,"RECORD MODE",
-        "ADDITIVE",
-        "EXISTING NOTES ARE PRESERVED",yellow);
+    draw_sequencer_options_card(0u,"K1  RECORD MODE",
+        seq_record_mode?"OVERWRITE":"OVERDUB",
+        seq_record_mode?"REPLACE NOTES AS PLAYHEAD PASSES":"KEEP EXISTING NOTES",yellow);
     int_text(set.performance.seq_length,value);text_cat(value," STEPS");
     draw_sequencer_options_card(1u,"K2  LOOP LENGTH",value,"TURN 2-64  /  DEFAULT 16",cyan);
     draw_sequencer_options_card(2u,"RECORD STATUS",
