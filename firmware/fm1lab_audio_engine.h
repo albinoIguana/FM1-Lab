@@ -17,6 +17,8 @@ typedef struct {
     uint8_t patch_mask;
     uint8_t enabled;
     uint8_t level;
+    int8_t octave;
+    int8_t fine_cents;
     uint8_t midi_bytes;
     uint8_t midi[3];
     uint8_t voice[FM1LAB_PATCH_BYTES];
@@ -32,6 +34,8 @@ typedef struct {
     uint8_t voice[FM1LAB_AUDIO_PATCHES][FM1LAB_PATCH_BYTES];
     uint8_t enabled[FM1LAB_AUDIO_PATCHES];
     uint8_t level[FM1LAB_AUDIO_PATCHES];
+    int8_t octave[FM1LAB_AUDIO_PATCHES];
+    int8_t fine_cents[FM1LAB_AUDIO_PATCHES];
     volatile uint32_t queue_head;
     volatile uint32_t queue_tail;
     volatile uint32_t panic_pending;
@@ -57,6 +61,8 @@ int fm1lab_audio_engine_set_enabled(fm1lab_audio_engine_t *engine,
                                     unsigned patch, int enabled);
 int fm1lab_audio_engine_set_level(fm1lab_audio_engine_t *engine,
                                   unsigned patch, unsigned level);
+int fm1lab_audio_engine_set_pitch(fm1lab_audio_engine_t *engine,
+                                  unsigned patch, int octave, int fine_cents);
 
 int fm1lab_audio_engine_note_on(fm1lab_audio_engine_t *engine,
                                 uint8_t note, uint8_t velocity);
