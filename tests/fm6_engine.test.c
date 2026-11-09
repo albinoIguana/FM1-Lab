@@ -663,6 +663,8 @@ int main(void) {
             saved.seq_note[lane][step] = (uint8_t)(36u + lane * 12u + step % 48u);
             saved.seq_velocity[lane][step] = (uint8_t)(70u + step % 58u);
             saved.seq_gate[lane][step] = (uint8_t)(10u + step % 91u);
+            if (lane == 0u && step > 0u && step < 4u)
+                saved.seq_gate[lane][step] |= 0x80u; /* tied continuation */
         }
     saved.arp_mode=3u;saved.arp_division=4u;saved.arp_gate=63u;
     saved.arp_octaves=3u;saved.arp_length=8u;saved.arp_output=2u;
