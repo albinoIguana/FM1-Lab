@@ -615,11 +615,33 @@ static int fm1lab_digitone_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_
 static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !out) return -1;
-    fm1lab_instrument_init(out,fm1lab_digitone_instrument_names[index]);
+
+    /* Give the Instrument a useful source name instead of a numbered bank label. */
+    uint8_t first_voice[FM1LAB_PATCH_BYTES];
+    char instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
+    if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT,first_voice)) return -1;
+    for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++) {
+        char c=(char)first_voice[145u+i];
+        instrument_name[i]=(c>=32 && c<=126)?c:' ';
+    }
+    instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
+    if(instrument_name[0]==' ' || instrument_name[0]=='\\0')
+        fm1lab_copy_string(instrument_name,sizeof instrument_name,
+                           fm1lab_digitone_instrument_names[index]);
+    fm1lab_instrument_init(out,instrument_name);
+
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
-        if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice) ||
-           fm1lab_patch_set_voice(out,patch,voice)) return -1;
+        if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
+
+        /* DX pitch-EG levels are centered at 50. Zero-filled levels transpose
+         * every imported note sharply downward; neutralize the unused EG. */
+        for(uint32_t stage=0;stage<4u;stage++) {
+            voice[126u+stage]=99u;
+            voice[130u+stage]=50u;
+        }
+
+        if(fm1lab_patch_set_voice(out,patch,voice)) return -1;
         fm1lab_patch_set_pan(out,patch,voice[155]);
         out->patches[patch].level=31u;
         out->patches[patch].enabled=1u;
