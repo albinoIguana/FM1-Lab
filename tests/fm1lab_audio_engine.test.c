@@ -66,10 +66,10 @@ int main(void)
     assert(engine.octave[0]==1 && engine.fine_cents[0]==25);
     assert(engine.octave[1]==-4 && engine.fine_cents[1]==-100);
     /* Changing one patch's tuning releases only that patch's notes. */
-    assert(fm1lab_audio_engine_set_pitch(&engine,0u,-1,-50)==0);
+    assert(fm1lab_audio_engine_set_pitch(&engine,2u,-1,-50)==0);
     assert(fm1lab_audio_engine_render(&engine,output,FM1_BLOCK_FRAMES)==0);
-    assert(engine.octave[0]==-1 && engine.fine_cents[0]==-50);
-    assert(fm1lab_audio_engine_active_voices(&engine,0u)==0);
+    assert(engine.octave[2]==-1 && engine.fine_cents[2]==-50);
+    assert(fm1lab_audio_engine_active_voices(&engine,2u)==0);
     assert(fm1lab_audio_engine_active_voices(&engine,1u)==1);
 
     /* The sequencer can address one patch without triggering the other layers. */
