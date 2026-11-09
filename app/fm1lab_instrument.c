@@ -102,6 +102,8 @@ int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
         instrument->patches[patch].macros[m] = 50;
     instrument->patches[patch].enabled = 1;
     instrument->patches[patch].level = 31; /* new voice starts at safe level */
+    instrument->patches[patch].octave = 0;
+    instrument->patches[patch].fine_cents = 0;
     return 0;
 }
 
@@ -117,6 +119,8 @@ int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const fm1lab_patch_t *patch = &instrument->patches[p];
         if (patch->enabled > 1 || patch->level > 127 ||
+            patch->octave < -4 || patch->octave > 4 ||
+            patch->fine_cents < -100 || patch->fine_cents > 100 ||
             patch->voice[VOICE_ALGORITHM] > 31 ||
             patch->voice[GLOBAL_FEEDBACK] > 7)
             return 0;
