@@ -38,7 +38,7 @@ static void fm6_zero_bytes(void *dst, uint32_t n)
  * patch level 31 peaks at 13,045,204 Q24. 10,536/32,768 maps that measured
  * contribution to 0.25 Q24 full scale; four coherent patches sum to 1.0. */
 #define FM6_PATCH_CALIBRATION_Q15 10536
-#define FM6_MASTER_TRIM_Q15 8231
+#define FM6_MASTER_TRIM_Q15 32768 /* unity: the patch calibration already reserves 12 dB per layer */
 #define FM6_FX_HEADROOM_SHIFT 5u
 #define FM6_FX_HEADROOM_SCALE (1u << FM6_FX_HEADROOM_SHIFT)
 #define FM6_LIMITER_CEILING_Q23 7470000
