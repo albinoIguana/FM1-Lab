@@ -20,7 +20,7 @@ typedef struct {
     uint8_t seq_enabled[2][64];
     uint8_t seq_note[2][64];
     uint8_t seq_velocity[2][64];
-    uint8_t seq_gate[2][64];
+    uint8_t seq_gate[2][64]; /* low 7 bits: gate %, high bit: tie from previous step */
     uint8_t arp_mode, arp_division, arp_gate, arp_octaves, arp_length;
     uint8_t arp_step_gain[16], arp_step_accent[16], arp_step_gate[16];
     uint8_t arp_output, arp_random, arp_macro_dest, arp_depth;
