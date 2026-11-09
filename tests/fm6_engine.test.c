@@ -557,12 +557,17 @@ int main(void) {
     assert(arp_peak>0); /* prove the generated arp note reaches the FM6 output */
     {
         fm6_arp_capture_event_t captured;
-        uint8_t saw_generated_note=0u;
+        uint8_t saw_generated_note=0u,saw_generated_release=0u;
         while(fm6_arp_capture_pop(&captured))
-            if(captured.on && captured.note>=60u && captured.note<=67u)saw_generated_note=1u;
+            if(captured.on && captured.note>=60u && captured.note<=67u) {
+                saw_generated_note=1u;assert(captured.lane==1u);
+            }
         assert(saw_generated_note); /* recorder sees the generated arp note, not just held input */
+        fm6_note_off(60u); fm6_note_off(64u); fm6_note_off(67u);
+        while(fm6_arp_capture_pop(&captured))
+            if(!captured.on)saw_generated_release=1u;
+        assert(saw_generated_release); /* gate/held-note release closes the captured event */
     }
-    fm6_note_off(60u); fm6_note_off(64u); fm6_note_off(67u);
     fm6_arpeggiator_set_mode(0u);
 
     /* Every effect changes the active FM6 output, not just a UI parameter. */
