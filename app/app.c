@@ -31,6 +31,7 @@ static fm1lab_instrument_t current_instrument;
 static fm1lab_insert_state_t current_inserts;
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
+static uint8_t patch_preset_cursor;
 static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
@@ -2111,6 +2112,7 @@ static void input(void)
             set.patch = (uint8_t)next;
             if (page == PAGE_HOME) {
                 patch_focus = 1u;
+                patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT+set.patch);
                 seq_ui_patch[seq_ui_lane] = set.patch;
                 performance_publish();
             }
@@ -2133,11 +2135,25 @@ static void input(void)
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             app_say("PATCH PITCH", "K1 OCTAVE / K2 FINE");
         } else if (k == EN_PRESET) {
-            /* PRESET always browses the 32 four-patch Instruments, even when
-             * one layer is focused. The old 16 M-VAVE recipes hid the library. */
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
+            } else if(page==PAGE_HOME && patch_focus) {
+                /* In patch focus, PRESET swaps only the selected patch voice.
+                 * The 128-voice DX7 library is shared across all four slots. */
+                int32_t next=((int32_t)patch_preset_cursor+e)%
+                    (int32_t)FM1LAB_DX7_VOICE_COUNT;
+                if(next<0)next+=(int32_t)FM1LAB_DX7_VOICE_COUNT;
+                uint8_t voice[FM1LAB_PATCH_BYTES];
+                if(fm1lab_dx7_decode_voice((uint32_t)next,voice)!=0 ||
+                   fm1lab_patch_set_voice(&current_instrument,set.patch,voice)!=0) {
+                    app_say("PATCH PRESET","LOAD FAILED");
+                } else {
+                    patch_preset_cursor=(uint8_t)next;
+                    voice_edit_changed();
+                    app_say("PATCH PRESET",patch_display_name(set.patch));
+                }
             } else {
+                /* Whole-Instrument focus: PRESET browses all 32 four-patch sets. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
@@ -2379,6 +2395,7 @@ static void input(void)
                  * continues to adjust that layer's level. */
                 patch_focus = 1u;
                 set.patch = (uint8_t)index;
+                patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT+set.patch);
                 seq_ui_patch[seq_ui_lane] = set.patch;
                 performance_publish();
                 int32_t value = (int32_t)set.levels[index] + e;
