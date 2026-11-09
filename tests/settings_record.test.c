@@ -335,7 +335,8 @@ int main(void)
     assert(imported.performance.seq_events[0][0].pitch==60u);
     assert(imported.performance.seq_events[0][1].start==2u);
     assert(imported.performance.seq_events[0][1].pitch==64u);
-    assert(settings_valid((const settings_t *)&imported)==0 || imported.magic==SET_MAGIC);
+    settings_seal(&imported);
+    assert(settings_valid(&imported));
 
     settings_v5_t bad_v5=v5;bad_v5.performance.tempo_bpm=29u;
     assert(!settings_v5_valid(&bad_v5));
