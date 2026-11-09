@@ -41,8 +41,8 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         if(s->seq_event_count[lane]>128u)return 0;
         for(unsigned i=0;i<s->seq_event_count[lane];i++) {
             const fm6_seq_event_t *event=&s->seq_events[lane][i];
-            if(event->start>=s->seq_length||!event->duration||
-               event->duration>(unsigned)s->seq_length-event->start||
+            if(event->start>=(unsigned)s->seq_length*2u||!event->duration||
+               event->duration>(unsigned)s->seq_length*2u-event->start||
                event->pitch>127u||!event->velocity||event->velocity>127u||event->accent>100u)return 0;
         }
     }
