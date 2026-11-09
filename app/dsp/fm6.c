@@ -1057,7 +1057,7 @@ void fm6_note_off_mask(uint8_t note,uint8_t patch_mask)
             break;
         }
         if(!arp_count){
-            if(arp_live)fm6_note_off_source(arp_live_note,arp_patch_mask,3u);
+            if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u);}
             arp_live=0u;arp_gate_left=0u;arp_amp_target_q15=32768;fm6_arp_macro_apply(0);
         }
     }
@@ -1192,12 +1192,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 seq_position=0u;seq_tick_position=0u;seq_tick_counter=0u; transport_phase=0u; seq_start_pending=0u;
             }
             if(arp_clear_pending) {
-                if(arp_live) fm6_note_off_source(arp_live_note,0x0fu,3u);
+                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u);}
                 arp_live=0u; arp_count=0u; arp_index=0u; arp_gate_left=0u;
                 arp_amp_target_q15=32768;fm6_arp_macro_apply(0);arp_clear_pending=0u;
             }
             if(arp_reset_pending) {
-                if(arp_live)fm6_note_off_source(arp_live_note,0x0fu,3u);
+                if(arp_live){fm6_arp_capture_push(0u,arp_live_note,0u);fm6_note_off_source(arp_live_note,arp_patch_mask,3u);}
                 arp_live=0u;arp_index=0u;arp_direction=1u;arp_step_position=0u;
                 arp_play_position=0u;arp_phase=0u;arp_gate_left=0u;
                 arp_amp_target_q15=32768;fm6_arp_macro_apply(0);arp_reset_pending=0u;
@@ -1345,13 +1345,14 @@ void fm6_sequencer_set_running(uint8_t running) {
 static void fm6_seq_event_trim(uint8_t length)
 {
     if(!seq_event_mode)return;
+    uint32_t loop_ticks=(uint32_t)length*2u;
     for(uint32_t lane=0;lane<2u;lane++) {
         fm6_seq_event_release_lane(lane);
         uint32_t write=0u;
         for(uint32_t i=0;i<seq_event_count[lane];i++) {
             fm6_seq_event_t event=seq_events[lane][i];
-            if(event.start>=length)continue;
-            uint32_t max_duration=(uint32_t)length-event.start;
+            if(event.start>=loop_ticks)continue;
+            uint32_t max_duration=loop_ticks-event.start;
             if(event.duration>max_duration)event.duration=(uint8_t)max_duration;
             if(event.duration)seq_events[lane][write++]=event;
         }
@@ -1482,8 +1483,8 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
         if(s->seq_event_count[lane]>FM6_SEQ_EVENTS_PER_LANE)return 0;
         for(uint32_t i=0;i<s->seq_event_count[lane];i++) {
             const fm6_seq_event_t *event=&s->seq_events[lane][i];
-            if(event->start>=s->seq_length || !event->duration ||
-               event->duration>(uint32_t)s->seq_length-event->start ||
+            if(event->start>=(uint32_t)s->seq_length*2u || !event->duration ||
+               event->duration>(uint32_t)s->seq_length*2u-event->start ||
                event->pitch>127u || !event->velocity || event->velocity>127u ||
                event->accent>100u)return 0;
         }
