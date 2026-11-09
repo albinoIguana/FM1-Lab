@@ -1537,6 +1537,7 @@ static void settings_defaults(void)
     set.patch = 0;
     set.enabled_mask = 0x0fu; /* all four factory layers active */
     set.ble_off = 0;
+    set.swing = 50u;
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         set.levels[p] = 31u; /* safe defaults; saved user levels are loaded below */
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
@@ -1650,6 +1651,7 @@ void app_init(void)
             if(has_legacy){settings_migrate_step_events(&set);set_dirty=1u;}
         }
     }
+    fm6_set_swing((uint8_t)set.swing);
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode=set.performance.arp_mode;
@@ -2262,7 +2264,12 @@ static void input(void)
         } else if (k >= EN_K1 && k <= EN_K4) {
             uint32_t index = (uint32_t)k - EN_K1;
             if (page == PAGE_GLOBAL) {
-                if(index==2u) {
+                if(index==1u) {
+                    set.swing=(uint16_t)clamp((int32_t)set.swing+e,50,75);
+                    fm6_set_swing((uint8_t)set.swing);
+                    set_dirty=1u;
+                    app_say("GLOBAL SWING",set.swing==50u?"STRAIGHT":"UPDATED");
+                } else if(index==2u) {
                     transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
                     performance_publish(); set_dirty=1u;
                     app_say("MASTER TEMPO","UPDATED");
@@ -3001,7 +3008,7 @@ static void draw_compressor_panel(void)
 static void draw_global_panel(uint32_t pct)
 {
     char t[24];
-    const char *labels[4] = {"MASTER", "OCTAVE", "TEMPO", "MIDI / BLE"};
+    const char *labels[4] = {"MASTER", "SWING", "TEMPO", "MIDI / BLE"};
     uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
@@ -3012,8 +3019,11 @@ static void draw_global_panel(uint32_t pct)
             int_text((int32_t)pct, t); text_cat(t, "%");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
         } else if (i == 1) {
-            octave_text(t);
-            cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            int_text((int32_t)set.swing,t);text_cat(t,"%");
+            cv_text(x + 9, y + 25, &FONT_B, t, colors[i]);
+            cv_rect(x+9,y+49,94,6,C_LINE);
+            cv_rect(x+9,y+49,((int32_t)set.swing-50)*94/25,6,colors[i]);
+            cv_text(x+9,y+63,&FONT_XS,set.swing==50u?"STRAIGHT":"SWING",C_GRAY);
         } else if (i == 2) {
             int_text((int32_t)transport_ui_bpm, t); text_cat(t, " BPM");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
