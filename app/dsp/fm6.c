@@ -123,6 +123,15 @@ uint64_t fm6_test_fx_send_peak(uint32_t effect, uint32_t channel)
 uint32_t fm6_test_fx_saturations(void) { return fm6_test_fx_saturation_count; }
 uint32_t fm6_test_limiter_events(void) { return fm6_test_limiter_event_count; }
 uint64_t fm6_test_output_peak(void) { return fm6_test_output_peak_q23; }
+int32_t fm6_test_macro_mod_level(uint32_t patch) { return patch < PATCHES ? instrument[patch].mod_level : 0; }
+uint8_t fm6_test_macro_feedback(uint32_t patch) { return patch < PATCHES ? instrument[patch].feedback : 0u; }
+int32_t fm6_test_macro_detune(uint32_t patch, uint32_t operator_index) {
+    return patch < PATCHES && operator_index < 6u ? instrument[patch].detune[operator_index] : 0;
+}
+uint8_t fm6_test_effective_byte(uint32_t patch, uint32_t byte_index) {
+    return patch < PATCHES && byte_index < FP_SIZE ? instrument[patch].effective[byte_index] : 0u;
+}
+
 
 #endif
 
@@ -705,21 +714,25 @@ static void fm6_rebuild_patch(uint32_t index)
     int32_t body = macro_values[FM1LAB_MACRO_BODY] - 50;
     int32_t motion = macro_values[FM1LAB_MACRO_MOTION];
     int32_t dirt = macro_values[FM1LAB_MACRO_EDGE] - 50;
-    int32_t ratio = body * 4 / 50;
-    int32_t meg = body * 40 / 50;
+    int32_t ratio = body * 12 / 50;
+    int32_t meg = body * 60 / 50;
+    int32_t motion_gain = motion <= 50 ? 25 + motion * 75 / 50
+                                        : 100 + (motion - 50) * 200 / 50;
     uint32_t carriers, k, j, carrier_n = 0;
     static const int8_t spread[6] = {0, 1, -1, 2, -2, 3};
-    int32_t cents_step = dirt * 70908 / 50; /* 12 cents at either macro extreme; Q24 log2 */
+    int32_t cents_step = dirt * 590900 / 50; /* up to +/-100 cents per carrier spread step */
     fm6_copy_bytes(e, b, FP_SIZE + 1u);
     carriers = fm6_carriers(e[FP_ALG]);
 
-    p->mod_level = (macro_values[FM1LAB_MACRO_BRIGHTNESS] - 50) * (6 << 24) / 50;
-    p->feedback = (uint8_t)clamp_i32((int32_t)b[FP_FB] + dirt * 3 / 50, 0, 7);
+    /* BRIGHT is a broad FM-index sweep: +/-18 semitones around neutral.
+     * Use 64-bit arithmetic; the full-range product exceeds signed 32-bit. */
+    p->mod_level = (int32_t)(((int64_t)(macro_values[FM1LAB_MACRO_BRIGHTNESS] - 50) * (18LL << 24)) / 50);
+    p->feedback = (uint8_t)clamp_i32((int32_t)b[FP_FB] + dirt * 7 / 50, 0, 7);
 
-    /* MOTION is a neutral-at-50 multiplier on the patch's LFO speed and depth. */
-    e[FP_LFS] = (uint8_t)clamp_i32((int32_t)b[FP_LFS] * motion / 50, 0, 99);
-    e[FP_LPMD] = (uint8_t)clamp_i32((int32_t)b[FP_LPMD] * motion / 50, 0, 99);
-    e[FP_LAMD] = (uint8_t)clamp_i32((int32_t)b[FP_LAMD] * motion / 50, 0, 99);
+    /* MOTION keeps 50 neutral, spanning a quarter-speed crawl through 3x speed/depth. */
+    e[FP_LFS] = (uint8_t)clamp_i32((int32_t)b[FP_LFS] * motion_gain / 100, 0, 99);
+    e[FP_LPMD] = (uint8_t)clamp_i32((int32_t)b[FP_LPMD] * motion_gain / 100, 0, 99);
+    e[FP_LAMD] = (uint8_t)clamp_i32((int32_t)b[FP_LAMD] * motion_gain / 100, 0, 99);
 
     for (k = 0; k < 6u; k++) {
         uint32_t ki = 5u - k; /* UI order OP1..OP6; core storage is OP6..OP1. */
