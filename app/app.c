@@ -1911,6 +1911,14 @@ static void input(void)
         } else {
             uint32_t held=plat_ms()-ui.rec_t;ui.rec_t=0u;
             if(held<1000u || !FM1B_BLE) {
+                /* Commit any notes still held when REC is disarmed. Dropping
+                 * these active captures here used to silently lose the tail
+                 * of a sustained note if the user stopped recording first. */
+                if(seq_record_armed) {
+                    for(uint32_t key=0;key<NKEYS+128u;key++)
+                        if(seq_record_active[key])
+                            sequencer_record_release(key,seq_record_note[key]);
+                }
                 seq_record_armed^=1u;seq_record_last_step=255u;
                 for(uint32_t key=0;key<NKEYS+128u;key++)seq_record_active[key]=0u;
                 app_say("RECORD",seq_record_armed?"ARMED":"DISARMED");
