@@ -90,7 +90,24 @@ int main(void)
 {
     settings_t good, copy;
     make_valid(&good);
+    /* A sealed V10 settings record must round-trip the complete event model
+     * for both tracks, including overlapping notes and long sustained notes. */
+    good.performance.seq_event_count[0]=2u;
+    good.performance.seq_events[0][0]=(fm6_seq_event_t){0u,8u,60u,112u,25u};
+    good.performance.seq_events[0][1]=(fm6_seq_event_t){0u,8u,64u,96u,0u};
+    good.performance.seq_event_count[1]=1u;
+    good.performance.seq_events[1][0]=(fm6_seq_event_t){12u,20u,48u,100u,50u};
+    settings_seal(&good);
     assert(settings_valid(&good));
+    copy=good;
+    assert(memcmp(&copy,&good,sizeof good)==0);
+    copy.performance.seq_events[1][0].duration=0u;
+    settings_seal(&copy);
+    assert(!settings_valid(&copy));
+    copy=good;
+    copy.performance.seq_event_count[0]=129u;
+    settings_seal(&copy);
+    assert(!settings_valid(&copy));
     copy=good;copy.reserved=1u;settings_seal(&copy);
     assert(settings_valid(&copy)&&copy.reserved==1u);
     copy.reserved=2u;copy.crc=settings_crc16(&copy,offsetof(settings_t,crc));assert(settings_valid(&copy));
