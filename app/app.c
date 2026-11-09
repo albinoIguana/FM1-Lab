@@ -857,6 +857,11 @@ static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro)
 
 static void instrument_factory_capture(void)
 {
+    /* Seed the first factory slot explicitly: it must never inherit a generic,
+     * silent template that requires a later PRESET action to become playable. */
+    uint8_t first_voice[FM1LAB_PATCH_BYTES];
+    fm1lab_factory_voice_build(first_voice, 0u);
+    (void)fm6_patch_set_voice(0u, first_voice);
     fm1lab_instrument_init(&factory_instrument, "FACTORY");
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const uint8_t *voice = fm6_patch_data(p);
@@ -890,6 +895,7 @@ static void instrument_load(uint32_t index, int from_audio)
 {
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
+    uint8_t repaired_first_patch = 0u;
     int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
     if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
         current_instrument = candidate;
@@ -897,12 +903,24 @@ static void instrument_load(uint32_t index, int from_audio)
     } else {
         instrument_factory_defaults();
     }
+    /* Older valid library records can have an Instrument placeholder in patch 1:
+     * valid metadata and CRC, but no carrier output. Repair just that slot. */
+    if (!fm1lab_voice_has_audible_carrier(current_instrument.patches[0].voice)) {
+        uint8_t playable[FM1LAB_PATCH_BYTES];
+        uint8_t previous_level = current_instrument.patches[0].level;
+        fm1lab_factory_voice_build(playable, 0u);
+        if (fm1lab_patch_set_voice(&current_instrument, 0u, playable) == 0) {
+            current_instrument.patches[0].level = previous_level ? previous_level : 31u;
+            repaired_first_patch = 1u;
+        }
+    }
     instrument_index = (uint8_t)index;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     instrument_loaded = 1u;
-    instrument_dirty = 0u;
+    instrument_dirty = repaired_first_patch;
+    if (repaired_first_patch) set_dirty = 1u;
     instrument_sync_settings();
     if (from_audio == 1) {
         /* PRESET changes replace this lane's engine bank. The master chain
@@ -2580,7 +2598,8 @@ static void draw_home_panel(void)
 }
 static void draw_macro_panel(void)
 {
-    static const char *const names[4] = {"BRIGHT", "BODY", "MOTION", "EDGE"};
+    static const char *const names[4] = {"BRIGHT / FM INDEX", "BODY / HARMONICS", "MOTION / LFO", "EDGE / DETUNE"};
+    static const char *const hints[4] = {"DARK <-> BRIGHT", "SOFT <-> METALLIC", "STILL <-> WILD", "CLEAN <-> GRIT"};
     uint32_t now = plat_ms();
     uint16_t accent = patch_color(set.patch);
     char t[24];
@@ -2596,11 +2615,13 @@ static void draw_macro_panel(void)
         cv_rect(x + 9, y + 42, 98, 6, RGB(31, 43, 55));
         cv_rect(x + 9, y + 42, (int32_t)value * 98 / 100, 6, accent);
         cv_rect(x + 9 + (int32_t)value * 98 / 100, y + 39, 2, 12, C_WHITE);
+        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
     }
 }
 static void draw_instrument_macro_panel(void)
 {
-    static const char *const names[4] = {"BRIGHT", "BODY", "MOTION", "EDGE"};
+    static const char *const names[4] = {"BRIGHT / FM INDEX", "BODY / HARMONICS", "MOTION / LFO", "EDGE / DETUNE"};
+    static const char *const hints[4] = {"DARK <-> BRIGHT", "SOFT <-> METALLIC", "STILL <-> WILD", "CLEAN <-> GRIT"};
     const uint16_t accent = RGB(150,120,255);
     const uint32_t now = plat_ms();
     char t[24];
@@ -2617,6 +2638,7 @@ static void draw_instrument_macro_panel(void)
         cv_rect(x + 9 + 49, y + 40, 1, 10, C_GRAY);
         if (value >= 50u) cv_rect(x + 9 + 49, y + 42, (int32_t)(value - 50u) * 49 / 50, 6, accent);
         else cv_rect(x + 9 + (int32_t)value * 49 / 50, y + 42, (int32_t)(50u - value) * 49 / 50, 6, accent);
+        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
     }
 }
 /* Four operator quadrants; roles come from the selected algorithm's actual data. */
