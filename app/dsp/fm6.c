@@ -123,13 +123,7 @@ uint64_t fm6_test_fx_send_peak(uint32_t effect, uint32_t channel)
 uint32_t fm6_test_fx_saturations(void) { return fm6_test_fx_saturation_count; }
 uint32_t fm6_test_limiter_events(void) { return fm6_test_limiter_event_count; }
 uint64_t fm6_test_output_peak(void) { return fm6_test_output_peak_q23; }
-uint32_t fm6_test_sequencer_active_events(uint8_t lane)
-{
-    uint32_t count=0u;
-    if(lane>=2u)return 0u;
-    for(uint32_t i=0;i<seq_event_count[lane];i++)count+=seq_event_active[lane][i]!=0u;
-    return count;
-}
+
 #endif
 
 
@@ -144,6 +138,15 @@ static volatile fm6_step_t seq_pattern[2][64];
 static fm6_seq_event_t seq_events[2][FM6_SEQ_EVENTS_PER_LANE];
 static volatile uint8_t seq_event_count[2], seq_event_active[2][FM6_SEQ_EVENTS_PER_LANE];
 static volatile uint8_t seq_event_mode;
+#ifdef FM6_TEST
+uint32_t fm6_test_sequencer_active_events(uint8_t lane)
+{
+    uint32_t count=0u;
+    if(lane>=2u)return 0u;
+    for(uint32_t i=0;i<seq_event_count[lane];i++)count+=seq_event_active[lane][i]!=0u;
+    return count;
+}
+#endif
 static volatile uint8_t seq_lane_base[2] = {0u,4u}, seq_lane_instrument[2]={0u,0u}, seq_length=16u, seq_position, seq_running;
 static volatile uint8_t seq_start_pending, seq_stop_pending, arp_clear_pending, arp_reset_pending, seq_clear_pending[2];
 static volatile uint8_t seq_play_position, arp_play_position;
