@@ -1227,21 +1227,30 @@ void fm6_sequencer_set_running(uint8_t running) {
     if(!next&&seq_running) seq_stop_pending=1u;
     seq_running=next;
 }
-void fm6_sequencer_set_length(uint8_t steps) {
-    seq_length=steps<2u?2u:steps>64u?64u:steps;
-    if(seq_position>=seq_length) seq_position=0u;
-    if(seq_event_mode) for(uint32_t lane=0;lane<2u;lane++) {
+static void fm6_seq_event_trim(uint8_t length)
+{
+    if(!seq_event_mode)return;
+    for(uint32_t lane=0;lane<2u;lane++) {
         fm6_seq_event_release_lane(lane);
         uint32_t write=0u;
         for(uint32_t i=0;i<seq_event_count[lane];i++) {
             fm6_seq_event_t event=seq_events[lane][i];
-            if(event.start>=seq_length) continue;
-            uint32_t max_duration=(uint32_t)seq_length-event.start;
-            if(event.duration>max_duration) event.duration=(uint8_t)max_duration;
-            if(event.duration) seq_events[lane][write++]=event;
+            if(event.start>=length)continue;
+            uint32_t max_duration=(uint32_t)length-event.start;
+            if(event.duration>max_duration)event.duration=(uint8_t)max_duration;
+            if(event.duration)seq_events[lane][write++]=event;
         }
+        for(uint32_t i=write;i<FM6_SEQ_EVENTS_PER_LANE;i++)seq_event_active[lane][i]=0u;
         seq_event_count[lane]=(uint8_t)write;
     }
+}
+void fm6_sequencer_set_length(uint8_t steps) {
+    uint8_t next=steps<2u?2u:steps>64u?64u:steps;
+    if(next!=seq_length) {
+        seq_length=next;
+        fm6_seq_event_trim(seq_length);
+    }
+    if(seq_position>=seq_length)seq_position=0u;
 }
 void fm6_sequencer_set_lane(uint8_t lane,uint8_t patch_base) { if(lane<2u&&(patch_base==0u||patch_base==4u)) seq_lane_base[lane]=patch_base; }
 void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t note,uint8_t velocity,uint8_t gate) {
@@ -1400,7 +1409,11 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
      * Cold boot starts in legacy mode; event mode is entered explicitly by
      * fm6_sequencer_set_events after migration or recording. */
     transport_bpm=s->tempo_bpm;
-    seq_length=s->seq_length<2u?2u:s->seq_length>64u?64u:s->seq_length;
+    uint8_t next_length=s->seq_length<2u?2u:s->seq_length>64u?64u:s->seq_length;
+    if(next_length!=seq_length) {
+        seq_length=next_length;
+        fm6_seq_event_trim(seq_length);
+    }
     if(seq_position>=seq_length)seq_position=0u;
     for(uint32_t lane=0;lane<2u;lane++){
         seq_lane_instrument[lane]=s->lane_instrument[lane];
