@@ -216,6 +216,9 @@ int main(void) {
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))==0);
     render_chaos(100u,42u,80u,0u,chunk_b);
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
+    render_chaos(100u,42u,0u,0u,chunk_a);
+    render_chaos(100u,42u,100u,0u,chunk_b);
+    assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
     render_chaos(100u,100u,100u,4u,chunk_a);
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
     fm6_init();
