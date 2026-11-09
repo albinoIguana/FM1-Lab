@@ -99,6 +99,7 @@ static uint32_t fm6_comp_attack_alpha_q15, fm6_comp_release_alpha_q15;
 static uint32_t fm6_comp_makeup_gain_q15;
 static uint8_t fm6_chaos_amount, fm6_chaos_rate, fm6_chaos_tone, fm6_chaos_shape;
 static uint32_t fm6_chaos_phase, fm6_chaos_phase_inc, fm6_chaos_random=0x6d2b79f5u;
+static int32_t fm6_chaos_random_hold;
 static int32_t fm6_chaos_filter[2];
 
 
@@ -352,7 +353,7 @@ static int32_t fm6_chaos_wave(uint32_t phase)
     if(fm6_chaos_shape==1u)return tri;
     if(fm6_chaos_shape==2u)return (phase&0x80000000u)?-32768:32767;
     if(fm6_chaos_shape==3u)return (tri/8192)*8192;
-    if(fm6_chaos_shape==4u)return (int32_t)(fm6_chaos_random>>16)-32768;
+    if(fm6_chaos_shape==4u)return fm6_chaos_random_hold;
     if(fm6_chaos_shape==5u)return tri;
     return tri;
 }
@@ -365,7 +366,7 @@ static void fm6_chaos_process_channel(unsigned channel,int64_t *sample,int32_t m
     shaped=(shaped*drive)/100;
     shaped=fm6_chaos_fold(shaped);
     unsigned crush=1u+(unsigned)fm6_chaos_amount/10u;
-    shaped=(shaped>>crush)<<crush;
+    { int64_t quantum=(int64_t)1<<crush; shaped=(shaped/quantum)*quantum; }
     int32_t noise_gain=(int32_t)((uint32_t)fm6_chaos_amount*fm6_chaos_tone*Q24_ONE/10000u);
     shaped+=((int64_t)noise*noise_gain)>>15;
     uint32_t alpha=80u+(uint32_t)fm6_chaos_tone*2800u/100u;
@@ -384,7 +385,8 @@ static void fm6_chaos_process(int64_t *left,int64_t *right)
     int32_t wave=fm6_chaos_wave(fm6_chaos_phase);
     int32_t noise=(int32_t)(fm6_chaos_next_random()>>16)-32768;
     if(fm6_chaos_shape==4u) {
-        if(fm6_chaos_phase<old_phase)wave=noise;
+        if(fm6_chaos_phase<old_phase)fm6_chaos_random_hold=noise;
+        wave=fm6_chaos_random_hold;
     } else if(fm6_chaos_shape==5u) {
         wave=(wave*2+noise)/3;
         if((fm6_chaos_phase&0x000fffffu)<fm6_chaos_phase_inc)wave=-wave;
@@ -868,7 +870,7 @@ void fm6_init(void)
     fm6_comp_params_update();
     fm1lab_insert_state_init(&fm6_master_inserts);
     fm6_chaos_amount=0u;fm6_chaos_rate=42u;fm6_chaos_tone=55u;fm6_chaos_shape=0u;
-    fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;fm6_chaos_rate_update();
+    fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_random_hold=0;fm6_chaos_filter[0]=fm6_chaos_filter[1]=0;fm6_chaos_rate_update();
     fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
     fm6_zero_bytes(fm6_eq_x1,sizeof(fm6_eq_x1));fm6_zero_bytes(fm6_eq_x2,sizeof(fm6_eq_x2));
     fm6_zero_bytes(fm6_eq_y1,sizeof(fm6_eq_y1));fm6_zero_bytes(fm6_eq_y2,sizeof(fm6_eq_y2));
