@@ -67,7 +67,7 @@ typedef struct {
     uint8_t patch;
     uint8_t note;
     uint8_t used;
-    uint8_t source;
+    uint16_t source;
     uint8_t fade_in;
     uint8_t fade_out;
     int16_t tune16;
@@ -347,8 +347,8 @@ static int32_t fm6_sat_q23(int64_t x)
     return x > OUTPUT_LIMIT ? OUTPUT_LIMIT : x < -OUTPUT_LIMIT ? -OUTPUT_LIMIT : (int32_t)x;
 }
 static uint32_t fm6_step_period(void) { return (FM6_SAMPLE_RATE*60u)/((uint32_t)transport_bpm*4u); }
-static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint8_t source);
-static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint8_t source);
+static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint16_t source);
+static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint16_t source);
 static void fm6_transport_step(void)
 {
     seq_play_position=seq_position;
@@ -794,7 +794,7 @@ void fm6_panic(void)
     arp_amp_gain_q15=arp_amp_target_q15=32768;fm6_arp_macro_apply(0);
 }
 
-static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint8_t source)
+static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int16_t tune16,uint16_t source)
 {
     uint32_t i;
     if (note > 127u || !velocity)
@@ -847,6 +847,18 @@ void fm6_note_on_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int
 void fm6_note_on_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask)
 {
     fm6_note_on_tuned_mask(note, velocity, patch_mask, 0);
+}
+
+void fm6_sequencer_note_on(uint8_t note,uint8_t velocity,uint8_t patch_mask,uint16_t event_token)
+{
+    if(event_token<=3u)return;
+    fm6_note_start_tuned_mask(note,velocity,patch_mask,0,event_token);
+}
+
+void fm6_sequencer_note_off(uint8_t note,uint8_t patch_mask,uint16_t event_token)
+{
+    if(event_token<=3u)return;
+    fm6_note_off_source(note,patch_mask,event_token);
 }
 
 void fm6_note_on(uint8_t note, uint8_t velocity)
