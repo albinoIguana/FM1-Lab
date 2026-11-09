@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "fm6.h"
+#include "../app/fm1lab_sequencer_record.h"
 enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
 static int32_t output[TEST_WORDS];
 static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
@@ -187,6 +188,16 @@ static void render_compressor_stereo(uint8_t enabled,int32_t *destination)
 }
 
 int main(void) {
+    /* The app uses this exact helper when committing a held key as a note.
+     * Exercise taps, exact grid boundaries, round-up, zero tick, and loop edge. */
+    assert(fm1lab_recorded_note_duration(0u,100u,16u,0u)==1u);
+    assert(fm1lab_recorded_note_duration(100u,100u,16u,0u)==1u);
+    assert(fm1lab_recorded_note_duration(101u,100u,16u,0u)==2u);
+    assert(fm1lab_recorded_note_duration(300u,100u,16u,0u)==3u);
+    assert(fm1lab_recorded_note_duration(300u,0u,16u,0u)==64u);
+    assert(fm1lab_recorded_note_duration(5000u,100u,16u,14u)==2u);
+    assert(fm1lab_recorded_note_duration(100u,100u,16u,16u)==0u);
+    assert(fm1lab_recorded_note_duration(100u,100u,128u,0u)==64u);
     assert(fm6_patch_count() == FM6_ENGINE_PATCH_COUNT);
     fm6_init();
     assert(fm6_patch_enabled(0) == 1u && fm6_patch_enabled(1) == 1u &&
