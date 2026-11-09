@@ -3017,8 +3017,8 @@ static void draw_operator_workbench(uint8_t view)
         }
         cv_text(8,4,&FONT_XS,"OPERATOR EG  /  LEVEL OVER TIME",C_GRAY);
         cv_text(8,20,&FONT_B,fm1lab_voice_operator_is_carrier(voice,env_operator)?"CARRIER: OUTPUT":"MODULATOR: HARMONICS",accent);
-        cv_rect(12,132,216,1,C_GRAY);
-        cv_rect(12,35,1,98,C_DIM);
+        cv_rect(12,105,216,1,C_GRAY);
+        cv_rect(12,35,1,71,C_DIM);
         fm1lab_plot_line(px[0],py[3],px[1],py[0],accent);
         fm1lab_plot_line(px[1],py[0],px[2],py[1],accent);
         fm1lab_plot_line(px[2],py[1],px[3],py[2],accent);
@@ -3029,12 +3029,12 @@ static void draw_operator_workbench(uint8_t view)
             cv_text(px[i]-5,132,&FONT_B,t,accent);
             cv_text(px[i]-5,148,&FONT_XS,env_mode?"LEVEL":"RATE",C_GRAY);
             if(!env_mode) {
-                cv_rect(px[i]-10,190,28,3,C_LINE);
-                cv_rect(px[i]-10,190,(int32_t)rates[i]*28/99,3,accent);
+                cv_rect(px[i]-10,162,28,3,C_LINE);
+                cv_rect(px[i]-10,162,(int32_t)rates[i]*28/99,3,accent);
             }
         }
-        cv_text(8,202,&FONT_XS,env_mode?"SELECT: RATE / TARGET  |  K1-4 EDIT LEVEL":"SELECT: RATE / TARGET  |  K1-4 EDIT RATE",C_GRAY);
-        cv_text(8,218,&FONT_XS,"ALGO KNOB: CHOOSE OPERATOR",C_GRAY);
+        cv_text(8,175,&FONT_XS,env_mode?"SELECT: RATE / TARGET  |  K1-4 EDIT LEVEL":"SELECT: RATE / TARGET  |  K1-4 EDIT RATE",C_GRAY);
+        
     }
 }
 
