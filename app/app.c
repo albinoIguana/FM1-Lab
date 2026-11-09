@@ -2550,7 +2550,7 @@ static int algorithm_preview_active(void)
 static void draw_algorithm_diagram(void)
 {
     static const int16_t nx[6]={20,102,184,20,102,184};
-    static const int16_t ny[6]={39,39,39,89,89,89};
+    static const int16_t ny[6]={30,30,30,76,76,76};
     const uint8_t *voice=current_instrument.patches[set.patch].voice;
     uint8_t algorithm=1u;
     uint16_t accent=patch_color(set.patch);
@@ -2602,9 +2602,9 @@ static void draw_algorithm_diagram(void)
             carrier?accent:C_WHITE);
         cv_rect(nx[i]+3,ny[i]+22,30,1,carrier?accent:C_DIM);
     }
-    cv_text(8,126,&FONT_XS,"CARRIER",accent);
-    cv_text(75,126,&FONT_XS,"MODULATOR",C_GRAY);
-    cv_text(166,126,&FONT_XS,"SELECT: ALGORITHM",C_GRAY);
+    cv_text(8,113,&FONT_XS,"CARRIER",accent);
+    cv_text(75,113,&FONT_XS,"MODULATOR",C_GRAY);
+    cv_text(166,113,&FONT_XS,"ALGO: ROUTING",C_GRAY);
 }
 
 static int patch_name_is_factory(const char *name)
@@ -2996,12 +2996,21 @@ static void draw_operator_workbench(uint8_t view)
     uint16_t accent=patch_color(set.patch);
     char t[20];
     if(view==0u) {
+        uint8_t coarse=0u,fine=0u,output=0u,detune=0u;
         draw_algorithm_diagram();
-        cv_text(8,151,&FONT_XS,"SELECTED OPERATOR",C_GRAY);
-        cv_text(8,166,&FONT_B,env_operator==1u?"OP 1":env_operator==2u?"OP 2":
+        (void)fm1lab_voice_operator_get(voice,env_operator,FM1LAB_OP_COARSE,&coarse);
+        (void)fm1lab_voice_operator_get(voice,env_operator,FM1LAB_OP_FINE,&fine);
+        (void)fm1lab_voice_operator_get(voice,env_operator,FM1LAB_OP_OUTPUT,&output);
+        (void)fm1lab_voice_operator_get(voice,env_operator,FM1LAB_OP_DETUNE,&detune);
+        cv_text(8,128,&FONT_XS,env_operator==1u?"OP 1":env_operator==2u?"OP 2":
             env_operator==3u?"OP 3":env_operator==4u?"OP 4":env_operator==5u?"OP 5":"OP 6",accent);
-        cv_text(65,151,&FONT_XS,fm1lab_voice_operator_is_carrier(voice,env_operator)?"CARRIER / SOUND SOURCE":"MODULATOR / TONE SHAPER",C_WHITE);
-        cv_text(8,174,&FONT_XS,"ALGO: CHANGE ROUTING   SELECT: CHOOSE OP",C_GRAY);
+        cv_text(42,128,&FONT_XS,fm1lab_voice_operator_is_carrier(voice,env_operator)?
+            "CARRIER / SOUND SOURCE":"MODULATOR / TONE SHAPER",C_WHITE);
+        cv_text(8,145,&FONT_XS,"K1 COARSE",C_GRAY);int_text(coarse,t);cv_text(66,145,&FONT_B,t,accent);
+        cv_text(118,145,&FONT_XS,"K2 FINE",C_GRAY);int_text(fine,t);cv_text(169,145,&FONT_B,t,accent);
+        cv_text(8,160,&FONT_XS,"K3 OUTPUT",C_GRAY);int_text(output,t);cv_text(66,160,&FONT_B,t,accent);
+        cv_text(118,160,&FONT_XS,"K4 DETUNE",C_GRAY);int_text(detune,t);cv_text(169,160,&FONT_B,t,accent);
+        cv_text(8,174,&FONT_XS,"ALGO: ROUTING   SELECT: CHOOSE OP",C_GRAY);
     } else {
         static const char *const stages[4]={"ATTACK","DECAY 1","DECAY 2","RELEASE"};
         uint8_t rates[4]={0u},levels[4]={0u};
