@@ -59,7 +59,16 @@ class Fm1 extends AudioWorkletProcessor {
       this.sentWrites = this.ex.web_store_writes();
       this.ex.web_master(m.master ?? 2800);
       this.ex.web_boot();
+      // Prime the host simulation before the AudioContext starts rendering.
+      // This advances two 1024-frame blocks (~46 ms), enough for the first UI
+      // frame and startup ident to be drawn even on browsers that defer the
+      // first AudioWorklet process() callback until resume().
+      this.ex.web_render(1024);
+      this.ex.web_render(1024);
+      this.publish();
       this.port.postMessage({ type: "ready" });
+    } catch (err) {
+      this.port.postMessage({ type: "error", message: String(err && (err.stack || err.message) || err) });
     } else if (!this.ex) {
       return;
     } else if (m.type === "buttons") {
