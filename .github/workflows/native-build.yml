@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "app/**"
+      - "patches/**"
+      - "tools/generate_dx7_library.py"
       - "firmware/**"
       - "tests/**"
       - "docs/**"
@@ -45,6 +47,8 @@ jobs:
             raise SystemExit("Expected 240x144 or already-expanded 240x180 graphics canvas definition")
         p.write_text(source)
         PY
+        python3 tools/generate_dx7_library.py
+        git diff --exit-code -- app/fm1lab_dx7_data.h
         bash tests/test-fm6-engine.sh
         sh build.sh --release 0.1
         # Emit the real ELF section sizes. The linker has separate RAM,
