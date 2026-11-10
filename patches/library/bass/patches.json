@@ -180,7 +180,8 @@
         32,
         49,
         64
-      ]
+      ],
+      "original_name": "JH.SUSBS 1"
     },
     {
       "id": "DX7-002",
@@ -359,7 +360,8 @@
         32,
         50,
         64
-      ]
+      ],
+      "original_name": "JH.SUSBS 2"
     },
     {
       "id": "DX7-003",
@@ -538,7 +540,8 @@
         67,
         69,
         64
-      ]
+      ],
+      "original_name": "LOW -SPACE"
     },
     {
       "id": "DX7-004",
@@ -717,7 +720,8 @@
         35,
         49,
         64
-      ]
+      ],
+      "original_name": "SO*LOW! #1"
     },
     {
       "id": "DX7-005",
@@ -896,7 +900,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "SUPER BASS"
     },
     {
       "id": "DX7-006",
@@ -1075,7 +1080,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "SECRETBASS"
     },
     {
       "id": "DX7-007",
@@ -1254,7 +1260,8 @@
         32,
         50,
         64
-      ]
+      ],
+      "original_name": "SYN.BASS 2"
     },
     {
       "id": "DX7-008",
@@ -1433,7 +1440,8 @@
         69,
         32,
         64
-      ]
+      ],
+      "original_name": "TECH BASE"
     },
     {
       "id": "DX7-009",
@@ -1612,7 +1620,8 @@
         83,
         32,
         64
-      ]
+      ],
+      "original_name": "THUMPBASS"
     },
     {
       "id": "DX7-010",
@@ -1791,7 +1800,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "TIGHT BASS"
     },
     {
       "id": "DX7-011",
@@ -1970,7 +1980,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "THUMB BASS"
     },
     {
       "id": "DX7-012",
@@ -2149,7 +2160,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "THNDR BASS"
     },
     {
       "id": "DX7-013",
@@ -2328,7 +2340,8 @@
         83,
         32,
         64
-      ]
+      ],
+      "original_name": "TSUN BASS"
     },
     {
       "id": "DX7-014",
@@ -2507,7 +2520,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "TUBEBASS"
     },
     {
       "id": "DX7-015",
@@ -2686,7 +2700,8 @@
         69,
         49,
         64
-      ]
+      ],
+      "original_name": "UNCLE ABE1"
     },
     {
       "id": "DX7-016",
@@ -2865,7 +2880,8 @@
         69,
         50,
         64
-      ]
+      ],
+      "original_name": "UNCLE ABE2"
     },
     {
       "id": "DX7-017",
@@ -3044,7 +3060,8 @@
         122,
         122,
         64
-      ]
+      ],
+      "original_name": "Uncle Buzz"
     },
     {
       "id": "DX7-018",
@@ -3223,7 +3240,8 @@
         49,
         32,
         64
-      ]
+      ],
+      "original_name": "UncleAbe1"
     },
     {
       "id": "DX7-019",
@@ -3402,7 +3420,8 @@
         115,
         115,
         64
-      ]
+      ],
+      "original_name": "Lo~Hi-Bass"
     },
     {
       "id": "DX7-020",
@@ -3581,7 +3600,8 @@
         32,
         50,
         64
-      ]
+      ],
+      "original_name": "Lo~Hi-Bs 2"
     },
     {
       "id": "DX7-021",
@@ -3760,7 +3780,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "VIRGINBASS"
     },
     {
       "id": "DX7-022",
@@ -3939,7 +3960,8 @@
         46,
         55,
         64
-      ]
+      ],
+      "original_name": "WDBSS 28.7"
     },
     {
       "id": "DX7-023",
@@ -4118,7 +4140,8 @@
         82,
         87,
         64
-      ]
+      ],
+      "original_name": "WA BASS RW"
     },
     {
       "id": "DX7-024",
@@ -4297,7 +4320,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "WEEBLEBASS"
     },
     {
       "id": "DX7-025",
@@ -4476,7 +4500,8 @@
         115,
         115,
         64
-      ]
+      ],
+      "original_name": "Wilde Bass"
     },
     {
       "id": "DX7-026",
@@ -4655,7 +4680,8 @@
         83,
         83,
         64
-      ]
+      ],
+      "original_name": "WOBBLEBASS"
     },
     {
       "id": "DX7-027",
@@ -4834,7 +4860,8 @@
         83,
         49,
         64
-      ]
+      ],
+      "original_name": "WOOD BASS1"
     },
     {
       "id": "DX7-028",
@@ -5013,7 +5040,8 @@
         83,
         50,
         64
-      ]
+      ],
+      "original_name": "WOOD BASS2"
     },
     {
       "id": "DX7-029",
@@ -5192,7 +5220,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "X-BASS"
     },
     {
       "id": "DX7-030",
@@ -5371,7 +5400,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "YO MAMA"
     },
     {
       "id": "DX7-031",
@@ -5550,7 +5580,8 @@
         33,
         32,
         64
-      ]
+      ],
+      "original_name": "Yo Mama !"
     },
     {
       "id": "DX7-032",
@@ -5729,7 +5760,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "Z-BASS"
     }
   ]
 }

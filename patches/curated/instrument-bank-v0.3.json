@@ -21,7 +21,7 @@
         "JH.SUSBS 1",
         "JH.SUSBS 2",
         "LOW -SPACE",
-        "SO*LOW! #1"
+        "WIDE-BS01"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -127,8 +127,8 @@
       ],
       "patch_names": [
         "*Choir",
-        "*Choral",
-        "*Choral",
+        "GRIT-VC01",
+        "DENS-VC01",
         "*Chorus"
       ],
       "curation_status": "draft-un-auditioned"
@@ -180,10 +180,10 @@
         "CC0-MOOG-04"
       ],
       "patch_names": [
-        "MINI-MOOG",
+        "WIDE-AN01",
         "MINIMOOG 1",
         "MINIMOOG 2",
-        "MINIMOOG"
+        "GRIT-AN01"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -199,8 +199,8 @@
       ],
       "patch_names": [
         "OBER.db1",
-        "OBERHEIM",
-        "OBERHEIM",
+        "WIDE-AN56",
+        "WIDE-AN57",
         "OBERHEIM 3"
       ],
       "curation_status": "draft-un-auditioned"
@@ -216,10 +216,10 @@
         "CC0-ANALOG-ANALOG04SYX-24"
       ],
       "patch_names": [
-        "PROPH",
-        "PROPH",
+        "WIDE-AN60",
+        "WIDE-AN61",
         "PROPH 8",
-        "Prophet"
+        "WIDE-AN62"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -234,10 +234,10 @@
         "CC0-ANALOG-ANALOG_1SYX-17"
       ],
       "patch_names": [
-        "ANALOG BRT",
-        "ANALOG BRT",
-        "ANALOG BRT",
-        "ANALOG PAD"
+        "WIDE-AN44",
+        "WIDE-AN45",
+        "WIDE-AN46",
+        "WIDE-AN81"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -291,7 +291,7 @@
         "*Lead    1",
         "*Lead    2",
         "ANLOGLEAD1",
-        "DIGI-LEAD1"
+        "WIDE-LD08"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -306,10 +306,10 @@
         "CC0-LEAD-LEAD01SYX-12"
       ],
       "patch_names": [
-        "DX1 LEAD B",
+        "GRIT-LD01",
         "DX1 LEAD D",
-        "FAT LEAD",
-        "FAT LEAD"
+        "WIDE-LD10",
+        "WIDE-LD11"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -360,10 +360,10 @@
         "CC0-LEAD-LEAD02SYX-21"
       ],
       "patch_names": [
-        "SYN-LEAD 2",
-        "SYN-LEAD 2",
+        "GRIT-AN18",
+        "WIDE-LD07",
         "SYN-LEAD 3",
-        "SYN-LEAD 4"
+        "GRIT-AN19"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -453,7 +453,7 @@
         "*Sternenkl",
         "AMBIENCE..",
         "AnnaSubtl\\",
-        "ANALOG PAD"
+        "WIDE-AN82"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -469,8 +469,8 @@
       ],
       "patch_names": [
         "CHORUS PAD",
-        "CHROMA 26",
-        "CHROMA 26",
+        "WIDE-PD08",
+        "WIDE-PD09",
         "CHUNG KUO"
       ],
       "curation_status": "draft-un-auditioned"
@@ -486,10 +486,10 @@
         "CC0-PAD-PADS02SYX-08"
       ],
       "patch_names": [
-        "CIRRUS",
-        "CIRRUS",
+        "DENS-PD01",
+        "DENS-PD02",
         "CLOUDS",
-        "ConPad II"
+        "WIDE-PD10"
       ],
       "curation_status": "draft-un-auditioned"
     },
@@ -504,7 +504,7 @@
         "CC0-PAD-PADS02SYX-12"
       ],
       "patch_names": [
-        "ConPad II",
+        "WIDE-PD11",
         "CRIME PADS",
         "DARK PAD",
         "DHARMA"
@@ -541,8 +541,8 @@
       ],
       "patch_names": [
         "Slow3D Pad",
-        "SOFT TOUCH",
-        "SOFT TOUCH",
+        "WIDE-PD32",
+        "WIDE-PD33",
         "SPACE PAD"
       ],
       "curation_status": "draft-un-auditioned"

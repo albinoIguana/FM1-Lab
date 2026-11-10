@@ -178,7 +178,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "Beefkick"
     },
     {
       "id": "DX7-066",
@@ -355,7 +356,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "Buffkick"
     },
     {
       "id": "DX7-067",
@@ -532,7 +534,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "DoopKick"
     },
     {
       "id": "DX7-068",
@@ -709,7 +712,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "GubKik"
     },
     {
       "id": "DX7-069",
@@ -886,7 +890,8 @@
         101,
         32,
         64
-      ]
+      ],
+      "original_name": "MildSnare"
     },
     {
       "id": "DX7-070",
@@ -1063,7 +1068,8 @@
         101,
         32,
         64
-      ]
+      ],
+      "original_name": "ResoSnare"
     },
     {
       "id": "DX7-071",
@@ -1240,7 +1246,8 @@
         101,
         32,
         64
-      ]
+      ],
+      "original_name": "FaceSnare"
     },
     {
       "id": "DX7-072",
@@ -1417,7 +1424,8 @@
         114,
         101,
         64
-      ]
+      ],
+      "original_name": "GlassSnare"
     },
     {
       "id": "DX7-073",
@@ -1594,7 +1602,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "JunkHat"
     },
     {
       "id": "DX7-074",
@@ -1771,7 +1780,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "HolloHat"
     },
     {
       "id": "DX7-075",
@@ -1948,7 +1958,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "AuteHat"
     },
     {
       "id": "DX7-076",
@@ -2125,7 +2136,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "SwakHat"
     },
     {
       "id": "DX7-077",
@@ -2302,7 +2314,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "BublClap"
     },
     {
       "id": "DX7-078",
@@ -2479,7 +2492,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "AFXClap"
     },
     {
       "id": "DX7-079",
@@ -2656,7 +2670,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "ZapClap"
     },
     {
       "id": "DX7-080",
@@ -2833,7 +2848,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "RoboClap"
     },
     {
       "id": "DX7-081",
@@ -3010,7 +3026,8 @@
         107,
         32,
         64
-      ]
+      ],
+      "original_name": "InsectShk"
     },
     {
       "id": "DX7-082",
@@ -3187,7 +3204,8 @@
         107,
         32,
         64
-      ]
+      ],
+      "original_name": "SquirtShk"
     },
     {
       "id": "DX7-083",
@@ -3364,7 +3382,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "NzTri"
     },
     {
       "id": "DX7-084",
@@ -3541,7 +3560,8 @@
         116,
         108,
         64
-      ]
+      ],
+      "original_name": "TamboWhstl"
     },
     {
       "id": "DX7-085",
@@ -3718,7 +3738,8 @@
         121,
         32,
         64
-      ]
+      ],
+      "original_name": "Big Tommy"
     },
     {
       "id": "DX7-086",
@@ -3895,7 +3916,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "BussTom"
     },
     {
       "id": "DX7-087",
@@ -4072,7 +4094,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "NoiseTom"
     },
     {
       "id": "DX7-088",
@@ -4249,7 +4272,8 @@
         109,
         63,
         64
-      ]
+      ],
+      "original_name": "isThatTom?"
     },
     {
       "id": "DX7-089",
@@ -4426,7 +4450,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "Wump"
     },
     {
       "id": "DX7-090",
@@ -4603,7 +4628,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "Thump"
     },
     {
       "id": "DX7-091",
@@ -4780,7 +4806,8 @@
         112,
         32,
         64
-      ]
+      ],
+      "original_name": "DripChirp"
     },
     {
       "id": "DX7-092",
@@ -4957,7 +4984,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "FunBwow"
     },
     {
       "id": "DX7-093",
@@ -5134,7 +5162,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "Plasteel"
     },
     {
       "id": "DX7-094",
@@ -5311,7 +5340,8 @@
         32,
         32,
         64
-      ]
+      ],
+      "original_name": "PewPew"
     },
     {
       "id": "DX7-095",
@@ -5488,7 +5518,8 @@
         111,
         32,
         64
-      ]
+      ],
+      "original_name": "VeloBongo"
     },
     {
       "id": "DX7-096",
@@ -5665,7 +5696,8 @@
         105,
         32,
         64
-      ]
+      ],
+      "original_name": "BellsObvi"
     }
   ]
 }

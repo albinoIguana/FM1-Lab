@@ -177,7 +177,8 @@
         71,
         32,
         63
-      ]
+      ],
+      "original_name": "MINI-MOOG"
     },
     {
       "id": "CC0-MOOG-02",
@@ -353,7 +354,8 @@
         32,
         49,
         63
-      ]
+      ],
+      "original_name": "MINIMOOG 1"
     },
     {
       "id": "CC0-MOOG-03",
@@ -529,7 +531,8 @@
         32,
         50,
         63
-      ]
+      ],
+      "original_name": "MINIMOOG 2"
     },
     {
       "id": "CC0-MOOG-04",
@@ -705,7 +708,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "MINIMOOG"
     },
     {
       "id": "CC0-MOOG-05",
@@ -881,7 +885,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "AD. MOOG"
     },
     {
       "id": "CC0-MOOG-06",
@@ -1057,7 +1062,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "MOOG 2"
     },
     {
       "id": "CC0-MOOG-07",
@@ -1233,7 +1239,8 @@
         51,
         65,
         63
-      ]
+      ],
+      "original_name": "MOOG - 13A"
     },
     {
       "id": "CC0-MOOG-08",
@@ -1409,7 +1416,8 @@
         51,
         66,
         63
-      ]
+      ],
+      "original_name": "MOOG - 13B"
     },
     {
       "id": "CC0-MOOG-09",
@@ -1585,7 +1593,8 @@
         51,
         67,
         63
-      ]
+      ],
+      "original_name": "MOOG - 13C"
     },
     {
       "id": "CC0-MOOG-10",
@@ -1761,7 +1770,8 @@
         68,
         78,
         63
-      ]
+      ],
+      "original_name": "MOOG-13 DN"
     },
     {
       "id": "CC0-MOOG-11",
@@ -1937,7 +1947,8 @@
         46,
         51,
         63
-      ]
+      ],
+      "original_name": "MOOG *14.3"
     },
     {
       "id": "CC0-MOOG-12",
@@ -2113,7 +2124,8 @@
         32,
         49,
         63
-      ]
+      ],
+      "original_name": "MOOG-21  1"
     },
     {
       "id": "CC0-MOOG-13",
@@ -2289,7 +2301,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "MOOG-51"
     },
     {
       "id": "CC0-MOOG-14",
@@ -2465,7 +2478,8 @@
         32,
         50,
         63
-      ]
+      ],
+      "original_name": "MOOG-52  2"
     },
     {
       "id": "CC0-MOOG-15",
@@ -2641,7 +2655,8 @@
         32,
         51,
         63
-      ]
+      ],
+      "original_name": "MOOG-52  3"
     },
     {
       "id": "CC0-MOOG-16",
@@ -2817,7 +2832,8 @@
         77,
         79,
         63
-      ]
+      ],
+      "original_name": "MOOG-52 MO"
     },
     {
       "id": "CC0-MOOG-17",
@@ -2993,7 +3009,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "MOOG-BOB"
     },
     {
       "id": "CC0-MOOG-18",
@@ -3169,7 +3186,8 @@
         49,
         32,
         63
-      ]
+      ],
+      "original_name": "Mooger #1"
     },
     {
       "id": "CC0-MOOG-19",
@@ -3345,7 +3363,8 @@
         50,
         32,
         63
-      ]
+      ],
+      "original_name": "Mooger #2"
     },
     {
       "id": "CC0-MOOG-20",
@@ -3521,7 +3540,8 @@
         51,
         32,
         63
-      ]
+      ],
+      "original_name": "Mooger #3"
     },
     {
       "id": "CC0-MOOG-21",
@@ -3697,7 +3717,8 @@
         52,
         32,
         63
-      ]
+      ],
+      "original_name": "Mooger #4"
     },
     {
       "id": "CC0-MOOG-22",
@@ -3873,7 +3894,8 @@
         53,
         32,
         63
-      ]
+      ],
+      "original_name": "Mooger #5"
     },
     {
       "id": "CC0-MOOG-23",
@@ -4049,7 +4071,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "MOOGER 1"
     },
     {
       "id": "CC0-MOOG-24",
@@ -4225,7 +4248,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "MOOGER 2"
     },
     {
       "id": "CC0-MOOG-25",
@@ -4401,7 +4425,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "POLYMOOG"
     },
     {
       "id": "CC0-MOOG-26",
@@ -4577,7 +4602,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "MOOGER 4"
     },
     {
       "id": "CC0-MOOG-27",
@@ -4753,7 +4779,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "Mooger 5"
     },
     {
       "id": "CC0-MOOG-28",
@@ -4929,7 +4956,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "Mooger 6"
     },
     {
       "id": "CC0-MOOG-29",
@@ -5105,7 +5133,8 @@
         111,
         119,
         63
-      ]
+      ],
+      "original_name": "Mooger Low"
     },
     {
       "id": "CC0-MOOG-30",
@@ -5281,7 +5310,8 @@
         79,
         71,
         63
-      ]
+      ],
+      "original_name": "MOOOOOOOOG"
     },
     {
       "id": "CC0-MOOG-31",
@@ -5457,7 +5487,8 @@
         71,
         49,
         63
-      ]
+      ],
+      "original_name": "3OSC.MOOG1"
     },
     {
       "id": "CC0-MOOG-32",
@@ -5633,7 +5664,8 @@
         32,
         32,
         63
-      ]
+      ],
+      "original_name": "OLD MOOG"
     }
   ]
 }
