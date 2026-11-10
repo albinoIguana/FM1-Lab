@@ -2,6 +2,11 @@ name: Deploy native FM1 emulator
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "native-emulator/**"
+      - ".github/workflows/deploy-native-emulator.yml"
 
 permissions:
   actions: read
