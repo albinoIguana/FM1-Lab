@@ -7,6 +7,7 @@
 #include "plat.h"
 
 #define APP_NAME "FM1 LAB"
+#define APP_SPLASH
 #define APP_SPLASH_RGB RGB(42, 210, 184)
 #define APP_BLOCK 256u                   /* frames per audio block: 5.8 ms at 44.1 kHz */
 #define APP_OVERLOAD                    /* shed a voice gracefully when the measured render exceeds 90% */
@@ -39,6 +40,7 @@ uint32_t app_audio_cpu_pct(void);       /* measured, smoothed device render load
 uint32_t app_audio_xruns(void);          /* audio DMA deadline misses since boot */
 uint32_t app_audio_overload_shed_count(void); /* FM6 voices faded after overload callbacks */
 void app_panic(void);                    /* silence now (before an update rewrites the flash) */
+void app_splash(void);                  /* suppress the generic platform splash */
 void app_ui_init(void);                  /* the first screen, after the splash */
 void app_frame(void);                    /* the UI: input and a redraw, about 60 times a second */
 void app_input_only(void);               /* between frames: input only */
