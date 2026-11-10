@@ -152,7 +152,7 @@ static int audit_four_layer_instruments(void)
     int32_t output[SAMPLE_WORDS];
     unsigned limited_instruments = 0u;
 
-    printf("Four-layer Instrument mix audit (level 31, note 60, max master):\n");
+    printf("Four-layer Instrument mix audit (calibrated levels, note 60, max master):\n");
     for (unsigned instrument = 0; instrument < FM1LAB_DX7_INSTRUMENT_COUNT; ++instrument) {
         uint64_t mix_peak = 0u, dry_peak = 0u, sum_abs = 0u;
         fm6_init();
