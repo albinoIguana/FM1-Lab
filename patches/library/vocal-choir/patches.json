@@ -183,7 +183,7 @@
     },
     {
       "id": "DX7-034",
-      "name": "*Choral",
+      "name": "GRIT-VC01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -345,23 +345,24 @@
         0,
         4,
         24,
-        42,
+        71,
+        82,
+        73,
+        84,
+        45,
+        86,
         67,
-        104,
-        111,
-        114,
-        97,
-        108,
-        32,
-        32,
+        48,
+        49,
         32,
         64
       ],
-      "original_name": "*Choral"
+      "original_name": "*Choral",
+      "name_analysis": "heuristic-grit"
     },
     {
       "id": "DX7-035",
-      "name": "*Choral",
+      "name": "DENS-VC01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -523,19 +524,20 @@
         0,
         2,
         24,
-        42,
+        68,
+        69,
+        78,
+        83,
+        45,
+        86,
         67,
-        104,
-        111,
-        114,
-        97,
-        108,
-        32,
-        32,
+        48,
+        49,
         32,
         64
       ],
-      "original_name": "*Choral"
+      "original_name": "*Choral",
+      "name_analysis": "heuristic-dens"
     },
     {
       "id": "DX7-036",
@@ -1073,7 +1075,7 @@
     },
     {
       "id": "DX7-039",
-      "name": "CHOIR  24",
+      "name": "WIDE-VC01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -1235,23 +1237,24 @@
         4,
         1,
         12,
-        67,
-        72,
-        79,
+        87,
         73,
-        82,
-        32,
-        32,
-        50,
-        52,
+        68,
+        69,
+        45,
+        86,
+        67,
+        48,
+        49,
         32,
         64
       ],
-      "original_name": "CHOIR  24"
+      "original_name": "CHOIR  24",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-040",
-      "name": "CHOIR  24",
+      "name": "WIDE-VC02",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -1413,19 +1416,20 @@
         4,
         1,
         12,
-        67,
-        72,
-        79,
+        87,
         73,
-        82,
-        32,
-        32,
+        68,
+        69,
+        45,
+        86,
+        67,
+        48,
         50,
-        52,
         32,
         64
       ],
-      "original_name": "CHOIR  24"
+      "original_name": "CHOIR  24",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-041",
@@ -3387,7 +3391,7 @@
     },
     {
       "id": "DX7-052",
-      "name": "CHORUS   5",
+      "name": "WIDE-VC03",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -3549,23 +3553,24 @@
         4,
         2,
         24,
+        87,
+        73,
+        68,
+        69,
+        45,
+        86,
         67,
-        72,
-        79,
-        82,
-        85,
-        83,
+        48,
+        51,
         32,
-        32,
-        32,
-        53,
         64
       ],
-      "original_name": "CHORUS   5"
+      "original_name": "CHORUS   5",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-053",
-      "name": "CHORUS   5",
+      "name": "WIDE-VC04",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -3727,23 +3732,24 @@
         4,
         2,
         24,
+        87,
+        73,
+        68,
+        69,
+        45,
+        86,
         67,
-        72,
-        79,
-        82,
-        85,
-        83,
+        48,
+        52,
         32,
-        32,
-        32,
-        53,
         64
       ],
-      "original_name": "CHORUS   5"
+      "original_name": "CHORUS   5",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-054",
-      "name": "CHORUS   5",
+      "name": "WIDE-VC05",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -3905,19 +3911,20 @@
         0,
         4,
         12,
+        87,
+        73,
+        68,
+        69,
+        45,
+        86,
         67,
-        72,
-        79,
-        82,
-        85,
-        83,
-        32,
-        32,
-        32,
+        48,
         53,
+        32,
         64
       ],
-      "original_name": "CHORUS   5"
+      "original_name": "CHORUS   5",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-055",
@@ -4099,7 +4106,7 @@
     },
     {
       "id": "DX7-056",
-      "name": "CHORUS   7",
+      "name": "WIDE-VC06",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -4261,23 +4268,24 @@
         0,
         3,
         24,
+        87,
+        73,
+        68,
+        69,
+        45,
+        86,
         67,
-        72,
-        79,
-        82,
-        85,
-        83,
+        48,
+        54,
         32,
-        32,
-        32,
-        55,
         64
       ],
-      "original_name": "CHORUS   7"
+      "original_name": "CHORUS   7",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-057",
-      "name": "CHORUS   7",
+      "name": "WIDE-VC07",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -4439,19 +4447,20 @@
         0,
         3,
         24,
+        87,
+        73,
+        68,
+        69,
+        45,
+        86,
         67,
-        72,
-        79,
-        82,
-        85,
-        83,
-        32,
-        32,
-        32,
+        48,
         55,
+        32,
         64
       ],
-      "original_name": "CHORUS   7"
+      "original_name": "CHORUS   7",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-058",
