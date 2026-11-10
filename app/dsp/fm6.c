@@ -7,7 +7,6 @@
  * pools, and per-patch note allocation.
  */
 #include <stdint.h>
-#include <string.h>
 #include "fm6.h"
 #include "felucca_tables.h"
 #include "felucca_fm6.h"
@@ -37,7 +36,21 @@ static void fm6_copy_bytes(void *dst, const void *src, uint32_t n)
 }
 static void fm6_zero_bytes(void *dst, uint32_t n)
 {
-    memset(dst, 0, n);
+    /* The device's small standalone DSP unit has no string.h include path.
+     * Clear aligned words first, then any byte tail, to avoid a byte-at-a-time
+     * loop on the render path without relying on the C library. */
+    uint8_t *d = (uint8_t *)dst;
+    while (n && ((uintptr_t)d & 3u)) {
+        *d++ = 0u;
+        --n;
+    }
+    uint32_t *w = (uint32_t *)d;
+    while (n >= sizeof(*w)) {
+        *w++ = 0u;
+        n -= sizeof(*w);
+    }
+    d = (uint8_t *)w;
+    while (n--) *d++ = 0u;
 }
 
 #define PATCHES FM6_ENGINE_PATCH_COUNT
