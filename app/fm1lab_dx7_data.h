@@ -5,7 +5,8 @@
 #define FM1LAB_DX7_VOICE_COUNT 128u
 #define FM1LAB_DX7_Z85_BYTES 195u
 
-/* Generated from patches/curated/instrument-bank-v0.3.json.
+/* Emulator refresh: patch archive naming audit, 2026-11-10.
+ * Generated from patches/curated/instrument-bank-v0.3.json.
  * Patch source of truth: patches/library/ by audible sound family.
  * 128 voices / 32 four-patch instruments. Draft selections require listening.
  */
