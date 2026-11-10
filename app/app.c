@@ -1723,7 +1723,9 @@ void app_init(void)
     web_device_xruns = 0u;
 #endif
     fm6_init();
-    (void)plat_cpu2_set(1); /* optional second-core audio worker; fm1.toml enables safe fallback */
+#if defined(PLAT_WEB)
+    (void)plat_cpu2_set(1); /* browser model only; device CPU2 remains off pending hardware qualification */
+#endif
     settings_defaults();
     loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
     if (loaded == (int)sizeof set && settings_valid(&set)) {
