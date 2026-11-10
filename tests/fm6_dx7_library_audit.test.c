@@ -149,43 +149,47 @@ static int audit_single_voices(void)
 
 static int audit_four_layer_instruments(void)
 {
+    static const uint8_t test_notes[3] = {48u, 60u, 72u};
     int32_t output[SAMPLE_WORDS];
     unsigned limited_instruments = 0u;
 
-    printf("Four-layer Instrument mix audit (calibrated levels, note 60, max master):\n");
+    printf("Four-layer Instrument mix audit (factory levels, notes 48/60/72, velocity 127, max master):\n");
     for (unsigned instrument = 0; instrument < FM1LAB_DX7_INSTRUMENT_COUNT; ++instrument) {
         uint64_t mix_peak = 0u, dry_peak = 0u, sum_abs = 0u;
-        fm6_init();
-        for (unsigned patch = FM1LAB_PATCH_COUNT; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
-            fm6_patch_set_enabled(patch, 0u);
-        for (unsigned patch = 0u; patch < FM1LAB_PATCH_COUNT; ++patch) {
-            uint8_t voice[FM1LAB_PATCH_BYTES];
-            if (decode_voice(instrument * FM1LAB_PATCH_COUNT + patch, voice) != 0 ||
-                fm6_patch_set_voice(patch, voice) != 0) {
-                fprintf(stderr, "Instrument %u patch %u: decode/load failed\n",
-                        instrument + 1u, patch + 1u);
-                return 1;
+        uint32_t limiter_total = 0u;
+        for (unsigned note_index = 0; note_index < 3u; ++note_index) {
+            fm6_init();
+            for (unsigned patch = FM1LAB_PATCH_COUNT; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
+                fm6_patch_set_enabled(patch, 0u);
+            for (unsigned patch = 0u; patch < FM1LAB_PATCH_COUNT; ++patch) {
+                uint8_t voice[FM1LAB_PATCH_BYTES];
+                if (decode_voice(instrument * FM1LAB_PATCH_COUNT + patch, voice) != 0 ||
+                    fm6_patch_set_voice(patch, voice) != 0) {
+                    fprintf(stderr, "Instrument %u patch %u: decode/load failed\n",
+                            instrument + 1u, patch + 1u);
+                    return 1;
+                }
+                fm6_patch_set_enabled(patch, 1u);
+                fm6_patch_set_level(patch, fm1lab_dx7_instrument_level[instrument]);
             }
-            fm6_patch_set_enabled(patch, 1u);
-            fm6_patch_set_level(patch, fm1lab_dx7_instrument_level[instrument]);
-        }
-        fm6_render(output, BLOCK_FRAMES, 4096u);
-        fm6_note_on_mask(60u, 110u, 0x0fu);
-        for (unsigned block = 0; block < 86u; ++block) {
             fm6_render(output, BLOCK_FRAMES, 4096u);
-            if (fm6_test_dry_peak() > dry_peak) dry_peak = fm6_test_dry_peak();
-            for (unsigned sample = 0; sample < SAMPLE_WORDS; ++sample) {
-                uint64_t magnitude = abs_sample(output[sample]);
-                if (magnitude > mix_peak) mix_peak = magnitude;
-                sum_abs += magnitude;
+            fm6_note_on_mask(test_notes[note_index], 127u, 0x0fu);
+            for (unsigned block = 0; block < 86u; ++block) {
+                fm6_render(output, BLOCK_FRAMES, 4096u);
+                if (fm6_test_dry_peak() > dry_peak) dry_peak = fm6_test_dry_peak();
+                for (unsigned sample = 0; sample < SAMPLE_WORDS; ++sample) {
+                    uint64_t magnitude = abs_sample(output[sample]);
+                    if (magnitude > mix_peak) mix_peak = magnitude;
+                    sum_abs += magnitude;
+                }
             }
+            limiter_total += fm6_test_limiter_events();
         }
-        uint32_t limiter = fm6_test_limiter_events();
-        if (limiter) ++limited_instruments;
+        if (limiter_total) ++limited_instruments;
         printf("  %02u %-18.18s lvl=%u dry=%" PRIu64 " out=%" PRIu64 " mean=%" PRIu64 " lim=%" PRIu32 "\n",
                instrument + 1u, fm1lab_dx7_instrument_names[instrument],
                (unsigned)fm1lab_dx7_instrument_level[instrument],
-               dry_peak, mix_peak, sum_abs / (86u * SAMPLE_WORDS), limiter);
+               dry_peak, mix_peak, sum_abs / (3u * 86u * SAMPLE_WORDS), limiter_total);
     }
     printf("  instruments invoking limiter: %u/%u\n",
            limited_instruments, FM1LAB_DX7_INSTRUMENT_COUNT);
