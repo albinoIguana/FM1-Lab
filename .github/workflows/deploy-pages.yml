@@ -52,7 +52,8 @@ jobs:
           test -s native-emulator/index.html
           test -s native-emulator/app.wasm
           test -s native-emulator/worklet.js
-          cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js _site/native-emulator/\n          cp native-emulator/startup-lab.html _site/native-emulator/startup-lab.html
+          cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js _site/native-emulator/
+          cp native-emulator/startup-lab.html _site/native-emulator/startup-lab.html
       - name: Verify published native emulator payload
         run: |
           test -s _site/native-emulator/index.html
