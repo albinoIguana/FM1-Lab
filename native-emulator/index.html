@@ -656,6 +656,7 @@ async function switchOn() {
       node.port.onmessage = (e) => {
         const m = e.data;
         if (m.type === "ready") res();
+        else if (m.type === "error") rej(new Error(m.message || "FM1 worklet failed during boot"));
         else if (m.type === "frame") {
           if (m.fb) drawScreen(m.fb);
           drawLights(m.buttons, m.keys, m.dimButtons, m.dimKeys);
