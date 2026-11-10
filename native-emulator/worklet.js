@@ -29,6 +29,7 @@ class Fm1 extends AudioWorkletProcessor {
 
   async onMessage(m) {
     if (m.type === "load") {
+      try {
       // C's plat_ticks24()/clock_gettime are performance counters in the
       // host simulator, not the virtual audio timeline. Use monotonic wall
       // time so render and CPU2 spans can be measured inside this worklet.
