@@ -37,7 +37,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_FX_ROUTING, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -2063,8 +2063,8 @@ static void input(void)
         } else if (k == B_ARP) {
             ui.arp_hold_t=plat_ms();ui.arp_hold_fired=0u;
         } else if (k == B_FX) {
-            if (page < PAGE_FX_AMP || page > PAGE_FX_ROUTING) page = PAGE_FX_AMP;
-            else page = page == PAGE_FX_ROUTING ? PAGE_FX_AMP : (uint8_t)(page + 1u);
+            if (page < PAGE_FX_AMP || page > PAGE_FX_EQ) page = PAGE_FX_AMP;
+            else page = page >= PAGE_FX_EQ ? PAGE_FX_AMP : (uint8_t)(page + 1u);
             app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
         } else if (k == B_PLAY) {
             /* PLAY is a global transport toggle; the current page only
@@ -2236,18 +2236,12 @@ static void input(void)
             performance_publish();set_dirty=1u;
             app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
 
-        } else if (k == EN_ALGO && page == PAGE_FX_ROUTING) {
-            int32_t next=((int32_t)set.patch+e)%4;
-            if(next<0) next+=4;
-            set.patch=(uint8_t)next;
-            set_dirty=1u;
-            app_say("ROUTING PATCH",patch_display_name(set.patch));
         } else if (k == EN_ALGO && page == PAGE_FX_COMPRESSOR) {
             compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
             app_say("COMP MAKEUP","UPDATED");
-        } else if (k == EN_SELECT && page >= PAGE_FX_AMP && page <= PAGE_FX_ROUTING) {
+        } else if (k == EN_SELECT && page >= PAGE_FX_AMP && page <= PAGE_FX_EQ) {
             int32_t next = (int32_t)(page - PAGE_FX_AMP) + e;
-            next %= 8;
+            next %= 7;
             if (next < 0) next += 8;
             page = (uint8_t)(PAGE_FX_AMP + next);
             app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
@@ -2422,12 +2416,6 @@ static void input(void)
                 else if(e) arp_ui_step_gate[step]=(uint8_t)!arp_ui_step_gate[step];
                 performance_publish();set_dirty=1u;
                 app_say("ARP STEP", "UPDATED");
-            } else if (page == PAGE_FX_ROUTING) {
-                uint8_t fx=(uint8_t)index;
-                set.performance.fx_send[set.patch][fx]=(uint8_t)clamp((int32_t)set.performance.fx_send[set.patch][fx]+e,0,100);
-                performance_publish();
-                set_dirty=1u;
-                app_say("PATCH FX SEND",fx==0u?"CHORUS":fx==1u?"DELAY":fx==2u?"REVERB":"PHASER");
             } else if (page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
                 uint8_t fx=(uint8_t)(page-PAGE_FX_CHORUS);
                 if(index==0u) {
@@ -3332,16 +3320,19 @@ static void draw_sequencer_piano_panel(void)
     char value[20];
     const uint8_t lane=seq_ui_lane, first=(uint8_t)((seq_ui_step/16u)*16u);
     const uint16_t accent=patch_color(seq_ui_patch[lane]);
-    const int32_t gx=24, gy=28, gw=208, gh=72, cw=13, rh=3;
+    const int32_t gx=24, gy=26, gw=208, gh=72, cw=13, rh=3;
     const fm6_seq_event_t *selected=sequencer_selected_event();
     int32_t focus_note=selected?selected->pitch:60;
     int32_t low=focus_note-12;
     if(low<0)low=0;
     if(low>103)low=103;
     const int32_t high=low+23;
-    instrument_card(4,2,232,154,panel_fill(),accent,accent);
-    cv_text(12,8,&FONT_XS,lane?"TRACK 2  /  NOTES":"TRACK 1  /  NOTES",accent);
-    cv_text_fit(150,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE,78);
+    instrument_card(4,2,232,174,panel_fill(),accent,accent);
+
+    /* Track identity and Instrument name have separate, bounded fields. */
+    cv_text_fit(12,8,&FONT_XS,lane?"TRACK 2 / NOTES":"TRACK 1 / NOTES",accent,100);
+    cv_text_fit(120,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE,104);
+
     for(uint32_t row=0;row<24u;row++) {
         int32_t note=high-(int32_t)row, y=gy+(int32_t)row*rh;
         uint8_t pc=(uint8_t)(note%12);
@@ -3362,7 +3353,7 @@ static void draw_sequencer_piano_panel(void)
             cv_rect(x+5,gy,2,gh,RGB(242,212,59));
         if((col%4u)==0u) {
             int_text((int32_t)step+1,value);
-            cv_text(x+1,104,&FONT_XS,value,C_GRAY);
+            cv_text(x+1,101,&FONT_XS,value,C_GRAY);
         }
     }
     for(uint32_t i=0;i<seq_event_count[lane];i++) {
@@ -3386,20 +3377,25 @@ static void draw_sequencer_piano_panel(void)
             if(barw>1)cv_rect(x+barw-1,y,1,barh,C_WHITE);
         }
     }
-    cv_text(10,116,&FONT_XS,"NOTE",C_GRAY);
-    if(selected)int_text(selected->pitch,value);else {value[0]='-';value[1]='-';value[2]='\0';}
-    cv_text(36,116,&FONT_B,value,accent);
-    cv_text(68,116,&FONT_XS,"LEN",C_GRAY);
+
+    /* Two readout rows with fixed columns keep long values apart. */
+    cv_text(12,113,&FONT_XS,"NOTE",C_GRAY);
+    if(selected)int_text(selected->pitch,value);else {value[0]='-';value[1]='-';value[2]='\\0';}
+    cv_text(42,113,&FONT_B,value,accent);
+    cv_text(92,113,&FONT_XS,"LENGTH",C_GRAY);
     int_text(selected?selected->duration:0,value);
-    cv_text(91,116,&FONT_B,value,C_WHITE);
-    cv_text(122,116,&FONT_XS,"ACC",C_GRAY);
+    cv_text(142,113,&FONT_B,value,C_WHITE);
+
+    cv_text(12,128,&FONT_XS,"ACCENT",C_GRAY);
     int_text(selected?selected->accent:0,value);
-    cv_text(145,116,&FONT_B,value,C_WHITE);
-    cv_text(177,116,&FONT_XS,"VEL",C_GRAY);
+    cv_text(54,128,&FONT_B,value,C_WHITE);
+    cv_text(92,128,&FONT_XS,"VELOCITY",C_GRAY);
     int_text(selected?selected->velocity:0,value);
-    cv_text(200,116,&FONT_B,value,C_WHITE);
-    cv_text(8,137,&FONT_XS,"K1 LEN  K2 PITCH  K3 ACC  K4 VEL",C_GRAY);
-    cv_text(8,151,&FONT_XS,"SELECT NOTE   EDIT DELETE",C_WHITE);
+    cv_text(158,128,&FONT_B,value,C_WHITE);
+
+    cv_text_fit(12,145,&FONT_XS,"K1 LENGTH   K2 PITCH",C_GRAY,210);
+    cv_text_fit(12,159,&FONT_XS,"K3 ACCENT   K4 VELOCITY",C_GRAY,210);
+    cv_text_fit(12,173,&FONT_XS,"SELECT NOTE   EDIT DELETE",C_WHITE,210);
 }
 
 static void draw_save_panel(void)
@@ -3618,25 +3614,6 @@ static void draw_fx_panel(uint8_t fx)
     }
 }
 
-static void draw_fx_routing_panel(void)
-{
-    static const char *const names[FM6_FX_COUNT]={"CHORUS SEND","DELAY SEND","REVERB SEND","PHASER SEND"};
-    char t[16];
-    uint16_t accent=patch_color(set.patch);
-    for(uint32_t fx=0;fx<FM6_FX_COUNT;++fx) {
-        uint8_t value=fm6_fx_get_send(set.patch,(uint8_t)fx);
-        int32_t x=panel_grid_x(fx);
-        int32_t y=panel_grid_y(fx,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        uint16_t color=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
-        panel_grid_card(fx, UI_GRID_TOP, UI_GRID_ROW_STEP, color);
-        cv_text(x+7,y+6,&FONT_XS,names[fx],C_GRAY);
-        int_text(value,t);
-        cv_text(x+7,y+23,&FONT_B,t,color);
-        cv_rect(x+48,y+29,55,5,C_LINE);
-        cv_rect(x+48,y+29,(int32_t)value*55/100,5,color);
-    }
-}
-
 /* The top identity line is the current page title, not the instrument's
  * generic FACTORY storage name. Page accents carry through to the footer. */
 static const char *page_title(uint8_t current)
@@ -3662,7 +3639,6 @@ static const char *page_title(uint8_t current)
     case PAGE_FX_DELAY: return "DELAY";
     case PAGE_FX_REVERB: return "REVERB";
     case PAGE_FX_PHASER: return "PHASER";
-    case PAGE_FX_ROUTING: return "PATCH SENDS";
     case PAGE_INSTRUMENT_MACRO: return "INSTRUMENT MACROS";
     case PAGE_CHAOS: return "MAELSTROM";
     case PAGE_SAVE: return "SAVE INSTRUMENT";
@@ -3691,7 +3667,6 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_FX_DELAY: return RGB(85,160,255);
     case PAGE_FX_REVERB: return RGB(150,120,255);
     case PAGE_FX_PHASER: return RGB(227,75,210);
-    case PAGE_FX_ROUTING: return patch_color(set.patch);
     default: return C_GRAY;
     }
 }
@@ -3701,9 +3676,9 @@ static uint16_t page_accent(uint8_t current)
 static void page_counter(uint8_t current, char *out, uint32_t out_size)
 {
     uint32_t index = 1u, total = 1u;
-    if (current >= PAGE_FX_AMP && current <= PAGE_FX_ROUTING) {
+    if (current >= PAGE_FX_AMP && current <= PAGE_FX_EQ) {
         index = (uint32_t)(current - PAGE_FX_AMP) + 1u;
-        total = (uint32_t)(PAGE_FX_ROUTING - PAGE_FX_AMP) + 1u;
+        total = 7u;
     } else if (current == PAGE_LFO || current == PAGE_LFO_MOD) {
         index = (uint32_t)lfo_view + 1u;
         total = 5u;
@@ -3784,7 +3759,6 @@ static void draw(void)
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
     else if (page == PAGE_FX_PHASER) draw_fx_panel(3u);
-    else if (page == PAGE_FX_ROUTING) draw_fx_routing_panel();
     else draw_global_panel(pct);
     if(ui.delete_until && (int32_t)(ui.delete_until-plat_ms())>0)draw_delete_overlay();
     if(page==PAGE_SEQ && seq_clear_prompt)draw_seq_clear_prompt();
