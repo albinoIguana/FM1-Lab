@@ -36,6 +36,34 @@ jobs:
       build: |
         set -euo pipefail
         git submodule update --init --recursive base upstream/felucca
+        # Keep the upstream BSP and FM1 base warning-clean without carrying a fork.
+        # These two signed subtractions are promoted to int before the ternary's
+        # unsigned zero branch; make their intended uint32_t arithmetic explicit.
+        python3 - <<'PY'
+        from pathlib import Path
+
+        sense = Path("base/lib/sense.c")
+        source = sense.read_text()
+        fixes = {
+            "rel = k->dland > k->d ? k->dland - k->d : 0u;":
+            "rel = k->dland > k->d ? (uint32_t)k->dland - (uint32_t)k->d : 0u;",
+            "rel = k->v > k->floor_ ? k->v - k->floor_ : 0u;":
+            "rel = k->v > k->floor_ ? (uint32_t)k->v - (uint32_t)k->floor_ : 0u;",
+        }
+        for old, new in fixes.items():
+            if old not in source:
+                raise SystemExit(f"Expected upstream warning site not found: {old}")
+            source = source.replace(old, new, 1)
+        sense.write_text(source)
+
+        build = Path("base/tools/build.py")
+        source = build.read_text()
+        old = 'CFLAGS = ["-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]'
+        new = 'CFLAGS = ["-Werror", "-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]'
+        if old not in source:
+            raise SystemExit("Expected FM1 base CFLAGS definition not found")
+        build.write_text(source.replace(old, new, 1))
+        PY
         python3 - <<'PY'
         from pathlib import Path
         p = Path("base/device/gfx.c")

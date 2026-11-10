@@ -904,7 +904,8 @@ static void performance_publish(void)
     }
     if(seq_event_store_ready) {
         uint32_t length=set.performance.seq_length;
-        if(length<2u)length=2u;if(length>64u)length=64u;
+        if (length < 2u) length = 2u;
+        if (length > 64u) length = 64u;
         for(uint32_t lane=0;lane<2u;lane++) {
             uint32_t write=0u;
             for(uint32_t i=0;i<seq_event_count[lane];i++) {
@@ -1428,7 +1429,6 @@ static void sequencer_event_edit(uint8_t field,int delta)
 {
     fm6_seq_event_t *event=sequencer_selected_event();
     if(!event || !delta)return;
-    uint8_t lane=seq_ui_lane;
     if(field==0u) {
         /* K1 is expressed in whole sequencer steps (two engine ticks). */
         int32_t max=(int32_t)set.performance.seq_length*2-event->start;
@@ -2990,7 +2990,6 @@ static const char *patch_display_name(uint32_t patch)
     if (fm1lab_voice_name_get(current_instrument.patches[patch].voice,
                               display[patch]) == 0) {
         uint32_t n = fm1lab_strlen(display[patch]);
-        const char *instrument_name = instrument_display_name();
         int placeholder = fm1lab_strcmp(display[patch], "INSTRUMENT") == 0 ||
             fm1lab_strcmp(display[patch], "PATCH") == 0 ||
             fm1lab_strcmp(display[patch], "FACTORY") == 0 ||
@@ -3692,7 +3691,9 @@ static uint16_t arp_step_gradient_color(uint8_t accent, uint32_t band, uint32_t 
     uint32_t level=18u+((uint32_t)accent*progress*82u)/10000u;
     uint32_t r=20u+(207u*level)/100u, g=12u+(63u*level)/100u, b=34u+(176u*level)/100u;
     if(playing){r+=r/2u;g+=g/2u;b+=b/2u;}
-    if(r>255u)r=255u;if(g>255u)g=255u;if(b>255u)b=255u;
+    if (r > 255u) r = 255u;
+    if (g > 255u) g = 255u;
+    if (b > 255u) b = 255u;
     return RGB(r,g,b);
 }
 static void draw_arp_latch_panel(void)
@@ -3800,7 +3801,6 @@ static void draw_seq_clear_prompt(void)
 
 static void draw_fx_panel(uint8_t fx)
 {
-    static const char *const names[4]={"CHORUS","DELAY","REVERB","PHASER"};
     static const char *const types[3]={"ROOM","HALL","PLATE"};
     char t[16];
     uint16_t accent=fx==0u?RGB(36,215,232):fx==1u?RGB(227,75,210):fx==2u?RGB(242,212,59):RGB(85,190,255);
@@ -3922,7 +3922,7 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
 static void draw(void)
 {
     char t[24];
-    uint32_t now = plat_ms(), pct = plat_master() * 100u / 4096u;
+    uint32_t pct = plat_master() * 100u / 4096u;
     uint16_t accent = page_accent(page);
     cv_begin(240, 37, screen_bg());
 
