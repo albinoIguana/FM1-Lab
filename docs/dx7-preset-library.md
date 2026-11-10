@@ -1,33 +1,39 @@
 # Curated DX7 preset library
 
-The active factory library contains **32 Instruments / 128 six-operator patches**. Each Instrument is four consecutive DX7 voices, converted from standard 32-voice DX7 SysEx VMEM banks into the FM1-Lab 156-byte voice format.
+The **archive source of truth** is `patches/`: 896 individual six-operator voices organized by sound family, with stable IDs, original names, source-bank provenance, licensing and converted 156-byte voice data. See `patches/README.md` and `patches/catalog/patches.csv`.
 
-## Sources and license
+The active FM1 factory selection is **32 Instruments / 128 voices**, generated from `patches/curated/instrument-bank-v0.2.json` and compiled into `app/fm1lab_dx7_data.h`. Each Instrument contains four voices.
 
-All source files below come from [visualizersdotnl/Yamaha-DX7-patch-library](https://github.com/visualizersdotnl/Yamaha-DX7-patch-library), whose repository declares **CC0-1.0**. The source archive describes itself as a preservation collection of freely shared DX7 patch banks. The converted data is retained in `app/fm1lab_dx7_data.h`.
+## Current factory balance
 
-- Bass: `!Instruments/Plucked/Bass/BASS_05.SYX` (voices 6, 7, 14), `BASS_07.SYX` (voice 27), and `BASS_09.SYX` (voices 1–16 and 18–29).
-- Choir: `!Instruments/Voice/Choir/CHOIR01.SYX` (all 32 voices).
-- FM rhythm: `Yamaha-DX7-Drum-Sounds-Coffeeshopped/DX7-Cfshpd-Drum-Voices.syx` (all 32 voices).
-- Synth percussion: `!Instruments/Percussion/Synth Drums/SYNDR01.SYX` (all 32 voices).
+| Slots | Family | Instruments | Voices |
+|---|---|---:|---:|
+| 01–08 | Bass / sub | 8 | 32 |
+| 09–16 | Choir / vocal layers | 8 | 32 |
+| 17 | FM rhythm | 1 | 4 |
+| 18 | Synth percussion | 1 | 4 |
+| 19–22 | Analog-like FM | 4 | 16 |
+| 23–26 | Leads | 4 | 16 |
+| 27–30 | Pads / strings | 4 | 16 |
+| 31–32 | Resonant / motion | 2 | 8 |
+| **Total** |  | **32** | **128** |
 
-## Instrument map
+This keeps the eight bass and eight choral sets, cuts the redundant percussion factory slots to one FM Rhythm and one Synth Perc instrument, and reallocates the remaining fourteen instruments to analog-like voices, leads, pads and motion-oriented sounds.
 
-| Slots | Collection | Purpose |
-|---|---|---|
-| 01–08 | FM BASS | Includes a dedicated sub-focused Instrument in slot 01, plus synth, punchy, moving and plucked basses |
-| 09–16 | CHORAL LAYERS | Choir, chorus and sustained vocal textures for layering |
-| 17–24 | FM RHYTHM | Kicks, snares, hats, toms and tuned/percussive FM hits |
-| 25–32 | SYNTH PERC | Electronic drums, Simmons-style toms, claps and synthetic percussion |
+## Naming
 
-Slot 01 begins with **JH.SUSBS 1**, **JH.SUSBS 2**, **LOW -SPACE**, and **SO*LOW! #1**. These are source patch names, not newly synthesized replacements.
+Home titles are derived from the first patch's original DX7 voice name (ten-character DX7 name field), rather than the source folder or bank category. The curated label remains in the selection manifest as an editorial fallback.
 
-## Patch descriptions
+## Sources and licensing
 
-The short descriptions shown on the Home cards are FM1-Lab's own role hints inferred from the patch names and source bank category. They are not claims that the original archive supplied detailed author notes. Original ten-character DX7 voice names are preserved in the patch data.
+The initial 128 voices came from selected banks in [visualizersdotnl/Yamaha-DX7-patch-library](https://github.com/visualizersdotnl/Yamaha-DX7-patch-library), which declares CC0-1.0. The 768 added voices were imported from 24 additional 32-voice banks in the same CC0 collection: Analog, MOOG, Lead, Synth Pads and Synth Resonant categories.
+
+Other promising banks are documented in `patches/catalog/SOURCES.md`. Some modern collections are non-redistributable or commercial, so the repository records their metadata and import status without mirroring their patch data.
+
+## Curation status
+
+The archive and factory selection are structurally valid, but the new selections are **provisional and awaiting listening tests**. The source folders are only initial family hints. Before calling the bank fully curated, audition voices across registers and velocities, check loudness/headroom, compare near-duplicates, and retag by actual sound character. In particular, confirm which candidates truly deliver shimmering leads, warm analog-like movement, clean techno weight, and industrial aggression.
 
 ## Migration behavior
 
-At startup, the library seeder replaces untouched factory placeholders and exact previous Digitone/factory seed Instruments with this DX7 collection. It does not overwrite renamed or edited user Instruments. The previous Digitone source data remains in the repository as a migration reference; it is no longer part of the active preset browser.
-
-PRESET now always cycles the 32 four-patch Instruments, including when a patch is focused. This removes the old Home-screen behavior where PRESET switched to a separate 16-entry M-VAVE recipe list and made the main library difficult to discover.
+The previous 32-instrument DX7 factory data is retained in `app/fm1lab_dx7_legacy_data.h` solely for exact-match migration detection. On startup, untouched old DX7 defaults can be replaced by the new 32-instrument selection. Renamed or edited user instruments are preserved.
