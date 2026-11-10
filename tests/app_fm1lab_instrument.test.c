@@ -1,0 +1,61 @@
+#include "../app/fm1lab_instrument.h"
+
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+
+int main(void)
+{
+    fm1lab_instrument_t instrument;
+    uint8_t voice[FM1LAB_PATCH_BYTES];
+    uint8_t expected[FM1LAB_PATCH_BYTES];
+    fm1lab_patch_t before[FM1LAB_PATCH_COUNT];
+
+    fm1lab_instrument_init(&instrument, "REPLACE TEST");
+    for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        memset(voice, (int)(p + 1u), sizeof voice);
+        voice[134] = (uint8_t)p;
+        voice[135] = (uint8_t)p;
+        voice[155] = 64u;
+        assert(fm1lab_patch_set_voice(&instrument, p, voice) == 0);
+        instrument.patches[p].level = (uint8_t)(30u + p);
+    }
+
+    instrument.patches[2].level = 73u;
+    instrument.patches[2].enabled = 0u;
+    instrument.patches[2].octave = -2;
+    instrument.patches[2].fine_cents = -25;
+    instrument.patches[2].macros[0] = 11u;
+    instrument.patches[2].macros[1] = 22u;
+    instrument.patches[2].macros[2] = 33u;
+    instrument.patches[2].macros[3] = 44u;
+    fm1lab_patch_set_pan(&instrument, 2u, 91u);
+    for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p)
+        before[p] = instrument.patches[p];
+
+    memset(voice, 17, sizeof voice);
+    voice[134] = 18u;
+    voice[135] = 5u;
+    voice[155] = 12u;
+    memcpy(expected, voice, sizeof expected);
+    expected[155] = 91u;
+
+    assert(fm1lab_patch_replace_voice(&instrument, 2u, voice) == 0);
+    for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        if (p != 2u)
+            assert(memcmp(&instrument.patches[p], &before[p], sizeof(fm1lab_patch_t)) == 0);
+    }
+    assert(memcmp(instrument.patches[2].voice, expected, FM1LAB_PATCH_BYTES) == 0);
+    assert(instrument.patches[2].level == 73u);
+    assert(instrument.patches[2].enabled == 0u);
+    assert(instrument.patches[2].octave == -2);
+    assert(instrument.patches[2].fine_cents == -25);
+    assert(instrument.patches[2].macros[0] == 11u);
+    assert(instrument.patches[2].macros[1] == 22u);
+    assert(instrument.patches[2].macros[2] == 33u);
+    assert(instrument.patches[2].macros[3] == 44u);
+    assert(fm1lab_patch_pan(&instrument, 2u) == 91u);
+    assert(fm1lab_instrument_valid(&instrument));
+    assert(fm1lab_patch_replace_voice(&instrument, 4u, voice) == -1);
+    return 0;
+}

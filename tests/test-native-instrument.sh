@@ -9,7 +9,8 @@ RUNTIME_BIN="$(mktemp)"
 SEQUENCER_BIN="$(mktemp)"
 SETTINGS_BIN="$(mktemp)"
 PRESET_BIN="$(mktemp)"
-trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN" "$PRESET_BIN"' EXIT
+APP_INSTRUMENT_BIN="$(mktemp)"
+trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN" "$PRESET_BIN" "$APP_INSTRUMENT_BIN"' EXIT
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/tests/fm1lab_instrument.test.c" -o "$INSTRUMENT_BIN"
@@ -27,6 +28,12 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" \
   "$ROOT/tests/fm1lab_preset_control.test.c" -o "$PRESET_BIN"
 "$PRESET_BIN"
 echo "FM1-Lab Instrument/patch preset focus tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror \
+  "$ROOT/app/fm1lab_instrument.c" "$ROOT/tests/app_fm1lab_instrument.test.c" \
+  -o "$APP_INSTRUMENT_BIN"
+"$APP_INSTRUMENT_BIN"
+echo "FM1-Lab app-side patch replacement isolation tests passed."
 
 cc -std=c11 -Wall -Wextra -Werror \
   -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
