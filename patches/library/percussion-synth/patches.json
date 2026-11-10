@@ -1429,7 +1429,7 @@
     },
     {
       "id": "DX7-105",
-      "name": "E. DRUMS 2",
+      "name": "GRIT-PS01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -1591,23 +1591,24 @@
         5,
         7,
         24,
-        69,
-        46,
-        32,
-        68,
+        71,
         82,
-        85,
-        77,
+        73,
+        84,
+        45,
+        80,
         83,
+        48,
+        49,
         32,
-        50,
         64
       ],
-      "original_name": "E. DRUMS 2"
+      "original_name": "E. DRUMS 2",
+      "name_analysis": "heuristic-grit"
     },
     {
       "id": "DX7-106",
-      "name": "E. DRUMS 2",
+      "name": "GRIT-PS02",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -1769,19 +1770,20 @@
         5,
         7,
         24,
-        69,
-        46,
-        32,
-        68,
+        71,
         82,
-        85,
-        77,
+        73,
+        84,
+        45,
+        80,
         83,
-        32,
+        48,
         50,
+        32,
         64
       ],
-      "original_name": "E. DRUMS 2"
+      "original_name": "E. DRUMS 2",
+      "name_analysis": "heuristic-grit"
     },
     {
       "id": "DX7-107",
@@ -4811,7 +4813,7 @@
     },
     {
       "id": "DX7-124",
-      "name": "Simmons",
+      "name": "WIDE-PS01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -4973,23 +4975,24 @@
         1,
         5,
         12,
+        87,
+        73,
+        68,
+        69,
+        45,
+        80,
         83,
-        105,
-        109,
-        109,
-        111,
-        110,
-        115,
-        32,
-        32,
+        48,
+        49,
         32,
         64
       ],
-      "original_name": "Simmons"
+      "original_name": "Simmons",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-125",
-      "name": "SIMMONS",
+      "name": "GRIT-PS03",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -5151,23 +5154,24 @@
         0,
         3,
         12,
-        83,
+        71,
+        82,
         73,
-        77,
-        77,
-        79,
-        78,
+        84,
+        45,
+        80,
         83,
-        32,
-        32,
+        48,
+        51,
         32,
         64
       ],
-      "original_name": "SIMMONS"
+      "original_name": "SIMMONS",
+      "name_analysis": "heuristic-grit"
     },
     {
       "id": "DX7-126",
-      "name": "SIMMONS",
+      "name": "WIDE-PS02",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -5329,19 +5333,20 @@
         0,
         3,
         0,
-        83,
+        87,
         73,
-        77,
-        77,
-        79,
-        78,
+        68,
+        69,
+        45,
+        80,
         83,
-        32,
-        32,
+        48,
+        50,
         32,
         64
       ],
-      "original_name": "SIMMONS"
+      "original_name": "SIMMONS",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-127",
