@@ -17,6 +17,7 @@ on:
       - ".github/workflows/native-build.yml"
       - ".github/workflows/deploy-pages.yml"
       - "scripts/build-web-installer.py"
+      - "native-emulator/**"
   pull_request:
     branches: [main]
   workflow_dispatch:
