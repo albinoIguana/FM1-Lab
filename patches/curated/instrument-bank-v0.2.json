@@ -1,0 +1,554 @@
+{
+  "schema_version": 1,
+  "version": "0.2",
+  "description": "First-pass 32-instrument factory selection sourced from the patch archive. All imported voices require user audition; Home titles are derived from the first voice's original name.",
+  "selection_status": "provisional;awaiting-audition",
+  "instrument_count": 32,
+  "voice_count": 128,
+  "instruments": [
+    {
+      "slot": 1,
+      "category": "bass",
+      "label": "Bass 01",
+      "patch_ids": [
+        "DX7-001",
+        "DX7-002",
+        "DX7-003",
+        "DX7-004"
+      ],
+      "patch_names": [
+        "JH.SUSBS 1",
+        "JH.SUSBS 2",
+        "LOW -SPACE",
+        "SO*LOW! #1"
+      ]
+    },
+    {
+      "slot": 2,
+      "category": "bass",
+      "label": "Bass 02",
+      "patch_ids": [
+        "DX7-005",
+        "DX7-006",
+        "DX7-007",
+        "DX7-008"
+      ],
+      "patch_names": [
+        "SUPER BASS",
+        "SECRETBASS",
+        "SYN.BASS 2",
+        "TECH BASE"
+      ]
+    },
+    {
+      "slot": 3,
+      "category": "bass",
+      "label": "Bass 03",
+      "patch_ids": [
+        "DX7-009",
+        "DX7-010",
+        "DX7-011",
+        "DX7-012"
+      ],
+      "patch_names": [
+        "THUMPBASS",
+        "TIGHT BASS",
+        "THUMB BASS",
+        "THNDR BASS"
+      ]
+    },
+    {
+      "slot": 4,
+      "category": "bass",
+      "label": "Bass 04",
+      "patch_ids": [
+        "DX7-013",
+        "DX7-014",
+        "DX7-015",
+        "DX7-016"
+      ],
+      "patch_names": [
+        "TSUN BASS",
+        "TUBEBASS",
+        "UNCLE ABE1",
+        "UNCLE ABE2"
+      ]
+    },
+    {
+      "slot": 5,
+      "category": "bass",
+      "label": "Bass 05",
+      "patch_ids": [
+        "DX7-017",
+        "DX7-018",
+        "DX7-019",
+        "DX7-020"
+      ],
+      "patch_names": [
+        "Uncle Buzz",
+        "UncleAbe1",
+        "Lo~Hi-Bass",
+        "Lo~Hi-Bs 2"
+      ]
+    },
+    {
+      "slot": 6,
+      "category": "bass",
+      "label": "Bass 06",
+      "patch_ids": [
+        "DX7-021",
+        "DX7-022",
+        "DX7-023",
+        "DX7-024"
+      ],
+      "patch_names": [
+        "VIRGINBASS",
+        "WDBSS 28.7",
+        "WA BASS RW",
+        "WEEBLEBASS"
+      ]
+    },
+    {
+      "slot": 7,
+      "category": "bass",
+      "label": "Bass 07",
+      "patch_ids": [
+        "DX7-025",
+        "DX7-026",
+        "DX7-027",
+        "DX7-028"
+      ],
+      "patch_names": [
+        "Wilde Bass",
+        "WOBBLEBASS",
+        "WOOD BASS1",
+        "WOOD BASS2"
+      ]
+    },
+    {
+      "slot": 8,
+      "category": "bass",
+      "label": "Bass 08",
+      "patch_ids": [
+        "DX7-029",
+        "DX7-030",
+        "DX7-031",
+        "DX7-032"
+      ],
+      "patch_names": [
+        "X-BASS",
+        "YO MAMA",
+        "Yo Mama !",
+        "Z-BASS"
+      ]
+    },
+    {
+      "slot": 9,
+      "category": "vocal-choir",
+      "label": "Choir 01",
+      "patch_ids": [
+        "DX7-033",
+        "DX7-034",
+        "DX7-035",
+        "DX7-036"
+      ],
+      "patch_names": [
+        "*Choir",
+        "*Choral",
+        "*Choral",
+        "*Chorus"
+      ]
+    },
+    {
+      "slot": 10,
+      "category": "vocal-choir",
+      "label": "Choir 02",
+      "patch_ids": [
+        "DX7-037",
+        "DX7-038",
+        "DX7-039",
+        "DX7-040"
+      ],
+      "patch_names": [
+        "<I> Choir",
+        "CH0R 3   A",
+        "CHOIR  24",
+        "CHOIR  24"
+      ]
+    },
+    {
+      "slot": 11,
+      "category": "vocal-choir",
+      "label": "Choir 03",
+      "patch_ids": [
+        "DX7-041",
+        "DX7-042",
+        "DX7-043",
+        "DX7-044"
+      ],
+      "patch_names": [
+        "CHOIR 1A",
+        "CHOIR 1B",
+        "ChoirFifth",
+        "CHOR"
+      ]
+    },
+    {
+      "slot": 12,
+      "category": "vocal-choir",
+      "label": "Choir 04",
+      "patch_ids": [
+        "DX7-045",
+        "DX7-046",
+        "DX7-047",
+        "DX7-048"
+      ],
+      "patch_names": [
+        "CHOR 4   A",
+        "CHORAL 2",
+        "CHORAL EM",
+        "CHORUS   1"
+      ]
+    },
+    {
+      "slot": 13,
+      "category": "vocal-choir",
+      "label": "Choir 05",
+      "patch_ids": [
+        "DX7-049",
+        "DX7-050",
+        "DX7-051",
+        "DX7-052"
+      ],
+      "patch_names": [
+        "CHORUS   2",
+        "CHORUS   3",
+        "CHORUS   4",
+        "CHORUS   5"
+      ]
+    },
+    {
+      "slot": 14,
+      "category": "vocal-choir",
+      "label": "Choir 06",
+      "patch_ids": [
+        "DX7-053",
+        "DX7-054",
+        "DX7-055",
+        "DX7-056"
+      ],
+      "patch_names": [
+        "CHORUS   5",
+        "CHORUS   5",
+        "CHORUS   6",
+        "CHORUS   7"
+      ]
+    },
+    {
+      "slot": 15,
+      "category": "vocal-choir",
+      "label": "Choir 07",
+      "patch_ids": [
+        "DX7-057",
+        "DX7-058",
+        "DX7-059",
+        "DX7-060"
+      ],
+      "patch_names": [
+        "CHORUS   7",
+        "CHORUS   9",
+        "CHORWULF",
+        "DX CHOIR"
+      ]
+    },
+    {
+      "slot": 16,
+      "category": "vocal-choir",
+      "label": "Choir 08",
+      "patch_ids": [
+        "DX7-061",
+        "DX7-062",
+        "DX7-063",
+        "DX7-064"
+      ],
+      "patch_names": [
+        "F. CHOIR",
+        "F.CHORUS 1",
+        "F.CHORUS 2",
+        "F.CHORUS 3"
+      ]
+    },
+    {
+      "slot": 17,
+      "category": "percussion-fm",
+      "label": "FM Rhythm",
+      "patch_ids": [
+        "DX7-065",
+        "DX7-066",
+        "DX7-067",
+        "DX7-068"
+      ],
+      "patch_names": [
+        "Beefkick",
+        "Buffkick",
+        "DoopKick",
+        "GubKik"
+      ]
+    },
+    {
+      "slot": 18,
+      "category": "percussion-synth",
+      "label": "Synth Perc",
+      "patch_ids": [
+        "DX7-097",
+        "DX7-098",
+        "DX7-099",
+        "DX7-100"
+      ],
+      "patch_names": [
+        "*Clap Trap",
+        "*Clash!!!!",
+        "*Syndrums1",
+        "*Syndrums2"
+      ]
+    },
+    {
+      "slot": 19,
+      "category": "analog-emulations",
+      "label": "Analog 01",
+      "patch_ids": [
+        "CC0-MOOG-01",
+        "CC0-MOOG-02",
+        "CC0-MOOG-03",
+        "CC0-MOOG-04"
+      ],
+      "patch_names": [
+        "MINI-MOOG",
+        "MINIMOOG 1",
+        "MINIMOOG 2",
+        "MINIMOOG"
+      ]
+    },
+    {
+      "slot": 20,
+      "category": "analog-emulations",
+      "label": "Analog 02",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG01SYX-01",
+        "CC0-ANALOG-ANALOG01SYX-02",
+        "CC0-ANALOG-ANALOG01SYX-03",
+        "CC0-ANALOG-ANALOG01SYX-04"
+      ],
+      "patch_names": [
+        "ABBASYNTH",
+        "Abe Moog 8",
+        "AD. MOOG",
+        "ANALG SYN8"
+      ]
+    },
+    {
+      "slot": 21,
+      "category": "analog-emulations",
+      "label": "Analog 03",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG02SYX-01",
+        "CC0-ANALOG-ANALOG02SYX-02",
+        "CC0-ANALOG-ANALOG02SYX-03",
+        "CC0-ANALOG-ANALOG02SYX-04"
+      ],
+      "patch_names": [
+        "ANALOG",
+        "ANALOG",
+        "ANALOG",
+        "ANALOG"
+      ]
+    },
+    {
+      "slot": 22,
+      "category": "analog-emulations",
+      "label": "Analog 04",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG03SYX-01",
+        "CC0-ANALOG-ANALOG03SYX-02",
+        "CC0-ANALOG-ANALOG03SYX-03",
+        "CC0-ANALOG-ANALOG03SYX-04"
+      ],
+      "patch_names": [
+        "MINIMOOG",
+        "MINIMOOG",
+        "MINIMOOG",
+        "MINI-MOOG"
+      ]
+    },
+    {
+      "slot": 23,
+      "category": "leads",
+      "label": "Lead 01",
+      "patch_ids": [
+        "CC0-LEAD-LEAD01SYX-01",
+        "CC0-LEAD-LEAD01SYX-02",
+        "CC0-LEAD-LEAD01SYX-03",
+        "CC0-LEAD-LEAD01SYX-04"
+      ],
+      "patch_names": [
+        "*Lead    1",
+        "*Lead    2",
+        "ANLOGLEAD1",
+        "DIGI-LEAD1"
+      ]
+    },
+    {
+      "slot": 24,
+      "category": "leads",
+      "label": "Lead 02",
+      "patch_ids": [
+        "CC0-LEAD-LEAD02SYX-01",
+        "CC0-LEAD-LEAD02SYX-02",
+        "CC0-LEAD-LEAD02SYX-03",
+        "CC0-LEAD-LEAD02SYX-04"
+      ],
+      "patch_names": [
+        "LEADSYN 7",
+        "LEADSYNTH1",
+        "LEADSYNTH2",
+        "METAL LEAD"
+      ]
+    },
+    {
+      "slot": 25,
+      "category": "leads",
+      "label": "Lead 03",
+      "patch_ids": [
+        "CC0-LEAD-LEAD03SYX-01",
+        "CC0-LEAD-LEAD03SYX-02",
+        "CC0-LEAD-LEAD03SYX-03",
+        "CC0-LEAD-LEAD03SYX-04"
+      ],
+      "patch_names": [
+        "SYN-LEAD20",
+        "SYN-LEAD21",
+        "SYN-LEAD22",
+        "SYN-LEAD23"
+      ]
+    },
+    {
+      "slot": 26,
+      "category": "leads",
+      "label": "Lead 04",
+      "patch_ids": [
+        "CC0-LEAD-LEAD01SYX-05",
+        "CC0-LEAD-LEAD01SYX-06",
+        "CC0-LEAD-LEAD01SYX-07",
+        "CC0-LEAD-LEAD01SYX-08"
+      ],
+      "patch_names": [
+        "DIGI-LEAD1",
+        "DIGI-LEAD2",
+        "DIGI-LEAD7",
+        "DX1 LEAD A"
+      ]
+    },
+    {
+      "slot": 27,
+      "category": "pads-strings",
+      "label": "Pad 01",
+      "patch_ids": [
+        "CC0-PAD-PADS01SYX-01",
+        "CC0-PAD-PADS01SYX-02",
+        "CC0-PAD-PADS01SYX-03",
+        "CC0-PAD-PADS01SYX-04"
+      ],
+      "patch_names": [
+        "ARM PAD 1",
+        "**Whizpad*",
+        "*Notre Dam",
+        "*Prophet 1"
+      ]
+    },
+    {
+      "slot": 28,
+      "category": "pads-strings",
+      "label": "Pad 02",
+      "patch_ids": [
+        "CC0-PAD-PADS02SYX-01",
+        "CC0-PAD-PADS02SYX-02",
+        "CC0-PAD-PADS02SYX-03",
+        "CC0-PAD-PADS02SYX-04"
+      ],
+      "patch_names": [
+        "CHORUS PAD",
+        "CHROMA 26",
+        "CHROMA 26",
+        "CHUNG KUO"
+      ]
+    },
+    {
+      "slot": 29,
+      "category": "pads-strings",
+      "label": "Pad 03",
+      "patch_ids": [
+        "CC0-PAD-PADS03SYX-01",
+        "CC0-PAD-PADS03SYX-02",
+        "CC0-PAD-PADS03SYX-03",
+        "CC0-PAD-PADS03SYX-04"
+      ],
+      "patch_names": [
+        "GLIDEPAD",
+        "HONG KONG",
+        "HUMAN 2",
+        "ICE PAD  1"
+      ]
+    },
+    {
+      "slot": 30,
+      "category": "pads-strings",
+      "label": "Pad 04",
+      "patch_ids": [
+        "CC0-PAD-PADS04SYX-01",
+        "CC0-PAD-PADS04SYX-02",
+        "CC0-PAD-PADS04SYX-03",
+        "CC0-PAD-PADS04SYX-04"
+      ],
+      "patch_names": [
+        "PAD",
+        "PAD",
+        "PAD 1",
+        "PADS R' US"
+      ]
+    },
+    {
+      "slot": 31,
+      "category": "sequences-motion",
+      "label": "Motion 01",
+      "patch_ids": [
+        "CC0-RESONANT-RESONA01SYX-01",
+        "CC0-RESONANT-RESONA01SYX-02",
+        "CC0-RESONANT-RESONA01SYX-03",
+        "CC0-RESONANT-RESONA01SYX-04"
+      ],
+      "patch_names": [
+        "*Cristals",
+        "*Dschungel",
+        "*Kershaw",
+        "*Octavian"
+      ]
+    },
+    {
+      "slot": 32,
+      "category": "sequences-motion",
+      "label": "Motion 02",
+      "patch_ids": [
+        "CC0-RESONANT-RESONA02SYX-01",
+        "CC0-RESONANT-RESONA02SYX-02",
+        "CC0-RESONANT-RESONA02SYX-03",
+        "CC0-RESONANT-RESONA02SYX-04"
+      ],
+      "patch_names": [
+        "FRIPP",
+        "GackFrShr\\",
+        "GLASS",
+        "GLASSSS JH"
+      ]
+    }
+  ]
+}
