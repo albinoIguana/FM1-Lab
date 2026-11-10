@@ -648,8 +648,8 @@ async function switchOn() {
     // Request playback while still inside the user's click gesture (Safari/iOS).
     ac.resume().catch(() => {});
     if (speakMode() === "voice") voiceOn();
-    const [wasm] = await Promise.all([fetch("app.wasm?v=20261110-3").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
-                                      ac.audioWorklet.addModule("worklet.js?v=20261110-3")]);
+    const [wasm] = await Promise.all([fetch("app.wasm?v=20261110-4").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
+                                      ac.audioWorklet.addModule("worklet.js?v=20261110-4")]);
     node = new AudioWorkletNode(ac, "fm1", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     node.addEventListener("processorerror", () => {
       status.textContent = "Audio processor stopped.";
