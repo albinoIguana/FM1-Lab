@@ -1,4 +1,5 @@
 #include "fm6.h"
+#include "fm1lab_instrument.h"
 #include "fm1lab_dx7_data.h"
 
 #include <inttypes.h>
