@@ -111,7 +111,9 @@ static int32_t fm6_voice_bus[2][FM6_N] PLAT_POOL;
 static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES / 2u] PLAT_POOL;
 static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
 static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
+#if defined(PLAT_WEB)
 static volatile uint32_t fm6_cpu2_total_job_ticks_accum;
+#endif
 
 static fm1lab_insert_state_t fm6_master_inserts;
 static uint32_t fm6_amp_drive_gain_q15, fm6_amp_output_gain_q15;
@@ -918,7 +920,9 @@ void fm6_init(void)
     fm6_zero_bytes(patch_lfo_delay, sizeof(patch_lfo_delay));
     age_counter = 0;
     overload_shed_count = 0u;
+#if defined(PLAT_WEB)
     fm6_cpu2_total_job_ticks_accum = 0u;
+#endif
     output_gain_q12 = 0;
     limiter_gain_q15 = 32768;
 #ifdef FM6_TEST
@@ -1205,14 +1209,23 @@ static void fm6_cpu2_voice_job(uint32_t unused)
     {
         uint32_t elapsed = plat_ticks24() - t0;
         fm6_cpu2_job_us = elapsed / PLAT_TICKS_PER_US;
+#if defined(PLAT_WEB)
         fm6_cpu2_total_job_ticks_accum += elapsed;
+#endif
     }
 #endif
 }
 
 uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
 uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
-uint32_t fm6_cpu2_total_job_ticks(void) { return fm6_cpu2_total_job_ticks_accum; }
+uint32_t fm6_cpu2_total_job_ticks(void)
+{
+#if defined(PLAT_WEB)
+    return fm6_cpu2_total_job_ticks_accum;
+#else
+    return 0u;
+#endif
+}
 
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
