@@ -646,16 +646,17 @@ async function switchOn() {
   try {
     const ac = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
     if (speakMode() === "voice") voiceOn();
-    const [wasm] = await Promise.all([fetch("app.wasm").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
-                                      ac.audioWorklet.addModule("worklet.js")]);
+    const [wasm] = await Promise.all([fetch("app.wasm?v=20261110-2").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
+                                      ac.audioWorklet.addModule("worklet.js?v=20261110-2")]);
     node = new AudioWorkletNode(ac, "fm1", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     gain = ac.createGain();
     gain.gain.value = $("mute").getAttribute("aria-pressed") === "true" ? 0 : 1;
     node.connect(gain).connect(ac.destination);
-    const ready = new Promise((res) => {
+    const ready = new Promise((res, rej) => {
       node.port.onmessage = (e) => {
         const m = e.data;
         if (m.type === "ready") res();
+        else if (m.type === "error") rej(new Error(m.message || "FM1 worklet failed during boot"));
         else if (m.type === "frame") {
           if (m.fb) drawScreen(m.fb);
           drawLights(m.buttons, m.keys, m.dimButtons, m.dimKeys);
