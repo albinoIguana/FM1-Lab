@@ -662,7 +662,7 @@ async function switchOn() {
           drawLights(m.buttons, m.keys, m.dimButtons, m.dimKeys);
           if (m.said) onSaid(m.said);
           window.emuLast = m;
-          if (m.load !== undefined) cpu.textContent = `FM1 budget ${m.deviceLoad ?? 0}% (XR ${m.deviceXruns ?? 0}) · browser ${m.load}%`;
+          if (m.load !== undefined) cpu.textContent = `FM1 C0 ${m.deviceCore0 ?? 0}% · C2 ${m.deviceCore2 ?? 0}% · budget ${m.deviceLoad ?? 0}% (XR ${m.deviceXruns ?? 0}) · browser ${m.load}%`;
           if (m.store) saveStore(m.store);
         } else if (m.type === "app" && appPart && appPart.message) appPart.message(m);
       };
