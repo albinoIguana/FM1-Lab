@@ -9,6 +9,9 @@ This registry distinguishes source discovery from permission to redistribute fil
 | Solyaris Music — 393 DX7II patches | 15 bundles including analog-style synths, strings, bass, brass, percussion, ambient pads and more | License/redistribution terms not clearly stated on source page | High-priority candidate; obtain permission or user-supplied copy before committing |
 | SoundEngine — Flywheel: DX7 | 64 voices specifically marketed as analog emulations plus FM edge; Prophet/Oberheim-style references | Paid commercial bank; redistribution not permitted absent explicit license | Strong analog-like candidate; do not mirror |
 | Nick Klimenko — FM Depths | 32 ambient/analog-like tones: silky strings, evolving drones, smooth pads, progressive basses, solo leads, sequences | Commercial soundset; redistribution not permitted absent explicit license | Strong analog-like candidate; do not mirror |
+
+| mene311 — FM-1 banks | 26 themed banks × 32 voices (832 total), with a playable audio gallery; synthwave, acid/techno, leads, ambient, industrial, sci-fi, electronic bass and more | MIT applies to generator/tooling only; patch data remains the work of original authors | Reference-only; do not mirror patch data without separate rights clearance |
+
 | Phi Mu Labs — Origin | 128 original DX7 SysEx patches, programmed in Dexed; broad FM palette | Paid/fair-price product; redistribution not permitted absent explicit license | Candidate for purchase/audition; do not mirror |
 | Yamaha Black Boxes / factory ROM banks | Factory DX7 and DX7II banks, including synth, complex and effects categories | Source page provides downloads; individual rights status needs confirmation | Reference only pending rights review |
 | Bobby Blues / patches.fm | Very large searchable historical DX7 archives | Rights vary or are not consistently stated | Discover individual banks; do not bulk-import without provenance review |
