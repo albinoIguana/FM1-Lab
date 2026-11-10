@@ -2802,15 +2802,6 @@ static void draw_startup(uint32_t elapsed)
 
     cv_begin(240,180,bg);
 
-    /* The single top-centre prism grows down across the title twice. */
-    for(i=0;i<8u;i++)
-        shape[i]=(int16_t)(((int32_t)prism_a[i]*(100u-morph)+
-                            (int32_t)prism_b[i]*morph)/100);
-    startup_prism(120,39,scale,shape,4,
-                  ramp>350u?red:silver,
-                  ramp>350u?red_edge:pale,
-                  ramp>350u?RGB(230,45,38):facet);
-
     /* Fade individual glyphs from the centre of SHIPWRECK toward both ends. */
     for(i=0;i<9u;i++) {
         int32_t cw;
@@ -2827,6 +2818,15 @@ static void draw_startup(uint32_t elapsed)
         cv_text(x,82,&FONT_B,ch,ink);
         x+=cw;
     }
+
+    /* The single top-centre prism grows down across the title twice. */
+    for(i=0;i<8u;i++)
+        shape[i]=(int16_t)(((int32_t)prism_a[i]*(100u-morph)+
+                            (int32_t)prism_b[i]*morph)/100);
+    startup_prism(120,39,scale,shape,4,
+                  ramp>350u?red:silver,
+                  ramp>350u?red_edge:pale,
+                  ramp>350u?RGB(230,45,38):facet);
 
     cv_text(99,163,&FONT_XS,"v0.10",RGB(184,195,203));
     cv_blit(0,41);
