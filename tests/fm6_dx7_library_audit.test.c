@@ -38,8 +38,46 @@ static int decode_voice(unsigned index, uint8_t out[FM1LAB_PATCH_BYTES])
         out[group * 4u + 2u] = (uint8_t)(value >> 8);
         out[group * 4u + 3u] = (uint8_t)value;
     }
+
+    printf("Four-layer Instrument mix audit (level 31, note 60, max master):\\n");
+    {
+        unsigned limited_instruments = 0u;
+        for (unsigned instrument = 0; instrument < FM1LAB_DX7_INSTRUMENT_COUNT; ++instrument) {
+            uint64_t mix_peak = 0u, dry_peak = 0u, sum_abs = 0u;
+            fm6_init();
+            for (unsigned patch = 4u; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
+                fm6_patch_set_enabled(patch, 0u);
+            for (unsigned patch = 0u; patch < FM1LAB_PATCH_COUNT; ++patch) {
+                uint8_t voice[FM1LAB_PATCH_BYTES];
+                if (decode_voice(instrument * FM1LAB_PATCH_COUNT + patch, voice) != 0 ||
+                    fm6_patch_set_voice(patch, voice) != 0) {
+                    fprintf(stderr, "Instrument %u patch %u: decode/load failed\\n", instrument + 1u, patch + 1u);
+                    return 1;
+                }
+                fm6_patch_set_enabled(patch, 1u);
+                fm6_patch_set_level(patch, 31u);
+            }
+            fm6_render(output, BLOCK_FRAMES, 4096u);
+            fm6_note_on_mask(60u, 110u, 0x0fu);
+            for (unsigned block = 0; block < 86u; ++block) {
+                fm6_render(output, BLOCK_FRAMES, 4096u);
+                if (fm6_test_dry_peak() > dry_peak) dry_peak = fm6_test_dry_peak();
+                for (unsigned sample = 0; sample < SAMPLE_WORDS; ++sample) {
+                    uint64_t magnitude = abs_sample(output[sample]);
+                    if (magnitude > mix_peak) mix_peak = magnitude;
+                    sum_abs += magnitude;
+                }
+            }
+            uint32_t limiter = fm6_test_limiter_events();
+            if (limiter) ++limited_instruments;
+            printf("  %02u %-18.18s dry=%" PRIu64 " out=%" PRIu64 " mean=%" PRIu64 " lim=%" PRIu32 "\\n",
+                   instrument + 1u, fm1lab_dx7_instrument_names[instrument],
+                   dry_peak, mix_peak, sum_abs / (86u * SAMPLE_WORDS), limiter);
+        }
+        printf("  instruments invoking limiter: %u/%u\\n",
+               limited_instruments, FM1LAB_DX7_INSTRUMENT_COUNT);
+    }
     return 0;
-}
 
 static uint64_t abs_sample(int32_t sample)
 {
