@@ -167,7 +167,7 @@ static int audit_four_layer_instruments(void)
                 return 1;
             }
             fm6_patch_set_enabled(patch, 1u);
-            fm6_patch_set_level(patch, 31u);
+            fm6_patch_set_level(patch, fm1lab_dx7_instrument_level[instrument]);
         }
         fm6_render(output, BLOCK_FRAMES, 4096u);
         fm6_note_on_mask(60u, 110u, 0x0fu);
@@ -182,13 +182,14 @@ static int audit_four_layer_instruments(void)
         }
         uint32_t limiter = fm6_test_limiter_events();
         if (limiter) ++limited_instruments;
-        printf("  %02u %-18.18s dry=%" PRIu64 " out=%" PRIu64 " mean=%" PRIu64 " lim=%" PRIu32 "\n",
+        printf("  %02u %-18.18s lvl=%u dry=%" PRIu64 " out=%" PRIu64 " mean=%" PRIu64 " lim=%" PRIu32 "\n",
                instrument + 1u, fm1lab_dx7_instrument_names[instrument],
+               (unsigned)fm1lab_dx7_instrument_level[instrument],
                dry_peak, mix_peak, sum_abs / (86u * SAMPLE_WORDS), limiter);
     }
     printf("  instruments invoking limiter: %u/%u\n",
            limited_instruments, FM1LAB_DX7_INSTRUMENT_COUNT);
-    return 0;
+    return limited_instruments ? 2 : 0;
 }
 
 int main(void)
