@@ -32,7 +32,7 @@ Other promising banks are documented in `patches/catalog/SOURCES.md`. Some moder
 
 ## Curation status
 
-The archive and factory selection are structurally valid, but the new selections are **provisional and awaiting listening tests**. The source folders are only initial family hints. Before calling the bank fully curated, audition voices across registers and velocities, check loudness/headroom, compare near-duplicates, and retag by actual sound character. In particular, confirm which candidates truly deliver shimmering leads, warm analog-like movement, clean techno weight, and industrial aggression.
+The archive contains 896 indexed source slots: 812 named voices and 84 empty slots excluded from curation. Among the named voices, exact byte comparison finds 764 unique patterns (46 duplicate groups, 48 duplicate copies). The active 128-voice factory selection has 128 unique voice patterns. The new selections are **provisional and awaiting listening tests**. The source folders are only initial family hints. Before calling the bank fully curated, audition voices across registers and velocities, check loudness/headroom, compare near-duplicates, and retag by actual sound character. In particular, confirm which candidates truly deliver shimmering leads, warm analog-like movement, clean techno weight, and industrial aggression.
 
 ## Migration behavior
 
