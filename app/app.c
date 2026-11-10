@@ -1716,6 +1716,12 @@ void app_init(void)
     settings_v10_t old_v10;
     int performance_loaded = 0;
     int loaded;
+#if defined(PLAT_WEB)
+    web_device_cpu_q12 = web_device_cpu_pct = 0u;
+    web_device_core0_q12 = web_device_core2_q12 = 0u;
+    web_device_core0_pct = web_device_core2_pct = 0u;
+    web_device_xruns = 0u;
+#endif
     fm6_init();
     (void)plat_cpu2_set(1); /* optional second-core audio worker; fm1.toml enables safe fallback */
     settings_defaults();
