@@ -728,23 +728,14 @@ static int fm1lab_seed_dx7_legacy_instrument(uint32_t index,fm1lab_instrument_t 
 static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !out) return -1;
-    uint8_t first_voice[FM1LAB_PATCH_BYTES];
     char instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
-    if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT,first_voice)) return -1;
-    for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++) {
-        char c=i<10u?(char)first_voice[145u+i]:' ';
-        instrument_name[i]=(c>=32 && c<=126)?c:' ';
+    const char *label=fm1lab_dx7_instrument_names[index];
+    uint32_t name_len=0u;
+    while(name_len<FM1LAB_INSTRUMENT_NAME_BYTES && label[name_len]) {
+        instrument_name[name_len]=label[name_len];
+        ++name_len;
     }
-    instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
-    if(instrument_name[0]==' ' || instrument_name[0]=='\0') {
-        const char *fallback=fm1lab_dx7_instrument_names[index];
-        uint32_t i=0u;
-        while(i+1u<sizeof instrument_name && fallback[i]) {
-            instrument_name[i]=fallback[i];
-            ++i;
-        }
-        instrument_name[i]='\0';
-    }
+    instrument_name[name_len]='\0';
     fm1lab_instrument_init(out,instrument_name);
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
@@ -2875,7 +2866,7 @@ static void draw_macro_panel(void)
         uint32_t value = set.macros[set.patch][m];
         uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
         instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), border, accent);
-        cv_text(x + 9, y + 9, &FONT_XS, names[m], C_WHITE);
+        cv_text_fit(x+9,y+9,&FONT_XS,names[m],C_WHITE,72);
         int_text((int32_t)value, t);
         cv_text(x + 88, y + 7, &FONT_B, t, accent);
         cv_rect(x + 9, y + 42, 98, 6, RGB(31, 43, 55));
