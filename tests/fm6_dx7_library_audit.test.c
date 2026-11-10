@@ -116,6 +116,8 @@ int main(void)
     printf("  mean-absolute Q23 min/max: %" PRIu64 " / %" PRIu64 "\n", min_mean, max_mean);
     printf("  low-peak voices (<100000): %u/%u; silent (<1000): %u/%u\n",
            quiet, FM1LAB_DX7_VOICE_COUNT, silent, FM1LAB_DX7_VOICE_COUNT);
+    printf("  voices invoking the output limiter: %u/%u\n",
+           limited, FM1LAB_DX7_VOICE_COUNT);
     for (unsigned shown = 0; shown < 12u; ++shown) {
         unsigned best = FM1LAB_DX7_VOICE_COUNT;
         for (unsigned i = 0; i < FM1LAB_DX7_VOICE_COUNT; ++i) {
@@ -136,7 +138,7 @@ int main(void)
                 results[i].peak > results[best].peak) best = i;
         }
         if (best == FM1LAB_DX7_VOICE_COUNT) break;
-        printf("  loud #%03u %-10.10s pre=%" PRIu64 " out=%" PRIu64 " lim=%" PRIu32 "\\n",
+        printf("  loud #%03u %-10.10s pre=%" PRIu64 " out=%" PRIu64 " lim=%" PRIu32 "\n",
                best, results[best].name, results[best].pre_limiter_peak,
                results[best].output_peak, results[best].limiter_events);
         results[best].peak = UINT64_MAX;
