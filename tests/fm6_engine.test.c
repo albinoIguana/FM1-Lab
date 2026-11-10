@@ -7,6 +7,18 @@
 enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
 static int32_t output[TEST_WORDS];
 static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
+
+static void render_cpu2_mode(uint8_t mode, int32_t *destination)
+{
+    fm6_init();
+    for (unsigned patch = 1u; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
+        fm6_patch_set_enabled((uint8_t)patch, 0u);
+    fm6_test_set_cpu2_mode(mode);
+    for (unsigned note = 0u; note < 6u; ++note)
+        fm6_note_on_mask((uint8_t)(48u + note * 3u),
+                         (uint8_t)(92u - note * 4u), 0x01u);
+    fm6_render(destination, TEST_FRAMES, 4096u);
+}
 static int32_t peak(const int32_t *samples, unsigned count) {
     int32_t result = 0;
     for (unsigned i = 0; i < count; ++i) {
@@ -223,6 +235,14 @@ static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
 }
 
 int main(void) {
+    /* A single patch's active voices split across the cores, not by fixed
+     * patch index. A partial worker failure must restore state before fallback. */
+    render_cpu2_mode(0u, chunk_a);
+    render_cpu2_mode(1u, chunk_b);
+    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    render_cpu2_mode(2u, chunk_b);
+    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+
     /* MAELSTROM amount zero is a truly transparent bypass, independent of
      * the parked modulation controls. Engaged settings must alter the mix. */
     render_chaos(0u,0u,0u,0u,chunk_a);
