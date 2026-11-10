@@ -20,8 +20,8 @@ This directory is the **source of truth for patch assets and curation metadata**
 
 ## Current inventory
 
-The archive now contains **896 individual six-operator voices** indexed in `catalog/patches.csv`: the original 128 plus 768 additional voices from 24 CC0 DX7 banks. Imported families include analog-emulation (384), leads (96), pads/strings (160), and resonant/motion (128), alongside the original bass, choir and percussion sets. The original 128 still skew heavily toward bass, choir and percussion; the new material directly addresses those gaps.
+The archive contains **896 indexed voice slots**: 128 original factory candidates plus 768 additional entries from 24 CC0 DX7 banks. Of those, **84 are empty source slots**, explicitly excluded from curation; **812 named voices remain**. New archive families include analog-emulation candidates, leads, pads/strings and resonant/motion, filling out the previous bass/choir/percussion-heavy selection.
 
-All imported voices retain original names, source bank, source voice index, CC0 provenance and converted 156-byte voice data. The new imports are **not yet auditioned**; their folders are provisional source-family groupings, not final sound classifications. They must be listened to, deduplicated and retagged before promotion into four-patch FM1 instruments.
+Every imported voice retains its original name, source-bank path, voice index, CC0 provenance and converted 156-byte data. The family folders are starting classifications, not a substitute for listening. None of the new voices has yet been auditioned on the FM1-Lab engine. Use `catalog/audition-queue.csv` for a prioritized, name-hint-only listening queue, then record actual sound traits before promoting voices into `curated/`.
 
-See `catalog/sources.csv` for external candidate collections and redistribution status, and `catalog/next-imports.csv` for the first import batch (now ingested).
+A modern external reference is documented in `sources/FM1-BANKS-REFERENCE.md`. It has useful synthwave, acid/techno, ambient, lead and industrial themes, but its bank-data rights remain with the original authors, so it is reference-only. See `catalog/sources.csv` for all source and licensing status.
