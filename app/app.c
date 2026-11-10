@@ -3951,12 +3951,16 @@ static void draw(void)
         int_text((int32_t)app_audio_overload_shed_count(), number);
         text_cat(diag, number);
         if (plat_cpu2_on()) {
+#if defined(PLAT_WEB)
+            text_cat(diag, " C2 SIM");
+#else
             text_cat(diag, " C2 S");
             int_text((int32_t)plat_cpu2_stack(), number);
             text_cat(diag, number);
             text_cat(diag, " W");
             int_text((int32_t)fm6_cpu2_last_wait_us(), number);
             text_cat(diag, number);
+#endif
         } else {
             text_cat(diag, " C1");
         }
