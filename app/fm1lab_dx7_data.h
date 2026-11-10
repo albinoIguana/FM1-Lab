@@ -5,8 +5,7 @@
 #define FM1LAB_DX7_VOICE_COUNT 128u
 #define FM1LAB_DX7_Z85_BYTES 195u
 
-/* Emulator refresh: patch archive naming audit, 2026-11-10.
- * Generated from patches/curated/instrument-bank-v0.3.json.
+/* Generated from patches/curated/instrument-bank-v0.3.json.
  * Patch source of truth: patches/library/ by audible sound family.
  * 128 voices / 32 four-patch instruments. Draft selections require listening.
  */
@@ -255,7 +254,7 @@ static const char fm1lab_dx7_voice_z85[] =
     "vmoK*O5syqaR01G8k0001e00968v>5o+v(MBF8VRC(0rr91p5>s}2v*Cqm}kUe04d:R0%nJ609]N90"
     "0=FguPZ80gboNH0vmZC009i87/KNjeLFP0l)aDN"
     "0aOYjm}kUe04d:F0%X(i000Ph0B[/km}kUe04d:R0%nP80aC%v0TwZnoK*O5syqaR00ilc0Trcm0rr"
-    "dgoK*O5syqaR01G8k0SSD900-Si0aOYjm}kUe04d:F0%wP7p5>s}2v*Cqm}kUe04d:R00961000357"
+    "dgoK*O5syqaR01G8k0SSE400-Si0aOYjm}kUe04d:F0%wP7p5>s}2v*Cqm}kUe04d:R00961000357"
     "YWGqpaYddk%$XQ03?KA009i97/KNjeLFP0l[{wW"
     "v>662v(MBF8VRC(0rr91oAka]2v*Cqm}kUe04d:R0%nJ60aC{f00^1cv[g3hu&RLO4G=!k003He0rr"
     "vmoK*O5syqaR01G8k0001e00ic9v>6uav(MBF8VRC(0rr91p5>p{2v*Cqm}kUe04d:R0%nJ609]N90"
@@ -429,6 +428,41 @@ static const char fm1lab_dx7_instrument_names[FM1LAB_DX7_INSTRUMENT_COUNT][24] =
     "EVOLVING PAD",
     "CINEMATIC FX",
     "GLASS MOTION",
+};
+
+static const unsigned char fm1lab_dx7_instrument_level[FM1LAB_DX7_INSTRUMENT_COUNT] = {
+    23,
+    14,
+    17,
+    18,
+    16,
+    13,
+    29,
+    17,
+    20,
+    12,
+    8,
+    11,
+    15,
+    9,
+    11,
+    13,
+    12,
+    13,
+    8,
+    8,
+    8,
+    51,
+    38,
+    25,
+    15,
+    16,
+    23,
+    20,
+    14,
+    22,
+    15,
+    17,
 };
 
 static const char fm1lab_dx7_patch_descriptions[FM1LAB_DX7_VOICE_COUNT][20] = {
