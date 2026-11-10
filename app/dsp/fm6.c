@@ -1306,8 +1306,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * The output stage adds the requested 6 dB; calibrated Instrument
              * levels preserve headroom, with the stereo-linked limiter as backup. */
-            int64_t out_l = ((left * output_gain_q12) >> 11);
-            int64_t out_r = ((right * output_gain_q12) >> 11);
+            int64_t out_l = ((left * output_gain_q12) >> 12);
+            int64_t out_r = ((right * output_gain_q12) >> 12);
             uint64_t abs_l = fm6_abs_i64(out_l);
             uint64_t abs_r = fm6_abs_i64(out_r);
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
