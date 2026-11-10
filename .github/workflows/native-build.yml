@@ -13,6 +13,8 @@ on:
       - ".gitmodules"
       - "build.sh"
       - ".github/workflows/native-build.yml"
+      - ".github/workflows/deploy-pages.yml"
+      - "scripts/build-web-installer.py"
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -44,7 +46,7 @@ jobs:
         p.write_text(source)
         PY
         bash tests/test-fm6-engine.sh
-        sh build.sh
+        sh build.sh --release 0.1
         # Emit the real ELF section sizes. The linker has separate RAM,
         # RAMTEXT and POOL regions; a single "RAM used" number is misleading.
         python3 - <<'PY'
@@ -74,4 +76,4 @@ jobs:
         print("  limits: RAM .data+.bss 98304; RAMTEXT 32768; POOL 344064 (8192 minimum spare)")
         PY
         python3 base/tools/build.py app --host
-      packages: app/build/fm1lab.fwsc
+      packages: app/build/fm1lab-0.1.fwsc
