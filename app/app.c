@@ -2778,94 +2778,56 @@ static void startup_prism(int32_t cx,int32_t cy,int32_t scale,
 }
 static void draw_startup(uint32_t elapsed)
 {
-    static const int16_t b1[]={-50,-10,0,-15,50,50,-30,30};
-    static const int16_t b1r[]={-30,-50,15,-15,50,30,-50,10};
-    static const int16_t b2[]={0,50,-30,-12,0,-50,30,-12};
-    static const int16_t b2m[]={0,0,-50,50,0,-50,50,50};
-    static const int16_t b3[]={50,-10,0,-15,-50,50,30,30};
-    static const int16_t b3r[]={30,-50,-15,-15,-50,30,50,10};
-    static const int16_t square[]={-50,-50,50,-50,50,50,-50,50};
-    static const int16_t star[]={0,-50,12,-13,50,-13,17,10,33,50,0,23,-32,50,-16,10,-50,-13,-11,-13};
-    static const int16_t b5[]={0,50,-26,13,0,-50,26,13};
-    static const int16_t b5m[]={0,0,-50,50,0,-50,50,50};
-    static const int16_t *const normal[6]={b1,b2,b3,square,b5,square};
-    static const int16_t *const altered[6]={b1r,b2m,b3r,star,b5m,star};
-    static const uint8_t counts[6]={4,4,4,10,4,10};
-    const uint16_t silver=RGB(174,181,186), pale=RGB(226,231,232);
-    const uint16_t shade=RGB(100,112,121), red=RGB(178,20,25);
-    const uint16_t yellow=RGB(255,218,28), beam=RGB(111,239,255);
-    const uint16_t hot=RGB(255,255,232);
-    uint32_t t=elapsed, i;
-    uint8_t morph=(uint8_t)(t>650u && t<1650u);
-    uint32_t blend=t<=650u?0u:(t>=1650u?100u:(t-650u)/10u);
-    cv_begin(240,180,RGB(2,3,6));
+    /* One prism: two deliberate pulses, then the title disappears from
+     * its midpoint outward. No aperture, beam, field of fragments or dissolve. */
+    static const int16_t prism_a[]={0,50,-30,-12,0,-50,30,-12};
+    static const int16_t prism_b[]={0,0,-50,50,0,-50,50,50};
+    const uint16_t bg=RGB(2,3,6);
+    const uint16_t silver=RGB(174,181,186);
+    const uint16_t pale=RGB(226,231,232);
+    const uint16_t facet=RGB(207,213,217);
+    const uint16_t red=RGB(178,20,25);
+    const uint16_t red_edge=RGB(255,90,75);
+    const uint16_t yellow=RGB(255,218,28);
+    uint32_t t=elapsed;
+    uint32_t cycle=t<1400u?t:(t<2800u?t-1400u:1400u);
+    uint32_t ramp=cycle<700u?cycle:1400u-cycle;
+    uint32_t morph=ramp*100u/700u;
+    int32_t scale=24+(int32_t)(ramp*126u/700u);
+    int16_t shape[8];
+    char ch[2]={0,0};
+    int32_t word_w=text_w(&FONT_B,"SHIPWRECK");
+    int32_t x=(240-word_w)/2;
+    uint32_t i;
 
-    /* The source's prismAni background: a black/orange diagonal aperture
-     * opens in a flash behind the six original prism forms. */
-    if(t<2050u) {
-        static const int16_t aperture[]={-100,-100,100,-100,-100,100,100,100};
-        uint32_t f=t<350u?0u:(t<900u?t-350u:(t<1250u?550u:2050u-t));
-        if(f>550u)f=550u;
-        if(f) {
-            startup_poly(120,90,(int32_t)(f*100u/550u),aperture,4,RGB(56,25,8));
-            startup_poly(120,90,(int32_t)(f*84u/550u),aperture,4,RGB(103,54,13));
-        }
+    cv_begin(240,180,bg);
+
+    /* The single top-centre prism grows down across the title twice. */
+    for(i=0;i<8u;i++)
+        shape[i]=(int16_t)(((int32_t)prism_a[i]*(100u-morph)+
+                            (int32_t)prism_b[i]*morph)/100);
+    startup_prism(120,39,scale,shape,4,
+                  ramp>350u?red:silver,
+                  ramp>350u?red_edge:pale,
+                  ramp>350u?RGB(230,45,38):facet);
+
+    /* Fade individual glyphs from the centre of SHIPWRECK toward both ends. */
+    for(i=0;i<9u;i++) {
+        int32_t cw;
+        uint32_t distance=(i<4u?4u-i:i-4u);
+        uint32_t fade_start=1500u+distance*150u;
+        uint32_t fade= t<=fade_start?0u:
+                       (t>=fade_start+450u?100u:(t-fade_start)*100u/450u);
+        uint16_t ink=yellow;
+        if(fade>=75u) ink=bg;
+        else if(fade>=50u) ink=RGB(93,79,17);
+        else if(fade>=25u) ink=RGB(170,133,22);
+        ch[0]="SHIPWRECK"[i];
+        cw=text_w(&FONT_B,ch);
+        cv_text(x,82,&FONT_B,ch,ink);
+        x+=cw;
     }
 
-    /* LaserLinks' original 3x2 prism field: six separate clip-path forms. */
-    for(i=0;i<6u;i++) {
-        int32_t cx=40+(int32_t)(i%3u)*80;
-        int32_t cy=i<3u?35:136;
-        int32_t scale=(i==3u||i==5u)?29:32;
-        const int16_t *shape=normal[i];
-        uint16_t fill=silver, edge=pale, facet=RGB(207,213,217);
-        if(morph && (i==1u||i==3u||i==4u||i==5u)) {
-            /* Interpolate the original diamond/square silhouettes into their
-             * starburst/fragment forms rather than substituting rectangles. */
-            int16_t points[20];
-            int32_t mix=(int32_t)blend;
-            for(uint8_t p=0;p<counts[i]*2u;p++)
-                points[p]=(int16_t)(((int32_t)normal[i][p]*(100-mix)+
-                                     (int32_t)altered[i][p]*mix)/100);
-            shape=points;
-            if(i==3u||i==5u) {fill=red;edge=RGB(255,90,75);facet=RGB(230,45,38);}
-        } else if(t>=1650u && (i==3u||i==5u)) {
-            shape=altered[i];fill=red;edge=RGB(255,100,80);facet=RGB(230,45,38);
-        } else if(t>=1650u && i==1u) shape=altered[i];
-        startup_prism(cx,cy,scale,shape,counts[i],fill,edge,facet);
-    }
-
-    /* SHIPWRECK sits in a clean black band between the two rows of prisms. */
-    if(t<3900u) {
-        int32_t word_w=text_w(&FONT_B,"SHIPWRECK");
-        int32_t word_x=(240-word_w)/2;
-        cv_rect(8,72,224,38,RGB(2,3,6));
-        if(t<3100u) cv_text(word_x,82,&FONT_B,"SHIPWRECK",yellow);
-        if(t>=1250u && t<3000u) {
-            int32_t x=12+(int32_t)((t-1250u)*216u/1750u);
-            cv_rect(x-5,76,11,30,RGB(50,21,5));
-            cv_rect(x-2,74,5,34,beam);
-            cv_rect(x-1,75,2,32,hot);
-            cv_rect(x-1,77,2,25,RGB(2,3,6));
-            cv_rect(x-8,87,17,2,hot);
-        }
-        if(t>=3000u && t<3900u) {
-            uint32_t d=t-3000u;
-            for(i=0;i<22u;i++) {
-                int32_t sx=16+(int32_t)((i*37u+i*i*7u)%208u);
-                int32_t sy=77+(int32_t)((i*13u)%24u)+(int32_t)(d*(1u+i%4u)/45u);
-                if(sy<145) cv_rect(sx,sy,2+(int32_t)(i%4u),2,
-                    (i&1u)?yellow:beam);
-            }
-            cv_rect(8,77+(int32_t)(d*54u/900u),224,40,RGB(2,3,6));
-        }
-    }
-
-    /* A last red-white glint recalls the original starburst color transition. */
-    if(t>1750u && t<2200u) {
-        uint16_t c=(t/45u)&1u?hot:RGB(255,62,46);
-        cv_rect(116,69,8,42,c);
-    }
     cv_text(99,163,&FONT_XS,"v0.10",RGB(184,195,203));
     cv_blit(0,41);
 }
