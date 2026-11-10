@@ -30,16 +30,17 @@ class Fm1 extends AudioWorkletProcessor {
   async onMessage(m) {
     if (m.type === "load") {
       try {
-        // AudioWorkletGlobalScope does not expose every Window API consistently.
-        // Prefer its monotonic performance clock, then the audio timeline, then wall time.
-        const now = () => {
-          const ms = globalThis.performance?.now?.()
-            ?? (typeof currentTime === "number" ? currentTime * 1000 : Date.now());
-          return BigInt(Math.max(0, Math.round(ms * 1e6)));
-        };
+        // WASI clock_time_get writes a little-endian u64 nanosecond timestamp.
+        // Use the AudioWorklet's monotonic audio timeline and two 32-bit stores:
+        // this avoids BigInt/DataView.setBigUint64 compatibility issues in some
+        // browser worklet runtimes while preserving the WASI memory layout.
         const wasi = {
           clock_time_get: (id, prec, out) => {
-            new DataView(this.mem.buffer).setBigUint64(out, now(), true);
+            const ns = Math.max(0, Math.floor(currentTime * 1e9));
+            const view = new DataView(this.mem.buffer);
+            if (!Number.isInteger(out) || out < 0 || out + 8 > this.mem.buffer.byteLength) return 21;
+            view.setUint32(out, ns >>> 0, true);
+            view.setUint32(out + 4, Math.floor(ns / 4294967296) >>> 0, true);
             return 0;
           },
           fd_write: (fd, iov, n, out) => { new DataView(this.mem.buffer).setUint32(out, 0, true); return 0; },
