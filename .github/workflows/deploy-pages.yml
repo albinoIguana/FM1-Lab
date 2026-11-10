@@ -24,7 +24,7 @@ jobs:
       - name: Check out FM1-Lab and official M-VAVE source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: main # release package is run-pinned; maintained emulator shell comes from current main
           submodules: recursive
       - name: Download the verified native release package
         uses: actions/download-artifact@v4
