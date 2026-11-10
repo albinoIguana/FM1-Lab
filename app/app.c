@@ -2065,7 +2065,7 @@ static void input(void)
         } else if (k == B_FX) {
             if (page < PAGE_FX_AMP || page > PAGE_FX_EQ) page = PAGE_FX_AMP;
             else page = page >= PAGE_FX_EQ ? PAGE_FX_AMP : (uint8_t)(page + 1u);
-            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
+            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PARAMETRIC EQ");
         } else if (k == B_PLAY) {
             /* PLAY is a global transport toggle; the current page only
              * determines what is displayed, never whether transport runs. */
@@ -2242,9 +2242,9 @@ static void input(void)
         } else if (k == EN_SELECT && page >= PAGE_FX_AMP && page <= PAGE_FX_EQ) {
             int32_t next = (int32_t)(page - PAGE_FX_AMP) + e;
             next %= 7;
-            if (next < 0) next += 8;
+            if (next < 0) next += 7;
             page = (uint8_t)(PAGE_FX_AMP + next);
-            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"SEND ROUTING");
+            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PARAMETRIC EQ");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
@@ -3327,7 +3327,7 @@ static void draw_sequencer_piano_panel(void)
     if(low<0)low=0;
     if(low>103)low=103;
     const int32_t high=low+23;
-    instrument_card(4,2,232,174,panel_fill(),accent,accent);
+    instrument_card(4,2,232,176,panel_fill(),accent,accent);
 
     /* Track identity and Instrument name have separate, bounded fields. */
     cv_text_fit(12,8,&FONT_XS,lane?"TRACK 2 / NOTES":"TRACK 1 / NOTES",accent,100);
@@ -3380,7 +3380,7 @@ static void draw_sequencer_piano_panel(void)
 
     /* Two readout rows with fixed columns keep long values apart. */
     cv_text(12,113,&FONT_XS,"NOTE",C_GRAY);
-    if(selected)int_text(selected->pitch,value);else {value[0]='-';value[1]='-';value[2]='\\0';}
+    if(selected)int_text(selected->pitch,value);else {value[0]='-';value[1]='-';value[2]='\0';}
     cv_text(42,113,&FONT_B,value,accent);
     cv_text(92,113,&FONT_XS,"LENGTH",C_GRAY);
     int_text(selected?selected->duration:0,value);
@@ -3395,7 +3395,7 @@ static void draw_sequencer_piano_panel(void)
 
     cv_text_fit(12,145,&FONT_XS,"K1 LENGTH   K2 PITCH",C_GRAY,210);
     cv_text_fit(12,159,&FONT_XS,"K3 ACCENT   K4 VELOCITY",C_GRAY,210);
-    cv_text_fit(12,173,&FONT_XS,"SELECT NOTE   EDIT DELETE",C_WHITE,210);
+    cv_text_fit(12,169,&FONT_XS,"SELECT NOTE   EDIT DELETE",C_WHITE,210);
 }
 
 static void draw_save_panel(void)
