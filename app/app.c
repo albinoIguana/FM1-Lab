@@ -2800,11 +2800,23 @@ static void draw_startup(uint32_t elapsed)
     uint32_t blend=t<=650u?0u:(t>=1650u?100u:(t-650u)/10u);
     cv_begin(240,180,RGB(2,3,6));
 
+    /* The source's prismAni background: a black/orange diagonal aperture
+     * opens in a flash behind the six original prism forms. */
+    if(t<2050u) {
+        uint32_t f=t<350u?0u:(t<900u?t-350u:(t<1250u?550u:2050u-t));
+        if(f>550u)f=550u;
+        if(f) {
+            int32_t w=(int32_t)(f*210u/550u);
+            cv_rect(120-w/2,4,w,172,RGB(56,25,8));
+            cv_rect(120-w/2+2,4,w>4?w-4:1,172,RGB(103,54,13));
+        }
+    }
+
     /* LaserLinks' original 3x2 prism field: six separate clip-path forms. */
     for(i=0;i<6u;i++) {
         int32_t cx=40+(int32_t)(i%3u)*80;
-        int32_t cy=i<3u?35:145;
-        int32_t scale=(i==3u||i==5u)?31:34;
+        int32_t cy=i<3u?35:136;
+        int32_t scale=(i==3u||i==5u)?29:32;
         const int16_t *shape=normal[i];
         uint16_t fill=silver, edge=pale, facet=RGB(207,213,217);
         if(morph && (i==1u||i==3u||i==4u||i==5u)) {
@@ -2821,20 +2833,6 @@ static void draw_startup(uint32_t elapsed)
             shape=altered[i];fill=red;edge=RGB(255,100,80);facet=RGB(230,45,38);
         } else if(t>=1650u && i==1u) shape=altered[i];
         startup_prism(cx,cy,scale,shape,counts[i],fill,edge,facet);
-    }
-
-    /* The source's prismAni background: a black/orange diagonal aperture
-     * opens in a flash, then collapses behind the six forms. */
-    if(t<2050u) {
-        static const int16_t flash[]={-50,-50,50,-50,-50,50,50,50};
-        uint32_t f=t<350u?0u:(t<900u?t-350u:(t<1250u?550u:2050u-t));
-        if(f>550u)f=550u;
-        if(f) {
-            int32_t w=(int32_t)(f*210u/550u);
-            cv_rect(120-w/2,4,w,172,RGB(56,25,8));
-            cv_rect(120-w/2+2,4,w>4?w-4:1,172,RGB(103,54,13));
-            (void)flash;
-        }
     }
 
     /* SHIPWRECK sits in a clean black band between the two rows of prisms. */
@@ -2868,7 +2866,7 @@ static void draw_startup(uint32_t elapsed)
         uint16_t c=(t/45u)&1u?hot:RGB(255,62,46);
         cv_rect(116,69,8,42,c);
     }
-    cv_text(99,160,&FONT_XS,"v0.10",RGB(184,195,203));
+    cv_text(99,163,&FONT_XS,"v0.10",RGB(184,195,203));
     cv_blit(0,41);
 }
 static int algorithm_preview_active(void)
