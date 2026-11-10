@@ -2930,8 +2930,6 @@ static void draw_chaos_panel(void)
             cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_GRAY);
         }
     }
-    /* Status is already reflected by the amount control; no footer over the cards. */\n    /* cv_text(8,154,&FONT_XS,set.performance.chaos_amount?"MAELSTROM ACTIVE":"BYPASS  /  SIGNAL UNTOUCHED",
-        set.performance.chaos_amount?accent:C_GRAY);
 }
 
 /* Whole-patch pitch: every note from this layer shares the same octave/cents offset. */
