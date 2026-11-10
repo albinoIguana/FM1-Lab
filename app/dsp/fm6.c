@@ -11,6 +11,18 @@
 #include "felucca_tables.h"
 #include "felucca_fm6.h"
 
+/* FM6's two operator buses must be private to each render call when CPU2 is
+ * active. The upstream FELUCCA_CPU2 branch moves them from shared static
+ * storage to the render stack, preventing cross-core bus races. */
+#if defined(FM1B_CPU2) || defined(FM6_TEST)
+#ifndef FELUCCA_CPU2
+#define FELUCCA_CPU2 1
+#endif
+#endif
+#ifndef FM6_TEST
+#include "plat.h"
+#endif
+
 /* FM6 core source: Apache-2.0, Copyright Google / Pascal Gauthier / Leo Kuroshita.
  * Do not remove its SPDX header or attribution. */
 #include "../../upstream/felucca/firmware/src/fm6_core.c"
@@ -76,6 +88,16 @@ typedef struct {
 
 static fm1lab_patch_t instrument[PATCHES];
 static fm1lab_voice_t voices[VOICES];
+
+/* Dual-core render scratch lives in .pool, not either core's small stack.
+ * The active-voice index list is rebuilt each 32-sample quantum, so a single
+ * patch's notes are split too (rather than splitting fixed patch-slot ranges). */
+static uint8_t fm6_voice_work[VOICES] PLAT_POOL;
+static int64_t fm6_patch_mix[2][PATCHES][FM6_N] PLAT_POOL;
+static int32_t fm6_voice_bus[2][FM6_N] PLAT_POOL;
+static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES / 2u] PLAT_POOL;
+static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
+
 static fm1lab_insert_state_t fm6_master_inserts;
 static uint32_t fm6_amp_drive_gain_q15, fm6_amp_output_gain_q15;
 static uint16_t fm6_tone_alpha_q15;
@@ -102,6 +124,11 @@ static int32_t fm6_chaos_random_hold;
 
 
 #ifdef FM6_TEST
+static uint8_t fm6_test_cpu2_mode;
+void fm6_test_set_cpu2_mode(uint8_t mode)
+{
+    fm6_test_cpu2_mode = mode <= 2u ? mode : 0u;
+}
 static uint64_t fm6_test_patch_peak_q24[PATCHES];
 static uint64_t fm6_test_dry_peak_q24;
 static uint64_t fm6_test_send_peak[4][2];
@@ -1099,6 +1126,64 @@ void fm6_pitch_bend(uint16_t value)
     pitch_bend_16 = (int16_t)(((int32_t)value - 8192) * 32 / 8192);
 }
 
+/* Render a contiguous slice of the dynamically packed active-voice list.
+ * Each worker owns its voices, output accumulator and FM6 operator bus. */
+static void fm6_render_voice_range(uint32_t first, uint32_t end,
+                                   int64_t patch_mix[PATCHES][FM6_N],
+                                   int32_t bus[FM6_N])
+{
+    for (uint32_t k = first; k < end; ++k) {
+        uint32_t i;
+        fm1lab_voice_t *voice = &voices[fm6_voice_work[k]];
+        fm1lab_patch_t *patch = &instrument[voice->patch];
+        int32_t pitch, fb;
+        if (!voice->used)
+            continue;
+        pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16 + voice->tune16 + pitch_bend_16, 0);
+        /* Q24 log2-frequency offset: octave is exact; cents retain 1-cent resolution. */
+        pitch += (int32_t)patch->octave * (1 << 24);
+        pitch += (int32_t)(((int64_t)patch->fine_cents * (1LL << 24)) / 1200LL);
+        fb = patch->feedback;
+        if (fm6_note_compute(&voice->state, patch->effective, bus,
+                             patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
+                             pitch, patch->effective[FP_ALG], fb, patch->detune, patch->mod_level)) {
+            int32_t dc = voice->state.dc;
+            uint8_t shedding = voice->fade_out != 0u;
+            for (i = 0; i < FM6_N; i++) {
+                int32_t x = bus[i] - dc;
+                dc += x >> 10; /* ~7 Hz high-pass; FM sidebands can otherwise leave DC. */
+                if (voice->fade_in) {
+                    uint32_t gain = 32u - voice->fade_in;
+                    x = (int32_t)(((int64_t)x * gain) >> 5);
+                    voice->fade_in--;
+                }
+                if (voice->fade_out) {
+                    x = (int32_t)(((int64_t)x * voice->fade_out) >> 5);
+                    --voice->fade_out;
+                }
+                patch_mix[voice->patch][i] += (((int64_t)x * patch_gain_q15[voice->patch]) >> 15) * FM6_PATCH_CALIBRATION_Q15 >> 15;
+            }
+            voice->state.dc = dc;
+            if (shedding && !voice->fade_out) {
+                voice->state.live = 0;
+                voice->used = 0;
+            }
+        }
+        if (voice->used && fm6_note_done(&voice->state, patch->effective, patch->effective[FP_ALG])) {
+            voice->state.live = 0;
+            voice->used = 0;
+        }
+    }
+}
+
+static void fm6_cpu2_voice_job(uint32_t unused)
+{
+    (void)unused;
+    fm6_render_voice_range(fm6_cpu2_job_start,
+                           fm6_cpu2_job_start + fm6_cpu2_job_count,
+                           fm6_patch_mix[1], fm6_voice_bus[1]);
+}
+
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
 #ifdef FM6_TEST
@@ -1108,12 +1193,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 #endif
     uint32_t base;
     for (base = 0; base < frames; base += FM6_N) {
-        int64_t patch_mix[PATCHES][FM6_N] = {{0}};
         int32_t patch_gain_q15[PATCHES] = {0};
         int32_t patch_pan_l_q15[PATCHES], patch_pan_r_q15[PATCHES];
         uint32_t p, v, i;
         uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
 
+        fm6_zero_bytes(fm6_patch_mix, sizeof fm6_patch_mix);
         /* Patch level is an independent linear-amplitude control. Never
          * renormalize it when other patches become active or inactive. */
         for (p = 0; p < PATCHES; ++p) {
@@ -1126,48 +1211,74 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             patch_lfo_delay[p] = fm6_lfo_delay(&patch_lfo[p]);
         }
 
-        for (v = 0; v < VOICES; v++) {
-            fm1lab_voice_t *voice = &voices[v];
-            fm1lab_patch_t *patch;
-            int32_t bus[FM6_N];
-            int32_t pitch, fb;
-            if (!voice->used)
-                continue;
-            patch = &instrument[voice->patch];
-            pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16 + voice->tune16 + pitch_bend_16, 0);
-            /* Q24 log2-frequency offset: octave is exact; cents retain 1-cent resolution. */
-            pitch += (int32_t)patch->octave * (1 << 24);
-            pitch += (int32_t)(((int64_t)patch->fine_cents * (1LL << 24)) / 1200LL);
-            fb = patch->feedback;
-            if (fm6_note_compute(&voice->state, patch->effective, bus,
-                                 patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
-                                 pitch, patch->effective[FP_ALG], fb, patch->detune, patch->mod_level)) {
-                int32_t dc = voice->state.dc;
-                uint8_t shedding = voice->fade_out != 0u;
-                for (i = 0; i < FM6_N; i++) {
-                    int32_t x = bus[i] - dc;
-                    dc += x >> 10; /* ~7 Hz high-pass; FM sidebands can otherwise leave DC. */
-                    if (voice->fade_in) {
-                        uint32_t gain = 32u - voice->fade_in;
-                        x = (int32_t)(((int64_t)x * gain) >> 5);
-                        voice->fade_in--;
-                    }
-                    if (voice->fade_out) {
-                        x = (int32_t)(((int64_t)x * voice->fade_out) >> 5);
-                        --voice->fade_out;
-                    }
-                    patch_mix[voice->patch][i] += (((int64_t)x * patch_gain_q15[voice->patch]) >> 15) * FM6_PATCH_CALIBRATION_Q15 >> 15;
+        /* Pack only sounding voices, then divide that list. This is important:
+         * a fixed split by patch index would leave the second core idle when a
+         * single patch is being played. */
+        uint32_t active_voice_count = 0u;
+        for (v = 0; v < VOICES; ++v)
+            if (voices[v].used)
+                fm6_voice_work[active_voice_count++] = (uint8_t)v;
+
+        if (active_voice_count > 1u) {
+            uint32_t split = (active_voice_count + 1u) / 2u;
+            fm6_cpu2_job_start = split;
+            fm6_cpu2_job_count = active_voice_count - split;
+#ifdef FM6_TEST
+            if (fm6_test_cpu2_mode == 1u || fm6_test_cpu2_mode == 2u) {
+                for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
+                    fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
+                if (fm6_test_cpu2_mode == 1u) {
+                    fm6_cpu2_voice_job(0u);
+                    fm6_render_voice_range(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
+                    for (p = 0; p < PATCHES; ++p)
+                        for (i = 0; i < FM6_N; ++i)
+                            fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
+                } else {
+                    uint32_t partial = fm6_cpu2_job_count / 2u;
+                    if (!partial) partial = 1u;
+                    fm6_render_voice_range(split, split + partial,
+                                           fm6_patch_mix[1], fm6_voice_bus[1]);
+                    fm6_render_voice_range(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
+                    for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
+                        voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
+                    fm6_render_voice_range(split, active_voice_count,
+                                           fm6_patch_mix[0], fm6_voice_bus[0]);
                 }
-                voice->state.dc = dc;
-                if (shedding && !voice->fade_out) {
-                    voice->state.live = 0;
-                    voice->used = 0;
+            } else {
+                fm6_render_voice_range(0u, active_voice_count,
+                                       fm6_patch_mix[0], fm6_voice_bus[0]);
+            }
+#else
+            if (plat_cpu2_on()) {
+                for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
+                    fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
+                if (plat_cpu2_run(fm6_cpu2_voice_job, 0u)) {
+                    fm6_render_voice_range(0u, split,
+                                           fm6_patch_mix[0], fm6_voice_bus[0]);
+                    if (plat_cpu2_wait() == 0) {
+                        for (p = 0; p < PATCHES; ++p)
+                            for (i = 0; i < FM6_N; ++i)
+                                fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
+                    } else {
+                        /* If core 1 was late or faulted mid-job, roll back its
+                         * voice state before rendering that half on core 0. */
+                        for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
+                            voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
+                        fm6_render_voice_range(split, active_voice_count,
+                                               fm6_patch_mix[0], fm6_voice_bus[0]);
+                    }
+                } else {
+                    fm6_render_voice_range(0u, active_voice_count,
+                                           fm6_patch_mix[0], fm6_voice_bus[0]);
                 }
+            } else {
+                fm6_render_voice_range(0u, active_voice_count,
+                                       fm6_patch_mix[0], fm6_voice_bus[0]);
             }
-            if (voice->used && fm6_note_done(&voice->state, patch->effective, patch->effective[FP_ALG])) {
-                voice->state.live = 0;
-                voice->used = 0;
-            }
+#endif
+        } else {
+            fm6_render_voice_range(0u, active_voice_count,
+                                   fm6_patch_mix[0], fm6_voice_bus[0]);
         }
 
         for (i = 0; i < count; i++) {
@@ -1240,7 +1351,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
             int64_t dry=0, dry_l=0, dry_r=0, send_accum[4][2]={{0,0},{0,0},{0,0},{0,0}};
             for(uint32_t p=0;p<PATCHES;p++) {
-                int64_t sample=patch_mix[p][i];
+                int64_t sample=fm6_patch_mix[0][p][i];
                 if(arp_output==1u)sample=(sample*arp_amp_gain_q15)>>15;
 #ifdef FM6_TEST
                 uint64_t patch_abs=fm6_test_abs_i64(sample);
