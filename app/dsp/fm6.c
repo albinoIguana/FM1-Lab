@@ -22,12 +22,6 @@
 #ifndef FM6_TEST
 #include "plat.h"
 #endif
-#if defined(PLAT_WEB)
-__attribute__((import_module("env"), import_name("fm1lab_cpu2_start")))
-extern void fm1lab_cpu2_start(void);
-__attribute__((import_module("env"), import_name("fm1lab_cpu2_end")))
-extern void fm1lab_cpu2_end(void);
-#endif
 
 /* FM6 core source: Apache-2.0, Copyright Google / Pascal Gauthier / Leo Kuroshita.
  * Do not remove its SPDX header or attribution. */
@@ -117,6 +111,7 @@ static int32_t fm6_voice_bus[2][FM6_N] PLAT_POOL;
 static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES / 2u] PLAT_POOL;
 static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
 static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
+static volatile uint32_t fm6_cpu2_total_job_ticks;
 
 static fm1lab_insert_state_t fm6_master_inserts;
 static uint32_t fm6_amp_drive_gain_q15, fm6_amp_output_gain_q15;
@@ -923,6 +918,7 @@ void fm6_init(void)
     fm6_zero_bytes(patch_lfo_delay, sizeof(patch_lfo_delay));
     age_counter = 0;
     overload_shed_count = 0u;
+    fm6_cpu2_total_job_ticks = 0u;
     output_gain_q12 = 0;
     limiter_gain_q15 = 32768;
 #ifdef FM6_TEST
@@ -1202,22 +1198,21 @@ static void fm6_cpu2_voice_job(uint32_t unused)
 #ifndef FM6_TEST
     uint32_t t0 = plat_ticks24();
 #endif
-#if defined(PLAT_WEB)
-    fm1lab_cpu2_start();
-#endif
     fm6_render_voice_range(fm6_cpu2_job_start,
                            fm6_cpu2_job_start + fm6_cpu2_job_count,
                            fm6_patch_mix[1], fm6_voice_bus[1]);
-#if defined(PLAT_WEB)
-    fm1lab_cpu2_end();
-#endif
 #ifndef FM6_TEST
-    fm6_cpu2_job_us = (plat_ticks24() - t0) / PLAT_TICKS_PER_US;
+    {
+        uint32_t elapsed = plat_ticks24() - t0;
+        fm6_cpu2_job_us = elapsed / PLAT_TICKS_PER_US;
+        fm6_cpu2_total_job_ticks += elapsed;
+    }
 #endif
 }
 
 uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
 uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
+uint32_t fm6_cpu2_total_job_ticks(void) { return fm6_cpu2_total_job_ticks; }
 
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
