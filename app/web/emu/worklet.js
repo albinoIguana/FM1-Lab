@@ -20,7 +20,11 @@ class Fm1 extends AudioWorkletProcessor {
     this.lastFrame = 0;
     this.busy = 0;
     this.frames = 0;
+    this.deviceCore0Q12 = 0;
+    this.deviceCore2Q12 = 0;
     this.deviceLoadQ12 = 0;
+    this.deviceCore0 = 0;
+    this.deviceCore2 = 0;
     this.deviceLoad = 0;
     this.deviceXruns = 0;
     this.port.onmessage = (e) => this.onMessage(e.data);
@@ -80,6 +84,7 @@ class Fm1 extends AudioWorkletProcessor {
     const blits = ex.web_blits();
     const msg = { type: "frame", buttons: ex.web_lit_buttons() >>> 0, keys: ex.web_lit_keys() >>> 0,
                   dimButtons: ex.web_dim_buttons() >>> 0, dimKeys: ex.web_dim_keys() >>> 0,
+                  deviceCore0: this.deviceCore0, deviceCore2: this.deviceCore2,
                   deviceLoad: this.deviceLoad, deviceXruns: this.deviceXruns };
     if (this.frames >= 44100) {                       // the share of real time spent running the device
       msg.load = Math.round(100 * this.busy / (this.frames / 44.1));
@@ -127,9 +132,14 @@ class Fm1 extends AudioWorkletProcessor {
         const core0 = Math.max(0, m.renderMs - core1);
         const criticalMs = Math.max(core0, core1);
         const budgetMs = 256 * 1000 / 44100;
-        const rawQ12 = Math.round(criticalMs * 4096 / budgetMs);
-        this.deviceLoadQ12 = Math.floor((this.deviceLoadQ12 * 15 + rawQ12 + 8) / 16);
-        this.deviceLoad = Math.round(this.deviceLoadQ12 * 100 / 4096);
+        const core0Q12 = Math.round(core0 * 4096 / budgetMs);
+        const core2Q12 = Math.round(core1 * 4096 / budgetMs);
+        this.deviceCore0Q12 = Math.floor((this.deviceCore0Q12 * 15 + core0Q12 + 8) / 16);
+        this.deviceCore2Q12 = Math.floor((this.deviceCore2Q12 * 15 + core2Q12 + 8) / 16);
+        this.deviceLoadQ12 = Math.max(this.deviceCore0Q12, this.deviceCore2Q12);
+        this.deviceCore0 = Math.round(this.deviceCore0Q12 * 100 / 4096);
+        this.deviceCore2 = Math.round(this.deviceCore2Q12 * 100 / 4096);
+        this.deviceLoad = Math.max(this.deviceCore0, this.deviceCore2);
         if (criticalMs > budgetMs * 0.9 && this.ex.app_overload) this.ex.app_overload();
         if (criticalMs > budgetMs) this.deviceXruns++;
         if (this.ex.app_audio_set_device_metrics)
