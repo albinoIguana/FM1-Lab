@@ -654,6 +654,14 @@ static int32_t fm6_phaser_channel(int32_t input, int32_t state[4], uint32_t phas
 }
 static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4][2],int64_t *left,int64_t *right)
 {
+    /* True bypass: the old path still clocked every delay/comb buffer and ran
+     * both four-stage phasers while all effects were OFF. On the FM1 this
+     * consumed a large share of the 5.8 ms audio budget before a note played. */
+    if(!fx_enabled[0] && !fx_enabled[1] && !fx_enabled[2] && !fx_enabled[3]) {
+        *left=input_l;
+        *right=input_r;
+        return;
+    }
     int32_t chorus=0,chorus_r=0,reverb=0,phaser_l=0,phaser_r=0;
     uint32_t cp=fx_chorus_pos&(FM6_CHORUS_SIZE-1u), dp=fx_delay_pos&(FM6_DELAY_SIZE-1u);
     uint32_t tri=(fx_lfo_phase>>16)&1023u, depth=tri<512u?tri:1023u-tri;
@@ -720,10 +728,7 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
         fx_phaser_feedback_l=phaser_l;
         fx_phaser_feedback_r=phaser_r;
     } else {
-        /* Feed silence through the all-pass states while bypassed so a stale
-         * resonant tail cannot jump out when the processor is re-enabled. */
-        (void)fm6_phaser_channel(0,fx_phaser_state_l,(fx_phaser_phase>>16)&0xFFFFu);
-        (void)fm6_phaser_channel(0,fx_phaser_state_r,((fx_phaser_phase+0x40000000u)>>16)&0xFFFFu);
+        /* A bypassed Phaser is genuinely idle; re-enable resets its state. */
         fx_phaser_feedback_l=0;
         fx_phaser_feedback_r=0;
     }
@@ -1466,7 +1471,36 @@ uint8_t fm6_test_arpeggiator_amp_level(void)
     return (uint8_t)(level>=32768u?127u:level*127u/32768u);
 }
 #endif
-void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled) { if(effect<4u) fx_enabled[effect]=enabled!=0u; }
+void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled)
+{
+    if(effect>=4u)return;
+    uint8_t next=(uint8_t)(enabled!=0u);
+    if(!fx_enabled[effect] && next) {
+        /* Never resurrect a tail from before a bypass interval. */
+        if(effect==0u) {
+            fm6_zero_bytes(fx_chorus,sizeof(fx_chorus));
+            fm6_zero_bytes(fx_chorus_r,sizeof(fx_chorus_r));
+            fx_chorus_pos=0u;
+        } else if(effect==1u) {
+            fm6_zero_bytes(fx_delay,sizeof(fx_delay));
+            fm6_zero_bytes(fx_delay_r,sizeof(fx_delay_r));
+            fx_delay_pos=0u;
+        } else if(effect==2u) {
+            fm6_zero_bytes(fx_comb_a,sizeof(fx_comb_a));
+            fm6_zero_bytes(fx_comb_a_r,sizeof(fx_comb_a_r));
+            fm6_zero_bytes(fx_comb_b,sizeof(fx_comb_b));
+            fm6_zero_bytes(fx_comb_b_r,sizeof(fx_comb_b_r));
+            fm6_zero_bytes(fx_comb_c,sizeof(fx_comb_c));
+            fm6_zero_bytes(fx_comb_c_r,sizeof(fx_comb_c_r));
+            fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u;
+        } else {
+            fm6_zero_bytes(fx_phaser_state_l,sizeof(fx_phaser_state_l));
+            fm6_zero_bytes(fx_phaser_state_r,sizeof(fx_phaser_state_r));
+            fx_phaser_feedback_l=fx_phaser_feedback_r=0;
+        }
+    }
+    fx_enabled[effect]=next;
+}
 void fm6_fx_set_mix(uint8_t effect,uint8_t mix) { if(effect<4u) fx_mix[effect]=mix>100u?100u:mix; }
 void fm6_fx_set_time(uint8_t effect,uint8_t value) { if(effect<4u) fx_time[effect]=value>100u?100u:value; }
 void fm6_fx_set_feedback(uint8_t effect,uint8_t value) { if(effect<4u) fx_feedback[effect]=value>(effect==0u?70u:90u)?(effect==0u?70u:90u):value; }
@@ -1643,7 +1677,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
     fm6_comp_params_update();
     fm6_chaos_set(s->chaos_amount,s->chaos_rate,s->chaos_tone,s->chaos_shape);
     for(uint32_t fx=0;fx<4u;fx++){
-        fx_enabled[fx]=s->fx_enabled[fx];fx_mix[fx]=s->fx_mix[fx];
+        fm6_fx_set_enabled((uint8_t)fx,s->fx_enabled[fx]);fx_mix[fx]=s->fx_mix[fx];
         fx_time[fx]=s->fx_time[fx];fx_feedback[fx]=s->fx_feedback[fx];
         fx_depth[fx]=s->fx_depth[fx];
         for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){fx_send[patch][fx]=s->fx_send[patch][fx];fx_send[patch+FM1LAB_PATCH_COUNT][fx]=s->fx_send[patch][fx];}
