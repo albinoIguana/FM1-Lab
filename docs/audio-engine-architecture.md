@@ -44,6 +44,12 @@ References:
 - [Official M-VAVE FM1 open-source app](https://github.com/m-vave/fm1_open)
 - [FM-Stud1o firmware and profiling documentation](https://github.com/MPASTEAU/FM-Stud1o-FM-1-Firmware)
 
+## Browser emulator audio-budget model
+
+The browser build explicitly enables `FM1B_CPU2`, so it exercises the same voice-list split and FM6 per-core scratch path as the device. fm1-base's host platform executes its CPU2 worker synchronously; this is not real parallel execution. The app-specific AudioWorklet hooks time the whole app render and the CPU2 half separately, then estimate the two-core critical path as `max(core 0, core 1)`. That estimate is compared with the device's 256-frame / 5.805 ms audio-block budget, smoothed with the same 16-block IIR, and invokes the same `app_overload()` voice-shed callback above 90%. A modeled block over 100% increments the emulator's simulated deadline-miss counter.
+
+The emulator status line keeps browser execution load separate from the FM1 budget estimate. Browser timing is useful for relative workload comparisons, but it is not cycle-accurate AC791N timing: WASM execution speed and browser scheduling vary by device. Physical FM1 CPU/XRUN measurements remain the calibration reference. The emulator models the deadline, voice-shedding threshold and split policy; it does not claim to reproduce silicon instruction timing or real CPU2 concurrency.
+
 ## Device-side headroom telemetry
 
 The exact pinned fm1-base platform revision used by this branch (`2d8ed748cdade582c65d9fc8d8cf17da4ddadec8`) exposes:
