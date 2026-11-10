@@ -97,6 +97,7 @@ static int64_t fm6_patch_mix[2][PATCHES][FM6_N] PLAT_POOL;
 static int32_t fm6_voice_bus[2][FM6_N] PLAT_POOL;
 static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES / 2u] PLAT_POOL;
 static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
+static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 
 static fm1lab_insert_state_t fm6_master_inserts;
 static uint32_t fm6_amp_drive_gain_q15, fm6_amp_output_gain_q15;
@@ -1179,10 +1180,19 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
 static void fm6_cpu2_voice_job(uint32_t unused)
 {
     (void)unused;
+#ifndef FM6_TEST
+    uint32_t t0 = plat_ticks24();
+#endif
     fm6_render_voice_range(fm6_cpu2_job_start,
                            fm6_cpu2_job_start + fm6_cpu2_job_count,
                            fm6_patch_mix[1], fm6_voice_bus[1]);
+#ifndef FM6_TEST
+    fm6_cpu2_job_us = (plat_ticks24() - t0) / PLAT_TICKS_PER_US;
+#endif
 }
+
+uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
+uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
 
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
@@ -1257,7 +1267,10 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 if (plat_cpu2_run(fm6_cpu2_voice_job, 0u)) {
                     fm6_render_voice_range(0u, split,
                                            fm6_patch_mix[0], fm6_voice_bus[0]);
-                    if (plat_cpu2_wait() == 0) {
+                    uint32_t wait_t0 = plat_ticks24();
+                    int wait_rc = plat_cpu2_wait();
+                    fm6_cpu2_wait_us = (plat_ticks24() - wait_t0) / PLAT_TICKS_PER_US;
+                    if (wait_rc == 0) {
                         for (p = 0; p < PATCHES; ++p)
                             for (i = 0; i < FM6_N; ++i)
                                 fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
