@@ -56,6 +56,10 @@ jobs:
           tar -xf previous-pages/artifact.tar -C _site
           mkdir -p _site/native-emulator
           cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js _site/native-emulator/
+          build_sha="${GITHUB_SHA}"
+          printf 'Build identity: %s\\n' "${build_sha:0:8}"
+          sed -i "s/__FM1_BUILD_SHA__/${build_sha:0:8}/g" _site/native-emulator/index.html
+          ! grep -q "__FM1_BUILD_SHA__" _site/native-emulator/index.html
           test -s _site/index.html
           test -s _site/m-vave/simulator.wasm
           test -s _site/native-emulator/index.html
