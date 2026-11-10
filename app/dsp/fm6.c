@@ -1212,7 +1212,7 @@ static void fm6_cpu2_voice_job(uint32_t unused)
 
 uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
 uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
-uint32_t fm6_cpu2_total_job_ticks_accum(void) { return fm6_cpu2_total_job_ticks_accum; }
+uint32_t fm6_cpu2_total_job_ticks(void) { return fm6_cpu2_total_job_ticks_accum; }
 
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
