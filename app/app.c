@@ -1381,8 +1381,9 @@ static void sequencer_event_edit(uint8_t field,int delta)
     if(!event || !delta)return;
     uint8_t lane=seq_ui_lane;
     if(field==0u) {
+        /* K1 is expressed in whole sequencer steps (two engine ticks). */
         int32_t max=(int32_t)set.performance.seq_length*2-event->start;
-        event->duration=(uint8_t)clamp((int32_t)event->duration+delta,1,max);
+        event->duration=(uint8_t)clamp((int32_t)event->duration+delta*2,2,max);
     } else if(field==1u)event->pitch=(uint8_t)clamp((int32_t)event->pitch+delta,0,127);
     else if(field==2u)event->accent=(uint8_t)clamp((int32_t)event->accent+delta,0,100);
     else event->velocity=(uint8_t)clamp((int32_t)event->velocity+delta,1,127);
@@ -3317,7 +3318,7 @@ static void draw_sequencer_panel(void)
 }
 static void draw_sequencer_piano_panel(void)
 {
-    char value[20];
+    char value[20], pitch[20];
     const uint8_t lane=seq_ui_lane, first=(uint8_t)((seq_ui_step/16u)*16u);
     const uint16_t accent=patch_color(seq_ui_patch[lane]);
     const int32_t gx=24, gy=26, gw=208, gh=72, cw=13, rh=3;
@@ -3329,10 +3330,10 @@ static void draw_sequencer_piano_panel(void)
     const int32_t high=low+23;
     instrument_card(4,2,232,176,panel_fill(),accent,accent);
 
-    /* Track identity and Instrument name have separate, bounded fields. */
     cv_text_fit(12,8,&FONT_XS,lane?"TRACK 2 / NOTES":"TRACK 1 / NOTES",accent,100);
     cv_text_fit(120,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE,104);
 
+    /* Piano-roll window. */
     for(uint32_t row=0;row<24u;row++) {
         int32_t note=high-(int32_t)row, y=gy+(int32_t)row*rh;
         uint8_t pc=(uint8_t)(note%12);
@@ -3378,24 +3379,27 @@ static void draw_sequencer_piano_panel(void)
         }
     }
 
-    /* Two readout rows with fixed columns keep long values apart. */
-    cv_text(12,113,&FONT_XS,"NOTE",C_GRAY);
-    if(selected)int_text(selected->pitch,value);else {value[0]='-';value[1]='-';value[2]='\0';}
-    cv_text(42,113,&FONT_B,value,accent);
-    cv_text(92,113,&FONT_XS,"LENGTH",C_GRAY);
-    int_text(selected?selected->duration:0,value);
-    cv_text(142,113,&FONT_B,value,C_WHITE);
+    /* Four encoder readouts, arranged as a compact 2x2 grid. */
+    cv_text(12,116,&FONT_XS,"K1 LEN",C_GRAY);
+    if(selected)int_text((selected->duration+1u)/2u,value);
+    else {value[0]='-';value[1]='\\0';}
+    cv_text_fit(58,116,&FONT_B,value,C_WHITE,48);
+    cv_text(124,116,&FONT_XS,"K2 PITCH",C_GRAY);
+    if(selected)note_name(selected->pitch,pitch);
+    else {pitch[0]='-';pitch[1]='-';pitch[2]='\\0';}
+    cv_text_fit(178,116,&FONT_B,pitch,accent,50);
 
-    cv_text(12,128,&FONT_XS,"ACCENT",C_GRAY);
-    int_text(selected?selected->accent:0,value);
-    cv_text(54,128,&FONT_B,value,C_WHITE);
-    cv_text(92,128,&FONT_XS,"VELOCITY",C_GRAY);
-    int_text(selected?selected->velocity:0,value);
-    cv_text(158,128,&FONT_B,value,C_WHITE);
+    cv_text(12,137,&FONT_XS,"K3 ACC",C_GRAY);
+    if(selected)int_text(selected->accent,value);
+    else {value[0]='-';value[1]='\\0';}
+    cv_text_fit(58,137,&FONT_B,value,C_WHITE,48);
+    cv_text(124,137,&FONT_XS,"K4 VEL",C_GRAY);
+    if(selected)int_text(selected->velocity,value);
+    else {value[0]='-';value[1]='\\0';}
+    cv_text_fit(178,137,&FONT_B,value,C_WHITE,50);
 
-    cv_text_fit(12,145,&FONT_XS,"K1 LENGTH   K2 PITCH",C_GRAY,210);
-    cv_text_fit(12,159,&FONT_XS,"K3 ACCENT   K4 VELOCITY",C_GRAY,210);
-    cv_text_fit(12,169,&FONT_XS,"SELECT NOTE   EDIT DELETE",C_WHITE,210);
+    /* This instruction is below and outside the piano-roll grid. */
+    cv_text_fit(12,161,&FONT_XS,"SELECT: NOTE   EDIT: DELETE",C_WHITE,210);
 }
 
 static void draw_save_panel(void)
