@@ -1643,6 +1643,7 @@ void app_init(void)
     int performance_loaded = 0;
     int loaded;
     fm6_init();
+    (void)plat_cpu2_set(1); /* optional second-core audio worker; fm1.toml enables safe fallback */
     settings_defaults();
     loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
     if (loaded == (int)sizeof set && settings_valid(&set)) {
@@ -3869,6 +3870,7 @@ static void draw(void)
         text_cat(diag, " SH ");
         int_text((int32_t)app_audio_overload_shed_count(), number);
         text_cat(diag, number);
+        text_cat(diag, plat_cpu2_on() ? " C2" : " C1");
         cv_text_fit(62, 4, &FONT_XS, diag, C_GRAY, 132);
     }
     page_counter(page, t, sizeof(t));
@@ -3979,6 +3981,14 @@ int app_expect(const char *what, int *got)
         *got = (int)app_audio_xruns();
     else if (!fm1lab_strcmp(what, "shed"))
         *got = (int)app_audio_overload_shed_count();
+    else if (!fm1lab_strcmp(what, "cpu2"))
+        *got = plat_cpu2_on();
+    else if (!fm1lab_strcmp(what, "cpu2stack"))
+        *got = (int)plat_cpu2_stack();
+    else if (!fm1lab_strcmp(what, "cpu2bad"))
+        *got = (int)plat_cpu2_bad();
+    else if (!fm1lab_strcmp(what, "cpu2why"))
+        *got = plat_cpu2_gave_up();
     else if (!fm1lab_strcmp(what, "vel"))           /* the last key's velocity and pressure */
         *got = ui.vel[ui.last_key];
     else if (!fm1lab_strcmp(what, "prs"))
