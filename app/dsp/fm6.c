@@ -22,6 +22,12 @@
 #ifndef FM6_TEST
 #include "plat.h"
 #endif
+#if defined(PLAT_WEB)
+__attribute__((import_module("env"), import_name("fm1lab_cpu2_start")))
+extern void fm1lab_cpu2_start(void);
+__attribute__((import_module("env"), import_name("fm1lab_cpu2_end")))
+extern void fm1lab_cpu2_end(void);
+#endif
 
 /* FM6 core source: Apache-2.0, Copyright Google / Pascal Gauthier / Leo Kuroshita.
  * Do not remove its SPDX header or attribution. */
@@ -1196,9 +1202,15 @@ static void fm6_cpu2_voice_job(uint32_t unused)
 #ifndef FM6_TEST
     uint32_t t0 = plat_ticks24();
 #endif
+#if defined(PLAT_WEB)
+    fm1lab_cpu2_start();
+#endif
     fm6_render_voice_range(fm6_cpu2_job_start,
                            fm6_cpu2_job_start + fm6_cpu2_job_count,
                            fm6_patch_mix[1], fm6_voice_bus[1]);
+#if defined(PLAT_WEB)
+    fm1lab_cpu2_end();
+#endif
 #ifndef FM6_TEST
     fm6_cpu2_job_us = (plat_ticks24() - t0) / PLAT_TICKS_PER_US;
 #endif
