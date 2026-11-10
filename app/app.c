@@ -1699,9 +1699,30 @@ void app_init(void)
             set.performance.arp_step_gate[step]=set.performance.arp_step_gate[step]?1u:0u;
         if(!set.performance.seq_event_count[0]&&!set.performance.seq_event_count[1]) {
             uint8_t has_legacy=0u;
-            for(uint32_t lane=0;lane<2u;lane++)for(uint32_t step=0;step<set.performance.seq_length;step++)
-                has_legacy=(uint8_t)(has_legacy||set.performance.seq_enabled[lane][step]);
-            if(has_legacy){settings_migrate_step_events(&set);set_dirty=1u;}
+            /* Earlier first-boot builds seeded a throwaway two-lane beat.
+             * Recognize that exact factory pattern and retire it, rather than
+             * migrating it into a real saved user sequence. */
+            uint8_t is_old_factory_seed=(uint8_t)(set.performance.seq_length>=16u);
+            for(uint32_t lane=0;lane<2u;lane++) {
+                for(uint32_t step=0;step<64u;step++) {
+                    uint8_t expected=(uint8_t)(step<16u && (step%4u==(lane?2u:0u)));
+                    if(set.performance.seq_enabled[lane][step]!=expected ||
+                       set.performance.seq_note[lane][step]!=(uint8_t)(lane?67u:48u) ||
+                       set.performance.seq_velocity[lane][step]!=100u ||
+                       (set.performance.seq_gate[lane][step]&0x7fu)!=50u ||
+                       (set.performance.seq_gate[lane][step]&0x80u)) is_old_factory_seed=0u;
+                    has_legacy=(uint8_t)(has_legacy||set.performance.seq_enabled[lane][step]);
+                }
+            }
+            if(is_old_factory_seed) {
+                for(uint32_t lane=0;lane<2u;lane++)
+                    for(uint32_t step=0;step<64u;step++)
+                        set.performance.seq_enabled[lane][step]=0u;
+                set_dirty=1u;
+            } else if(has_legacy) {
+                settings_migrate_step_events(&set);
+                set_dirty=1u;
+            }
         }
     }
     fm6_set_swing((uint8_t)set.swing);
@@ -1751,14 +1772,20 @@ void app_init(void)
             seq_ui_instrument[lane] = 0u;
             seq_ui_patch[lane] = 0u;
             for (uint32_t step = 0; step < 64u; ++step) {
-                seq_ui_note[lane][step] = (uint8_t)(lane ? 67u : 48u);
+                seq_ui_note[lane][step] = 60u;
                 seq_ui_velocity[lane][step] = 100u;
-                seq_ui_gate[lane][step] = 50u;
-                seq_ui_enabled[lane][step] = (uint8_t)((step < 16u) && (step % 4u == (lane ? 2u : 0u)));
-                 seq_ui_accent[lane][step] = 50u;
-                /* Performance state is applied below from one coherent snapshot. */
+                seq_ui_gate[lane][step] = 75u;
+                seq_ui_enabled[lane][step] = 0u;
+                seq_ui_tie[lane][step] = 0u;
+                seq_ui_accent[lane][step] = 0u;
             }
+            seq_event_count[lane]=0u;
+            seq_selected_event[lane]=255u;
+            for(uint32_t i=0;i<APP_SEQ_EVENTS_PER_LANE;i++)
+                seq_event_store[lane][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
         }
+        /* An empty event store is authoritative from the first boot. */
+        seq_event_store_ready=1u;
         performance_publish();
     }
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
