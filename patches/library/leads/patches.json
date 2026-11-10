@@ -13567,9 +13567,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -13743,9 +13745,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -13919,9 +13923,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -14095,9 +14101,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -14271,9 +14279,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -14447,9 +14457,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -14623,9 +14635,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -14799,9 +14813,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -14975,9 +14991,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -15151,9 +15169,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -15327,9 +15347,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -15503,9 +15525,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -15679,9 +15703,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -15855,9 +15881,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -16031,9 +16059,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -16207,9 +16237,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -16383,9 +16415,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -16559,9 +16593,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
@@ -16735,9 +16771,11 @@
       },
       "classification": {
         "primary": "leads",
-        "status": "provisional-folder-hint;needs-audition",
+        "status": "empty-source-slot",
         "auditioned": false,
-        "tags": []
+        "tags": [
+          "exclude-from-curation"
+        ]
       },
       "voice_format": "fm1lab-156-byte",
       "voice_156": [
