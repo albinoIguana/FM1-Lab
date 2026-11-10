@@ -60,7 +60,7 @@ def main(package: Path, out: Path) -> None:
     metadata = json.dumps({
         "version": VERSION,
         "product": product,
-        "pkg": "../firmware/" + pkg_name,
+        "pkg": "firmware/" + pkg_name,
         "backup": False,
         "res": None,
         "boot": None,
