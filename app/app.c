@@ -2803,12 +2803,12 @@ static void draw_startup(uint32_t elapsed)
     /* The source's prismAni background: a black/orange diagonal aperture
      * opens in a flash behind the six original prism forms. */
     if(t<2050u) {
+        static const int16_t aperture[]={-100,-100,100,-100,-100,100,100,100};
         uint32_t f=t<350u?0u:(t<900u?t-350u:(t<1250u?550u:2050u-t));
         if(f>550u)f=550u;
         if(f) {
-            int32_t w=(int32_t)(f*210u/550u);
-            cv_rect(120-w/2,4,w,172,RGB(56,25,8));
-            cv_rect(120-w/2+2,4,w>4?w-4:1,172,RGB(103,54,13));
+            startup_poly(120,90,(int32_t)(f*100u/550u),aperture,4,RGB(56,25,8));
+            startup_poly(120,90,(int32_t)(f*84u/550u),aperture,4,RGB(103,54,13));
         }
     }
 
