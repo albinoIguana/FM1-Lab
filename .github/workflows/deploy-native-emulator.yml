@@ -50,15 +50,13 @@ jobs:
           mkdir -p _site
           tar -xf previous-pages/artifact.tar -C _site
           mkdir -p _site/native-emulator
-          cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js native-emulator/app_worklet.js native-emulator/app_own_worklet.js _site/native-emulator/
+          cp native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js _site/native-emulator/
           test -s _site/index.html
           test -s _site/m-vave/simulator.wasm
           test -s _site/native-emulator/index.html
           test -s _site/native-emulator/app.wasm
           test -s _site/native-emulator/worklet.js
-          test -s _site/native-emulator/app_worklet.js
-          test -s _site/native-emulator/app_own_worklet.js
-
+remove worklet verification
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
