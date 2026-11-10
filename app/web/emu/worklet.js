@@ -124,10 +124,10 @@ class Fm1 extends AudioWorkletProcessor {
     // app_render computes the FM1 deadline model in C from the monotonic
     // clock and the separately timed CPU2 worker. Read its smoothed per-core
     // figures after advancing the simulated device clock.
-    if (this.ex.app_audio_cpu_pct) this.deviceLoad = this.ex.app_audio_cpu_pct();
-    if (this.ex.app_audio_core0_pct) this.deviceCore0 = this.ex.app_audio_core0_pct();
-    if (this.ex.app_audio_core2_pct) this.deviceCore2 = this.ex.app_audio_core2_pct();
-    if (this.ex.app_audio_xruns) this.deviceXruns = this.ex.app_audio_xruns();
+    if (this.ex.web_app_audio_cpu_pct) this.deviceLoad = this.ex.web_app_audio_cpu_pct();
+    if (this.ex.web_app_audio_core0_pct) this.deviceCore0 = this.ex.web_app_audio_core0_pct();
+    if (this.ex.web_app_audio_core2_pct) this.deviceCore2 = this.ex.web_app_audio_core2_pct();
+    if (this.ex.web_app_audio_xruns) this.deviceXruns = this.ex.web_app_audio_xruns();
     this.busy += clock() - t0;
     this.frames += n;
     out[0].set(new Float32Array(this.mem.buffer, this.ex.web_out_l(), n));
