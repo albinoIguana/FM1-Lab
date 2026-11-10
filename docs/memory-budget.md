@@ -1,79 +1,81 @@
 # FM1-Lab memory budget audit
 
 **Target:** M-VAVE FM1, 1 MiB SPI NOR and 512 KiB internal SRAM  
-**Build:** native fm1-base + Felucca-BSP + one pinned Felucca FM6 core  
-**Code baseline:** `c39f1a98ccb0e2bfc49dc5ea4609374457cefffa` (2026-11-06)  
-**Audit status:** native target ELF section totals verified by CI. Physical-device CPU, xrun, stack high-water and listening qualification remain outstanding.
+**Active build:** fm1-base + Felucca-BSP + pinned Felucca FM6 core  
+**Measured build commit:** `94c4b014ddafea81d11e224aa8c0f00a6eac98be` (2026-11-10)  
+**CI:** [Native FM1 build #814](https://github.com/albinoIguana/FM1-Lab/actions/runs/42838837224) — successful  
+**Audit boundary:** linker/build verified; physical-device flashing and runtime qualification are separate.
 
-## 1. Flash is not one 1 MiB application slot
+## 1. Flash budget — current device build
 
-The active Felucca-family linker/loader reserves a **581,564-byte XIP application slot**. The rest of flash is partitioned for boot/update, VM/configuration, Bluetooth data, user data and device reservations. Those regions are not spare firmware capacity.
+The FM1 has 1,048,576 bytes of SPI NOR, but firmware does not own all of it. The active Felucca-family linker/loader gives the application a **581,564-byte XIP slot**.
 
-The latest successful native device build emitted an application image of **202,376 bytes**, leaving **379,188 bytes** in the XIP slot. The packaged `.fwsc` file is not the installed application image size and is not used for this calculation.
+| Flash measurement | Bytes |
+|---|---:|
+| Physical SPI NOR | 1,048,576 |
+| Active application XIP slot | 581,564 |
+| Latest `app.bin` | **310,380** |
+| Remaining XIP headroom | **271,184** |
+| XIP slot used | 53.4% |
+| XIP slot free | 46.6% |
 
-The Instrument store is separately reserved in the 12-sector `0xF0000..0xFBFFF` pool (48 KiB). Do not move these ranges without re-auditing the pinned BSP; see [REBUILD_AUDIT.md](REBUILD_AUDIT.md).
+The measured image is from the latest successful device-target build on 2026-11-10, not the browser emulator's WASM file and not the compressed `.fwsc` update package. The CI log reports `app.bin 310380 / 581564 XIP-slot bytes`.
 
-## 2. SRAM is split into independently enforced regions
+The earlier **453,921-byte** ceiling and **484,552-byte** payload came from the retired M-VAVE SDK/packager path. That packager rejected its own legacy policy limit; it did not measure the active fm1-base/Felucca XIP slot. It is not the current release-build limit and must not be used to calculate current headroom.
 
-The pinned `base/device/app.ld` defines:
+## 2. What is in the firmware image
 
-| Region | Capacity | Purpose |
-|---|---:|---|
-| `.ram_text` | 32,768 B | Code that must execute from RAM |
-| `.data + .bss` | 98,304 B | Initialized and zero-initialized globals, FM6 voices and platform state |
-| `.pool` | 344,064 B | Large static buffers, graphics canvas and shared stereo FX storage |
-| Guarded stacks | 32,768 B | User stack 24,320 B, system stack 7,936 B, plus two 256-byte guard bands |
-| `.noinit` | 15,696 B | Reset-persistent runtime/diagnostic state |
-| Boot-reserved tail | 688 B | Boot information, update mailbox and vectors |
+The active app includes three generated voice-data headers:
 
-These regions total 512 KiB and are not interchangeable. The builder separately checks the 96 KiB `.data + .bss` limit and 336 KiB pool limit, preserving at least 8,192 bytes of pool headroom.
-
-## 3. Latest successful native target build
-
-CI run: [Native FM1 build](https://github.com/albinoIguana/FM1-Lab/actions/runs/42509214735)
-
-| Measurement | Used | Capacity | Remaining |
-|---|---:|---:|---:|
-| XIP application image | 189,588 B | 581,564 B | 391,976 B |
-| `.data + .bss` (builder region check) | 60,788 B | 98,304 B | 37,516 B |
-| `.pool` | 292,544 B | 344,064 B | 51,520 B |
-| `.pool` after mandatory 8 KiB reserve | — | — | 43,328 B |
-
-### Exact ELF section sizes
-
-| ELF section | Used | Region capacity |
+| Embedded dataset | Voices | Encoded voice data |
 |---|---:|---:|
-| `.text` | 195,768 B | Included in XIP image slot |
-| `.ram_text` | 3,556 B | 32,768 B |
-| `.data` | 3,052 B | Part of 98,304 B |
-| `.bss` | 57,732 B | Part of 98,304 B |
-| `.pool` | 292,544 B | 344,064 B |
-| `.noinit` | 1,836 B | 15,696 B |
-| `app.bin` | 202,376 B | 581,564 B |
+| Current curated DX7 factory library | 128 (32 Instruments × 4 patches) | 24,960 bytes/chars |
+| Previous DX7 library retained for exact-match migration | 128 | 24,960 bytes/chars |
+| Previous Digitone library retained for exact-match migration | 124 (31 Instruments × 4 patches) | 24,180 bytes/chars |
+| **Total embedded voice strings** | **380** | **74,100 bytes/chars** |
 
-The raw `.data + .bss` section sum is 60,784 B (3,052 + 57,732); the builder's address-based region check reports 60,788 B, including 4 bytes of alignment. The `.ram_text` region has 29,212 B unused, and `.noinit` has 13,860 B unused. The image size is exactly 202,376 B (195,768 + 3,556 + 3,052), before package wrapping.
+These are Z85-encoded strings in `app/fm1lab_dx7_data.h`, `app/fm1lab_dx7_legacy_data.h`, and `app/fm1lab_digitone_data.h`. All three headers are included by `app/app.c`; the current DX7 set seeds the 32-Instrument factory library, while the older datasets are referenced by startup migration checks so edited user Instruments can be preserved while untouched older factory slots are upgraded.
 
-The FM6 core's two 32-sample operator buses are shared static buffers (256 bytes total), not duplicated per voice. The core's `fm6_note_t` is 244 bytes; 64 live note records account for 15,616 bytes within `.bss`, before the FM1-Lab voice wrappers, eight patch records, LFO state and platform globals. Only one FM6 core is linked.
+The 74,100-byte figure is the encoded source-string payload, not a separately measured linker-symbol total. The current CI memory report aggregates code and read-only constants into `.text`; it does not yet print per-symbol sizes. The full image measurement already includes these embedded strings. The curated 128-voice factory library is therefore **inside the 310,380-byte application image**, not an additional 128-patch allocation on top of it.
 
-## 4. Pool composition and Instrument-wide FX
+The latest ELF section totals show `.text` at 303,768 bytes. That section includes executable code and read-only data; the build does not currently split those categories in its printed report.
 
-The pinned graphics implementation declares a 16-bit canvas of `240 × 144` pixels (**69,120 bytes**). The four stereo FX processors consume **196,608 bytes** of feedback storage. Those known allocations total **265,728 bytes**, leaving 9,536 bytes for other pool users.
+## 3. User-editable Instrument storage is separate from XIP
 
-Amp/Drive and the three-band parametric EQ now run once on the complete stereo Instrument bus after the shared FX returns; they do not allocate four copies of patch-insert state or filter histories. Their 14-byte control state is stored once per Instrument (32 Instruments) in the versioned `OBJ_INSERTS` sidecar. The compact V3 on-flash journal is 936 bytes. Static migration buffers remain large enough to read the older V1/V2 sidecars (3,624-byte record buffer plus 1,806-byte snapshot scratch); those buffers are included in the pool total.
+The app reserves a 12-sector, 4 KiB-per-sector pool at `0xF0000..0xFBFFF` (49,152 bytes) for five pooled objects:
 
-The 479-byte Instrument voice-bank record is unchanged. The sidecar's active/fallback snapshots remain protected by CRC plus bank CRC/generation. Legacy V1/V2 sidecars containing four patch insert records per Instrument migrate to one global state: identical old patch settings are retained; divergent values are safely bypassed and averaged for later manual recovery.
+- Four Instrument bank objects: 3,840 bytes each, eight Instruments per bank; 15,360 bytes of bank payload total.
+- One versioned settings/insert sidecar: 1,704 bytes in the current V5 format.
+- Each object is CRC-protected and the pool maintains current/previous copies with rotating sectors for power-fail safety and wear distribution. The 12 sectors are a shared A/B pool, not five fixed one-sector allocations; do not calculate spare capacity by simply subtracting payload bytes from 49,152.
 
-## 5. What this means
+The three small app objects (settings, panel calibration and BLE state) use their own A/B sectors at `0xEA000`, `0xEC000`, and `0xEE000`, respectively. Together those occupy the separate `0xEA000..0xEFFFF` app-object window. The app map preserves Felucca projects, samples, user preset banks, autosave, voice bank, global sectors and OTA staging as documented in [REBUILD_AUDIT.md](REBUILD_AUDIT.md).
 
-- **Dual-Instrument FM6:** two sequencer tracks now have independent four-patch banks (eight engine patch slots total), each with its own eight-voice pool. The 64-voice state fits the 96 KiB region with 37,516 bytes of link-time headroom. Keep the documented eight-voice-per-patch design.
-- **FX:** continue using one shared stereo effects rack with per-patch sends, not four duplicate effect engines. Preserve the mandatory 8 KiB pool reserve.
-- **Sequencer:** keep the two lanes' step/event state compact and statically bounded.
-- **UI:** the full-width canvas is the dominant pool allocation. A strip/tile renderer remains a fallback if future audio buffers need space; it is not required by this build's memory budget.
-- **CPU:** memory headroom does not prove real-time headroom. The second core is not currently distributing FM6 work. Device CPU percentage and xrun telemetry must be measured under dense four-layer playing and effects.
-- **Stack:** actual stack high-water marks still need a device run under MIDI, BLE and dense synthesis. Do not count stack capacity as free pool.
+**Important distinction:** factory patch source data is embedded in the XIP firmware image; user-editable 32-Instrument records live in the reserved pooled flash store. They are separate budgets and both fit their currently defined regions.
 
-## 6. Measurement boundaries
+## 4. Latest linker section report
 
-The native build workflow prints ELF section sizes for `.text`, `.ram_text`, `.data`, `.bss`, `.pool` and `.noinit`, plus the application image size and region limits. This distinguishes linker-verified capacity from derived allocations and values requiring physical-device measurement.
+The same successful CI run reported:
 
-This audit verifies link-time memory only. It does **not** claim physical-device flashing, worst-case callback timing, stack high-water, runtime heap use, CPU load, xrun-free operation or listening qualification.
+| ELF section / check | Used | Capacity | Remaining |
+|---|---:|---:|---:|
+| `.text` | 303,768 B | Included in XIP slot | — |
+| `.ram_text` | 3,556 B | 32,768 B | 29,212 B |
+| `.data + .bss` | 68,472 B | 98,304 B | 29,832 B |
+| `.pool` | 296,744 B | 344,064 B | 47,320 B |
+| `.pool` after mandatory 8 KiB reserve | — | — | 39,128 B |
+| `.noinit` | 1,836 B | 15,696 B | 13,860 B |
+| `app.bin` | **310,380 B** | **581,564 B** | **271,184 B** |
+
+The application image is exactly `.text + .ram_text + .data` (303,768 + 3,556 + 3,056 = 310,380 bytes). The builder separately checks the 96 KiB `.data + .bss` region, the 32 KiB RAM-text region, and the 336 KiB pool while preserving at least 8,192 bytes of pool headroom.
+
+The CI build expands the platform's 240 × 144 graphics canvas to 240 × 180 before compiling. The resulting 86,400-byte 16-bit canvas and 196,608 bytes of shared stereo FX feedback storage account for 283,008 bytes of the 296,744-byte pool total. The remaining 13,736 bytes cover other pool allocations, including migration and runtime buffers.
+
+## 5. Conclusion and remaining measurement
+
+- **32 Instruments / 128 current factory voices:** retained; no reduction is indicated by the current flash measurement.
+- **Firmware flash:** the latest successful build has **271,184 bytes of XIP headroom** after embedding the current factory library and the legacy migration datasets.
+- **User storage:** four 3,840-byte banks plus the 1,704-byte sidecar are in the dedicated 12-sector pool, separate from the application image.
+- **No flash-map changes are warranted** based on this audit. Do not repurpose OTA staging, Felucca data regions, or device-reserved sectors.
+- The remaining useful precision improvement is a linker map / symbol-size report that attributes the 303,768-byte `.text` section among executable code, the current DX7 data, and legacy migration data. The current build proves total fit, but does not yet provide that per-symbol breakdown.
+
+This audit verifies the successful CI device-target link and configured flash layout. It does not claim physical-device flashing, OTA/recovery qualification, or runtime audio qualification.
