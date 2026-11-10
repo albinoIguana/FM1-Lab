@@ -20,9 +20,6 @@ class Fm1 extends AudioWorkletProcessor {
     this.lastFrame = 0;
     this.busy = 0;
     this.frames = 0;
-    this.deviceCore0Q12 = 0;
-    this.deviceCore2Q12 = 0;
-    this.deviceLoadQ12 = 0;
     this.deviceCore0 = 0;
     this.deviceCore2 = 0;
     this.deviceLoad = 0;
@@ -32,7 +29,10 @@ class Fm1 extends AudioWorkletProcessor {
 
   async onMessage(m) {
     if (m.type === "load") {
-      const now = () => BigInt(Math.round(currentTime * 1e9));
+      // C's plat_ticks24()/clock_gettime are performance counters in the
+      // host simulator, not the virtual audio timeline. Use monotonic wall
+      // time so render and CPU2 spans can be measured inside this worklet.
+      const now = () => BigInt(Math.round(performance.now() * 1e6));
       const wasi = {
         clock_time_get: (id, prec, out) => {
           new DataView(this.mem.buffer).setBigUint64(out, now(), true);
