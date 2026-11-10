@@ -727,9 +727,10 @@ static int fm1lab_seed_dx7_legacy_instrument(uint32_t index,fm1lab_instrument_t 
 }
 /* Factory instrument identity follows the first DX7 voice name, not the
  * source bank/category label. The curated manifest remains the selection source. */
-static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out)
+static int fm1lab_seed_dx7_instrument_at_level(uint32_t index,fm1lab_instrument_t *out,
+        uint8_t mix_level)
 {
-    if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !out) return -1;
+    if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !out || !mix_level || mix_level>127u) return -1;
     char instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
     const char *label=fm1lab_dx7_instrument_names[index];
     uint32_t name_len=0u;
@@ -743,12 +744,21 @@ static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out)
         uint8_t voice[FM1LAB_PATCH_BYTES];
         if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
         if(fm1lab_patch_set_voice(out,patch,voice)) return -1;
-        out->patches[patch].level=31u;
+        out->patches[patch].level=mix_level;
         out->patches[patch].enabled=1u;
         for(uint32_t macro=0;macro<FM1LAB_MACRO_COUNT;macro++)
             out->patches[patch].macros[macro]=50u;
     }
     return fm1lab_instrument_valid(out)?0:-1;
+}
+static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out)
+{
+    if(index>=FM1LAB_DX7_INSTRUMENT_COUNT) return -1;
+    return fm1lab_seed_dx7_instrument_at_level(index,out,fm1lab_dx7_instrument_level[index]);
+}
+static int fm1lab_seed_dx7_instrument_legacy(uint32_t index,fm1lab_instrument_t *out)
+{
+    return fm1lab_seed_dx7_instrument_at_level(index,out,31u);
 }
 
 static int fm1lab_same_library_instrument(const fm1lab_instrument_t *a,
@@ -771,6 +781,10 @@ static int fm1lab_is_previous_dx7_instrument(uint32_t index,
     if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !existing) return 0;
     fm1lab_instrument_t previous;
     if(fm1lab_seed_dx7_instrument(index,&previous)==0 &&
+       fm1lab_same_library_instrument(existing,&previous)) return 1;
+    /* Existing untouched v0.3 instruments used the former uniform level 31.
+     * Migrate those exact factory records, but preserve any edited level. */
+    if(fm1lab_seed_dx7_instrument_legacy(index,&previous)==0 &&
        fm1lab_same_library_instrument(existing,&previous)) return 1;
     /* Exact-match migration for the previous 32-instrument DX7 factory bank.
      * This lets untouched old drum slots be reallocated without touching edits. */
