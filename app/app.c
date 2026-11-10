@@ -2799,7 +2799,7 @@ static uint16_t screen_bg(void) { return RGB(2,3,6); }
 static uint16_t panel_fill(void) { return screen_bg(); }
 
 /* Minimal power-on ident: crisp native-font title, fade in, hold, fade out. */
-/* Draw the boot word at 3.125x: another 25% larger than the previous 2.5x pass.
+/* Draw the boot word at 2.96875x: 5% smaller than the previous 3.125x pass.
  * Fractional nearest-neighbour expansion preserves the native letterforms,
  * with a physical one-pixel gap between glyphs for clearer reading. */
 static int32_t startup_text_width(const char *s)
@@ -2808,7 +2808,7 @@ static int32_t startup_text_width(const char *s)
     uint32_t count=0u;
     for(;*s;++s) {
         uint32_t gi=glyph(&FONT_B,(uint8_t)*s);
-        width+=(int32_t)((FONT_B.adv[gi]*25u+4u)/8u);
+        width+=(int32_t)((FONT_B.adv[gi]*95u+16u)/32u);
         ++count;
     }
     if(count>1u) width+=(int32_t)(count-1u);
@@ -2816,25 +2816,25 @@ static int32_t startup_text_width(const char *s)
 }
 static void startup_text_scaled(int32_t x, int32_t y, const char *s, uint16_t color)
 {
-    /* 25:8 nearest-neighbour bitmap enlargement, plus 1px inter-letter spacing. */
+    /* 95:32 nearest-neighbour bitmap enlargement, plus 1px inter-letter spacing. */
     for (; *s; ++s) {
         uint32_t gi=glyph(&FONT_B,(uint8_t)*s), gx, gy;
         uint32_t w=FONT_B.bw[gi], bpr=(w+1u)/2u;
         const uint8_t *gd=FONT_B.data+FONT_B.off[gi];
         for(gy=0;gy<FONT_B.h;gy++) {
-            uint32_t y0=gy*25u/8u, y1=(gy+1u)*25u/8u;
+            uint32_t y0=gy*95u/32u, y1=(gy+1u)*95u/32u;
             for(gx=0;gx<w;gx++) {
                 uint32_t a=gd[gy*bpr+gx/2u];
                 a=(gx&1u)?(a&15u):(a>>4);
                 if(a) {
-                    uint32_t x0=gx*25u/8u, x1=(gx+1u)*25u/8u;
-                    cv_rect(x+(int32_t)x0-(int32_t)(FONT_B.pad*25u/8u),
+                    uint32_t x0=gx*95u/32u, x1=(gx+1u)*95u/32u;
+                    cv_rect(x+(int32_t)x0-(int32_t)(FONT_B.pad*95u/32u),
                             y+(int32_t)y0,(int32_t)(x1-x0),
                             (int32_t)(y1-y0),color);
                 }
             }
         }
-        x+=(int32_t)((FONT_B.adv[gi]*25u+4u)/8u)+1;
+        x+=(int32_t)((FONT_B.adv[gi]*95u+16u)/32u)+1;
     }
 }
 static void draw_startup(uint32_t elapsed)
@@ -2855,7 +2855,7 @@ static void draw_startup(uint32_t elapsed)
             (uint32_t)(212u*alpha)/100u,
             (uint32_t)(59u*alpha)/100u);
     cv_begin(240,180,bg);
-    if(alpha) startup_text_scaled(x,(180-(int32_t)(FONT_B.h*25u/8u))/2,word,ink);
+    if(alpha) startup_text_scaled(x,((240-(int32_t)(FONT_B.h*95u/32u))/2)-41,word,ink);
     cv_blit(0,41);
 }
 static int algorithm_preview_active(void)
