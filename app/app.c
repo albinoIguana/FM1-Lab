@@ -26,6 +26,14 @@ static int fm1lab_strncmp(const char *a,const char *b,size_t n) {
     while(n && *a && *a==*b){++a;++b;--n;} return n?(unsigned char)*a-(unsigned char)*b:0;
 }
 
+#if defined(PLAT_WEB)
+__attribute__((import_module("env"), import_name("fm1lab_render_start")))
+extern void fm1lab_render_start(void);
+__attribute__((import_module("env"), import_name("fm1lab_render_end")))
+extern void fm1lab_render_end(void);
+static uint32_t web_device_cpu_pct, web_device_xruns;
+#endif
+
 static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
@@ -1581,15 +1589,43 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 /* Read-only diagnostics from fm1-base's measured audio ISR counters. These
  * deliberately do not add UI work or logging to the real-time render path. */
-uint32_t app_audio_cpu_pct(void) { return plat_cpu_pct(); }
-uint32_t app_audio_xruns(void) { return plat_xruns(); }
+uint32_t app_audio_cpu_pct(void)
+{
+#if defined(PLAT_WEB)
+    return web_device_cpu_pct;
+#else
+    return plat_cpu_pct();
+#endif
+}
+uint32_t app_audio_xruns(void)
+{
+#if defined(PLAT_WEB)
+    return web_device_xruns;
+#else
+    return plat_xruns();
+#endif
+}
+#if defined(PLAT_WEB)
+__attribute__((used, visibility("default")))
+void app_audio_set_device_metrics(uint32_t cpu_pct, uint32_t xruns)
+{
+    web_device_cpu_pct = cpu_pct;
+    web_device_xruns = xruns;
+}
+#endif
 uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count(); }
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
+#if defined(PLAT_WEB)
+    fm1lab_render_start();
+#endif
     ui_events_drain();
     midi_in();
     fm6_render(lr, n, master_q12);
+#if defined(PLAT_WEB)
+    fm1lab_render_end();
+#endif
 }
 
 void app_panic(void)
@@ -1622,6 +1658,9 @@ static void settings_defaults(void)
 /* Called by fm1-base after a measured audio block exceeds 90% of its
  * 5.8 ms deadline. The DSP fades the globally oldest voice over 32 samples;
  * no allocation, flash access, UI work, or cross-patch allocator mutation. */
+#if defined(PLAT_WEB)
+__attribute__((used, visibility("default")))
+#endif
 void app_overload(void)
 {
     fm6_overload();
