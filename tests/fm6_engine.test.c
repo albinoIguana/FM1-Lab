@@ -8,16 +8,20 @@ enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
 static int32_t output[TEST_WORDS];
 static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
 
-static void render_cpu2_mode(uint8_t mode, int32_t *destination)
+static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voices,
+                             int32_t *destination)
 {
     fm6_init();
-    for (unsigned patch = 1u; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
-        fm6_patch_set_enabled((uint8_t)patch, 0u);
+    for (unsigned patch = 0u; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
+        uint8_t enabled = (mask & (1u << patch)) != 0u;
+        fm6_patch_set_enabled((uint8_t)patch, enabled);
+        fm6_patch_set_level((uint8_t)patch, enabled ? 31u : 0u);
+    }
     fm6_test_set_cpu2_mode(mode);
     for (unsigned note = 0u; note < 8u; ++note)
         fm6_note_on_mask((uint8_t)(48u + note * 3u),
-                         (uint8_t)(92u - note * 4u), 0x01u);
-    assert(fm6_active_voices() == 8u); /* the entire eight-voice pool belongs to patch 0 */
+                         (uint8_t)(92u - note * 4u), mask);
+    assert(fm6_active_voices() == expected_voices);
     fm6_render(destination, TEST_FRAMES, 4096u);
 }
 static int32_t peak(const int32_t *samples, unsigned count) {
@@ -238,10 +242,19 @@ static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
 int main(void) {
     /* A single patch's active voices split across the cores, not by fixed
      * patch index. A partial worker failure must restore state before fallback. */
-    render_cpu2_mode(0u, chunk_a);
-    render_cpu2_mode(1u, chunk_b);
+    /* One isolated patch: eight notes split four/four. */
+    render_cpu2_mode(0u, 0x01u, 8u, chunk_a);
+    render_cpu2_mode(1u, 0x01u, 8u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
-    render_cpu2_mode(2u, chunk_b);
+    render_cpu2_mode(2u, 0x01u, 8u, chunk_b);
+    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+
+    /* One four-layer Instrument (not two sequencer Instruments or a sampler):
+     * eight notes fan out to 32 active FM voices, split 16/16. */
+    render_cpu2_mode(0u, 0x0fu, 32u, chunk_a);
+    render_cpu2_mode(1u, 0x0fu, 32u, chunk_b);
+    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    render_cpu2_mode(2u, 0x0fu, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
 
     /* MAELSTROM amount zero is a truly transparent bypass, independent of
