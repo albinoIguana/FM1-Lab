@@ -368,16 +368,16 @@
       "category": "analog-emulations",
       "label": "Analog 04",
       "patch_ids": [
-        "CC0-ANALOG-ANALOG03SYX-01",
-        "CC0-ANALOG-ANALOG03SYX-02",
-        "CC0-ANALOG-ANALOG03SYX-03",
-        "CC0-ANALOG-ANALOG03SYX-04"
+        "CC0-ANALOG-ANALOG03SYX-09",
+        "CC0-ANALOG-ANALOG03SYX-10",
+        "CC0-ANALOG-ANALOG03SYX-11",
+        "CC0-ANALOG-ANALOG03SYX-12"
       ],
       "patch_names": [
-        "MINIMOOG",
-        "MINIMOOG",
-        "MINIMOOG",
-        "MINI-MOOG"
+        "MINIMOOG 4",
+        "MINIMOOG 5",
+        "MINIMOOG 6",
+        "MOOG - 13A"
       ]
     },
     {
