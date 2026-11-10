@@ -70,6 +70,8 @@ static uint8_t arp_ui_output, arp_ui_random, arp_ui_macro_dest, arp_ui_depth=50u
 
 static const char *patch_display_name(uint32_t patch);
 static const char *instrument_display_name(void);
+static uint32_t startup_started_at;
+static uint8_t startup_active;
 static uint16_t panel_fill(void);
 static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro);
 
@@ -2709,6 +2711,86 @@ static uint16_t patch_color(uint32_t p)
 static uint16_t panel_fill(void) { return RGB(17,29,39); }
 static uint16_t screen_bg(void) { return RGB(8,13,19); }
 
+/* One-shot power-on ident. Ported from the prism/tunnel language in
+ * albinoIguana/laserLinks: layered frames, sharp flashes and a travelling cut. */
+static void draw_startup(uint32_t elapsed)
+{
+    const uint16_t yellow = RGB(255, 221, 35);
+    const uint16_t beam = RGB(111, 239, 255);
+    const uint16_t hot = RGB(255, 255, 226);
+    uint32_t phase = elapsed;
+    int32_t word_w = text_w(&FONT_B, "SHIPWRECK");
+    int32_t word_x = (240 - word_w) / 2;
+    uint32_t i;
+
+    cv_begin(240, 180, screen_bg());
+
+    /* The nested tunnel is a compact geometric echo of the original prismGrid. */
+    if (phase > 260u && phase < 3300u) {
+        uint16_t glow = (phase / 90u) & 1u ? RGB(45, 114, 132) : RGB(80, 61, 110);
+        outline(8, 27, 224, 126, glow);
+        outline(22, 39, 196, 102, RGB(34, 67, 83));
+        outline(38, 51, 164, 78, RGB(42, 51, 78));
+        outline(54, 62, 132, 56, RGB(57, 60, 73));
+        cv_rect(118, 27, 3, 126, RGB(23, 38, 50));
+        cv_rect(8, 89, 224, 1, RGB(23, 38, 50));
+        /* Angular prism facets rendered as stepped shards for the tiny TFT. */
+        for (i = 0; i < 6u; ++i) {
+            int32_t x = 17 + (int32_t)i * 37;
+            int32_t y = 34 + (int32_t)((i * 13u + phase / 80u) % 14u);
+            cv_rect(x, y, 15, 2, glow);
+            cv_rect(x + 4, y + 2, 2, 8, glow);
+            cv_rect(x + 6, y + 10, 12, 2, glow);
+        }
+    }
+
+    /* The word is deliberately oversized and isolated, like a title card. */
+    if (phase < 3150u) {
+        cv_text(word_x, 78, &FONT_B, "SHIPWRECK", yellow);
+    }
+
+    /* A bright cutting beam travels through the full word and leaves a slit. */
+    if (phase >= 1050u && phase < 2630u) {
+        uint32_t sweep = phase - 1050u;
+        int32_t x = 14 + (int32_t)(sweep * 212u / 1580u);
+        cv_rect(x - 5, 69, 11, 34, RGB(25, 91, 113));
+        cv_rect(x - 2, 66, 5, 40, beam);
+        cv_rect(x - 1, 67, 2, 38, hot);
+        cv_rect(x - 9, 80, 19, 2, hot);
+        cv_rect(x - 7, 76, 15, 1, beam);
+        /* A dark kerf directly behind the beam makes the cut read as a hole. */
+        cv_rect(x - 1, 76, 2, 20, screen_bg());
+    } else if (phase >= 2630u && phase < 3150u) {
+        cv_rect(118, 72, 4, 29, screen_bg());
+        cv_rect(117, 74, 1, 24, beam);
+        cv_rect(122, 74, 1, 24, beam);
+    }
+
+    /* The cut word breaks into small, deterministic shards and falls away. */
+    if (phase >= 2750u && phase < 4300u) {
+        uint32_t t = phase - 2750u;
+        for (i = 0; i < 18u; ++i) {
+            int32_t sx = 18 + (int32_t)((i * 47u + i * i * 11u) % 204u);
+            int32_t sy = 73 + (int32_t)((i * 17u) % 18u) + (int32_t)(t * (1u + i % 3u) / 90u);
+            int32_t sw = 2 + (int32_t)(i % 4u);
+            if (sy < 151) {
+                cv_rect(sx, sy, sw, 2 + (int32_t)(i % 3u),
+                        (i & 1u) ? yellow : beam);
+            }
+        }
+        /* A descending dark curtain dissolves the remaining letterforms. */
+        {
+            int32_t cover = (int32_t)(t * 42u / 900u);
+            if (cover > 42) cover = 42;
+            cv_rect(12, 75 + cover, 216, 43 - cover, screen_bg());
+        }
+    }
+
+    /* Version stays anchored at the foot of the display for the whole ident. */
+    cv_text(99, 160, &FONT_XS, "v0.10", RGB(184, 195, 203));
+    cv_blit(0, 41);
+}
+
 static int algorithm_preview_active(void)
 {
     return page == PAGE_HOME && plat_ms() < ui.msg_until &&
@@ -3812,13 +3894,27 @@ void app_ui_init(void)
 {
     touch_on(1);                             /* velocity and pressure: the keys' readings on */
     lcd_fill(0, 0, 240, 240, screen_bg());
+    startup_started_at = plat_ms();
+    startup_active = 1u;
     ui.redraw = 1;
 }
 
 void app_frame(void)
 {
-    static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw;
+    static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw, last_startup_draw;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
+    if (startup_active) {
+        uint32_t elapsed = now - startup_started_at;
+        if (elapsed >= 4600u) {
+            startup_active = 0u;
+            ui.redraw = 1u;
+        } else if ((uint32_t)(now - last_startup_draw) >= 30u) {
+            last_startup_draw = now;
+            draw_startup(elapsed);
+        }
+        if (startup_active)
+            return; /* keep the power-on ident clean; don't consume control input */
+    }
     input();
     if(seq_record_redraw){ui.redraw=1u;seq_record_redraw=0u;}
     if (performance_update_dirty && !performance_update_pending) performance_publish();
