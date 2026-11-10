@@ -29,40 +29,37 @@ class Fm1 extends AudioWorkletProcessor {
 
   async onMessage(m) {
     if (m.type === "load") {
-      try {
-        const now = () => BigInt(Math.round(performance.now() * 1e6));
-        const wasi = {
-          clock_time_get: (id, prec, out) => {
-            new DataView(this.mem.buffer).setBigUint64(out, now(), true);
-            return 0;
-          },
-          fd_write: (fd, iov, n, out) => { new DataView(this.mem.buffer).setUint32(out, 0, true); return 0; },
-          proc_exit: () => {},
-        };
-        const stub = new Proxy(wasi, { get: (t, k) => (k in t ? t[k] : () => 0) });
-        const appEnv = (globalThis.fm1App && globalThis.fm1App.env) || {};
-        const env = new Proxy(appEnv, { get: (t, k) => (k in t ? t[k] : () => 0) });
-        const { instance } = await WebAssembly.instantiate(m.wasm, { wasi_snapshot_preview1: stub, env });
-        this.ex = instance.exports;
-        this.mem = this.ex.memory;
-        if (this.ex._initialize) this.ex._initialize();
-        this.app = globalThis.fm1App || {};
-        if (this.app.load) this.app.load(this);
-        const max = this.ex.web_store_max();
-        for (const [obj, bytes] of Object.entries(m.store || {})) {
-          const b = new Uint8Array(bytes).subarray(0, max);
-          new Uint8Array(this.mem.buffer, this.ex.web_store(+obj), b.length).set(b);
-          this.ex.web_store_set_len(+obj, b.length);
-        }
-        this.sentWrites = this.ex.web_store_writes();
-        this.ex.web_master(m.master ?? 2800);
-        this.ex.web_boot();
-        this.port.postMessage({ type: "ready" });
-      } catch (err) {
-        this.ex = null;
-        this.mem = null;
-        this.port.postMessage({ type: "error", message: String(err && (err.stack || err.message) || err) });
+      // C's plat_ticks24()/clock_gettime are performance counters in the
+      // host simulator, not the virtual audio timeline. Use monotonic wall
+      // time so render and CPU2 spans can be measured inside this worklet.
+      const now = () => BigInt(Math.round(performance.now() * 1e6));
+      const wasi = {
+        clock_time_get: (id, prec, out) => {
+          new DataView(this.mem.buffer).setBigUint64(out, now(), true);
+          return 0;
+        },
+        fd_write: (fd, iov, n, out) => { new DataView(this.mem.buffer).setUint32(out, 0, true); return 0; },
+        proc_exit: () => {},
+      };
+      const stub = new Proxy(wasi, { get: (t, k) => (k in t ? t[k] : () => 0) });
+      const appEnv = (globalThis.fm1App && globalThis.fm1App.env) || {};
+      const env = new Proxy(appEnv, { get: (t, k) => (k in t ? t[k] : () => 0) });
+      const { instance } = await WebAssembly.instantiate(m.wasm, { wasi_snapshot_preview1: stub, env });
+      this.ex = instance.exports;
+      this.mem = this.ex.memory;
+      if (this.ex._initialize) this.ex._initialize();
+      this.app = globalThis.fm1App || {};
+      if (this.app.load) this.app.load(this);
+      const max = this.ex.web_store_max();
+      for (const [obj, bytes] of Object.entries(m.store || {})) {
+        const b = new Uint8Array(bytes).subarray(0, max);
+        new Uint8Array(this.mem.buffer, this.ex.web_store(+obj), b.length).set(b);
+        this.ex.web_store_set_len(+obj, b.length);
       }
+      this.sentWrites = this.ex.web_store_writes();
+      this.ex.web_master(m.master ?? 2800);
+      this.ex.web_boot();
+      this.port.postMessage({ type: "ready" });
     } else if (!this.ex) {
       return;
     } else if (m.type === "buttons") {
@@ -73,7 +70,7 @@ class Fm1 extends AudioWorkletProcessor {
       this.ex.web_enc(m.role, m.n | 0);
     } else if (m.type === "master") {
       this.ex.web_master(m.value | 0);
-    } else if (m.type === "sysex") {
+    } else if (m.type === "sysex") {                  // a screen reader's frame: the bytes between F0 and F7
       const b = Uint8Array.from(m.bytes).subarray(0, 64);
       new Uint8Array(this.mem.buffer, this.ex.web_sysex_buf(), b.length).set(b);
       this.ex.web_sysex(b.length);
