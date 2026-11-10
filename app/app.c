@@ -3382,20 +3382,20 @@ static void draw_sequencer_piano_panel(void)
     /* Four encoder readouts, arranged as a compact 2x2 grid. */
     cv_text(12,116,&FONT_XS,"K1 LEN",C_GRAY);
     if(selected)int_text((selected->duration+1u)/2u,value);
-    else {value[0]='-';value[1]='\\0';}
+    else {value[0]='-';value[1]='\0';}
     cv_text_fit(58,116,&FONT_B,value,C_WHITE,48);
     cv_text(124,116,&FONT_XS,"K2 PITCH",C_GRAY);
     if(selected)note_name(selected->pitch,pitch);
-    else {pitch[0]='-';pitch[1]='-';pitch[2]='\\0';}
+    else {pitch[0]='-';pitch[1]='-';pitch[2]='\0';}
     cv_text_fit(178,116,&FONT_B,pitch,accent,50);
 
     cv_text(12,137,&FONT_XS,"K3 ACC",C_GRAY);
     if(selected)int_text(selected->accent,value);
-    else {value[0]='-';value[1]='\\0';}
+    else {value[0]='-';value[1]='\0';}
     cv_text_fit(58,137,&FONT_B,value,C_WHITE,48);
     cv_text(124,137,&FONT_XS,"K4 VEL",C_GRAY);
     if(selected)int_text(selected->velocity,value);
-    else {value[0]='-';value[1]='\\0';}
+    else {value[0]='-';value[1]='\0';}
     cv_text_fit(178,137,&FONT_B,value,C_WHITE,50);
 
     /* This instruction is below and outside the piano-roll grid. */
