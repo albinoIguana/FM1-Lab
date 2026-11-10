@@ -1,0 +1,587 @@
+{
+  "version": "0.3",
+  "schema_version": 1,
+  "source_archive": "patches/library/",
+  "voice_count": 128,
+  "instrument_count": 32,
+  "curation_status": "draft-un-auditioned",
+  "notes": "Expanded factory palette emphasizing analog-like FM, classic and modern leads, shimmer leads, pads and motion textures. One FM Rhythm and one Synth Perc instrument. All source voices are CC0-1.0; candidate selections require FM1-Lab audition before final approval.",
+  "instruments": [
+    {
+      "slot": 1,
+      "category": "bass",
+      "label": "SUB FOUNDATION",
+      "patch_ids": [
+        "DX7-001",
+        "DX7-002",
+        "DX7-003",
+        "DX7-004"
+      ],
+      "patch_names": [
+        "JH.SUSBS 1",
+        "JH.SUSBS 2",
+        "LOW -SPACE",
+        "SO*LOW! #1"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 2,
+      "category": "bass",
+      "label": "CLEAN BASS",
+      "patch_ids": [
+        "DX7-005",
+        "DX7-006",
+        "DX7-007",
+        "DX7-008"
+      ],
+      "patch_names": [
+        "SUPER BASS",
+        "SECRETBASS",
+        "SYN.BASS 2",
+        "TECH BASE"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 3,
+      "category": "bass",
+      "label": "PUNCH BASS",
+      "patch_ids": [
+        "DX7-009",
+        "DX7-010",
+        "DX7-011",
+        "DX7-012"
+      ],
+      "patch_names": [
+        "THUMPBASS",
+        "TIGHT BASS",
+        "THUMB BASS",
+        "THNDR BASS"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 4,
+      "category": "bass",
+      "label": "DEEP BASS",
+      "patch_ids": [
+        "DX7-013",
+        "DX7-014",
+        "DX7-015",
+        "DX7-016"
+      ],
+      "patch_names": [
+        "TSUN BASS",
+        "TUBEBASS",
+        "UNCLE ABE1",
+        "UNCLE ABE2"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 5,
+      "category": "bass",
+      "label": "FUNK BASS",
+      "patch_ids": [
+        "DX7-017",
+        "DX7-018",
+        "DX7-019",
+        "DX7-020"
+      ],
+      "patch_names": [
+        "Uncle Buzz",
+        "UncleAbe1",
+        "Lo~Hi-Bass",
+        "Lo~Hi-Bs 2"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 6,
+      "category": "bass",
+      "label": "MOTION BASS",
+      "patch_ids": [
+        "DX7-021",
+        "DX7-022",
+        "DX7-023",
+        "DX7-024"
+      ],
+      "patch_names": [
+        "VIRGINBASS",
+        "WDBSS 28.7",
+        "WA BASS RW",
+        "WEEBLEBASS"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 7,
+      "category": "vocal-choir",
+      "label": "CHOIR LAYER",
+      "patch_ids": [
+        "DX7-033",
+        "DX7-034",
+        "DX7-035",
+        "DX7-036"
+      ],
+      "patch_names": [
+        "*Choir",
+        "*Choral",
+        "*Choral",
+        "*Chorus"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 8,
+      "category": "percussion-fm",
+      "label": "FM RHYTHM",
+      "patch_ids": [
+        "DX7-065",
+        "DX7-066",
+        "DX7-067",
+        "DX7-068"
+      ],
+      "patch_names": [
+        "Beefkick",
+        "Buffkick",
+        "DoopKick",
+        "GubKik"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 9,
+      "category": "percussion-synth",
+      "label": "SYNTH PERC",
+      "patch_ids": [
+        "DX7-097",
+        "DX7-098",
+        "DX7-099",
+        "DX7-100"
+      ],
+      "patch_names": [
+        "*Clap Trap",
+        "*Clash!!!!",
+        "*Syndrums1",
+        "*Syndrums2"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 10,
+      "category": "analog-emulations",
+      "label": "MINIMOOG STACK",
+      "patch_ids": [
+        "CC0-MOOG-01",
+        "CC0-MOOG-02",
+        "CC0-MOOG-03",
+        "CC0-MOOG-04"
+      ],
+      "patch_names": [
+        "MINI-MOOG",
+        "MINIMOOG 1",
+        "MINIMOOG 2",
+        "MINIMOOG"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 11,
+      "category": "analog-emulations",
+      "label": "OBERHEIM POLY",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG04SYX-12",
+        "CC0-ANALOG-ANALOG04SYX-13",
+        "CC0-ANALOG-ANALOG04SYX-14",
+        "CC0-ANALOG-ANALOG04SYX-15"
+      ],
+      "patch_names": [
+        "OBER.db1",
+        "OBERHEIM",
+        "OBERHEIM",
+        "OBERHEIM 3"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 12,
+      "category": "analog-emulations",
+      "label": "PROPHET POLY",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG04SYX-21",
+        "CC0-ANALOG-ANALOG04SYX-22",
+        "CC0-ANALOG-ANALOG04SYX-23",
+        "CC0-ANALOG-ANALOG04SYX-24"
+      ],
+      "patch_names": [
+        "PROPH",
+        "PROPH",
+        "PROPH 8",
+        "Prophet"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 13,
+      "category": "analog-emulations",
+      "label": "ANALOG BRIGHT",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG_1SYX-14",
+        "CC0-ANALOG-ANALOG_1SYX-15",
+        "CC0-ANALOG-ANALOG_1SYX-16",
+        "CC0-ANALOG-ANALOG_1SYX-17"
+      ],
+      "patch_names": [
+        "ANALOG BRT",
+        "ANALOG BRT",
+        "ANALOG BRT",
+        "ANALOG PAD"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 14,
+      "category": "analog-emulations",
+      "label": "CLEAN TECHNO",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG2SYX-01",
+        "CC0-ANALOG-ANALOG2SYX-02",
+        "CC0-ANALOG-ANALOG2SYX-03",
+        "CC0-ANALOG-ANALOG2SYX-04"
+      ],
+      "patch_names": [
+        "ANLOG SQR1",
+        "ANLOG SQR2",
+        "Anna 10",
+        "Anna 21"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 15,
+      "category": "analog-emulations",
+      "label": "ANALOG SYNC",
+      "patch_ids": [
+        "CC0-ANALOG-ANALOG_3SYX-01",
+        "CC0-ANALOG-ANALOG_3SYX-02",
+        "CC0-ANALOG-ANALOG_3SYX-03",
+        "CC0-ANALOG-ANALOG_3SYX-04"
+      ],
+      "patch_names": [
+        "ANALGSYN 1",
+        "ANALGSYN 2",
+        "ANALGSYN 3",
+        "ANALGSYN 4"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 16,
+      "category": "leads",
+      "label": "80S LEAD",
+      "patch_ids": [
+        "CC0-LEAD-LEAD01SYX-01",
+        "CC0-LEAD-LEAD01SYX-02",
+        "CC0-LEAD-LEAD01SYX-03",
+        "CC0-LEAD-LEAD01SYX-04"
+      ],
+      "patch_names": [
+        "*Lead    1",
+        "*Lead    2",
+        "ANLOGLEAD1",
+        "DIGI-LEAD1"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 17,
+      "category": "leads",
+      "label": "FAT LEAD",
+      "patch_ids": [
+        "CC0-LEAD-LEAD01SYX-09",
+        "CC0-LEAD-LEAD01SYX-10",
+        "CC0-LEAD-LEAD01SYX-11",
+        "CC0-LEAD-LEAD01SYX-12"
+      ],
+      "patch_names": [
+        "DX1 LEAD B",
+        "DX1 LEAD D",
+        "FAT LEAD",
+        "FAT LEAD"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 18,
+      "category": "leads",
+      "label": "PROPHET LEAD",
+      "patch_ids": [
+        "CC0-LEAD-LEAD02SYX-01",
+        "CC0-LEAD-LEAD02SYX-02",
+        "CC0-LEAD-LEAD02SYX-03",
+        "CC0-LEAD-LEAD02SYX-04"
+      ],
+      "patch_names": [
+        "LEADSYN 7",
+        "LEADSYNTH1",
+        "LEADSYNTH2",
+        "METAL LEAD"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 19,
+      "category": "leads",
+      "label": "DIGITAL LEAD",
+      "patch_ids": [
+        "CC0-LEAD-LEAD02SYX-05",
+        "CC0-LEAD-LEAD02SYX-06",
+        "CC0-LEAD-LEAD02SYX-07",
+        "CC0-LEAD-LEAD02SYX-08"
+      ],
+      "patch_names": [
+        "Mini Lead1",
+        "SYN.LEAD 1",
+        "SYN.LEAD 2",
+        "SYN.LEAD 3"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 20,
+      "category": "leads",
+      "label": "MODERN LEAD",
+      "patch_ids": [
+        "CC0-LEAD-LEAD02SYX-18",
+        "CC0-LEAD-LEAD02SYX-19",
+        "CC0-LEAD-LEAD02SYX-20",
+        "CC0-LEAD-LEAD02SYX-21"
+      ],
+      "patch_names": [
+        "SYN-LEAD 2",
+        "SYN-LEAD 2",
+        "SYN-LEAD 3",
+        "SYN-LEAD 4"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 21,
+      "category": "leads",
+      "label": "NEW SCHOOL",
+      "patch_ids": [
+        "CC0-LEAD-LEAD02SYX-25",
+        "CC0-LEAD-LEAD02SYX-26",
+        "CC0-LEAD-LEAD02SYX-27",
+        "CC0-LEAD-LEAD02SYX-28"
+      ],
+      "patch_names": [
+        "SYN-LEAD 8",
+        "SYN-LEAD10",
+        "SYN-LEAD11",
+        "SYN-LEAD13"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 22,
+      "category": "leads",
+      "label": "SHIMMER LEAD",
+      "patch_ids": [
+        "CC0-RESONANT-RESONA02SYX-05",
+        "CC0-RESONANT-RESONA02SYX-06",
+        "CC0-RESONANT-RESONA02SYX-07",
+        "CC0-RESONANT-RESONA02SYX-08"
+      ],
+      "patch_names": [
+        "GLASSVOIC1",
+        "GLASSVOIC2",
+        "GLASSY 1a",
+        "GLASSY 1b"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 23,
+      "category": "leads",
+      "label": "SPACE LEAD",
+      "patch_ids": [
+        "CC0-RESONANT-RESONA03SYX-01",
+        "CC0-RESONANT-RESONA03SYX-02",
+        "CC0-RESONANT-RESONA03SYX-03",
+        "CC0-RESONANT-RESONA03SYX-04"
+      ],
+      "patch_names": [
+        "SPACEANGEL",
+        "SPACEMUSIC",
+        "SPACY SYNT",
+        "SPHAERE  2"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 24,
+      "category": "pads-strings",
+      "label": "80S PAD",
+      "patch_ids": [
+        "CC0-PAD-PADS01SYX-01",
+        "CC0-PAD-PADS01SYX-02",
+        "CC0-PAD-PADS01SYX-03",
+        "CC0-PAD-PADS01SYX-04"
+      ],
+      "patch_names": [
+        "ARM PAD 1",
+        "**Whizpad*",
+        "*Notre Dam",
+        "*Prophet 1"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 25,
+      "category": "pads-strings",
+      "label": "ANALOG PAD",
+      "patch_ids": [
+        "CC0-PAD-PADS01SYX-05",
+        "CC0-PAD-PADS01SYX-06",
+        "CC0-PAD-PADS01SYX-07",
+        "CC0-PAD-PADS01SYX-08"
+      ],
+      "patch_names": [
+        "*Sternenkl",
+        "AMBIENCE..",
+        "ANALOG PAD",
+        "ANALOG PAD"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 26,
+      "category": "pads-strings",
+      "label": "CHORUS PAD",
+      "patch_ids": [
+        "CC0-PAD-PADS02SYX-01",
+        "CC0-PAD-PADS02SYX-02",
+        "CC0-PAD-PADS02SYX-03",
+        "CC0-PAD-PADS02SYX-04"
+      ],
+      "patch_names": [
+        "CHORUS PAD",
+        "CHROMA 26",
+        "CHROMA 26",
+        "CHUNG KUO"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 27,
+      "category": "pads-strings",
+      "label": "CLOUD PAD",
+      "patch_ids": [
+        "CC0-PAD-PADS02SYX-05",
+        "CC0-PAD-PADS02SYX-06",
+        "CC0-PAD-PADS02SYX-07",
+        "CC0-PAD-PADS02SYX-08"
+      ],
+      "patch_names": [
+        "CIRRUS",
+        "CIRRUS",
+        "CLOUDS",
+        "ConPad II"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 28,
+      "category": "pads-strings",
+      "label": "DARK PAD",
+      "patch_ids": [
+        "CC0-PAD-PADS02SYX-09",
+        "CC0-PAD-PADS02SYX-10",
+        "CC0-PAD-PADS02SYX-11",
+        "CC0-PAD-PADS02SYX-12"
+      ],
+      "patch_names": [
+        "ConPad II",
+        "CRIME PADS",
+        "DARK PAD",
+        "DHARMA"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 29,
+      "category": "pads-strings",
+      "label": "ICE PAD",
+      "patch_ids": [
+        "CC0-PAD-PADS03SYX-01",
+        "CC0-PAD-PADS03SYX-02",
+        "CC0-PAD-PADS03SYX-03",
+        "CC0-PAD-PADS03SYX-04"
+      ],
+      "patch_names": [
+        "GLIDEPAD",
+        "HONG KONG",
+        "HUMAN 2",
+        "ICE PAD  1"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 30,
+      "category": "pads-strings",
+      "label": "EVOLVING PAD",
+      "patch_ids": [
+        "CC0-PAD-PADS04SYX-12",
+        "CC0-PAD-PADS04SYX-13",
+        "CC0-PAD-PADS04SYX-14",
+        "CC0-PAD-PADS04SYX-15"
+      ],
+      "patch_names": [
+        "Slow3D Pad",
+        "SOFT TOUCH",
+        "SOFT TOUCH",
+        "SPACE PAD"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 31,
+      "category": "sequences-motion",
+      "label": "CINEMATIC FX",
+      "patch_ids": [
+        "CC0-RESONANT-RESONA03SYX-23",
+        "CC0-RESONANT-RESONA03SYX-24",
+        "CC0-RESONANT-RESONA03SYX-25",
+        "CC0-RESONANT-RESONA03SYX-26"
+      ],
+      "patch_names": [
+        "Atmosphere",
+        "CHANGES-2X",
+        "ETHEREAL",
+        "Etherial a"
+      ],
+      "curation_status": "draft-un-auditioned"
+    },
+    {
+      "slot": 32,
+      "category": "sequences-motion",
+      "label": "GLASS MOTION",
+      "patch_ids": [
+        "CC0-RESONANT-RESONA03SYX-27",
+        "CC0-RESONANT-RESONA03SYX-28",
+        "CC0-RESONANT-RESONA03SYX-29",
+        "CC0-RESONANT-RESONA03SYX-30"
+      ],
+      "patch_names": [
+        "Etherial b",
+        "Etherial5a",
+        "Etherial5b",
+        "Evolve 1a"
+      ],
+      "curation_status": "draft-un-auditioned"
+    }
+  ]
+}
