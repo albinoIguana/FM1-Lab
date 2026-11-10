@@ -2065,7 +2065,7 @@ static void input(void)
         } else if (k == B_FX) {
             if (page < PAGE_FX_AMP || page > PAGE_FX_EQ) page = PAGE_FX_AMP;
             else page = page >= PAGE_FX_EQ ? PAGE_FX_AMP : (uint8_t)(page + 1u);
-            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PARAMETRIC EQ");
+            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PHASER");
         } else if (k == B_PLAY) {
             /* PLAY is a global transport toggle; the current page only
              * determines what is displayed, never whether transport runs. */
