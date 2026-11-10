@@ -15,10 +15,13 @@ static inline uint8_t fm1lab_preset_target(uint8_t patch_focus)
     return patch_focus ? FM1LAB_PRESET_TARGET_PATCH : FM1LAB_PRESET_TARGET_INSTRUMENT;
 }
 
-/* PRESETS is a Home-only control, independent of patch focus. */
-static inline uint8_t fm1lab_preset_encoder_enabled(uint8_t page, uint8_t home_page)
+/* PRESETS is active on Home, or on the main Sequencer page when a
+ * track is highlighted. Options, piano roll, and all other pages are inert. */
+static inline uint8_t fm1lab_preset_encoder_enabled(uint8_t page,
+        uint8_t home_page, uint8_t sequencer_page, uint8_t track_highlighted)
 {
-    return (uint8_t)(page == home_page);
+    return (uint8_t)(page == home_page ||
+        (page == sequencer_page && track_highlighted));
 }
 
 /* Wrap a signed encoder delta across the curated individual-voice bank. */

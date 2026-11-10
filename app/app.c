@@ -2324,9 +2324,10 @@ static void input(void)
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
         ui.redraw = 1;
-        /* PRESETS is deliberately inert outside Home. Gate before page-specific
-         * handlers so Save, Sequencer, ARP and every other page ignore it. */
-        if (k == EN_PRESET && !fm1lab_preset_encoder_enabled(page, PAGE_HOME))
+        /* PRESETS is active on Home, plus the main Sequencer page when its
+         * selected track is highlighted. All other pages ignore the encoder. */
+        if (k == EN_PRESET && !fm1lab_preset_encoder_enabled(
+                page, PAGE_HOME, PAGE_SEQ, (uint8_t)(seq_ui_lane < 2u)))
             continue;
         if(page==PAGE_SAVE) {
             if(k==EN_PRESET) {
@@ -2416,7 +2417,7 @@ static void input(void)
             if(arp_ui_step>=arp_ui_length)arp_ui_step=(uint8_t)(arp_ui_length-1u);
             performance_publish();set_dirty=1u;
             app_say("ARP LENGTH",arp_ui_length==8u?"8 STEPS":"16 STEPS");
-        } else if (k == EN_PRESET && (page == PAGE_SEQ || page == PAGE_SEQ_PIANO)) {
+        } else if (k == EN_PRESET && page == PAGE_SEQ && seq_ui_lane < 2u) {
             if(instrument_apply_pending)continue;
             if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","INSTRUMENT NOT CHANGED");continue;}
             int32_t next=((int32_t)seq_ui_instrument[seq_ui_lane]+e)%(int32_t)USER_INSTRUMENT_COUNT;
