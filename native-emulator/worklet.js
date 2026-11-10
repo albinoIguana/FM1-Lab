@@ -20,12 +20,19 @@ class Fm1 extends AudioWorkletProcessor {
     this.lastFrame = 0;
     this.busy = 0;
     this.frames = 0;
+    this.deviceCore0 = 0;
+    this.deviceCore2 = 0;
+    this.deviceLoad = 0;
+    this.deviceXruns = 0;
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
 
   async onMessage(m) {
     if (m.type === "load") {
-      const now = () => BigInt(Math.round(currentTime * 1e9));
+      // C's plat_ticks24()/clock_gettime are performance counters in the
+      // host simulator, not the virtual audio timeline. Use monotonic wall
+      // time so render and CPU2 spans can be measured inside this worklet.
+      const now = () => BigInt(Math.round(performance.now() * 1e6));
       const wasi = {
         clock_time_get: (id, prec, out) => {
           new DataView(this.mem.buffer).setBigUint64(out, now(), true);
@@ -76,7 +83,9 @@ class Fm1 extends AudioWorkletProcessor {
     const ex = this.ex;
     const blits = ex.web_blits();
     const msg = { type: "frame", buttons: ex.web_lit_buttons() >>> 0, keys: ex.web_lit_keys() >>> 0,
-                  dimButtons: ex.web_dim_buttons() >>> 0, dimKeys: ex.web_dim_keys() >>> 0 };
+                  dimButtons: ex.web_dim_buttons() >>> 0, dimKeys: ex.web_dim_keys() >>> 0,
+                  deviceCore0: this.deviceCore0, deviceCore2: this.deviceCore2,
+                  deviceLoad: this.deviceLoad, deviceXruns: this.deviceXruns };
     if (this.frames >= 44100) {                       // the share of real time spent running the device
       msg.load = Math.round(100 * this.busy / (this.frames / 44.1));
       this.busy = this.frames = 0;
@@ -112,6 +121,13 @@ class Fm1 extends AudioWorkletProcessor {
     const t0 = clock();
     if (this.app.process) this.app.process(this);
     this.ex.web_render(n);
+    // app_render computes the FM1 deadline model in C from the monotonic
+    // clock and the separately timed CPU2 worker. Read its smoothed per-core
+    // figures after advancing the simulated device clock.
+    if (this.ex.app_audio_cpu_pct) this.deviceLoad = this.ex.app_audio_cpu_pct();
+    if (this.ex.app_audio_core0_pct) this.deviceCore0 = this.ex.app_audio_core0_pct();
+    if (this.ex.app_audio_core2_pct) this.deviceCore2 = this.ex.app_audio_core2_pct();
+    if (this.ex.app_audio_xruns) this.deviceXruns = this.ex.app_audio_xruns();
     this.busy += clock() - t0;
     this.frames += n;
     out[0].set(new Float32Array(this.mem.buffer, this.ex.web_out_l(), n));

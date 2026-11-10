@@ -79,6 +79,7 @@ a { color: var(--accent); }
 .speak p.note { color: var(--muted); margin: .4rem 0 0; font-size: .92rem; }
 @media (prefers-reduced-motion: reduce) { .btnface, .keyface { transition: none; } }
 .bar .cpu { font-variant-numeric: tabular-nums; }
+.cpu-note { max-width: 76ch; margin: .35rem 0 0; color: var(--muted); font-size: .86rem; }
 .help h2 { font: 600 1.1rem "Barlow Semi Condensed", "Barlow", sans-serif; margin: 0 0 .3rem; }
 .help { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem 2rem; margin: 1.6rem 0 0; }
 .help h2 { font: 600 1.1rem "Barlow Semi Condensed", "Barlow", sans-serif; margin: 0 0 .3rem; }
@@ -115,6 +116,7 @@ kbd { font: 600 .85em ui-monospace, Menlo, monospace; background: var(--card); b
   <button id="reset" type="button" aria-describedby="reset-why">Factory reset</button>
   <span id="reset-why" class="sr">Forget what was saved and start again from the factory settings</span>
 </div>
+<p class="cpu-note">FM1 budget model: 256 frames per 5.8 ms block; it sheds a voice above 90% and counts simulated deadline misses. CPU2 is split and timed separately. Browser timing is an estimate, not cycle-accurate FM1 silicon timing.</p>
 
 <details class="speak" id="speak">
   <summary><h2>Screen Reader</h2></summary>
@@ -645,8 +647,7 @@ async function switchOn() {
     const ac = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
     if (speakMode() === "voice") voiceOn();
     const [wasm] = await Promise.all([fetch("app.wasm").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
-                                      ac.audioWorklet.addModule("app_worklet.js").catch(() => {})
-                                        .then(() => ac.audioWorklet.addModule("worklet.js"))]);
+                                      ac.audioWorklet.addModule("worklet.js")]);
     node = new AudioWorkletNode(ac, "fm1", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     gain = ac.createGain();
     gain.gain.value = $("mute").getAttribute("aria-pressed") === "true" ? 0 : 1;
@@ -660,7 +661,7 @@ async function switchOn() {
           drawLights(m.buttons, m.keys, m.dimButtons, m.dimKeys);
           if (m.said) onSaid(m.said);
           window.emuLast = m;
-          if (m.load !== undefined) cpu.textContent = `fm1lab uses ${m.load}% of this computer's time`;
+          if (m.load !== undefined) cpu.textContent = `FM1 C0 ${m.deviceCore0 ?? 0}% · C2 ${m.deviceCore2 ?? 0}% · budget ${m.deviceLoad ?? 0}% (XR ${m.deviceXruns ?? 0}) · browser ${m.load}%`;
           if (m.store) saveStore(m.store);
         } else if (m.type === "app" && appPart && appPart.message) appPart.message(m);
       };
