@@ -2789,16 +2789,20 @@ static const char *patch_display_name(uint32_t patch)
                               display[patch]) == 0) {
         uint32_t n = fm1lab_strlen(display[patch]);
         const char *instrument_name = instrument_display_name();
-        int same_as_instrument = n && fm1lab_strcmp(display[patch], instrument_name) == 0;
         int placeholder = fm1lab_strcmp(display[patch], "INSTRUMENT") == 0 ||
             fm1lab_strcmp(display[patch], "PATCH") == 0 ||
-            fm1lab_strcmp(display[patch], "PATCH 1") == 0 ||
-            fm1lab_strcmp(display[patch], "FACTORY") == 0;
-        if (n && !patch_name_is_factory(display[patch]) &&
-            !same_as_instrument && !placeholder) return display[patch];
+            fm1lab_strcmp(display[patch], "FACTORY") == 0 ||
+            (display[patch][0]=='P' && display[patch][1]=='A' &&
+             display[patch][2]=='T' && display[patch][3]=='C' &&
+             display[patch][4]=='H' && display[patch][5]==' ' &&
+             display[patch][6]>='0' && display[patch][6]<='9');
+        /* A patch may legitimately share its name with its Instrument.
+         * In particular, patch 1 is often the voice that names the Instrument. */
+        if (n && !patch_name_is_factory(display[patch]) && !placeholder)
+            return display[patch];
     }
-    fallback[patch][0]='P'; fallback[patch][1]='A'; fallback[patch][2]='T';
-    fallback[patch][3]='C'; fallback[patch][4]='H'; fallback[patch][5]=' ';
+    fallback[patch][0]='V'; fallback[patch][1]='O'; fallback[patch][2]='I';
+    fallback[patch][3]='C'; fallback[patch][4]='E'; fallback[patch][5]=' ';
     int_text((int32_t)patch+1,fallback[patch]+6);
     return fallback[patch];
 }
