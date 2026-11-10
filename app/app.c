@@ -2712,12 +2712,41 @@ static uint16_t panel_fill(void) { return RGB(17,29,39); }
 static uint16_t screen_bg(void) { return RGB(8,13,19); }
 
 /* Minimal power-on ident: crisp native-font title, fade in, hold, fade out. */
+/* Draw the boot word at 150% using the native antialiased font bitmap.
+ * Nearest-neighbour coverage expansion keeps the original letterforms while
+ * making the identity noticeably larger on the 240x240 panel. */
+static int32_t startup_text_width(const char *s)
+{
+    return (text_w(&FONT_B,s)*3+1)/2;
+}
+static void startup_text_scaled(int32_t x, int32_t y, const char *s, uint16_t color)
+{
+    for (; *s; ++s) {
+        uint32_t gi=glyph(&FONT_B,(uint8_t)*s), gx, gy;
+        uint32_t w=FONT_B.bw[gi], bpr=(w+1u)/2u;
+        const uint8_t *gd=FONT_B.data+FONT_B.off[gi];
+        for(gy=0;gy<FONT_B.h;gy++) {
+            uint32_t y0=gy*3u/2u, y1=(gy+1u)*3u/2u;
+            for(gx=0;gx<w;gx++) {
+                uint32_t a=gd[gy*bpr+gx/2u];
+                a=(gx&1u)?(a&15u):(a>>4);
+                if(a) {
+                    uint32_t x0=gx*3u/2u, x1=(gx+1u)*3u/2u;
+                    cv_rect(x+(int32_t)x0-(int32_t)(FONT_B.pad*3u/2u),
+                            y+(int32_t)y0,(int32_t)(x1-x0),(int32_t)(y1-y0),color);
+                }
+            }
+        }
+        x+=(int32_t)(FONT_B.adv[gi]*3u/2u);
+    }
+}
 static void draw_startup(uint32_t elapsed)
 {
     const uint32_t fade_ms=1100u, hold_ms=850u;
     const uint16_t bg=RGB(2,3,6);
     uint32_t alpha;
-    int32_t word_w=text_w(&FONT_B,"SHIPWRECK");
+    const char *word="SHIPWRECK";
+    int32_t word_w=startup_text_width(word);
     int32_t x=(240-word_w)/2;
     uint16_t ink;
     if(elapsed<fade_ms) alpha=elapsed*100u/fade_ms;
@@ -2729,7 +2758,7 @@ static void draw_startup(uint32_t elapsed)
             3u+(215u*alpha)/100u,
             6u+(22u*alpha)/100u);
     cv_begin(240,180,bg);
-    if(alpha) cv_text(x,82,&FONT_B,"SHIPWRECK",ink);
+    if(alpha) startup_text_scaled(x,(180-(int32_t)(FONT_B.h*3u/2u))/2,word,ink);
     cv_blit(0,41);
 }
 static int algorithm_preview_active(void)
