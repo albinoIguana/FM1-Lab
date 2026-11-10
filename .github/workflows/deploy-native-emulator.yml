@@ -56,7 +56,6 @@ jobs:
           test -s _site/native-emulator/index.html
           test -s _site/native-emulator/app.wasm
           test -s _site/native-emulator/worklet.js
-remove worklet verification
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
