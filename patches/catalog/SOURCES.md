@@ -34,3 +34,8 @@ Before adding a source bank:
 4. Extract individual voices into the sound-family folders, retaining original slot and voice name.
 5. Deduplicate by normalized voice bytes, then audition. Do not delete near-duplicates solely by byte hash; edited variants may be musically distinct.
 6. If redistribution is unclear or prohibited, store only the source record and local import instructions, not the patch data.
+
+
+## Modern FM-1-specific reference
+
+`mene311/fm1-banks` contains 26 thematic 32-voice DX7 banks with a useful audio gallery and modern directions such as synthwave pads, acid/techno, leads, ambient and industrial. Its MIT license covers its tools, not the patch data; the author states that the patches remain the original authors' work. It is registered as reference-only in `sources.csv` and must not be copied into our archive without rights clearance. See `sources/FM1-BANKS-REFERENCE.md`.
