@@ -2832,7 +2832,7 @@ static void startup_text_scaled(int32_t x, int32_t y, const char *s, uint16_t co
                 }
             }
         }
-        x+=(int32_t)((FONT_B.adv[gi]*5u+1u)/2u)+1;
+        x+=(int32_t)((FONT_B.adv[gi]*25u+4u)/8u)+1;
     }
 }
 static void draw_startup(uint32_t elapsed)
