@@ -743,6 +743,9 @@ static int fm1lab_seed_dx7_instrument_at_level(uint32_t index,fm1lab_instrument_
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
         if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
+        /* The old v0.3 bank shipped SYN-LEAD10 with both algorithm-0 carriers
+         * muted. Recreate that exact old record only for legacy matching. */
+        if(mix_level==31u && index==20u && patch==1u) voice[79]=0u;
         if(fm1lab_patch_set_voice(out,patch,voice)) return -1;
         out->patches[patch].level=mix_level;
         out->patches[patch].enabled=1u;
