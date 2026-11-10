@@ -5,7 +5,7 @@
   "patches": [
     {
       "id": "CC0-MOOG-01",
-      "name": "MINI-MOOG",
+      "name": "WIDE-AN01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "file": "!Instruments/Keyboard/Synth/Specific Synth/MOOG.SYX",
@@ -166,19 +166,20 @@
         4,
         2,
         36,
-        77,
+        87,
         73,
-        78,
-        73,
+        68,
+        69,
         45,
-        77,
-        79,
-        79,
-        71,
+        65,
+        78,
+        48,
+        49,
         32,
         63
       ],
-      "original_name": "MINI-MOOG"
+      "original_name": "MINI-MOOG",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "CC0-MOOG-02",
@@ -536,7 +537,7 @@
     },
     {
       "id": "CC0-MOOG-04",
-      "name": "MINIMOOG",
+      "name": "GRIT-AN01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "file": "!Instruments/Keyboard/Synth/Specific Synth/MOOG.SYX",
@@ -697,19 +698,20 @@
         0,
         3,
         12,
-        77,
-        73,
-        78,
-        73,
-        77,
-        79,
-        79,
         71,
-        32,
+        82,
+        73,
+        84,
+        45,
+        65,
+        78,
+        48,
+        49,
         32,
         63
       ],
-      "original_name": "MINIMOOG"
+      "original_name": "MINIMOOG",
+      "name_analysis": "heuristic-grit"
     },
     {
       "id": "CC0-MOOG-05",
@@ -890,7 +892,7 @@
     },
     {
       "id": "CC0-MOOG-06",
-      "name": "MOOG 2",
+      "name": "WIDE-AN03",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "file": "!Instruments/Keyboard/Synth/Specific Synth/MOOG.SYX",
@@ -1051,19 +1053,20 @@
         0,
         2,
         24,
-        77,
-        79,
-        79,
-        71,
-        32,
-        50,
-        32,
-        32,
-        32,
+        87,
+        73,
+        68,
+        69,
+        45,
+        65,
+        78,
+        48,
+        51,
         32,
         63
       ],
-      "original_name": "MOOG 2"
+      "original_name": "MOOG 2",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "CC0-MOOG-07",
@@ -2660,7 +2663,7 @@
     },
     {
       "id": "CC0-MOOG-16",
-      "name": "MOOG-52 MO",
+      "name": "WIDE-AN04",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "file": "!Instruments/Keyboard/Synth/Specific Synth/MOOG.SYX",
@@ -2821,19 +2824,20 @@
         0,
         2,
         24,
-        77,
-        79,
-        79,
-        71,
+        87,
+        73,
+        68,
+        69,
         45,
-        53,
-        50,
+        65,
+        78,
+        48,
+        52,
         32,
-        77,
-        79,
         63
       ],
-      "original_name": "MOOG-52 MO"
+      "original_name": "MOOG-52 MO",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "CC0-MOOG-17",
