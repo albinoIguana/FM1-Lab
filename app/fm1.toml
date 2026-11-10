@@ -13,6 +13,7 @@ cpu2_stack = 4096
 # serialized by the host simulator; the worklet measures both halves and
 # models their parallel critical path against the FM1 audio-block deadline.
 web_cflags = ["-DFM1B_CPU2=1"]
+web_link = ["web/emu/web_exports.c"]
 ble = true
 ble_stack = "own"
 ble_central = true
