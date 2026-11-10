@@ -2713,84 +2713,163 @@ static uint16_t screen_bg(void) { return RGB(8,13,19); }
 
 /* One-shot power-on ident. Ported from the prism/tunnel language in
  * albinoIguana/laserLinks: layered frames, sharp flashes and a travelling cut. */
-static void draw_startup(uint32_t elapsed)
+/* Rasterize the original LaserLinks clip-path polygons on the FM1's 240x180
+ * canvas. Even/odd scan conversion handles the concave starburst shapes. */
+static void startup_poly(int32_t cx,int32_t cy,int32_t scale,
+                         const int16_t *p,uint8_t n,uint16_t color)
 {
-    const uint16_t yellow = RGB(255, 221, 35);
-    const uint16_t beam = RGB(111, 239, 255);
-    const uint16_t hot = RGB(255, 255, 226);
-    uint32_t phase = elapsed;
-    int32_t word_w = text_w(&FONT_B, "SHIPWRECK");
-    int32_t word_x = (240 - word_w) / 2;
-    uint32_t i;
-
-    cv_begin(240, 180, screen_bg());
-
-    /* The nested tunnel is a compact geometric echo of the original prismGrid. */
-    if (phase > 260u && phase < 3300u) {
-        uint16_t glow = (phase / 90u) & 1u ? RGB(45, 114, 132) : RGB(80, 61, 110);
-        outline(8, 27, 224, 126, glow);
-        outline(22, 39, 196, 102, RGB(34, 67, 83));
-        outline(38, 51, 164, 78, RGB(42, 51, 78));
-        outline(54, 62, 132, 56, RGB(57, 60, 73));
-        cv_rect(118, 27, 3, 126, RGB(23, 38, 50));
-        cv_rect(8, 89, 224, 1, RGB(23, 38, 50));
-        /* Angular prism facets rendered as stepped shards for the tiny TFT. */
-        for (i = 0; i < 6u; ++i) {
-            int32_t x = 17 + (int32_t)i * 37;
-            int32_t y = 34 + (int32_t)((i * 13u + phase / 80u) % 14u);
-            cv_rect(x, y, 15, 2, glow);
-            cv_rect(x + 4, y + 2, 2, 8, glow);
-            cv_rect(x + 6, y + 10, 12, 2, glow);
-        }
+    int32_t min_y=1000,max_y=-1000;
+    for(uint8_t i=0;i<n;i++) {
+        int32_t y=cy+(int32_t)p[i*2u+1u]*scale/100;
+        if(y<min_y)min_y=y;
+        if(y>max_y)max_y=y;
     }
-
-    /* The word is deliberately oversized and isolated, like a title card. */
-    if (phase < 3150u) {
-        cv_text(word_x, 78, &FONT_B, "SHIPWRECK", yellow);
-    }
-
-    /* A bright cutting beam travels through the full word and leaves a slit. */
-    if (phase >= 1050u && phase < 2630u) {
-        uint32_t sweep = phase - 1050u;
-        int32_t x = 14 + (int32_t)(sweep * 212u / 1580u);
-        cv_rect(x - 5, 69, 11, 34, RGB(25, 91, 113));
-        cv_rect(x - 2, 66, 5, 40, beam);
-        cv_rect(x - 1, 67, 2, 38, hot);
-        cv_rect(x - 9, 80, 19, 2, hot);
-        cv_rect(x - 7, 76, 15, 1, beam);
-        /* A dark kerf directly behind the beam makes the cut read as a hole. */
-        cv_rect(x - 1, 76, 2, 20, screen_bg());
-    } else if (phase >= 2630u && phase < 3150u) {
-        cv_rect(118, 72, 4, 29, screen_bg());
-        cv_rect(117, 74, 1, 24, beam);
-        cv_rect(122, 74, 1, 24, beam);
-    }
-
-    /* The cut word breaks into small, deterministic shards and falls away. */
-    if (phase >= 2750u && phase < 4300u) {
-        uint32_t t = phase - 2750u;
-        for (i = 0; i < 18u; ++i) {
-            int32_t sx = 18 + (int32_t)((i * 47u + i * i * 11u) % 204u);
-            int32_t sy = 73 + (int32_t)((i * 17u) % 18u) + (int32_t)(t * (1u + i % 3u) / 90u);
-            int32_t sw = 2 + (int32_t)(i % 4u);
-            if (sy < 151) {
-                cv_rect(sx, sy, sw, 2 + (int32_t)(i % 3u),
-                        (i & 1u) ? yellow : beam);
+    if(min_y<0)min_y=0;
+    if(max_y>179)max_y=179;
+    for(int32_t y=min_y;y<=max_y;y++) {
+        int32_t xs[16]; uint8_t count=0;
+        for(uint8_t i=0,j=(uint8_t)(n-1u);i<n;j=i++) {
+            int32_t x1=cx+(int32_t)p[j*2u]*scale/100;
+            int32_t y1=cy+(int32_t)p[j*2u+1u]*scale/100;
+            int32_t x2=cx+(int32_t)p[i*2u]*scale/100;
+            int32_t y2=cy+(int32_t)p[i*2u+1u]*scale/100;
+            if((y1<=y && y2>y)||(y2<=y && y1>y)) {
+                if(count<16u) xs[count++]=x1+(y-y1)*(x2-x1)/(y2-y1);
             }
         }
-        /* A descending dark curtain dissolves the remaining letterforms. */
-        {
-            int32_t cover = (int32_t)(t * 42u / 900u);
-            if (cover > 42) cover = 42;
-            cv_rect(12, 75 + cover, 216, 43 - cover, screen_bg());
+        for(uint8_t a=0;a<count;a++) for(uint8_t b=(uint8_t)(a+1u);b<count;b++)
+            if(xs[b]<xs[a]) {int32_t t=xs[a];xs[a]=xs[b];xs[b]=t;}
+        for(uint8_t k=0;k+1u<count;k=(uint8_t)(k+2u)) {
+            int32_t x=xs[k],w=xs[k+1u]-x+1;
+            if(w>0)cv_rect(x,y,w,1,color);
+        }
+    }
+}
+static void startup_line(int32_t x0,int32_t y0,int32_t x1,int32_t y1,uint16_t color)
+{
+    int32_t dx=x1>x0?x1-x0:x0-x1, sx=x0<x1?1:-1;
+    int32_t dy=y1>y0?y1-y0:y0-y1, sy=y0<y1?1:-1;
+    int32_t err=dx-dy;
+    for(;;) {
+        cv_rect(x0,y0,1,1,color);
+        if(x0==x1 && y0==y1)break;
+        {int32_t e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}
+    }
+}
+static void startup_poly_edge(int32_t cx,int32_t cy,int32_t scale,
+                              const int16_t *p,uint8_t n,uint16_t color)
+{
+    for(uint8_t i=0;i<n;i++) {
+        uint8_t j=(uint8_t)((i+1u)%n);
+        startup_line(cx+(int32_t)p[i*2u]*scale/100,
+                     cy+(int32_t)p[i*2u+1u]*scale/100,
+                     cx+(int32_t)p[j*2u]*scale/100,
+                     cy+(int32_t)p[j*2u+1u]*scale/100,color);
+    }
+}
+static void startup_prism(int32_t cx,int32_t cy,int32_t scale,
+                          const int16_t *shape,uint8_t n,uint16_t fill,
+                          uint16_t edge,uint16_t facet)
+{
+    static const int16_t facet_a[]={-34,-17, 0,-42, 5,4};
+    startup_poly(cx,cy,scale,shape,n,fill);
+    startup_poly(cx,cy,scale,facet_a,3,facet);
+    startup_poly_edge(cx,cy,scale,shape,n,edge);
+}
+static void draw_startup(uint32_t elapsed)
+{
+    static const int16_t b1[]={-50,-10,0,-15,50,50,-30,30};
+    static const int16_t b1r[]={-30,-50,15,-15,50,30,-50,10};
+    static const int16_t b2[]={0,50,-30,-12,0,-50,30,-12};
+    static const int16_t b2m[]={0,0,-50,50,0,-50,50,50};
+    static const int16_t b3[]={50,-10,0,-15,-50,50,30,30};
+    static const int16_t b3r[]={30,-50,-15,-15,-50,30,50,10};
+    static const int16_t square[]={-50,-50,50,-50,50,50,-50,50};
+    static const int16_t star[]={0,-50,12,-13,50,-13,17,10,33,50,0,23,-32,50,-16,10,-50,-13,-11,-13};
+    static const int16_t b5[]={0,50,-26,13,0,-50,26,13};
+    static const int16_t b5m[]={0,0,-50,50,0,-50,50,50};
+    static const int16_t *const normal[6]={b1,b2,b3,square,b5,square};
+    static const int16_t *const altered[6]={b1r,b2m,b3r,star,b5m,star};
+    static const uint8_t counts[6]={4,4,4,10,4,10};
+    const uint16_t silver=RGB(174,181,186), pale=RGB(226,231,232);
+    const uint16_t shade=RGB(100,112,121), red=RGB(178,20,25);
+    const uint16_t yellow=RGB(255,218,28), beam=RGB(111,239,255);
+    const uint16_t hot=RGB(255,255,232);
+    uint32_t t=elapsed, i;
+    uint8_t morph=(uint8_t)(t>650u && t<1650u);
+    uint32_t blend=t<=650u?0u:(t>=1650u?100u:(t-650u)/10u);
+    cv_begin(240,180,RGB(2,3,6));
+
+    /* LaserLinks' original 3x2 prism field: six separate clip-path forms. */
+    for(i=0;i<6u;i++) {
+        int32_t cx=40+(int32_t)(i%3u)*80;
+        int32_t cy=i<3u?35:145;
+        int32_t scale=(i==3u||i==5u)?31:34;
+        const int16_t *shape=normal[i];
+        uint16_t fill=silver, edge=pale, facet=RGB(207,213,217);
+        if(morph && (i==1u||i==3u||i==4u||i==5u)) {
+            /* Interpolate the original diamond/square silhouettes into their
+             * starburst/fragment forms rather than substituting rectangles. */
+            int16_t points[20];
+            for(uint8_t p=0;p<counts[i]*2u;p++)
+                points[p]=(int16_t)(((int32_t)normal[i][p]*(100u-blend)+
+                                     (int32_t)altered[i][p]*blend)/100);
+            shape=points;
+            if(i==3u||i==5u) {fill=red;edge=RGB(255,90,75);facet=RGB(230,45,38);}
+        } else if(t>=1650u && (i==3u||i==5u)) {
+            shape=altered[i];fill=red;edge=RGB(255,100,80);facet=RGB(230,45,38);
+        } else if(t>=1650u && i==1u) shape=altered[i];
+        startup_prism(cx,cy,scale,shape,counts[i],fill,edge,facet);
+    }
+
+    /* The source's prismAni background: a black/orange diagonal aperture
+     * opens in a flash, then collapses behind the six forms. */
+    if(t<2050u) {
+        static const int16_t flash[]={-50,-50,50,-50,-50,50,50,50};
+        uint32_t f=t<350u?0u:(t<900u?t-350u:(t<1250u?550u:2050u-t));
+        if(f>550u)f=550u;
+        if(f) {
+            int32_t w=(int32_t)(f*210u/550u);
+            cv_rect(120-w/2,4,w,172,RGB(56,25,8));
+            cv_rect(120-w/2+2,4,w>4?w-4:1,172,RGB(103,54,13));
+            (void)flash;
         }
     }
 
-    /* Version stays anchored at the foot of the display for the whole ident. */
-    cv_text(99, 160, &FONT_XS, "v0.10", RGB(184, 195, 203));
-    cv_blit(0, 41);
-}
+    /* SHIPWRECK sits in a clean black band between the two rows of prisms. */
+    if(t<3900u) {
+        int32_t word_w=text_w(&FONT_B,"SHIPWRECK");
+        int32_t word_x=(240-word_w)/2;
+        cv_rect(8,72,224,38,RGB(2,3,6));
+        if(t<3100u) cv_text(word_x,82,&FONT_B,"SHIPWRECK",yellow);
+        if(t>=1250u && t<3000u) {
+            int32_t x=12+(int32_t)((t-1250u)*216u/1750u);
+            cv_rect(x-5,76,11,30,RGB(50,21,5));
+            cv_rect(x-2,74,5,34,beam);
+            cv_rect(x-1,75,2,32,hot);
+            cv_rect(x-1,77,2,25,RGB(2,3,6));
+            cv_rect(x-8,87,17,2,hot);
+        }
+        if(t>=3000u && t<3900u) {
+            uint32_t d=t-3000u;
+            for(i=0;i<22u;i++) {
+                int32_t sx=16+(int32_t)((i*37u+i*i*7u)%208u);
+                int32_t sy=77+(int32_t)((i*13u)%24u)+(int32_t)(d*(1u+i%4u)/45u);
+                if(sy<145) cv_rect(sx,sy,2+(int32_t)(i%4u),2,
+                    (i&1u)?yellow:beam);
+            }
+            cv_rect(8,77+(int32_t)(d*54u/900u),224,40,RGB(2,3,6));
+        }
+    }
 
+    /* A last red-white glint recalls the original starburst color transition. */
+    if(t>1750u && t<2200u) {
+        uint16_t c=(t/45u)&1u?hot:RGB(255,62,46);
+        cv_rect(116,69,8,42,c);
+    }
+    cv_text(99,160,&FONT_XS,"v0.10",RGB(184,195,203));
+    cv_blit(0,41);
+}
 static int algorithm_preview_active(void)
 {
     return page == PAGE_HOME && plat_ms() < ui.msg_until &&
