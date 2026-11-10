@@ -45060,7 +45060,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-01",
+      "id": "CC0-ANALOG-ANALOG_1SYX-01",
       "name": "ANALOG  1",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -45236,7 +45236,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-02",
+      "id": "CC0-ANALOG-ANALOG_1SYX-02",
       "name": "ANALOG  2",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -45412,7 +45412,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-03",
+      "id": "CC0-ANALOG-ANALOG_1SYX-03",
       "name": "ANALOG  3",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -45588,7 +45588,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-04",
+      "id": "CC0-ANALOG-ANALOG_1SYX-04",
       "name": "ANALOG  4",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -45764,7 +45764,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-05",
+      "id": "CC0-ANALOG-ANALOG_1SYX-05",
       "name": "ANALOG  5",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -45940,7 +45940,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-06",
+      "id": "CC0-ANALOG-ANALOG_1SYX-06",
       "name": "ANALOG  6",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -46116,7 +46116,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-07",
+      "id": "CC0-ANALOG-ANALOG_1SYX-07",
       "name": "ANALOG  7",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -46292,7 +46292,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-08",
+      "id": "CC0-ANALOG-ANALOG_1SYX-08",
       "name": "ANALOG  8",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -46468,7 +46468,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-09",
+      "id": "CC0-ANALOG-ANALOG_1SYX-09",
       "name": "ANALOG  9",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -46644,7 +46644,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-10",
+      "id": "CC0-ANALOG-ANALOG_1SYX-10",
       "name": "ANALOG 10",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -46820,7 +46820,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-11",
+      "id": "CC0-ANALOG-ANALOG_1SYX-11",
       "name": "ANALOG 11",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -46996,7 +46996,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-12",
+      "id": "CC0-ANALOG-ANALOG_1SYX-12",
       "name": "ANALOG 12",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -47172,7 +47172,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-13",
+      "id": "CC0-ANALOG-ANALOG_1SYX-13",
       "name": "ANALOG 13",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -47348,7 +47348,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-14",
+      "id": "CC0-ANALOG-ANALOG_1SYX-14",
       "name": "ANALOG BRT",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -47524,7 +47524,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-15",
+      "id": "CC0-ANALOG-ANALOG_1SYX-15",
       "name": "ANALOG BRT",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -47700,7 +47700,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-16",
+      "id": "CC0-ANALOG-ANALOG_1SYX-16",
       "name": "ANALOG BRT",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -47876,7 +47876,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-17",
+      "id": "CC0-ANALOG-ANALOG_1SYX-17",
       "name": "ANALOG PAD",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -48052,7 +48052,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-18",
+      "id": "CC0-ANALOG-ANALOG_1SYX-18",
       "name": "ANALOG PAD",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -48228,7 +48228,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-19",
+      "id": "CC0-ANALOG-ANALOG_1SYX-19",
       "name": "ANALOG PAD",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -48404,7 +48404,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-20",
+      "id": "CC0-ANALOG-ANALOG_1SYX-20",
       "name": "ANALOG SNC",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -48580,7 +48580,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-21",
+      "id": "CC0-ANALOG-ANALOG_1SYX-21",
       "name": "ANALOG SNC",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -48756,7 +48756,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-22",
+      "id": "CC0-ANALOG-ANALOG_1SYX-22",
       "name": "ANALOG-4DL",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -48932,7 +48932,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-23",
+      "id": "CC0-ANALOG-ANALOG_1SYX-23",
       "name": "-ANALOG 5-",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -49108,7 +49108,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-24",
+      "id": "CC0-ANALOG-ANALOG_1SYX-24",
       "name": "--ANALOG--",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -49284,7 +49284,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-25",
+      "id": "CC0-ANALOG-ANALOG_1SYX-25",
       "name": "ANALQG--OB",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -49460,7 +49460,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-26",
+      "id": "CC0-ANALOG-ANALOG_1SYX-26",
       "name": "ANLG STG 3",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -49636,7 +49636,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-27",
+      "id": "CC0-ANALOG-ANALOG_1SYX-27",
       "name": "ANLG SYNC1",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -49812,7 +49812,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-28",
+      "id": "CC0-ANALOG-ANALOG_1SYX-28",
       "name": "ANLG SYNC3",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -49988,7 +49988,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-29",
+      "id": "CC0-ANALOG-ANALOG_1SYX-29",
       "name": "ANLG SYNC3",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -50164,7 +50164,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-30",
+      "id": "CC0-ANALOG-ANALOG_1SYX-30",
       "name": "ANLGBRTSYN",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -50340,7 +50340,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-31",
+      "id": "CC0-ANALOG-ANALOG_1SYX-31",
       "name": "ANLNG 32.4",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -50516,7 +50516,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG1SYX-32",
+      "id": "CC0-ANALOG-ANALOG_1SYX-32",
       "name": "ANLNG 32.4",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -56324,7 +56324,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-01",
+      "id": "CC0-ANALOG-ANALOG_3SYX-01",
       "name": "ANALGSYN 1",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -56500,7 +56500,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-02",
+      "id": "CC0-ANALOG-ANALOG_3SYX-02",
       "name": "ANALGSYN 2",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -56676,7 +56676,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-03",
+      "id": "CC0-ANALOG-ANALOG_3SYX-03",
       "name": "ANALGSYN 3",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -56852,7 +56852,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-04",
+      "id": "CC0-ANALOG-ANALOG_3SYX-04",
       "name": "ANALGSYN 4",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -57028,7 +57028,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-05",
+      "id": "CC0-ANALOG-ANALOG_3SYX-05",
       "name": "ANALGSYN 5",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -57204,7 +57204,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-06",
+      "id": "CC0-ANALOG-ANALOG_3SYX-06",
       "name": "ANALGSYN 6",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -57380,7 +57380,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-07",
+      "id": "CC0-ANALOG-ANALOG_3SYX-07",
       "name": "ANALGSYN 7",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -57556,7 +57556,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-08",
+      "id": "CC0-ANALOG-ANALOG_3SYX-08",
       "name": "ANALGSYN 8",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -57732,7 +57732,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-09",
+      "id": "CC0-ANALOG-ANALOG_3SYX-09",
       "name": "ANALGSYN 9",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -57908,7 +57908,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-10",
+      "id": "CC0-ANALOG-ANALOG_3SYX-10",
       "name": "ANALGSYN10",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -58084,7 +58084,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-11",
+      "id": "CC0-ANALOG-ANALOG_3SYX-11",
       "name": "ANALGSYN11",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -58260,7 +58260,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-12",
+      "id": "CC0-ANALOG-ANALOG_3SYX-12",
       "name": "ANALGSYN12",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -58436,7 +58436,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-13",
+      "id": "CC0-ANALOG-ANALOG_3SYX-13",
       "name": "ANALGSYN13",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -58612,7 +58612,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-14",
+      "id": "CC0-ANALOG-ANALOG_3SYX-14",
       "name": "ANALGSYN14",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -58788,7 +58788,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-15",
+      "id": "CC0-ANALOG-ANALOG_3SYX-15",
       "name": "ANALGSYN15",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -58964,7 +58964,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-16",
+      "id": "CC0-ANALOG-ANALOG_3SYX-16",
       "name": "ANALGSYN17",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -59140,7 +59140,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-17",
+      "id": "CC0-ANALOG-ANALOG_3SYX-17",
       "name": "ANALGSYN18",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -59316,7 +59316,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-18",
+      "id": "CC0-ANALOG-ANALOG_3SYX-18",
       "name": "ANALGSYN19",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -59492,7 +59492,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-19",
+      "id": "CC0-ANALOG-ANALOG_3SYX-19",
       "name": "ANALOGSTR1",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -59668,7 +59668,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-20",
+      "id": "CC0-ANALOG-ANALOG_3SYX-20",
       "name": "ANALOGSTR2",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -59844,7 +59844,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-21",
+      "id": "CC0-ANALOG-ANALOG_3SYX-21",
       "name": "ANALOGSTR3",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -60020,7 +60020,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-22",
+      "id": "CC0-ANALOG-ANALOG_3SYX-22",
       "name": "Analog-X",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -60196,7 +60196,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-23",
+      "id": "CC0-ANALOG-ANALOG_3SYX-23",
       "name": "ANLOGLEAD1",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -60372,7 +60372,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-24",
+      "id": "CC0-ANALOG-ANALOG_3SYX-24",
       "name": "ANALGSYN16",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -60548,7 +60548,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-25",
+      "id": "CC0-ANALOG-ANALOG_3SYX-25",
       "name": "ANALOG BRS",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -60724,7 +60724,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-26",
+      "id": "CC0-ANALOG-ANALOG_3SYX-26",
       "name": "ANALOG BRS",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -60900,7 +60900,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-27",
+      "id": "CC0-ANALOG-ANALOG_3SYX-27",
       "name": "AnaBrass 1",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -61076,7 +61076,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-28",
+      "id": "CC0-ANALOG-ANALOG_3SYX-28",
       "name": "AnaBrass 2",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -61252,7 +61252,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-29",
+      "id": "CC0-ANALOG-ANALOG_3SYX-29",
       "name": "ANLG BRASS",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -61428,7 +61428,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-30",
+      "id": "CC0-ANALOG-ANALOG_3SYX-30",
       "name": "ANLG BRASS",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -61604,7 +61604,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-31",
+      "id": "CC0-ANALOG-ANALOG_3SYX-31",
       "name": "ANLGBRSS2",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
@@ -61780,7 +61780,7 @@
       ]
     },
     {
-      "id": "CC0-ANALOG-ANALOG3SYX-32",
+      "id": "CC0-ANALOG-ANALOG_3SYX-32",
       "name": "ANLGBRSS3",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
