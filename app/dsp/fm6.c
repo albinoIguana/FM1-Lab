@@ -7,6 +7,7 @@
  * pools, and per-patch note allocation.
  */
 #include <stdint.h>
+#include <string.h>
 #include "fm6.h"
 #include "felucca_tables.h"
 #include "felucca_fm6.h"
@@ -36,9 +37,7 @@ static void fm6_copy_bytes(void *dst, const void *src, uint32_t n)
 }
 static void fm6_zero_bytes(void *dst, uint32_t n)
 {
-    uint8_t *d = (uint8_t *)dst;
-    while (n--)
-        *d++ = 0;
+    memset(dst, 0, n);
 }
 
 #define PATCHES FM6_ENGINE_PATCH_COUNT
@@ -1198,7 +1197,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
         uint32_t p, v, i;
         uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
 
-        fm6_zero_bytes(fm6_patch_mix, sizeof fm6_patch_mix);
+        fm6_zero_bytes(fm6_patch_mix[0], sizeof fm6_patch_mix[0]);
         fm6_zero_bytes(fm6_patch_gain_q15, sizeof fm6_patch_gain_q15);
         /* Patch level is an independent linear-amplitude control. Never
          * renormalize it when other patches become active or inactive. */
@@ -1226,6 +1225,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             fm6_cpu2_job_count = active_voice_count - split;
 #ifdef FM6_TEST
             if (fm6_test_cpu2_mode == 1u || fm6_test_cpu2_mode == 2u) {
+                fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
                 if (fm6_test_cpu2_mode == 1u) {
@@ -1251,6 +1251,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
 #else
             if (plat_cpu2_on()) {
+                fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
                 if (plat_cpu2_run(fm6_cpu2_voice_job, 0u)) {
