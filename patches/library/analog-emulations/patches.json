@@ -43329,7 +43329,7 @@
     },
     {
       "id": "CC0-ANALOG-ANALOG4SYX-21",
-      "name": "- - SYNTH",
+      "name": "ANLG-SYNTH",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "file": "!Instruments/Keyboard/Synth/Analog/ANALOG4.SYX",
@@ -43490,11 +43490,11 @@
         4,
         2,
         24,
-        127,
+        65,
+        78,
+        76,
+        71,
         45,
-        127,
-        45,
-        127,
         83,
         89,
         78,
@@ -43502,7 +43502,8 @@
         72,
         63
       ],
-      "original_name": "- - SYNTH"
+      "original_name": "- - SYNTH",
+      "name_analysis": "heuristic-family"
     },
     {
       "id": "CC0-ANALOG-ANALOG4SYX-22",
