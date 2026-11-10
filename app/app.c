@@ -27,11 +27,13 @@ static int fm1lab_strncmp(const char *a,const char *b,size_t n) {
 }
 
 #if defined(PLAT_WEB)
-__attribute__((import_module("env"), import_name("fm1lab_render_start")))
-extern void fm1lab_render_start(void);
-__attribute__((import_module("env"), import_name("fm1lab_render_end")))
-extern void fm1lab_render_end(void);
-static uint32_t web_device_cpu_pct, web_device_xruns;
+static uint32_t web_device_cpu_q12, web_device_cpu_pct;
+static uint32_t web_device_core0_q12, web_device_core2_q12;
+static uint32_t web_device_core0_pct, web_device_core2_pct;
+static uint32_t web_device_xruns;
+#define FM1LAB_WEB_EXPORT __attribute__((used, visibility("default")))
+#else
+#define FM1LAB_WEB_EXPORT
 #endif
 
 static settings_t set;
@@ -1589,7 +1591,7 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 /* Read-only diagnostics from fm1-base's measured audio ISR counters. These
  * deliberately do not add UI work or logging to the real-time render path. */
-uint32_t app_audio_cpu_pct(void)
+FM1LAB_WEB_EXPORT uint32_t app_audio_cpu_pct(void)
 {
 #if defined(PLAT_WEB)
     return web_device_cpu_pct;
@@ -1597,7 +1599,7 @@ uint32_t app_audio_cpu_pct(void)
     return plat_cpu_pct();
 #endif
 }
-uint32_t app_audio_xruns(void)
+FM1LAB_WEB_EXPORT uint32_t app_audio_xruns(void)
 {
 #if defined(PLAT_WEB)
     return web_device_xruns;
@@ -1605,26 +1607,59 @@ uint32_t app_audio_xruns(void)
     return plat_xruns();
 #endif
 }
-#if defined(PLAT_WEB)
-__attribute__((used, visibility("default")))
-void app_audio_set_device_metrics(uint32_t cpu_pct, uint32_t xruns)
+FM1LAB_WEB_EXPORT uint32_t app_audio_core0_pct(void)
 {
-    web_device_cpu_pct = cpu_pct;
-    web_device_xruns = xruns;
-}
+#if defined(PLAT_WEB)
+    return web_device_core0_pct;
+#else
+    return 0u;
 #endif
+}
+FM1LAB_WEB_EXPORT uint32_t app_audio_core2_pct(void)
+{
+#if defined(PLAT_WEB)
+    return web_device_core2_pct;
+#else
+    return 0u;
+#endif
+}
 uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count(); }
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
 #if defined(PLAT_WEB)
-    fm1lab_render_start();
+    uint32_t render_t0 = plat_ticks24();
+    uint32_t cpu2_t0 = fm6_cpu2_total_job_ticks();
 #endif
     ui_events_drain();
     midi_in();
     fm6_render(lr, n, master_q12);
 #if defined(PLAT_WEB)
-    fm1lab_render_end();
+    {
+        uint32_t elapsed = plat_ticks24() - render_t0;
+        uint32_t cpu2 = fm6_cpu2_total_job_ticks() - cpu2_t0;
+        uint32_t cpu0 = elapsed > cpu2 ? elapsed - cpu2 : 0u;
+        uint32_t critical = cpu0 > cpu2 ? cpu0 : cpu2;
+        uint32_t budget = (uint32_t)(((uint64_t)n * PLAT_TICKS_PER_US * 1000000u) /
+                                     FM6_SAMPLE_RATE_HZ);
+        if (budget) {
+            uint32_t c0_q12 = (uint32_t)(((uint64_t)cpu0 * 4096u) / budget);
+            uint32_t c2_q12 = (uint32_t)(((uint64_t)cpu2 * 4096u) / budget);
+            uint32_t total_q12;
+            web_device_core0_q12 = (web_device_core0_q12 * 15u + c0_q12 + 8u) / 16u;
+            web_device_core2_q12 = (web_device_core2_q12 * 15u + c2_q12 + 8u) / 16u;
+            total_q12 = web_device_core0_q12 > web_device_core2_q12 ?
+                        web_device_core0_q12 : web_device_core2_q12;
+            web_device_cpu_q12 = total_q12;
+            web_device_core0_pct = (web_device_core0_q12 * 100u + 2048u) >> 12;
+            web_device_core2_pct = (web_device_core2_q12 * 100u + 2048u) >> 12;
+            web_device_cpu_pct = (web_device_cpu_q12 * 100u + 2048u) >> 12;
+            if ((uint64_t)critical * 10u > (uint64_t)budget * 9u)
+                app_overload();
+            if (critical > budget)
+                ++web_device_xruns;
+        }
+    }
 #endif
 }
 
