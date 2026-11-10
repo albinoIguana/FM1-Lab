@@ -59,6 +59,9 @@ def main() -> None:
     instruments = manifest["instruments"]
     if len(instruments) != 32:
         raise ValueError("firmware bank must contain exactly 32 instruments")
+    mix_levels = [item.get("mix_level", 31) for item in instruments]
+    if any(not isinstance(level, int) or level < 1 or level > 127 for level in mix_levels):
+        raise ValueError("each instrument mix_level must be an integer from 1 to 127")
 
     voices: list[list[int]] = []
     names: list[str] = []
@@ -117,6 +120,12 @@ def main() -> None:
         "static const char fm1lab_dx7_instrument_names[FM1LAB_DX7_INSTRUMENT_COUNT][24] = {",
     ]
     header.extend("    " + c_string(name) + "," for name in names)
+    header += [
+        "};",
+        "",
+        "static const unsigned char fm1lab_dx7_instrument_level[FM1LAB_DX7_INSTRUMENT_COUNT] = {",
+    ]
+    header.extend("    " + str(level) + "," for level in mix_levels)
     header += [
         "};",
         "",
