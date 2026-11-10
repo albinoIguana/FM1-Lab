@@ -2859,7 +2859,7 @@ static void draw_home_panel(void)
 }
 static void draw_macro_panel(void)
 {
-    static const char *const names[4] = {"BRIGHT / FM INDEX", "BODY / HARMONICS", "MOTION / LFO", "EDGE / DETUNE"};
+    static const char *const names[4] = {"BRIGHT / FM", "BODY / HARM", "MOTION / LFO", "EDGE / TUNE"};
     static const char *const hints[4] = {"DARK <-> BRIGHT", "SOFT <-> METALLIC", "STILL <-> WILD", "CLEAN <-> GRIT"};
     uint32_t now = plat_ms();
     uint16_t accent = patch_color(set.patch);
@@ -2881,7 +2881,7 @@ static void draw_macro_panel(void)
 }
 static void draw_instrument_macro_panel(void)
 {
-    static const char *const names[4] = {"BRIGHT / FM INDEX", "BODY / HARMONICS", "MOTION / LFO", "EDGE / DETUNE"};
+    static const char *const names[4] = {"BRIGHT / FM", "BODY / HARM", "MOTION / LFO", "EDGE / TUNE"};
     static const char *const hints[4] = {"DARK <-> BRIGHT", "SOFT <-> METALLIC", "STILL <-> WILD", "CLEAN <-> GRIT"};
     const uint16_t accent = RGB(150,120,255);
     const uint32_t now = plat_ms();
@@ -3169,7 +3169,6 @@ static void draw_operator_workbench(uint8_t view)
         cv_text(118,143,&FONT_XS,"K2 FINE",C_GRAY);int_text(fine,t);cv_text(169,143,&FONT_B,t,accent);
         cv_text(8,158,&FONT_XS,"K3 OUTPUT",C_GRAY);int_text(output,t);cv_text(66,158,&FONT_B,t,accent);
         cv_text(118,158,&FONT_XS,"K4 TUNE",C_GRAY);int_text(detune,t);cv_text(169,158,&FONT_B,t,accent);
-        cv_text(8,174,&FONT_XS,"ALGO: ROUTE   SELECT: OP",C_GRAY);
     } else {
         static const char *const stages[4]={"ATTACK","DECAY 1","DECAY 2","RELEASE"};
         uint8_t rates[4]={0u},levels[4]={0u};
@@ -3222,7 +3221,6 @@ static void draw_operator_workbench(uint8_t view)
                 cv_rect(cx-13,161,(int32_t)levels[i]*26/99,3,accent);
             }
         }
-        cv_text(8,174,&FONT_XS,view==2u?"K1-4: TARGET LEVELS   SELECT: OP":"K1-4: STAGE RATES   SELECT: OP",C_GRAY);
     }
 }
 
