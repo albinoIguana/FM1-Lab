@@ -30,7 +30,13 @@ class Fm1 extends AudioWorkletProcessor {
   async onMessage(m) {
     if (m.type === "load") {
       try {
-        const now = () => BigInt(Math.round(performance.now() * 1e6));
+        // AudioWorkletGlobalScope does not expose every Window API consistently.
+        // Prefer its monotonic performance clock, then the audio timeline, then wall time.
+        const now = () => {
+          const ms = globalThis.performance?.now?.()
+            ?? (typeof currentTime === "number" ? currentTime * 1000 : Date.now());
+          return BigInt(Math.max(0, Math.round(ms * 1e6)));
+        };
         const wasi = {
           clock_time_get: (id, prec, out) => {
             new DataView(this.mem.buffer).setBigUint64(out, now(), true);
