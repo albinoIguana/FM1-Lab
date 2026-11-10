@@ -20,7 +20,7 @@ This directory is the **source of truth for patch assets and curation metadata**
 
 ## Current inventory
 
-The archive contains **896 indexed voice slots**: 128 original factory candidates plus 768 additional entries from 24 CC0 DX7 banks. Of those, **84 are empty source slots**, explicitly excluded from curation; **812 named voices remain**. New archive families include analog-emulation candidates, leads, pads/strings and resonant/motion, filling out the previous bass/choir/percussion-heavy selection.
+The archive contains **896 indexed voice slots**: 128 original factory candidates plus 768 additional entries from 24 CC0 DX7 banks. Of those, **84 are empty source slots**, explicitly excluded from curation; **812 named voices remain**. Exact byte comparison finds **764 unique named voice patterns**, with 46 duplicate groups (48 duplicate copies beyond canonical entries); see `catalog/duplicates.csv`. The 128-voice factory selection has been checked separately and contains 128 unique voice patterns. New archive families include analog-emulation candidates, leads, pads/strings and resonant/motion, filling out the previous bass/choir/percussion-heavy selection.
 
 Every imported voice retains its original name, source-bank path, voice index, CC0 provenance and converted 156-byte data. The family folders are starting classifications, not a substitute for listening. None of the new voices has yet been auditioned on the FM1-Lab engine. Use `catalog/audition-queue.csv` for a prioritized, name-hint-only listening queue, then record actual sound traits before promoting voices into `curated/`.
 
