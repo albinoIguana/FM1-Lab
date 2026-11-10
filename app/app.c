@@ -1655,7 +1655,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
             web_device_core2_pct = (web_device_core2_q12 * 100u + 2048u) >> 12;
             web_device_cpu_pct = (web_device_cpu_q12 * 100u + 2048u) >> 12;
             if ((uint64_t)critical * 10u > (uint64_t)budget * 9u)
-                app_overload();
+                fm6_overload();
             if (critical > budget)
                 ++web_device_xruns;
         }
