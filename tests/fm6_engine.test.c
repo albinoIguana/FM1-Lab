@@ -54,6 +54,7 @@ static uint64_t render_pan_send_peak(uint8_t pan, unsigned effect, unsigned chan
     for (unsigned patch=1u; patch<FM6_ENGINE_PATCH_COUNT; ++patch)
         fm6_patch_set_enabled((uint8_t)patch,0u);
     fm6_patch_set_pan(0u,pan);
+    fm6_fx_set_enabled((uint8_t)effect,1u);
     fm6_fx_set_send(0u,(uint8_t)effect,100u);
     fm6_render(warmup,2048u,4096u);
     fm6_note_on_mask(60u,110u,0x01u);
