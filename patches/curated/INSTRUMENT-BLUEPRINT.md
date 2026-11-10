@@ -1,32 +1,30 @@
-# Factory instrument curation blueprint
+# Factory instrument curation: v0.3
 
-This is the target palette for the next factory-library revision. It is a **selection plan**, not an approved instrument bank: each four-voice group must be assembled from stable patch IDs in the library and auditioned on the FM1-Lab engine before it replaces factory presets.
+The active 32-instrument / 128-voice factory candidate is defined in `instrument-bank-v0.3.json`. It uses stable IDs from the sound-family archive and is generated into `app/fm1lab_dx7_data.h`.
 
-## Proposed 32-instrument palette
+## Palette balance
 
-| Slots | Instrument direction | Candidate source families | Curation intent |
-|---|---|---|---|
-| 01–04 | Bass foundations | bass, analog-emulations | Deep sub, rounded mono bass, punchy FM bass, clean techno bass |
-| 05–08 | Modern bass / industrial | bass, analog-emulations, sequences-motion | Acid bite, growl, metallic bass, aggressive industrial low end |
-| 09–12 | Classic synth leads | leads, analog-emulations | 80s solo lead, bright sync lead, fat Prophet/Moog-like lead, expressive glide-style voice |
-| 13–16 | Modern / shimmering leads | leads, pads-strings, sequences-motion | Shimmer lead, glassy high lead, evolving digital lead, bold modern techno lead |
-| 17–20 | 80s and analog-style pads | pads-strings, analog-emulations | Warm analog-like pad, wide chorus pad, slow string pad, soft poly pad |
-| 21–24 | Modern pads and atmospheres | pads-strings, sequences-motion | Shimmering pad, evolving cloud, cinematic bed, animated motion pad |
-| 25–27 | Textures and sequences | sequences-motion, textures-drones-fx | Industrial machine texture, resonant sequence voice, dark cinematic drone |
-| 28–29 | Keys and plucks | keys-electric-piano, plucks-mallets, bells-metallic | Distinctive FM keys, glass/metal plucks |
-| 30 | Vocal / ensemble | vocal-choir, pads-strings | Choir or formant texture, not another near-duplicate choir bank |
-| 31 | FM Rhythm | percussion-fm | One dedicated tuned-FM rhythm instrument |
-| 32 | Synth Percussion | percussion-synth | One dedicated electronic percussion instrument |
+| Slots | Count | Direction |
+|---|---:|---|
+| 01–06 | 6 | Bass foundations, clean/punchy/funk/moving |
+| 07 | 1 | Choir / vocal layer |
+| 08–09 | 2 | One FM Rhythm and one Synth Perc instrument |
+| 10–15 | 6 | Moog / Oberheim / Prophet / analog-like and cleaner techno FM |
+| 16–23 | 8 | Classic 80s, fat, Prophet, digital, modern, new-school, shimmer and space leads |
+| 24–30 | 7 | 80s, analog, chorus, cloud, dark, ice and evolving pads |
+| 31–32 | 2 | Cinematic and glassy motion textures |
 
-## Four-patch assembly rules
+This intentionally replaces the previous 8-choir / 8-FM-rhythm / 8-synth-percussion-heavy balance with much more playable melodic and textural variety. Percussion is now two instruments total.
 
-- Four patch positions should have distinct musical jobs, not four near-identical source-bank variations.
-- A proposed group should cover useful registers and have balanced loudness/headroom.
-- Include at least one patch with clear transient/attack, one sustained or evolving voice, and one contrasting harmonic character where the concept allows.
-- Do not use blank source slots, duplicates, or unreviewed voices as final selections.
-- Retain original voice names and patch IDs in the manifest; instrument display names are our own concise editorial names.
-- Keep percussion to one FM Rhythm and one Synth Perc instrument. The remaining slots go to melodic and textural FM sounds.
+## Why the new groups
 
-## Current gate
+- **Analog-like FM:** the archive contains name-hint candidates such as MINI-MOOG, OBERHEIM, PROPHET, ANALOG BRT and ANLOG SQR. These groups provide a useful starting palette for rounded, subtractive-style tones.
+- **Leads:** eight four-voice sets create more room for classic 80s, fat, digital, modern and shimmering lead directions.
+- **Pads:** seven sets cover warm, analog-like, chorus, cloud, dark, icy and evolving textures.
+- **Motion:** two groups emphasize glassy and cinematic evolving voices.
 
-The 896-entry archive is indexed. 84 imported entries are empty source slots and are explicitly marked `empty-source-slot`; 812 entries remain named candidates. The new voices have not yet been auditioned on the FM1-Lab engine. Use `catalog/audition-queue.csv` to start with analog-like, shimmer/pad, lead, aggressive and motion candidates. Do not promote the plan into firmware until the selected voices have passed listening and regression checks.
+## Review status
+
+This is a **draft listening build**, not a claim that every group has been fully auditioned. The imported CC0 voices have valid 156-byte records and original source names, but individual sound character still needs listening on the FM1-Lab engine. The first test should focus on the eight lead instruments and seven pad instruments, then check analog-like and cleaner techno groups for loudness, tuning, note-off and duplicate feel.
+
+Empty source slots are excluded from the selection. The complete inventory and candidate audition queue remain in `catalog/patches.csv` and `catalog/audition-queue.csv`.
