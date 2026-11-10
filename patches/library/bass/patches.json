@@ -545,7 +545,7 @@
     },
     {
       "id": "DX7-004",
-      "name": "SO*LOW! #1",
+      "name": "WIDE-BS01",
       "source": {
         "collection": "visualizersdotnl/Yamaha-DX7-patch-library",
         "files": [
@@ -709,19 +709,20 @@
         0,
         2,
         24,
-        83,
-        79,
-        42,
-        76,
-        79,
         87,
-        33,
-        32,
-        35,
+        73,
+        68,
+        69,
+        45,
+        66,
+        83,
+        48,
         49,
+        32,
         64
       ],
-      "original_name": "SO*LOW! #1"
+      "original_name": "SO*LOW! #1",
+      "name_analysis": "heuristic-wide"
     },
     {
       "id": "DX7-005",
