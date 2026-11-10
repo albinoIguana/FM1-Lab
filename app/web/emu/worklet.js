@@ -121,31 +121,13 @@ class Fm1 extends AudioWorkletProcessor {
     const t0 = clock();
     if (this.app.process) this.app.process(this);
     this.ex.web_render(n);
-    // The app's browser-only hooks time app_render and the CPU2 voice job
-    // separately. The host platform runs CPU2 synchronously, so subtract its
-    // time from the total and use max(core 0, core 1) as the parallel critical
-    // path. Compare that path with the FM1's 256-frame / 5.805 ms deadline.
-    if (this.app.metrics) {
-      const m = this.app.metrics();
-      if (m.renderMs > 0) {
-        const core1 = Math.max(0, m.cpu2Ms);
-        const core0 = Math.max(0, m.renderMs - core1);
-        const criticalMs = Math.max(core0, core1);
-        const budgetMs = 256 * 1000 / 44100;
-        const core0Q12 = Math.round(core0 * 4096 / budgetMs);
-        const core2Q12 = Math.round(core1 * 4096 / budgetMs);
-        this.deviceCore0Q12 = Math.floor((this.deviceCore0Q12 * 15 + core0Q12 + 8) / 16);
-        this.deviceCore2Q12 = Math.floor((this.deviceCore2Q12 * 15 + core2Q12 + 8) / 16);
-        this.deviceLoadQ12 = Math.max(this.deviceCore0Q12, this.deviceCore2Q12);
-        this.deviceCore0 = Math.round(this.deviceCore0Q12 * 100 / 4096);
-        this.deviceCore2 = Math.round(this.deviceCore2Q12 * 100 / 4096);
-        this.deviceLoad = Math.max(this.deviceCore0, this.deviceCore2);
-        if (criticalMs > budgetMs * 0.9 && this.ex.app_overload) this.ex.app_overload();
-        if (criticalMs > budgetMs) this.deviceXruns++;
-        if (this.ex.app_audio_set_device_metrics)
-          this.ex.app_audio_set_device_metrics(this.deviceLoad, this.deviceXruns);
-      }
-    }
+    // app_render computes the FM1 deadline model in C from the monotonic
+    // clock and the separately timed CPU2 worker. Read its smoothed per-core
+    // figures after advancing the simulated device clock.
+    if (this.ex.app_audio_cpu_pct) this.deviceLoad = this.ex.app_audio_cpu_pct();
+    if (this.ex.app_audio_core0_pct) this.deviceCore0 = this.ex.app_audio_core0_pct();
+    if (this.ex.app_audio_core2_pct) this.deviceCore2 = this.ex.app_audio_core2_pct();
+    if (this.ex.app_audio_xruns) this.deviceXruns = this.ex.app_audio_xruns();
     this.busy += clock() - t0;
     this.frames += n;
     out[0].set(new Float32Array(this.mem.buffer, this.ex.web_out_l(), n));
