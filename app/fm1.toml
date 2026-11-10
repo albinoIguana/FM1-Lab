@@ -8,6 +8,7 @@ credits = "FM1-Lab native app on fm1-base; Felucca FM6 core, 32-Instrument four-
 unity_opt = "s"
 cpu2 = true
 cpu2_fallback = true
+cpu2_stack = 4096
 ble = true
 ble_stack = "own"
 ble_central = true
