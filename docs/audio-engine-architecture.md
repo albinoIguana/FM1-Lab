@@ -13,7 +13,7 @@ The device app compiles the pinned Felucca FM6 core directly through `app/dsp/fm
 3. Main-loop controls publish compact events; `app_render()` drains them in the audio interrupt before calling `fm6_render()`.
 4. `fm6_render()` produces stereo 24-bit audio at the platform-provided master gain.
 
-The FM6 wrapper contains eight patch slots (two four-patch sequencer Instrument banks) and **eight independent eight-voice allocators (64 total voice slots)**. Each patch has a fixed pool of eight voices; allocation and voice stealing are scoped to that patch, so a busy layer cannot steal another layer's notes. A normal single-patch performance therefore renders only that patch's sounding notes, not four layers by default. This is a structural polyphony guarantee, not a claim about available CPU headroom.
+The FM6 wrapper contains eight patch slots (two four-patch sequencer Instrument banks) and **eight independent eight-voice allocators (64 total voice slots)**. Each sequencer Instrument is one four-layer sound: when all four layer levels are nonzero, one played note can create four active FM6 voices. The two four-patch banks belong to the two sequencer tracks; selecting one Instrument does not mean the other track or the sampler is playing. Each patch has a fixed pool of eight voices, and allocation/voice stealing are scoped to that layer. This is a structural polyphony guarantee, not a claim about available CPU headroom.
 
 The engine supports per-patch enable and level, non-destructive BRIGHTNESS/BODY/MOTION/EDGE macros, algorithm-aware carrier identification, note masks, pitch bend and tuned notes. The active app now loads the 32-Instrument / four-bank store described in the README, with audio-owner Instrument swaps.
 
