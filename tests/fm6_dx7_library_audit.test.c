@@ -13,6 +13,9 @@ typedef struct {
     char name[11];
     uint64_t peak;
     uint64_t mean_abs;
+    uint64_t pre_limiter_peak;
+    uint64_t output_peak;
+    uint32_t limiter_events;
 } result_t;
 
 static const char z85_alphabet[] =
@@ -49,11 +52,11 @@ int main(void)
     int32_t output[SAMPLE_WORDS];
     uint64_t min_peak = UINT64_MAX, max_peak = 0u;
     uint64_t min_mean = UINT64_MAX, max_mean = 0u;
-    unsigned quiet = 0u, silent = 0u;
+    unsigned quiet = 0u, silent = 0u, limited = 0u;
 
     for (unsigned index = 0; index < FM1LAB_DX7_VOICE_COUNT; ++index) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
-        uint64_t peak = 0u, sum_abs = 0u;
+        uint64_t peak = 0u, sum_abs = 0u, pre_limiter_peak = 0u;
         char name[11];
 
         if (decode_voice(index, voice) != 0) {
@@ -84,6 +87,8 @@ int main(void)
 
         for (unsigned block = 0; block < BLOCK_COUNT; ++block) {
             fm6_render(output, BLOCK_FRAMES, 4096u);
+            if (fm6_test_patch_peak(0u) > pre_limiter_peak)
+                pre_limiter_peak = fm6_test_patch_peak(0u);
             for (unsigned sample = 0; sample < SAMPLE_WORDS; ++sample) {
                 uint64_t magnitude = abs_sample(output[sample]);
                 if (magnitude > peak) peak = magnitude;
@@ -93,6 +98,9 @@ int main(void)
 
         results[index].peak = peak;
         results[index].mean_abs = sum_abs / ((uint64_t)BLOCK_COUNT * SAMPLE_WORDS);
+        results[index].pre_limiter_peak = pre_limiter_peak;
+        results[index].output_peak = fm6_test_output_peak();
+        results[index].limiter_events = fm6_test_limiter_events();
         memcpy(results[index].name, name, sizeof name);
         if (peak < min_peak) min_peak = peak;
         if (peak > max_peak) max_peak = peak;
@@ -100,6 +108,7 @@ int main(void)
         if (results[index].mean_abs > max_mean) max_mean = results[index].mean_abs;
         if (peak < 100000u) ++quiet;
         if (peak < 1000u) ++silent;
+        if (results[index].limiter_events) ++limited;
     }
 
     printf("DX7 library audio audit (one patch, level 31, note 60, 1 s):\n");
@@ -119,5 +128,18 @@ int main(void)
                best, results[best].name, results[best].peak, results[best].mean_abs);
         results[best].peak = UINT64_MAX;
     }
-    return silent ? 2 : 0;
+    for (unsigned shown = 0; shown < 12u; ++shown) {
+        unsigned best = FM1LAB_DX7_VOICE_COUNT;
+        for (unsigned i = 0; i < FM1LAB_DX7_VOICE_COUNT; ++i) {
+            if (results[i].peak == UINT64_MAX) continue;
+            if (best == FM1LAB_DX7_VOICE_COUNT ||
+                results[i].peak > results[best].peak) best = i;
+        }
+        if (best == FM1LAB_DX7_VOICE_COUNT) break;
+        printf("  loud #%03u %-10.10s pre=%" PRIu64 " out=%" PRIu64 " lim=%" PRIu32 "\\n",
+               best, results[best].name, results[best].pre_limiter_peak,
+               results[best].output_peak, results[best].limiter_events);
+        results[best].peak = UINT64_MAX;
+    }
+    return 0;
 }
