@@ -15,7 +15,7 @@
 /* FM6's two operator buses must be private to each render call when CPU2 is
  * active. The upstream FELUCCA_CPU2 branch moves them from shared static
  * storage to the render stack, preventing cross-core bus races. */
-#if defined(FM1B_CPU2) || defined(FM6_TEST)
+#if (defined(FM1B_CPU2) && FM1B_CPU2) || defined(FM6_TEST)
 #ifndef FELUCCA_CPU2
 #define FELUCCA_CPU2 1
 #endif
