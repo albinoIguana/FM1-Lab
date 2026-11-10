@@ -446,13 +446,13 @@
       "patch_ids": [
         "CC0-PAD-PADS01SYX-05",
         "CC0-PAD-PADS01SYX-06",
-        "CC0-PAD-PADS01SYX-07",
+        "CC0-PAD-PADS01SYX-12",
         "CC0-PAD-PADS01SYX-08"
       ],
       "patch_names": [
         "*Sternenkl",
         "AMBIENCE..",
-        "ANALOG PAD",
+        "AnnaSubtl\\",
         "ANALOG PAD"
       ],
       "curation_status": "draft-un-auditioned"
