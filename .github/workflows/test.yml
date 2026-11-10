@@ -25,6 +25,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify generated curated DX7 firmware bank
+        run: |
+          python3 tools/generate_dx7_library.py
+          git diff --exit-code -- app/fm1lab_dx7_data.h
       - name: Test Digitone conversion primitives
         run: python3 -m unittest discover -s tests -p 'test_digitone_converter.py'
       - name: Set up Node.js
