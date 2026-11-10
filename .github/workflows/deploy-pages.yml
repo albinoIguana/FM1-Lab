@@ -1,9 +1,10 @@
-name: FM1-Lab · M-VAVE native engine
+name: Publish Shipwreck Web Installer and Emulator
 
 on:
   workflow_run:
     workflows: ["Native FM1 build"]
     types: [completed]
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Check out FM1-Lab and official M-VAVE source
