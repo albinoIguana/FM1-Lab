@@ -3860,7 +3860,7 @@ static void draw(void)
         cv_text(6, 4, &FONT_XS, t, C_GRAY);
     }
     {
-        char diag[32], number[12];
+        char diag[40], number[12];
         int_text((int32_t)app_audio_cpu_pct(), diag);
         /* Compact live hardware telemetry: render load, DMA misses, and shed voices. */
         char suffix[24] = "% CPU  XR ";
@@ -3870,7 +3870,13 @@ static void draw(void)
         text_cat(diag, " SH ");
         int_text((int32_t)app_audio_overload_shed_count(), number);
         text_cat(diag, number);
-        text_cat(diag, plat_cpu2_on() ? " C2" : " C1");
+        if (plat_cpu2_on()) {
+            text_cat(diag, " C2 ");
+            int_text((int32_t)plat_cpu2_stack(), number);
+            text_cat(diag, number);
+        } else {
+            text_cat(diag, " C1");
+        }
         cv_text_fit(62, 4, &FONT_XS, diag, C_GRAY, 132);
     }
     page_counter(page, t, sizeof(t));
