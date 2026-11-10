@@ -3871,8 +3871,11 @@ static void draw(void)
         int_text((int32_t)app_audio_overload_shed_count(), number);
         text_cat(diag, number);
         if (plat_cpu2_on()) {
-            text_cat(diag, " C2 ");
+            text_cat(diag, " C2 S");
             int_text((int32_t)plat_cpu2_stack(), number);
+            text_cat(diag, number);
+            text_cat(diag, " W");
+            int_text((int32_t)fm6_cpu2_last_wait_us(), number);
             text_cat(diag, number);
         } else {
             text_cat(diag, " C1");
@@ -3991,6 +3994,10 @@ int app_expect(const char *what, int *got)
         *got = plat_cpu2_on();
     else if (!fm1lab_strcmp(what, "cpu2stack"))
         *got = (int)plat_cpu2_stack();
+    else if (!fm1lab_strcmp(what, "cpu2job"))
+        *got = (int)fm6_cpu2_last_job_us();
+    else if (!fm1lab_strcmp(what, "cpu2wait"))
+        *got = (int)fm6_cpu2_last_wait_us();
     else if (!fm1lab_strcmp(what, "cpu2bad"))
         *got = (int)plat_cpu2_bad();
     else if (!fm1lab_strcmp(what, "cpu2why"))
