@@ -81,7 +81,7 @@ static int audit_single_voices(void)
             return 1;
         }
         fm6_patch_set_enabled(0u, 1u);
-        fm6_patch_set_level(0u, 31u);
+        fm6_patch_set_level(0u, fm1lab_dx7_instrument_level[index / FM1LAB_PATCH_COUNT]);
         fm6_render(output, BLOCK_FRAMES, 4096u);
         fm6_note_on_mask(60u, 110u, 0x01u);
 
@@ -111,7 +111,7 @@ static int audit_single_voices(void)
         if (results[index].limiter_events) ++limited;
     }
 
-    printf("DX7 library audio audit (one patch, level 31, note 60, 1 s):\n");
+    printf("DX7 library audio audit (one patch at factory layer level, note 60, 1 s):\n");
     printf("  peak Q23 min/max: %" PRIu64 " / %" PRIu64 "\n", min_peak, max_peak);
     printf("  mean-absolute Q23 min/max: %" PRIu64 " / %" PRIu64 "\n", min_mean, max_mean);
     printf("  low-peak voices (<100000): %u/%u; silent (<1000): %u/%u\n",
