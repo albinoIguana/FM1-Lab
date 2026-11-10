@@ -723,6 +723,8 @@ static int fm1lab_seed_dx7_legacy_instrument(uint32_t index,fm1lab_instrument_t 
     }
     return fm1lab_instrument_valid(out)?0:-1;
 }
+/* Factory instrument identity follows the first DX7 voice name, not the
+ * source bank/category label. The curated manifest remains the selection source. */
 static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !out) return -1;
