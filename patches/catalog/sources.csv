@@ -1,0 +1,10 @@
+source_id,collection,voice_count,format,license_status,redistribution,priority,notes,url
+SRC-CC0-DX7,visualizersdotnl Yamaha DX7 patch library,large,DX7 SysEx,CC0-1.0,allowed,high,"Existing 128 voices came from selected bank files; mine additional categories",https://github.com/visualizersdotnl/Yamaha-DX7-patch-library
+SRC-DEEPDX,The Introvert Deep DX,~608,DX7 SysEx,restricted-use,not-allowed,"high","AI-generated; derivatives allowed in music but patch/sample library redistribution prohibited",https://theintrovert.net/dx7-sound-banks/
+SRC-SOLYARIS,Solyaris Music 393 original patches,393,DX7II SysEx,unclear,not-confirmed,"high","Includes analogia, strings, bass, ambient pads, brass, percussion and other bundles",https://solyaris.altervista.org/dx7.html
+SRC-FLYWHEEL,SoundEngine Flywheel DX7,64,DX7 SysEx,commercial,not-allowed,"high","Analog emulations and FM edge; Prophet/Oberheim-like voices",https://soundengine.com/product/flywheel-dx7/
+SRC-FMDEPTHS,Nick Klimenko FM Depths,32,DX7 SysEx,commercial,not-allowed,"high","Silky strings, evolving drones, smooth pads, analog-like basses and solo leads",https://lfo.store/shop/software-synths/arturia-dx7-v/fm-depths-soundset-32-presets/
+SRC-PHIMU,Phi Mu Labs Origin,128,DX7 SysEx,commercial,not-allowed,"medium","Original Dexed-created patches; broad palette",https://blacksidedsun.gumroad.com/l/pmlo
+SRC-FACTORY,Yamaha Black Boxes DX7 and DX7II factory banks,various,DX7 SysEx,unclear,not-confirmed,"medium","Useful baseline; factory ROM rights require review",https://yamahablackboxes.com/collection/yamaha-dx7-synthesizer/patches/
+SRC-BB,Bobby Blues DX7 archive,~15000,DX7 SysEx and other formats,variable,not-confirmed,"medium","Large community archive; review individual bank provenance",https://www.bobbysblues.com/
+SRC-PATCHESFM,patches.fm DX7 database,~26000,individual voices,unstated,not-confirmed,"medium","Search and export individual voices; no license stated",https://patches.fm/
