@@ -58,7 +58,9 @@ jobs:
       - name: Assemble the FM1-Lab workshop and native hardware emulator
         run: |
           mkdir -p _site/src _site/m-vave _site/native-emulator
-          python3 scripts/build-web-installer.py /tmp/fm1-release/fm1lab-0.1.fwsc _site/install
+          python3 scripts/build-web-installer.py /tmp/fm1-release/app/build/fm1lab-0.1.fwsc _site/install
+          test -s _site/install/firmware/fm1lab-0.1.fwsc
+          grep -q \"firmware/fm1lab-0.1.fwsc\" _site/install/index.html
           cp index.html _site/index.html
           cp .nojekyll _site/.nojekyll
           cp -R src/. _site/src/
