@@ -2323,23 +2323,9 @@ static void input(void)
         } else if (k == EN_PRESET) {
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
-            } else if(page==PAGE_MACRO) {
-                /* PRESET on the patch editor browses individual DX7 voices.
-                 * On HOME it always selects the four-patch Instrument. */
-                int32_t next=((int32_t)patch_preset_cursor+e)%
-                    (int32_t)FM1LAB_DX7_VOICE_COUNT;
-                if(next<0)next+=(int32_t)FM1LAB_DX7_VOICE_COUNT;
-                uint8_t voice[FM1LAB_PATCH_BYTES];
-                if(fm1lab_dx7_decode_voice((uint32_t)next,voice)!=0 ||
-                   fm1lab_patch_set_voice(&current_instrument,set.patch,voice)!=0) {
-                    app_say("PATCH PRESET","LOAD FAILED");
-                } else {
-                    patch_preset_cursor=(uint8_t)next;
-                    voice_edit_changed();
-                    app_say("PATCH PRESET",patch_display_name(set.patch));
-                }
             } else {
-                /* Whole-Instrument focus: PRESET browses all 32 four-patch sets. */
+                /* PRESETS always selects the four-patch Instrument.
+                 * SELECT chooses the patch; ALGORITHM edits its FM routing. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
@@ -2725,8 +2711,9 @@ static uint16_t patch_color(uint32_t p)
     static const uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
     return colors[p & 3u];
 }
-static uint16_t panel_fill(void) { return RGB(17,29,39); }
 static uint16_t screen_bg(void) { return RGB(2,3,6); }
+/* Cards sit directly on the same near-black as the screen, not blue-gray. */
+static uint16_t panel_fill(void) { return screen_bg(); }
 
 /* Minimal power-on ident: crisp native-font title, fade in, hold, fade out. */
 /* Draw the boot word at 150% using the native antialiased font bitmap.
@@ -2734,27 +2721,26 @@ static uint16_t screen_bg(void) { return RGB(2,3,6); }
  * making the identity noticeably larger on the 240x240 panel. */
 static int32_t startup_text_width(const char *s)
 {
-    return (text_w(&FONT_B,s)*3+1)/2;
+    return text_w(&FONT_B,s)*2;
 }
 static void startup_text_scaled(int32_t x, int32_t y, const char *s, uint16_t color)
 {
+    /* 2x nearest-neighbour bitmap enlargement: crisp, legible at arm's length. */
     for (; *s; ++s) {
         uint32_t gi=glyph(&FONT_B,(uint8_t)*s), gx, gy;
         uint32_t w=FONT_B.bw[gi], bpr=(w+1u)/2u;
         const uint8_t *gd=FONT_B.data+FONT_B.off[gi];
         for(gy=0;gy<FONT_B.h;gy++) {
-            uint32_t y0=gy*3u/2u, y1=(gy+1u)*3u/2u;
             for(gx=0;gx<w;gx++) {
                 uint32_t a=gd[gy*bpr+gx/2u];
                 a=(gx&1u)?(a&15u):(a>>4);
                 if(a) {
-                    uint32_t x0=gx*3u/2u, x1=(gx+1u)*3u/2u;
-                    cv_rect(x+(int32_t)x0-(int32_t)(FONT_B.pad*3u/2u),
-                            y+(int32_t)y0,(int32_t)(x1-x0),(int32_t)(y1-y0),color);
+                    cv_rect(x+(int32_t)(gx*2u)-(int32_t)(FONT_B.pad*2u),
+                            y+(int32_t)(gy*2u),2,2,color);
                 }
             }
         }
-        x+=(int32_t)(FONT_B.adv[gi]*3u/2u);
+        x+=(int32_t)(FONT_B.adv[gi]*2u);
     }
 }
 static void draw_startup(uint32_t elapsed)
@@ -2772,10 +2758,10 @@ static void draw_startup(uint32_t elapsed)
         alpha=100u-(elapsed-fade_ms-hold_ms)*100u/fade_ms;
     else alpha=0u;
     ink=RGB(2u+(253u*alpha)/100u,
-            3u+(215u*alpha)/100u,
-            6u+(22u*alpha)/100u);
+            3u+(247u*alpha)/100u,
+            6u+(249u*alpha)/100u);
     cv_begin(240,180,bg);
-    if(alpha) startup_text_scaled(x,(180-(int32_t)(FONT_B.h*3u/2u))/2,word,ink);
+    if(alpha) startup_text_scaled(x,(180-(int32_t)(FONT_B.h*2u))/2,word,ink);
     cv_blit(0,41);
 }
 static int algorithm_preview_active(void)
