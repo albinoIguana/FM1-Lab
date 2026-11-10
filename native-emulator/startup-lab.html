@@ -1,69 +1,39 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>FM1 · Shipwreck LaserLinks Lab</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>FM1 · Shipwreck LaserLinks Lab</title>
 <style>
-:root{color-scheme:dark;--bg:#090d16;--panel:#111a29;--ink:#dce9f7;--muted:#8496ad;--cyan:#55e7ed;--blue:#477cf6;--violet:#a16cff}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 15%,#15233a 0,#090d16 58%);color:var(--ink);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;min-height:100svh;padding:22px 14px 30px}
-main{width:min(100%,520px);margin:auto}.eyebrow{font-size:11px;letter-spacing:.2em;color:var(--cyan);text-transform:uppercase}.heading{font-size:22px;font-weight:700;letter-spacing:.04em;margin:5px 0 3px}.sub{color:var(--muted);margin:0 0 18px;font-size:13px}
-.stage{background:#03060c;border:1px solid #26374c;border-radius:16px;padding:14px;box-shadow:0 16px 50px #0008}
-.screen-wrap{width:min(100%,360px);margin:auto;aspect-ratio:1;background:#02040a;border:1px solid #26364b;box-shadow:inset 0 0 0 4px #0a1220;display:grid;place-items:center;overflow:hidden}
-canvas{width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
-.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.control{background:var(--panel);border:1px solid #26364b;border-radius:10px;padding:10px}.control label{display:flex;justify-content:space-between;color:#c9d8e9;font-size:12px;margin-bottom:7px}.control output{color:var(--cyan);font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:var(--cyan)}
-.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1;border:1px solid #35506c;background:#17253a;color:#e5f2ff;border-radius:9px;padding:11px;font:600 13px inherit}.actions button.primary{background:#173e55;border-color:#3d9aa9}.note{color:var(--muted);font-size:11px;margin:12px 2px 0;text-align:center}
-@media(min-width:480px){body{padding-top:34px}.stage{padding:20px}}
-</style>
-</head>
-<body><main>
-<div class="eyebrow">FM1 · 240 × 240 DISPLAY STUDY</div>
-<div class="heading">SHIPWRECK / LASERLINKS</div>
-<p class="sub">Low-resolution motion study · 120 × 120 logical pixels · nearest-neighbor upscale</p>
-<section class="stage">
-<div class="screen-wrap"><canvas id="screen" width="120" height="120" aria-label="Animated Shipwreck laser line logo"></canvas></div>
-<div class="controls">
-<div class="control"><label for="speed">Sequence speed <output id="speedOut">1.0×</output></label><input id="speed" type="range" min=".5" max="2" step=".1" value="1"></div>
-<div class="control"><label for="fragments">Pixel breakup <output id="fragOut">medium</output></label><input id="fragments" type="range" min="1" max="3" step="1" value="2"></div>
-</div>
-<div class="actions"><button class="primary" id="restart">↻ Replay sequence</button><button id="toggle">Ⅱ Pause</button></div>
-</section>
-<p class="note">Concept only · geometric laser strokes, restrained palette, no glow or reflections</p>
-</main>
+:root{color-scheme:dark;--bg:#090d16;--panel:#111a29;--ink:#dce9f7;--muted:#8496ad;--cyan:#55e7ed}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 12%,#15233a 0,#090d16 58%);color:var(--ink);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;min-height:100svh;padding:22px 14px 30px}main{width:min(100%,520px);margin:auto}.eyebrow{font-size:11px;letter-spacing:.2em;color:var(--cyan);text-transform:uppercase}.heading{font-size:22px;font-weight:700;letter-spacing:.04em;margin:5px 0 3px}.sub{color:var(--muted);margin:0 0 18px;font-size:13px}.stage{background:#03060c;border:1px solid #26374c;border-radius:16px;padding:14px;box-shadow:0 16px 50px #0008}.screen-wrap{width:min(100%,400px);margin:auto;aspect-ratio:1;background:#02040a;border:1px solid #26364b;box-shadow:inset 0 0 0 4px #0a1220;display:grid;place-items:center;overflow:hidden}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.control{background:var(--panel);border:1px solid #26364b;border-radius:10px;padding:10px}.control label{display:flex;justify-content:space-between;color:#c9d8e9;font-size:12px;margin-bottom:7px}.control output{color:var(--cyan);font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:var(--cyan)}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1;border:1px solid #35506c;background:#17253a;color:#e5f2ff;border-radius:9px;padding:11px;font:600 13px ui-sans-serif,system-ui}.actions button.primary{background:#173e55;border-color:#3d9aa9}.note{color:var(--muted);font-size:11px;margin:12px 2px 0;text-align:center}
+</style></head><body><main><div class="eyebrow">FM1 · NATIVE 240 × 240 STUDY</div><div class="heading">SHIPWRECK / LASERLINKS</div><p class="sub">Connected angular laser paths · center-out cut · native pixel resolution</p><section class="stage"><div class="screen-wrap"><canvas id="screen" width="240" height="240" aria-label="SHIPWRECK title cut apart by geometric laser lines"></canvas></div>
+<div class="controls"><div class="control"><label for="speed">Sequence speed <output id="speedOut">1.0×</output></label><input id="speed" type="range" min=".5" max="2" step=".1" value="1"></div><div class="control"><label for="breakup">Letter breakup <output id="breakOut">medium</output></label><input id="breakup" type="range" min="1" max="3" step="1" value="2"></div></div>
+<div class="actions"><button class="primary" id="restart">↻ Replay sequence</button><button id="toggle">Ⅱ Pause</button></div></section><p class="note">Full 240×240 canvas · angular line geometry · no object, reflections, glow, or particle cloud</p></main>
 <script>
-(()=>{const c=document.getElementById('screen'),x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=false;
-const speed=document.getElementById('speed'),fr=document.getElementById('fragments'),so=document.getElementById('speedOut'),fo=document.getElementById('fragOut'),toggle=document.getElementById('toggle');
-let start=performance.now(),paused=false,pauseAt=0;
-const lines=[
- [[8,34],[29,18],[49,35],[72,13],[108,31]],
- [[10,48],[31,31],[52,48],[77,28],[111,44]],
- [[15,20],[29,42],[47,19],[67,43],[91,20],[105,39]],
- [[14,58],[39,45],[59,61],[83,43],[105,57]]
+(()=>{const c=document.getElementById('screen'),g=c.getContext('2d'),speed=document.getElementById('speed'),breakup=document.getElementById('breakup'),speedOut=document.getElementById('speedOut'),breakOut=document.getElementById('breakOut'),toggle=document.getElementById('toggle');
+const bg='#03060c',yellow='#f5d52f',laser=['#55e7ed','#477cf6','#a16cff','#d5f8ff'];
+// Each path is a connected, asymmetric LaserLinks-style polyline radiating from the cut point.
+const paths=[
+ [[120,113],[103,96],[88,109],[69,91],[51,106],[29,94],[13,108]],
+ [[120,113],[101,130],[83,115],[64,135],[45,121],[25,139],[9,129]],
+ [[120,113],[137,94],[153,109],[171,90],[190,106],[211,92],[229,105]],
+ [[120,113],[139,132],[157,116],[177,136],[196,120],[216,139],[233,128]],
+ [[120,113],[108,89],[122,72],[111,55],[126,38]],
+ [[120,113],[133,137],[119,154],[134,172],[121,194]]
 ];
-function path(points,color,a=1,w=1){x.globalAlpha=a;x.strokeStyle=color;x.lineWidth=w;x.beginPath();x.moveTo(...points[0]);for(let i=1;i<points.length;i++)x.lineTo(...points[i]);x.stroke();x.globalAlpha=1}
-function textMask(){x.font='bold 15px monospace';x.textAlign='center';x.textBaseline='middle';x.fillStyle='#e8efff';x.fillText('SHIPWRECK',60,61)}
-function draw(now){if(!paused){const t=((now-start)/1000*speed.value)%9;const phase=t<1.2?0:t<3.4?1:t<5.6?2:t<7.4?3:4;const p=phase===0?t/1.2:phase===1?(t-1.2)/2.2:phase===2?(t-3.4)/2.2:phase===3?(t-5.6)/1.8:1;
-x.fillStyle='#03060c';x.fillRect(0,0,120,120);
-if(t<8.15){textMask();}
-// Geometric line construction: short connected strokes, not a solid object.
-const reveal=Math.min(1,Math.max(0,(t-.25)/1.25));
-const colors=['#55e7ed','#477cf6','#a16cff','#55e7ed'];
-lines.forEach((pts,i)=>{const count=Math.ceil((pts.length-1)*reveal);for(let j=0;j<count;j++){const end=pts[j+1],beg=pts[j];path([beg,end],colors[(i+j)%colors.length],.95,1);}});
-if(t>1.35&&t<7.5){
- // Pixel fragments are clipped to the logo band and increase as the laser strokes pass.
- const strength=fr.value;const amount=Math.floor((t-1.35)*24*strength);
- for(let i=0;i<Math.min(170,amount);i++){const seed=(i*73+19)%997;const px=12+(seed*17)%96,py=53+(seed*7)%18;const gate=((px*3+py*5+i*11)%100)/100;if(gate<p*.92){x.fillStyle=colors[i%3];x.fillRect(px,py,1+(i%3===0?1:0),1);}}
- // Erase a growing center-out band in coarse blocks, so the lettering visibly breaks apart.
- const erase=Math.floor(Math.max(0,p*58));x.fillStyle='#03060c';for(let k=0;k<erase;k++){const yy=54+(k%14),xx=60+((k*13)%2?1:-1)*Math.floor(k/2);if(xx>10&&xx<110)x.fillRect(xx,yy,2,2);}
-}
-if(t>7.5){x.fillStyle='#03060c';x.fillRect(0,0,120,120);}
-if(t>8.15){x.fillStyle='#03060c';x.fillRect(0,0,120,120);}
-}
-requestAnimationFrame(draw)}
-requestAnimationFrame(draw);
-speed.addEventListener('input',()=>so.value=Number(speed.value).toFixed(1)+'×');
-fr.addEventListener('input',()=>fo.value=['','light','medium','heavy'][fr.value]);
-document.getElementById('restart').addEventListener('click',()=>{start=performance.now();if(paused){paused=false;toggle.textContent='Ⅱ Pause';}});
-toggle.addEventListener('click',()=>{if(!paused){paused=true;pauseAt=performance.now();toggle.textContent='▶ Play';}else{start+=performance.now()-pauseAt;paused=false;toggle.textContent='Ⅱ Pause';}});
+const glyphs='SHIPWRECK';let start=performance.now(),paused=false,pauseAt=0;
+function strokePartial(points,progress,color){let lengths=[],total=0;for(let i=1;i<points.length;i++){const d=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);lengths.push(d);total+=d;}let remain=total*progress;g.beginPath();g.moveTo(...points[0]);for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],d=lengths[i-1];if(remain>=d){g.lineTo(...b);remain-=d;}else{const q=Math.max(0,remain/d);g.lineTo(a[0]+(b[0]-a[0])*q,a[1]+(b[1]-a[1])*q);break;}}g.strokeStyle=color;g.lineWidth=1.6;g.lineJoin='miter';g.lineCap='square';g.stroke();}
+// Stable integer hash: repeatable square fragments, no random particle field.
+function hash(n){let v=(n*1664525+1013904223)>>>0;v^=v>>>16;return v>>>0;}
+function frame(now){if(!paused){const t=((now-start)/1000*Number(speed.value))%8.4;g.fillStyle=bg;g.fillRect(0,0,240,240);
+const pass=t<3.2?0:t<6.4?1:-1,local=pass<0?1:(t-pass*3.2)/3.2,front=Math.min(1,Math.max(0,(local-.08)/.68));
+const cx=120,wordY=123;g.font='bold 27px monospace';g.textAlign='left';g.textBaseline='middle';const widths=[...glyphs].map(ch=>g.measureText(ch).width),total=widths.reduce((a,b)=>a+b,0);let x=(240-total)/2;
+for(let i=0;i<glyphs.length;i++){const center=x+widths[i]/2,dist=Math.abs(center-cx),delay=dist/((total/2)+2)*.78;const gone=Math.max(0,Math.min(1,(front-delay)/.19));const fade=gone*gone;
+if(fade<.995){g.globalAlpha=1-fade;g.fillStyle=yellow;g.fillText(glyphs[i],x,wordY);g.globalAlpha=1;}
+if(gone>0){const n=breakup.value*3;for(let k=0;k<n;k++){const h=hash(i*41+k*13+pass*997),px=x+(h%Math.max(1,Math.floor(widths[i]))),py=wordY-10+((h>>>8)%21);const drift=(gone*12)+(k*2);g.fillStyle=laser[(i+k)%3];g.fillRect(px+(i<4?-drift:drift),py+(k%2?drift:-drift),1+(k%3===0?1:0),1+(k%3===1?1:0));}}
+x+=widths[i];}
+if(pass>=0){const p=Math.min(1,Math.max(0,(local-.04)/.72));for(let i=0;i<paths.length;i++){const delay=i<4?(i%2)*.055:(i-3)*.09;const q=Math.max(0,Math.min(1,(p-delay)/.83));if(q<=0)continue;g.globalAlpha=.9;strokePartial(paths[i],q,laser[i%laser.length]);g.globalAlpha=1;
+// tiny white-hot leading point, attached to the line tip rather than a flare
+const pts=paths[i],seg=(pts.length-1)*q,idx=Math.min(pts.length-2,Math.floor(seg)),f=seg-idx,ax=pts[idx][0]+(pts[idx+1][0]-pts[idx][0])*f,ay=pts[idx][1]+(pts[idx+1][1]-pts[idx][1])*f;g.fillStyle='#d5f8ff';g.fillRect(Math.round(ax),Math.round(ay),2,2);}}
+if(t>6.5){g.fillStyle=bg;g.fillRect(0,0,240,240);}
+}requestAnimationFrame(frame);}
+requestAnimationFrame(frame);speed.addEventListener('input',()=>speedOut.value=Number(speed.value).toFixed(1)+'×');breakup.addEventListener('input',()=>breakOut.value=['','light','medium','heavy'][breakup.value]);document.getElementById('restart').addEventListener('click',()=>{start=performance.now();if(paused){paused=false;toggle.textContent='Ⅱ Pause';}});toggle.addEventListener('click',()=>{if(!paused){paused=true;pauseAt=performance.now();toggle.textContent='▶ Play';}else{start+=performance.now()-pauseAt;paused=false;toggle.textContent='Ⅱ Pause';}});
 })();
 </script></body></html>
