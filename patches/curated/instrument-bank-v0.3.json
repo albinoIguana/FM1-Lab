@@ -23,7 +23,8 @@
         "LOW -SPACE",
         "WIDE-BS01"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 23
     },
     {
       "slot": 2,
@@ -41,7 +42,8 @@
         "SYN.BASS 2",
         "TECH BASE"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 14
     },
     {
       "slot": 3,
@@ -59,7 +61,8 @@
         "THUMB BASS",
         "THNDR BASS"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 17
     },
     {
       "slot": 4,
@@ -77,7 +80,8 @@
         "UNCLE ABE1",
         "UNCLE ABE2"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 18
     },
     {
       "slot": 5,
@@ -95,7 +99,8 @@
         "Lo~Hi-Bass",
         "Lo~Hi-Bs 2"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 16
     },
     {
       "slot": 6,
@@ -113,7 +118,8 @@
         "WA BASS RW",
         "WEEBLEBASS"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 13
     },
     {
       "slot": 7,
@@ -131,7 +137,8 @@
         "DENS-VC01",
         "*Chorus"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 29
     },
     {
       "slot": 8,
@@ -149,7 +156,8 @@
         "DoopKick",
         "GubKik"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 17
     },
     {
       "slot": 9,
@@ -167,7 +175,8 @@
         "*Syndrums1",
         "*Syndrums2"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 20
     },
     {
       "slot": 10,
@@ -185,7 +194,8 @@
         "MINIMOOG 2",
         "GRIT-AN01"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 12
     },
     {
       "slot": 11,
@@ -203,7 +213,8 @@
         "WIDE-AN57",
         "OBERHEIM 3"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 8
     },
     {
       "slot": 12,
@@ -221,7 +232,8 @@
         "PROPH 8",
         "WIDE-AN62"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 11
     },
     {
       "slot": 13,
@@ -239,7 +251,8 @@
         "WIDE-AN46",
         "WIDE-AN81"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 15
     },
     {
       "slot": 14,
@@ -257,7 +270,8 @@
         "Anna 10",
         "Anna 21"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 9
     },
     {
       "slot": 15,
@@ -275,7 +289,8 @@
         "ANALGSYN 3",
         "ANALGSYN 4"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 11
     },
     {
       "slot": 16,
@@ -293,7 +308,8 @@
         "ANLOGLEAD1",
         "WIDE-LD08"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 13
     },
     {
       "slot": 17,
@@ -311,7 +327,8 @@
         "WIDE-LD10",
         "WIDE-LD11"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 12
     },
     {
       "slot": 18,
@@ -329,7 +346,8 @@
         "LEADSYNTH2",
         "METAL LEAD"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 13
     },
     {
       "slot": 19,
@@ -347,7 +365,8 @@
         "SYN.LEAD 2",
         "SYN.LEAD 3"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 8
     },
     {
       "slot": 20,
@@ -365,7 +384,8 @@
         "SYN-LEAD 3",
         "GRIT-AN19"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 8
     },
     {
       "slot": 21,
@@ -383,7 +403,8 @@
         "SYN-LEAD11",
         "SYN-LEAD13"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 8
     },
     {
       "slot": 22,
@@ -401,7 +422,8 @@
         "GLASSY 1a",
         "GLASSY 1b"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 51
     },
     {
       "slot": 23,
@@ -419,7 +441,8 @@
         "SPACY SYNT",
         "SPHAERE  2"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 38
     },
     {
       "slot": 24,
@@ -437,7 +460,8 @@
         "*Notre Dam",
         "*Prophet 1"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 25
     },
     {
       "slot": 25,
@@ -455,7 +479,8 @@
         "AnnaSubtl\\",
         "WIDE-AN82"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 15
     },
     {
       "slot": 26,
@@ -473,7 +498,8 @@
         "WIDE-PD09",
         "CHUNG KUO"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 16
     },
     {
       "slot": 27,
@@ -491,7 +517,8 @@
         "CLOUDS",
         "WIDE-PD10"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 23
     },
     {
       "slot": 28,
@@ -509,7 +536,8 @@
         "DARK PAD",
         "DHARMA"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 20
     },
     {
       "slot": 29,
@@ -527,7 +555,8 @@
         "HUMAN 2",
         "ICE PAD  1"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 14
     },
     {
       "slot": 30,
@@ -545,7 +574,8 @@
         "WIDE-PD33",
         "SPACE PAD"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 22
     },
     {
       "slot": 31,
@@ -563,7 +593,8 @@
         "ETHEREAL",
         "Etherial a"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 15
     },
     {
       "slot": 32,
@@ -581,7 +612,8 @@
         "Etherial5b",
         "Evolve 1a"
       ],
-      "curation_status": "draft-un-auditioned"
+      "curation_status": "draft-un-auditioned",
+      "mix_level": 17
     }
   ]
 }
