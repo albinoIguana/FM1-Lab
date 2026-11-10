@@ -26,6 +26,7 @@ main, body > header { max-width: 1040px; margin: 0 auto; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1.2rem; margin: 0 0 1rem; }
 h1 { font: 700 2rem/1.1 "Barlow Semi Condensed", "Barlow", sans-serif; margin: 0; }
 header p { margin: 0; color: var(--muted); }
+#build-id { margin-left: auto; padding: .18rem .55rem; border: 1px solid var(--rule); border-radius: 6px; color: var(--muted); font: 600 .76rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
 header nav { margin-left: auto; display: flex; gap: 1rem; }
 a { color: var(--accent); }
 /* at phone width the drawn panel keeps its controls 24 px or more (WCAG 2.5.8): it keeps a minimum width and
@@ -91,6 +92,7 @@ kbd { font: 600 .85em ui-monospace, Menlo, monospace; background: var(--card); b
 <body>
 <header>
   <h1>fm1lab</h1>
+  <span id="build-id">BUILD __FM1_BUILD_SHA__</span>
 </header>
 <main>
 <h2 class="sr">The FM-1</h2>
@@ -648,8 +650,8 @@ async function switchOn() {
     // Request playback while still inside the user's click gesture (Safari/iOS).
     ac.resume().catch(() => {});
     if (speakMode() === "voice") voiceOn();
-    const [wasm] = await Promise.all([fetch("app.wasm?v=20261110-6").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
-                                      ac.audioWorklet.addModule("worklet.js?v=20261110-6")]);
+    const [wasm] = await Promise.all([fetch("app.wasm?v=20261110-7").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
+                                      ac.audioWorklet.addModule("worklet.js?v=20261110-7")]);
     node = new AudioWorkletNode(ac, "fm1", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     node.addEventListener("processorerror", () => {
       status.textContent = "Audio processor stopped.";
