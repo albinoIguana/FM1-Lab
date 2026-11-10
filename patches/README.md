@@ -20,6 +20,8 @@ This directory is the **source of truth for patch assets and curation metadata**
 
 ## Current inventory
 
-The initial 128 voices are indexed in `catalog/patches.csv`. They are the existing CC0-1.0 archive selection, not 128 newly auditioned or diverse sounds. Their source banks currently skew heavily toward bass, choir and percussion. This is why the next curation pass must bring in more leads, pads, analog-like tones, keys, motion and textures.
+The archive now contains **896 individual six-operator voices** indexed in `catalog/patches.csv`: the original 128 plus 768 additional voices from 24 CC0 DX7 banks. Imported families include analog-emulation (384), leads (96), pads/strings (160), and resonant/motion (128), alongside the original bass, choir and percussion sets. The original 128 still skew heavily toward bass, choir and percussion; the new material directly addresses those gaps.
 
-See `catalog/sources.csv` for external candidate collections and redistribution status.
+All imported voices retain original names, source bank, source voice index, CC0 provenance and converted 156-byte voice data. The new imports are **not yet auditioned**; their folders are provisional source-family groupings, not final sound classifications. They must be listened to, deduplicated and retagged before promotion into four-patch FM1 instruments.
+
+See `catalog/sources.csv` for external candidate collections and redistribution status, and `catalog/next-imports.csv` for the first import batch (now ingested).
