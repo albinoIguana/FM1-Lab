@@ -2730,7 +2730,6 @@ static void draw_startup(uint32_t elapsed)
             6u+(22u*alpha)/100u);
     cv_begin(240,180,bg);
     if(alpha) cv_text(x,82,&FONT_B,"SHIPWRECK",ink);
-    cv_text(99,163,&FONT_XS,"v0.10",RGB(184,195,203));
     cv_blit(0,41);
 }
 static int algorithm_preview_active(void)
