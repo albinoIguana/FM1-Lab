@@ -2811,9 +2811,10 @@ static void draw_startup(uint32_t elapsed)
             /* Interpolate the original diamond/square silhouettes into their
              * starburst/fragment forms rather than substituting rectangles. */
             int16_t points[20];
+            int32_t mix=(int32_t)blend;
             for(uint8_t p=0;p<counts[i]*2u;p++)
-                points[p]=(int16_t)(((int32_t)normal[i][p]*(100u-blend)+
-                                     (int32_t)altered[i][p]*blend)/100);
+                points[p]=(int16_t)(((int32_t)normal[i][p]*(100-mix)+
+                                     (int32_t)altered[i][p]*mix)/100);
             shape=points;
             if(i==3u||i==5u) {fill=red;edge=RGB(255,90,75);facet=RGB(230,45,38);}
         } else if(t>=1650u && (i==3u||i==5u)) {
