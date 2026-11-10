@@ -3421,7 +3421,7 @@ static void draw_save_panel(void)
         for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++)t[i]=current_instrument.name[i];
         t[FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
     }
-    cv_text(14,117,&FONT_B,t,accent);
+    cv_text_fit(14,117,&FONT_B,t,accent,210);
     int32_t cursor_x=14+(int32_t)save_name_cursor*(save_name_target?8:7);
     cv_rect(cursor_x,137,save_name_target?7:6,2,C_WHITE);
     cv_text(14,151,&FONT_XS,"K1 CURSOR  K2 CHAR  K3 NAME TYPE",C_WHITE);
