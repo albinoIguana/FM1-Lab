@@ -3855,6 +3855,19 @@ static void draw(void)
         text_cat(t, "/32");
         cv_text(6, 4, &FONT_XS, t, C_GRAY);
     }
+    {
+        char diag[32], number[12];
+        int_text((int32_t)app_audio_cpu_pct(), diag);
+        /* Compact live hardware telemetry: render load, DMA misses, and shed voices. */
+        char suffix[24] = "% CPU  XR ";
+        text_cat(diag, suffix);
+        int_text((int32_t)app_audio_xruns(), number);
+        text_cat(diag, number);
+        text_cat(diag, " SH ");
+        int_text((int32_t)app_audio_overload_shed_count(), number);
+        text_cat(diag, number);
+        cv_text_fit(62, 4, &FONT_XS, diag, C_GRAY, 132);
+    }
     page_counter(page, t, sizeof(t));
     cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, accent);
     cv_blit(0, 221);
