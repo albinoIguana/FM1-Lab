@@ -2306,9 +2306,9 @@ static void input(void)
         } else if (k == EN_PRESET) {
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
-            } else if(page==PAGE_HOME && patch_focus) {
-                /* In patch focus, PRESET swaps only the selected patch voice.
-                 * The 128-voice DX7 library is shared across all four slots. */
+            } else if(page==PAGE_MACRO) {
+                /* PRESET on the patch editor browses individual DX7 voices.
+                 * On HOME it always selects the four-patch Instrument. */
                 int32_t next=((int32_t)patch_preset_cursor+e)%
                     (int32_t)FM1LAB_DX7_VOICE_COUNT;
                 if(next<0)next+=(int32_t)FM1LAB_DX7_VOICE_COUNT;
@@ -2709,7 +2709,7 @@ static uint16_t patch_color(uint32_t p)
     return colors[p & 3u];
 }
 static uint16_t panel_fill(void) { return RGB(17,29,39); }
-static uint16_t screen_bg(void) { return RGB(8,13,19); }
+static uint16_t screen_bg(void) { return RGB(2,3,6); }
 
 /* Minimal power-on ident: crisp native-font title, fade in, hold, fade out. */
 /* Draw the boot word at 150% using the native antialiased font bitmap.
@@ -2743,7 +2743,7 @@ static void startup_text_scaled(int32_t x, int32_t y, const char *s, uint16_t co
 static void draw_startup(uint32_t elapsed)
 {
     const uint32_t fade_ms=1100u, hold_ms=850u;
-    const uint16_t bg=RGB(2,3,6);
+    const uint16_t bg=screen_bg();
     uint32_t alpha;
     const char *word="SHIPWRECK";
     int32_t word_w=startup_text_width(word);
@@ -3858,6 +3858,12 @@ static void draw(void)
     page_counter(page, t, sizeof(t));
     cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, accent);
     cv_blit(0, 221);
+}
+
+void app_splash(void)
+{
+    /* Suppress fm1-base's generic app-name splash; keep the panel on Shipwreck black. */
+    lcd_fill(0,0,240,240,screen_bg());
 }
 
 void app_ui_init(void)
