@@ -2888,7 +2888,7 @@ static void draw_instrument_macro_panel(void)
         uint32_t value = current_inserts.instrument_macros[m];
         uint16_t border = ui.turned_at[EN_K1 + m] && now - ui.turned_at[EN_K1 + m] < 650u ? accent : C_LINE;
         instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), border, accent);
-        cv_text(x + 9, y + 9, &FONT_XS, names[m], C_WHITE);
+        cv_text_fit(x+9,y+9,&FONT_XS,names[m],C_WHITE,72);
         int_text((int32_t)value, t);
         cv_text(x + 88, y + 7, &FONT_B, t, accent);
         cv_rect(x + 9, y + 42, 98, 6, RGB(31,43,55));
@@ -2930,7 +2930,7 @@ static void draw_chaos_panel(void)
             cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_GRAY);
         }
     }
-    cv_text(8,154,&FONT_XS,set.performance.chaos_amount?"MAELSTROM ACTIVE":"BYPASS  /  SIGNAL UNTOUCHED",
+    /* Status is already reflected by the amount control; no footer over the cards. */\n    /* cv_text(8,154,&FONT_XS,set.performance.chaos_amount?"MAELSTROM ACTIVE":"BYPASS  /  SIGNAL UNTOUCHED",
         set.performance.chaos_amount?accent:C_GRAY);
 }
 
@@ -3343,7 +3343,7 @@ static void draw_sequencer_piano_panel(void)
     const int32_t high=low+23;
     instrument_card(4,2,232,154,panel_fill(),accent,accent);
     cv_text(12,8,&FONT_XS,lane?"TRACK 2  /  NOTES":"TRACK 1  /  NOTES",accent);
-    cv_text(148,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE);
+    cv_text_fit(150,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE,78);
     for(uint32_t row=0;row<24u;row++) {
         int32_t note=high-(int32_t)row, y=gy+(int32_t)row*rh;
         uint8_t pc=(uint8_t)(note%12);
@@ -3400,8 +3400,8 @@ static void draw_sequencer_piano_panel(void)
     cv_text(177,116,&FONT_XS,"VEL",C_GRAY);
     int_text(selected?selected->velocity:0,value);
     cv_text(200,116,&FONT_B,value,C_WHITE);
-    cv_text(8,137,&FONT_XS,"K1 LENGTH   K2 PITCH   K3 ACCENT   K4 VELOCITY",C_GRAY);
-    cv_text(8,151,&FONT_XS,"SELECT NEXT NOTE   EDIT DELETE",C_WHITE);
+    cv_text(8,137,&FONT_XS,"K1 LEN  K2 PITCH  K3 ACC  K4 VEL",C_GRAY);
+    cv_text(8,151,&FONT_XS,"SELECT NOTE   EDIT DELETE",C_WHITE);
 }
 
 static void draw_save_panel(void)
