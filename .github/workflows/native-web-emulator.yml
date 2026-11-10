@@ -68,6 +68,7 @@ jobs:
           test -s app/build/emu/app.wasm
           test -s app/build/emu/worklet.js
           test -s app/build/emu/app_worklet.js
+          test -s app/build/emu/app_own_worklet.js
           echo "Native FM1 emulator bundle:"
           du -h app/build/emu/*
 
@@ -89,7 +90,7 @@ jobs:
           fi
           git reset --hard "$remote_sha"
           mkdir -p native-emulator
-          cp app/build/emu/index.html app/build/emu/app.wasm app/build/emu/worklet.js app/build/emu/app_worklet.js native-emulator/
+          cp app/build/emu/index.html app/build/emu/app.wasm app/build/emu/worklet.js app/build/emu/app_worklet.js app/build/emu/app_own_worklet.js native-emulator/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js
