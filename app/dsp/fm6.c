@@ -34,9 +34,8 @@ static void fm6_zero_bytes(void *dst, uint32_t n)
 #define Q24_ONE (1 << 24)
 #define Q24_DB6 (1 << 24)
 #define OUTPUT_LIMIT 8388607
-/* Calibrated against the pinned FM6 core: the reference factory voice at
- * patch level 31 peaks at 13,045,204 Q24. 10,536/32,768 maps that measured
- * contribution to 0.25 Q24 full scale; four coherent patches sum to 1.0. */
+/* Base per-patch calibration against the pinned FM6 core. The curated
+ * four-layer bank applies a per-Instrument mix level before the master stage. */
 #define FM6_PATCH_CALIBRATION_Q15 10536
 #define FM6_MASTER_TRIM_Q15 32768 /* unity: the patch calibration already reserves 12 dB per layer */
 #define FM6_FX_HEADROOM_SHIFT 5u
@@ -1305,10 +1304,10 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             fm6_master_insert_process(&left,&right);
             fm6_master_comp_process(&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
-             * Add 6 dB to the physical MASTER range; the stereo-linked peak
-             * limiter below remains the final safety net. */
-            int64_t out_l = ((left * output_gain_q12) >> 12);
-            int64_t out_r = ((right * output_gain_q12) >> 12);
+             * The output stage adds the requested 6 dB; calibrated Instrument
+             * levels preserve headroom, with the stereo-linked limiter as backup. */
+            int64_t out_l = ((left * output_gain_q12) >> 11);
+            int64_t out_r = ((right * output_gain_q12) >> 11);
             uint64_t abs_l = fm6_abs_i64(out_l);
             uint64_t abs_r = fm6_abs_i64(out_r);
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
