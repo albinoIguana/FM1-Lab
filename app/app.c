@@ -14,6 +14,7 @@
 #include "fm1lab_store_library.h"
 #include "fm1lab_digitone_data.h"
 #include "fm1lab_dx7_data.h"
+#include "fm1lab_dx7_legacy_data.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include <stddef.h>
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
@@ -688,10 +689,61 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
     }
     return fm1lab_instrument_valid(out)?0:-1;
 }
+static int fm1lab_dx7_legacy_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
+{
+    if(voice_index>=FM1LAB_DX7_LEGACY_VOICE_COUNT || !out) return -1;
+    const char *source=fm1lab_dx7_legacy_voice_z85+voice_index*FM1LAB_DX7_LEGACY_Z85_BYTES;
+    for(uint32_t group=0;group<39u;group++) {
+        uint64_t value=0u;
+        for(uint32_t digit=0;digit<5u;digit++) {
+            int decoded=fm1lab_digitone_z85_digit(source[group*5u+digit]);
+            if(decoded<0) return -1;
+            value=value*85u+(uint32_t)decoded;
+        }
+        if(value>0xffffffffu) return -1;
+        out[group*4u]=(uint8_t)(value>>24);
+        out[group*4u+1u]=(uint8_t)(value>>16);
+        out[group*4u+2u]=(uint8_t)(value>>8);
+        out[group*4u+3u]=(uint8_t)value;
+    }
+    return 0;
+}
+static int fm1lab_seed_dx7_legacy_instrument(uint32_t index,fm1lab_instrument_t *out)
+{
+    if(index>=FM1LAB_DX7_LEGACY_INSTRUMENT_COUNT || !out) return -1;
+    fm1lab_instrument_init(out,fm1lab_dx7_legacy_instrument_names[index]);
+    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
+        uint8_t voice[FM1LAB_PATCH_BYTES];
+        if(fm1lab_dx7_legacy_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
+        if(fm1lab_patch_set_voice(out,patch,voice)) return -1;
+        out->patches[patch].level=31u;
+        out->patches[patch].enabled=1u;
+        for(uint32_t macro=0;macro<FM1LAB_MACRO_COUNT;macro++)
+            out->patches[patch].macros[macro]=50u;
+    }
+    return fm1lab_instrument_valid(out)?0:-1;
+}
 static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !out) return -1;
-    fm1lab_instrument_init(out,fm1lab_dx7_instrument_names[index]);
+    uint8_t first_voice[FM1LAB_PATCH_BYTES];
+    char instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
+    if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT,first_voice)) return -1;
+    for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++) {
+        char c=i<10u?(char)first_voice[145u+i]:' ';
+        instrument_name[i]=(c>=32 && c<=126)?c:' ';
+    }
+    instrument_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
+    if(instrument_name[0]==' ' || instrument_name[0]=='\\0') {
+        const char *fallback=fm1lab_dx7_instrument_names[index];
+        uint32_t i=0u;
+        while(i+1u<sizeof instrument_name && fallback[i]) {
+            instrument_name[i]=fallback[i];
+            ++i;
+        }
+        instrument_name[i]='\\0';
+    }
+    fm1lab_instrument_init(out,instrument_name);
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
         if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
@@ -723,7 +775,12 @@ static int fm1lab_is_previous_dx7_instrument(uint32_t index,
 {
     if(index>=FM1LAB_DX7_INSTRUMENT_COUNT || !existing) return 0;
     fm1lab_instrument_t previous;
-    return fm1lab_seed_dx7_instrument(index,&previous)==0 &&
+    if(fm1lab_seed_dx7_instrument(index,&previous)==0 &&
+       fm1lab_same_library_instrument(existing,&previous)) return 1;
+    /* Exact-match migration for the previous 32-instrument DX7 factory bank.
+     * This lets untouched old drum slots be reallocated without touching edits. */
+    return index<FM1LAB_DX7_LEGACY_INSTRUMENT_COUNT &&
+           fm1lab_seed_dx7_legacy_instrument(index,&previous)==0 &&
            fm1lab_same_library_instrument(existing,&previous);
 }
 static int fm1lab_is_previous_factory_instrument(uint32_t index,
@@ -753,9 +810,10 @@ static int fm1lab_is_previous_factory_instrument(uint32_t index,
 }
 static void fm1lab_seed_factory_library(void)
 {
-    /* Curated CC0 six-operator DX7 library: 8 bass/sub Instruments, 8
-     * choral layers, 8 FM rhythm Instruments and 8 synth-percussion sets.
-     * Replace untouched factory or old Digitone content; preserve user edits. */
+    /* Curated CC0 six-operator DX7 library: 8 bass, 8 choir, one FM rhythm,
+     * one synth-percussion, plus analog-like, lead, pad and motion Instruments.
+     * Exact-match legacy detection replaces untouched old factory/DX7 slots;
+     * renamed or edited user Instruments remain untouched. */
     for(uint32_t index=0;index<FM1LAB_DX7_INSTRUMENT_COUNT;index++) {
         fm1lab_instrument_t existing,seed;
         fm1lab_insert_state_t inserts;
