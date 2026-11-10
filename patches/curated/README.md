@@ -9,3 +9,7 @@ python3 tools/generate_dx7_library.py
 ```
 
 Only promote an instrument after all four voices have been auditioned on the FM1-Lab engine, loudness-matched, checked across registers and screened for duplicates. The current v0.3 bank is a listening build: it expands analog-like FM, leads, shimmer leads, pads and motion textures while keeping one FM Rhythm and one Synth Perc instrument. The new source voices still need listening and refinement.
+
+## Mix calibration
+
+Each instrument manifest entry carries a shared `mix_level` for its four layers. The current values are calibrated against the native FM6 renderer at MIDI notes 48, 60 and 72, velocity 127, targeting approximately 6,000,000 Q24 dry peak at maximum MASTER. This keeps the four-layer sum below the output limiter while preserving the relative balance of the four source voices. Re-run `tests/test-fm6-engine.sh` after changing the bank; do not reset every patch to level 31.
