@@ -2324,6 +2324,10 @@ static void input(void)
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
         ui.redraw = 1;
+        /* PRESETS is deliberately inert outside Home. Gate before page-specific
+         * handlers so Save, Sequencer, ARP and every other page ignore it. */
+        if (k == EN_PRESET && !fm1lab_preset_encoder_enabled(page, PAGE_HOME))
+            continue;
         if(page==PAGE_SAVE) {
             if(k==EN_PRESET) {
                 int32_t next=((int32_t)save_slot+e)%(int32_t)USER_INSTRUMENT_COUNT;

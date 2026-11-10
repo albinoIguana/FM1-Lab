@@ -15,6 +15,12 @@ static inline uint8_t fm1lab_preset_target(uint8_t patch_focus)
     return patch_focus ? FM1LAB_PRESET_TARGET_PATCH : FM1LAB_PRESET_TARGET_INSTRUMENT;
 }
 
+/* PRESETS is a Home-only control, independent of patch focus. */
+static inline uint8_t fm1lab_preset_encoder_enabled(uint8_t page, uint8_t home_page)
+{
+    return (uint8_t)(page == home_page);
+}
+
 /* Wrap a signed encoder delta across the curated individual-voice bank. */
 static inline uint8_t fm1lab_preset_cursor_advance(uint8_t cursor, int delta,
                                                    uint32_t voice_count)
