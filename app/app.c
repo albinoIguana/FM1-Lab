@@ -3907,9 +3907,5 @@ int app_expect(const char *what, int *got)
         return 0;
     return 1;
 }
-#endif   /* a labelled box, lit when on */
-{
-    cv_rect(x, y, w, 18, on ? C_HI : C_LINE);
-    cv_text(x + (w - text_w(&FONT_XS, s)) / 2, y + 2, &FONT_XS, s, on ? C_BLACK : C_GRAY);
-}
+#endif
 
