@@ -16,6 +16,7 @@
 #include "fm1lab_dx7_data.h"
 #include "fm1lab_dx7_legacy_data.h"
 #include "../firmware/fm1lab_physical_controls.h"
+#include "fm1lab_preset_control.h"
 #include <stddef.h>
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
 static size_t fm1lab_strlen(const char *s) { size_t n=0u; while(s && s[n])++n; return n; }
@@ -657,6 +658,39 @@ static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH
     }
     return 0;
 }
+
+/* Replace only the focused patch's DX7 voice. Mixer, tuning, pan, and macro
+ * state belong to the patch slot and survive preset browsing. */
+static int fm1lab_patch_preset_load(uint8_t cursor)
+{
+    uint8_t voice[FM1LAB_PATCH_BYTES];
+    fm1lab_patch_t previous;
+    fm1lab_patch_t *patch;
+
+    if (cursor >= FM1LAB_DX7_VOICE_COUNT || set.patch >= FM1LAB_PATCH_COUNT ||
+        fm1lab_dx7_decode_voice(cursor, voice) != 0)
+        return -1;
+
+    previous = current_instrument.patches[set.patch];
+    if (fm1lab_patch_set_voice(&current_instrument, set.patch, voice) != 0)
+        return -1;
+
+    patch = &current_instrument.patches[set.patch];
+    patch->level = previous.level;
+    patch->enabled = previous.enabled;
+    patch->octave = previous.octave;
+    patch->fine_cents = previous.fine_cents;
+    for (uint32_t macro = 0; macro < FM1LAB_MACRO_COUNT; ++macro)
+        patch->macros[macro] = previous.macros[macro];
+    fm1lab_patch_set_pan(&current_instrument, set.patch, previous.voice[155]);
+
+    patch_preset_cursor = cursor;
+    instrument_dirty = 1u;
+    set_dirty = 1u;
+    voice_dirty = 1u;
+    return 0;
+}
+
 static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !out) return -1;
@@ -1036,6 +1070,7 @@ static void instrument_load(uint32_t index, int from_audio)
         }
     }
     instrument_index = (uint8_t)index;
+    patch_preset_cursor = (uint8_t)(index * FM1LAB_PATCH_COUNT + set.patch);
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
@@ -2406,9 +2441,18 @@ static void input(void)
         } else if (k == EN_PRESET) {
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
+            } else if (fm1lab_preset_target(patch_focus) == FM1LAB_PRESET_TARGET_PATCH) {
+                /* Focused mode browses individual voices, replacing only the
+                 * selected patch. The four-patch Instrument identity is stable. */
+                uint8_t next = fm1lab_preset_cursor_advance(
+                    patch_preset_cursor, e, FM1LAB_DX7_VOICE_COUNT);
+                if (fm1lab_patch_preset_load(next) != 0) {
+                    app_say("PATCH PRESET","LOAD FAILED");
+                    continue;
+                }
+                app_say("PATCH PRESET", patch_display_name(set.patch));
             } else {
-                /* PRESETS always selects the four-patch Instrument.
-                 * SELECT chooses the patch; ALGORITHM edits its FM routing. */
+                /* Overview mode changes the complete four-patch Instrument. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
