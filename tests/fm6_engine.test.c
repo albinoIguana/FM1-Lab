@@ -17,6 +17,7 @@ static void render_cpu2_mode(uint8_t mode, int32_t *destination)
     for (unsigned note = 0u; note < 6u; ++note)
         fm6_note_on_mask((uint8_t)(48u + note * 3u),
                          (uint8_t)(92u - note * 4u), 0x01u);
+    assert(fm6_active_voices() == 6u); /* all six voices belong to patch 0 */
     fm6_render(destination, TEST_FRAMES, 4096u);
 }
 static int32_t peak(const int32_t *samples, unsigned count) {
