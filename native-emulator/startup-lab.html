@@ -1,39 +1,77 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>FM1 · Shipwreck LaserLinks Lab</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FM1 · Shipwreck Startup</title>
 <style>
 :root{color-scheme:dark;--bg:#090d16;--panel:#111a29;--ink:#dce9f7;--muted:#8496ad;--cyan:#55e7ed}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 12%,#15233a 0,#090d16 58%);color:var(--ink);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;min-height:100svh;padding:22px 14px 30px}main{width:min(100%,520px);margin:auto}.eyebrow{font-size:11px;letter-spacing:.2em;color:var(--cyan);text-transform:uppercase}.heading{font-size:22px;font-weight:700;letter-spacing:.04em;margin:5px 0 3px}.sub{color:var(--muted);margin:0 0 18px;font-size:13px}.stage{background:#03060c;border:1px solid #26374c;border-radius:16px;padding:14px;box-shadow:0 16px 50px #0008}.screen-wrap{width:min(100%,400px);margin:auto;aspect-ratio:1;background:#02040a;border:1px solid #26364b;box-shadow:inset 0 0 0 4px #0a1220;display:grid;place-items:center;overflow:hidden}canvas{width:100%;height:100%;display:block;image-rendering:pixelated}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.control{background:var(--panel);border:1px solid #26364b;border-radius:10px;padding:10px}.control label{display:flex;justify-content:space-between;color:#c9d8e9;font-size:12px;margin-bottom:7px}.control output{color:var(--cyan);font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:var(--cyan)}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1;border:1px solid #35506c;background:#17253a;color:#e5f2ff;border-radius:9px;padding:11px;font:600 13px ui-sans-serif,system-ui}.actions button.primary{background:#173e55;border-color:#3d9aa9}.note{color:var(--muted);font-size:11px;margin:12px 2px 0;text-align:center}
-</style></head><body><main><div class="eyebrow">FM1 · NATIVE 240 × 240 STUDY</div><div class="heading">SHIPWRECK / LASERLINKS</div><p class="sub">Connected angular laser paths · center-out cut · native pixel resolution</p><section class="stage"><div class="screen-wrap"><canvas id="screen" width="240" height="240" aria-label="SHIPWRECK title cut apart by geometric laser lines"></canvas></div>
-<div class="controls"><div class="control"><label for="speed">Sequence speed <output id="speedOut">1.0×</output></label><input id="speed" type="range" min=".5" max="2" step=".1" value="1"></div><div class="control"><label for="breakup">Letter breakup <output id="breakOut">medium</output></label><input id="breakup" type="range" min="1" max="3" step="1" value="2"></div></div>
-<div class="actions"><button class="primary" id="restart">↻ Replay sequence</button><button id="toggle">Ⅱ Pause</button></div></section><p class="note">Full 240×240 canvas · angular line geometry · no object, reflections, glow, or particle cloud</p></main>
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;padding:22px 14px 30px;background:radial-gradient(ellipse at 50% 12%,#15233a 0,#090d16 58%);color:var(--ink);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif}
+main{width:min(100%,520px);margin:auto}
+.eyebrow{font-size:11px;letter-spacing:.2em;color:var(--cyan);text-transform:uppercase}
+.heading{font-size:22px;font-weight:700;letter-spacing:.04em;margin:5px 0 3px}
+.sub{color:var(--muted);margin:0 0 18px;font-size:13px}
+.stage{background:#03060c;border:1px solid #26374c;border-radius:16px;padding:14px;box-shadow:0 16px 50px #0008}
+.screen-wrap{width:min(100%,400px);margin:auto;aspect-ratio:1;background:#02040a;border:1px solid #26364b;box-shadow:inset 0 0 0 4px #0a1220;display:grid;place-items:center;overflow:hidden}
+canvas{width:100%;height:100%;display:block;image-rendering:auto}
+.controls{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}
+.control{background:var(--panel);border:1px solid #26364b;border-radius:10px;padding:10px}
+.control label{display:flex;justify-content:space-between;color:#c9d8e9;font-size:12px;margin-bottom:7px}
+.control output{color:var(--cyan);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--cyan)}
+.actions{display:flex;gap:8px;margin-top:10px}
+.actions button{flex:1;border:1px solid #35506c;background:#17253a;color:#e5f2ff;border-radius:9px;padding:11px;font:600 13px ui-sans-serif,system-ui}
+.actions button.primary{background:#173e55;border-color:#3d9aa9}
+.note{color:var(--muted);font-size:11px;margin:12px 2px 0;text-align:center}
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">FM1 · NATIVE 240 × 240 STUDY</div>
+<div class="heading">SHIPWRECK / STARTUP</div>
+<p class="sub">Simple title reveal · hold · fade out</p>
+<section class="stage">
+<div class="screen-wrap"><canvas id="screen" width="240" height="240" aria-label="SHIPWRECK title fading in and out"></canvas></div>
+<div class="controls">
+<div class="control"><label for="duration">Fade duration <output id="durationOut">1.2 s</output></label><input id="duration" type="range" min=".4" max="2.4" step=".1" value="1.2"></div>
+</div>
+<div class="actions"><button class="primary" id="restart">↻ Replay</button><button id="toggle">Ⅱ Pause</button></div>
+</section>
+<p class="note">240 × 240 native canvas · clean antialiased type · no additional effects</p>
+</main>
 <script>
-(()=>{const c=document.getElementById('screen'),g=c.getContext('2d'),speed=document.getElementById('speed'),breakup=document.getElementById('breakup'),speedOut=document.getElementById('speedOut'),breakOut=document.getElementById('breakOut'),toggle=document.getElementById('toggle');
-const bg='#03060c',yellow='#f5d52f',laser=['#55e7ed','#477cf6','#a16cff','#d5f8ff'];
-// Each path is a connected, asymmetric LaserLinks-style polyline radiating from the cut point.
-const paths=[
- [[120,113],[103,96],[88,109],[69,91],[51,106],[29,94],[13,108]],
- [[120,113],[101,130],[83,115],[64,135],[45,121],[25,139],[9,129]],
- [[120,113],[137,94],[153,109],[171,90],[190,106],[211,92],[229,105]],
- [[120,113],[139,132],[157,116],[177,136],[196,120],[216,139],[233,128]],
- [[120,113],[108,89],[122,72],[111,55],[126,38]],
- [[120,113],[133,137],[119,154],[134,172],[121,194]]
-];
-const glyphs='SHIPWRECK';let start=performance.now(),paused=false,pauseAt=0;
-function strokePartial(points,progress,color){let lengths=[],total=0;for(let i=1;i<points.length;i++){const d=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);lengths.push(d);total+=d;}let remain=total*progress;g.beginPath();g.moveTo(...points[0]);for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],d=lengths[i-1];if(remain>=d){g.lineTo(...b);remain-=d;}else{const q=Math.max(0,remain/d);g.lineTo(a[0]+(b[0]-a[0])*q,a[1]+(b[1]-a[1])*q);break;}}g.strokeStyle=color;g.lineWidth=1.6;g.lineJoin='miter';g.lineCap='square';g.stroke();}
-// Stable integer hash: repeatable square fragments, no random particle field.
-function hash(n){let v=(n*1664525+1013904223)>>>0;v^=v>>>16;return v>>>0;}
-function frame(now){if(!paused){const t=((now-start)/1000*Number(speed.value))%8.4;g.fillStyle=bg;g.fillRect(0,0,240,240);
-const pass=t<3.2?0:t<6.4?1:-1,local=pass<0?1:(t-pass*3.2)/3.2,front=Math.min(1,Math.max(0,(local-.08)/.68));
-const cx=120,wordY=123;g.font='bold 27px monospace';g.textAlign='left';g.textBaseline='middle';const widths=[...glyphs].map(ch=>g.measureText(ch).width),total=widths.reduce((a,b)=>a+b,0);let x=(240-total)/2;
-for(let i=0;i<glyphs.length;i++){const center=x+widths[i]/2,dist=Math.abs(center-cx),delay=dist/((total/2)+2)*.78;const gone=Math.max(0,Math.min(1,(front-delay)/.19));const fade=gone*gone;
-if(fade<.995){g.globalAlpha=1-fade;g.fillStyle=yellow;g.fillText(glyphs[i],x,wordY);g.globalAlpha=1;}
-if(gone>0){const n=breakup.value*3;for(let k=0;k<n;k++){const h=hash(i*41+k*13+pass*997),px=x+(h%Math.max(1,Math.floor(widths[i]))),py=wordY-10+((h>>>8)%21);const drift=(gone*12)+(k*2);g.fillStyle=laser[(i+k)%3];g.fillRect(px+(i<4?-drift:drift),py+(k%2?drift:-drift),1+(k%3===0?1:0),1+(k%3===1?1:0));}}
-x+=widths[i];}
-if(pass>=0){const p=Math.min(1,Math.max(0,(local-.04)/.72));for(let i=0;i<paths.length;i++){const delay=i<4?(i%2)*.055:(i-3)*.09;const q=Math.max(0,Math.min(1,(p-delay)/.83));if(q<=0)continue;g.globalAlpha=.9;strokePartial(paths[i],q,laser[i%laser.length]);g.globalAlpha=1;
-// tiny white-hot leading point, attached to the line tip rather than a flare
-const pts=paths[i],seg=(pts.length-1)*q,idx=Math.min(pts.length-2,Math.floor(seg)),f=seg-idx,ax=pts[idx][0]+(pts[idx+1][0]-pts[idx][0])*f,ay=pts[idx][1]+(pts[idx+1][1]-pts[idx][1])*f;g.fillStyle='#d5f8ff';g.fillRect(Math.round(ax),Math.round(ay),2,2);}}
-if(t>6.5){g.fillStyle=bg;g.fillRect(0,0,240,240);}
-}requestAnimationFrame(frame);}
-requestAnimationFrame(frame);speed.addEventListener('input',()=>speedOut.value=Number(speed.value).toFixed(1)+'×');breakup.addEventListener('input',()=>breakOut.value=['','light','medium','heavy'][breakup.value]);document.getElementById('restart').addEventListener('click',()=>{start=performance.now();if(paused){paused=false;toggle.textContent='Ⅱ Pause';}});toggle.addEventListener('click',()=>{if(!paused){paused=true;pauseAt=performance.now();toggle.textContent='▶ Play';}else{start+=performance.now()-pauseAt;paused=false;toggle.textContent='Ⅱ Pause';}});
+(()=> {
+const canvas=document.getElementById('screen'),ctx=canvas.getContext('2d');
+const duration=document.getElementById('duration'),durationOut=document.getElementById('durationOut'),toggle=document.getElementById('toggle');
+const bg='#03060c',title='#f5d52f';
+let start=performance.now(),paused=false,pauseAt=0;
+function draw(now){
+ if(!paused){
+  const fade=Number(duration.value),elapsed=(now-start)/1000;
+  const fadeIn=Math.min(1,elapsed/fade);
+  const hold=.9;
+  const fadeOut=Math.max(0,Math.min(1,(elapsed-fade-hold)/fade));
+  const alpha=elapsed<fade?fadeIn:elapsed<fade+hold?1:elapsed<fade*2+hold?1-fadeOut:0;
+  ctx.clearRect(0,0,240,240);
+  ctx.fillStyle=bg;ctx.fillRect(0,0,240,240);
+  ctx.save();
+  ctx.globalAlpha=Math.max(0,Math.min(1,alpha));
+  ctx.fillStyle=title;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font='700 25px Arial, Helvetica, sans-serif';
+  ctx.letterSpacing='1.1px';
+  ctx.fillText('SHIPWRECK',120,120);
+  ctx.restore();
+  if(elapsed>=fade*2+hold+1.1)start=now;
+ }
+ requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+duration.addEventListener('input',()=>durationOut.value=Number(duration.value).toFixed(1)+' s');
+document.getElementById('restart').addEventListener('click',()=>{start=performance.now();if(paused){paused=false;toggle.textContent='Ⅱ Pause';}});
+toggle.addEventListener('click',()=>{if(!paused){paused=true;pauseAt=performance.now();toggle.textContent='▶ Play';}else{start+=performance.now()-pauseAt;paused=false;toggle.textContent='Ⅱ Pause';}});
 })();
-</script></body></html>
+</script>
+</body>
+</html>
