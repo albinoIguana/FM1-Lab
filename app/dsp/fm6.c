@@ -88,6 +88,7 @@ typedef struct {
 
 static fm1lab_patch_t instrument[PATCHES];
 static fm1lab_voice_t voices[VOICES];
+static int32_t fm6_patch_gain_q15[PATCHES];
 
 /* Dual-core render scratch lives in .pool, not either core's small stack.
  * The active-voice index list is rebuilt each 32-sample quantum, so a single
@@ -1161,7 +1162,7 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
                     x = (int32_t)(((int64_t)x * voice->fade_out) >> 5);
                     --voice->fade_out;
                 }
-                patch_mix[voice->patch][i] += (((int64_t)x * patch_gain_q15[voice->patch]) >> 15) * FM6_PATCH_CALIBRATION_Q15 >> 15;
+                patch_mix[voice->patch][i] += (((int64_t)x * fm6_patch_gain_q15[voice->patch]) >> 15) * FM6_PATCH_CALIBRATION_Q15 >> 15;
             }
             voice->state.dc = dc;
             if (shedding && !voice->fade_out) {
@@ -1193,17 +1194,17 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 #endif
     uint32_t base;
     for (base = 0; base < frames; base += FM6_N) {
-        int32_t patch_gain_q15[PATCHES] = {0};
         int32_t patch_pan_l_q15[PATCHES], patch_pan_r_q15[PATCHES];
         uint32_t p, v, i;
         uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
 
         fm6_zero_bytes(fm6_patch_mix, sizeof fm6_patch_mix);
+        fm6_zero_bytes(fm6_patch_gain_q15, sizeof fm6_patch_gain_q15);
         /* Patch level is an independent linear-amplitude control. Never
          * renormalize it when other patches become active or inactive. */
         for (p = 0; p < PATCHES; ++p) {
             if (instrument[p].enabled && instrument[p].level)
-                patch_gain_q15[p] = (int32_t)((uint32_t)instrument[p].level * 32768u / 127u);
+                fm6_patch_gain_q15[p] = (int32_t)((uint32_t)instrument[p].level * 32768u / 127u);
             fm6_pan_gains(instrument[p].pan, &patch_pan_l_q15[p], &patch_pan_r_q15[p]);
         }
         for (p = 0; p < PATCHES; p++) {
