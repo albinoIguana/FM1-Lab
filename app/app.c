@@ -3047,7 +3047,7 @@ static void draw_eq_panel(void)
     cv_text(143,153,&FONT_XS,t,C_WHITE);
     int_text(selected->q,t); text_cat(t," Q");
     cv_text(187,153,&FONT_XS,t,C_WHITE);
-    cv_text(10,171,&FONT_XS,"K2 BAND  K3 FREQ  K4 GAIN  /  SELECT Q",C_GRAY);
+    cv_text(10,165,&FONT_XS,"K2 BAND  K3 FREQ  K4 GAIN  /  SELECT Q",C_GRAY);
 }
 
 static void draw_compressor_panel(void)
@@ -3145,7 +3145,7 @@ static void draw_envelope_panel(void)
         cv_text(129,167,&FONT_XS,"LEVEL",C_GRAY);
         int_text(adsr[3],t); cv_text(190,149,&FONT_B,t,accent);
         cv_text(190,167,&FONT_XS,env_rate_word(adsr[3]),C_GRAY);
-        cv_text(10,174,&FONT_XS,"99 = FAST   0 = SLOW / LONG",C_GRAY);
+        /* Rate direction is shown by the live rate labels above; no clipped footer. */
     }
 }
 
