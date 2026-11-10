@@ -88,10 +88,13 @@ jobs:
           fi
           git reset --hard "$remote_sha"
           mkdir -p native-emulator
-          cp app/build/emu/index.html app/build/emu/app.wasm app/build/emu/worklet.js native-emulator/
+          # index.html and worklet.js are the maintained emulator shell and
+          # audio-worklet overlay. Only the generated WASM belongs to this build.
+          cp app/build/emu/app.wasm native-emulator/
+          node --check native-emulator/worklet.js
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add native-emulator/index.html native-emulator/app.wasm native-emulator/worklet.js
+          git add native-emulator/app.wasm
           if ! git diff --cached --quiet; then
             git commit -m "build: publish native FM1 emulator"
             git push origin HEAD:main
