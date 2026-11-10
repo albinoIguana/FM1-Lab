@@ -1,6 +1,6 @@
 # Curated DX7 preset library
 
-The **archive source of truth** is `patches/`: 896 indexed six-operator voice slots, including 812 named voices and 84 empty source slots. The named archive contains 764 unique voice-data patterns after exact duplicate analysis. Stable IDs, original names, source-bank provenance, licensing and converted 156-byte voice data are retained. See `patches/README.md`, `patches/catalog/patches.csv`, `patches/catalog/empty-slots.csv` and `patches/catalog/duplicates.csv`.
+The **archive source of truth** is `patches/`: 896 indexed six-operator voice slots, including 812 named voices and 84 empty source slots. The named archive contains 764 unique voice-data patterns after exact duplicate analysis. Stable IDs, original names (`original_name`), display names, source-bank provenance, licensing and converted 156-byte voice data are retained. Generic names reused by distinct voices receive concise settings-derived display names; byte-identical duplicate copies keep the same display name. See `patches/README.md`, `patches/catalog/patches.csv`, `patches/catalog/empty-slots.csv` and `patches/catalog/duplicates.csv`.
 
 The active FM1 factory candidate is **32 instruments / 128 voices**, generated from `patches/curated/instrument-bank-v0.3.json` into `app/fm1lab_dx7_data.h`. Each instrument contains four voices. All 128 selected voices are unique by exact voice-data comparison, and all IDs resolve to named archive voices.
 
