@@ -2711,123 +2711,25 @@ static uint16_t patch_color(uint32_t p)
 static uint16_t panel_fill(void) { return RGB(17,29,39); }
 static uint16_t screen_bg(void) { return RGB(8,13,19); }
 
-/* One-shot power-on ident. Ported from the prism/tunnel language in
- * albinoIguana/laserLinks: layered frames, sharp flashes and a travelling cut. */
-/* Rasterize the original LaserLinks clip-path polygons on the FM1's 240x180
- * canvas. Even/odd scan conversion handles the concave starburst shapes. */
-static void startup_poly(int32_t cx,int32_t cy,int32_t scale,
-                         const int16_t *p,uint8_t n,uint16_t color)
-{
-    int32_t min_y=1000,max_y=-1000;
-    for(uint8_t i=0;i<n;i++) {
-        int32_t y=cy+(int32_t)p[i*2u+1u]*scale/100;
-        if(y<min_y)min_y=y;
-        if(y>max_y)max_y=y;
-    }
-    if(min_y<0)min_y=0;
-    if(max_y>179)max_y=179;
-    for(int32_t y=min_y;y<=max_y;y++) {
-        int32_t xs[16]; uint8_t count=0;
-        for(uint8_t i=0,j=(uint8_t)(n-1u);i<n;j=i++) {
-            int32_t x1=cx+(int32_t)p[j*2u]*scale/100;
-            int32_t y1=cy+(int32_t)p[j*2u+1u]*scale/100;
-            int32_t x2=cx+(int32_t)p[i*2u]*scale/100;
-            int32_t y2=cy+(int32_t)p[i*2u+1u]*scale/100;
-            if((y1<=y && y2>y)||(y2<=y && y1>y)) {
-                if(count<16u) xs[count++]=x1+(y-y1)*(x2-x1)/(y2-y1);
-            }
-        }
-        for(uint8_t a=0;a<count;a++) for(uint8_t b=(uint8_t)(a+1u);b<count;b++)
-            if(xs[b]<xs[a]) {int32_t t=xs[a];xs[a]=xs[b];xs[b]=t;}
-        for(uint8_t k=0;k+1u<count;k=(uint8_t)(k+2u)) {
-            int32_t x=xs[k],w=xs[k+1u]-x+1;
-            if(w>0)cv_rect(x,y,w,1,color);
-        }
-    }
-}
-static void startup_line(int32_t x0,int32_t y0,int32_t x1,int32_t y1,uint16_t color)
-{
-    int32_t dx=x1>x0?x1-x0:x0-x1, sx=x0<x1?1:-1;
-    int32_t dy=y1>y0?y1-y0:y0-y1, sy=y0<y1?1:-1;
-    int32_t err=dx-dy;
-    for(;;) {
-        cv_rect(x0,y0,1,1,color);
-        if(x0==x1 && y0==y1)break;
-        {int32_t e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}
-    }
-}
-static void startup_poly_edge(int32_t cx,int32_t cy,int32_t scale,
-                              const int16_t *p,uint8_t n,uint16_t color)
-{
-    for(uint8_t i=0;i<n;i++) {
-        uint8_t j=(uint8_t)((i+1u)%n);
-        startup_line(cx+(int32_t)p[i*2u]*scale/100,
-                     cy+(int32_t)p[i*2u+1u]*scale/100,
-                     cx+(int32_t)p[j*2u]*scale/100,
-                     cy+(int32_t)p[j*2u+1u]*scale/100,color);
-    }
-}
-static void startup_prism(int32_t cx,int32_t cy,int32_t scale,
-                          const int16_t *shape,uint8_t n,uint16_t fill,
-                          uint16_t edge,uint16_t facet)
-{
-    static const int16_t facet_a[]={-34,-17, 0,-42, 5,4};
-    startup_poly(cx,cy,scale,shape,n,fill);
-    startup_poly(cx,cy,scale,facet_a,3,facet);
-    startup_poly_edge(cx,cy,scale,shape,n,edge);
-}
+/* Minimal power-on ident: crisp native-font title, fade in, hold, fade out. */
 static void draw_startup(uint32_t elapsed)
 {
-    /* One prism: two deliberate pulses, then the title disappears from
-     * its midpoint outward. No aperture, beam, field of fragments or dissolve. */
-    static const int16_t prism_a[]={0,50,-30,-12,0,-50,30,-12};
-    static const int16_t prism_b[]={0,0,-50,50,0,-50,50,50};
+    const uint32_t fade_ms=1100u, hold_ms=850u;
     const uint16_t bg=RGB(2,3,6);
-    const uint16_t silver=RGB(174,181,186);
-    const uint16_t pale=RGB(226,231,232);
-    const uint16_t facet=RGB(207,213,217);
-    const uint16_t red=RGB(178,20,25);
-    const uint16_t red_edge=RGB(255,90,75);
-    const uint16_t yellow=RGB(255,218,28);
-    uint32_t t=elapsed;
-    uint32_t cycle=t<1400u?t:(t<2800u?t-1400u:1400u);
-    uint32_t ramp=cycle<700u?cycle:1400u-cycle;
-    uint32_t morph=ramp*100u/700u;
-    int32_t scale=24+(int32_t)(ramp*126u/700u);
-    int16_t shape[8];
-    char ch[2]={0,0};
+    uint32_t alpha;
     int32_t word_w=text_w(&FONT_B,"SHIPWRECK");
     int32_t x=(240-word_w)/2;
-    uint32_t i;
-
+    uint16_t ink;
+    if(elapsed<fade_ms) alpha=elapsed*100u/fade_ms;
+    else if(elapsed<fade_ms+hold_ms) alpha=100u;
+    else if(elapsed<fade_ms*2u+hold_ms)
+        alpha=100u-(elapsed-fade_ms-hold_ms)*100u/fade_ms;
+    else alpha=0u;
+    ink=RGB(2u+(253u*alpha)/100u,
+            3u+(215u*alpha)/100u,
+            6u+(22u*alpha)/100u);
     cv_begin(240,180,bg);
-
-    /* Fade individual glyphs from the centre of SHIPWRECK toward both ends. */
-    for(i=0;i<9u;i++) {
-        int32_t cw;
-        uint32_t distance=(i<4u?4u-i:i-4u);
-        uint32_t fade_start=1500u+distance*150u;
-        uint32_t fade= t<=fade_start?0u:
-                       (t>=fade_start+450u?100u:(t-fade_start)*100u/450u);
-        uint16_t ink=yellow;
-        if(fade>=75u) ink=bg;
-        else if(fade>=50u) ink=RGB(93,79,17);
-        else if(fade>=25u) ink=RGB(170,133,22);
-        ch[0]="SHIPWRECK"[i];
-        cw=text_w(&FONT_B,ch);
-        cv_text(x,82,&FONT_B,ch,ink);
-        x+=cw;
-    }
-
-    /* The single top-centre prism grows down across the title twice. */
-    for(i=0;i<8u;i++)
-        shape[i]=(int16_t)(((int32_t)prism_a[i]*(100u-morph)+
-                            (int32_t)prism_b[i]*morph)/100);
-    startup_prism(120,39,scale,shape,4,
-                  ramp>350u?red:silver,
-                  ramp>350u?red_edge:pale,
-                  ramp>350u?RGB(230,45,38):facet);
-
+    if(alpha) cv_text(x,82,&FONT_B,"SHIPWRECK",ink);
     cv_text(99,163,&FONT_XS,"v0.10",RGB(184,195,203));
     cv_blit(0,41);
 }
@@ -3945,7 +3847,7 @@ void app_frame(void)
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     if (startup_active) {
         uint32_t elapsed = now - startup_started_at;
-        if (elapsed >= 4600u) {
+        if (elapsed >= 4300u) {
             startup_active = 0u;
             ui.redraw = 1u;
         } else if ((uint32_t)(now - last_startup_draw) >= 30u) {
