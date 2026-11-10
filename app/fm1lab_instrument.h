@@ -54,6 +54,10 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name);
 int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
                            const uint8_t voice[FM1LAB_PATCH_BYTES]);
 
+/* Replace a patch's voice while preserving slot-owned mix, tuning, pan and macros. */
+int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
+                               const uint8_t voice[FM1LAB_PATCH_BYTES]);
+
 /* Validate the complete serialized value before loading or saving it. */
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument);
 

@@ -107,6 +107,30 @@ int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
     return 0;
 }
 
+int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
+                               const uint8_t voice[FM1LAB_PATCH_BYTES])
+{
+    fm1lab_patch_t previous;
+    fm1lab_patch_t *replacement;
+
+    if (!fm1lab_instrument_valid(instrument) || !voice || patch >= FM1LAB_PATCH_COUNT)
+        return -1;
+
+    previous = instrument->patches[patch];
+    if (fm1lab_patch_set_voice(instrument, patch, voice) != 0)
+        return -1;
+
+    replacement = &instrument->patches[patch];
+    replacement->level = previous.level;
+    replacement->enabled = previous.enabled;
+    replacement->octave = previous.octave;
+    replacement->fine_cents = previous.fine_cents;
+    copy_bytes(replacement->macros, previous.macros, FM1LAB_MACRO_COUNT);
+    replacement->voice[155] = previous.voice[155]; /* pan belongs to the slot */
+
+    return 0;
+}
+
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
 {
     if (!instrument || instrument->magic != FM1LAB_INSTRUMENT_MAGIC ||

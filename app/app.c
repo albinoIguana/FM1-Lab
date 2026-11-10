@@ -664,25 +664,10 @@ static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH
 static int fm1lab_patch_preset_load(uint8_t cursor)
 {
     uint8_t voice[FM1LAB_PATCH_BYTES];
-    fm1lab_patch_t previous;
-    fm1lab_patch_t *patch;
-
     if (cursor >= FM1LAB_DX7_VOICE_COUNT || set.patch >= FM1LAB_PATCH_COUNT ||
-        fm1lab_dx7_decode_voice(cursor, voice) != 0)
+        fm1lab_dx7_decode_voice(cursor, voice) != 0 ||
+        fm1lab_patch_replace_voice(&current_instrument, set.patch, voice) != 0)
         return -1;
-
-    previous = current_instrument.patches[set.patch];
-    if (fm1lab_patch_set_voice(&current_instrument, set.patch, voice) != 0)
-        return -1;
-
-    patch = &current_instrument.patches[set.patch];
-    patch->level = previous.level;
-    patch->enabled = previous.enabled;
-    patch->octave = previous.octave;
-    patch->fine_cents = previous.fine_cents;
-    for (uint32_t macro = 0; macro < FM1LAB_MACRO_COUNT; ++macro)
-        patch->macros[macro] = previous.macros[macro];
-    fm1lab_patch_set_pan(&current_instrument, set.patch, previous.voice[155]);
 
     patch_preset_cursor = cursor;
     instrument_dirty = 1u;
