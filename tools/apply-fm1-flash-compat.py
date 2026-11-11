@@ -93,10 +93,13 @@ def patch_rescue(apply: bool) -> bool:
     new_guard = """    if key != 0x980F or typ != 3 or fid not in FLASH_IDS:
         allowed = ", ".join(f"{value:06X}" for value in FLASH_IDS)
         raise Fail(f"this is not a supported FM-1 flash (expected key 980F, type 3, id in {allowed}); nothing written")"""
-    if source.count(size_line) != 1 or source.count(old_guard) != 1:
-        raise SystemExit("BSP rescue drift: expected audited single-ID guard was not found")
+    old_doc = "  2. the chip key must be 980F and the flash 856014 (1 MiB), or nothing is done;"
+    new_doc = "  2. the chip key must be 980F and the flash 856014 (Puya) or B36014 (UCUN), both 1 MiB, or nothing is done;"
+    if source.count(size_line) != 1 or source.count(old_guard) != 1 or source.count(old_doc) != 1:
+        raise SystemExit("BSP rescue drift: expected audited single-ID guard/documentation was not found")
     source = source.replace(size_line, size_line + "\nFLASH_IDS = (0x856014, 0xB36014)  # Puya P25Q80H and UCUN UC25HQ80, both 1 MiB", 1)
     source = source.replace(old_guard, new_guard, 1)
+    source = source.replace(old_doc, new_doc, 1)
     RESCUE.write_text(source)
     return True
 
