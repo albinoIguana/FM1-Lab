@@ -1,3 +1,4 @@
+# Re-run trigger only: no build logic or firmware sources changed.
 name: Native FM1 build
 
 on:
