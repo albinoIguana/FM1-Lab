@@ -19,7 +19,7 @@
 #include "fm1lab_preset_control.h"
 #include <stddef.h>
 
-#define C_PEWTER RGB(155,165,175)
+#define C_PEWTER RGB(175,185,195)
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
 static size_t fm1lab_strlen(const char *s) { size_t n=0u; while(s && s[n])++n; return n; }
 static int fm1lab_strcmp(const char *a,const char *b) {
