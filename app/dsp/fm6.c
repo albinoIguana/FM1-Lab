@@ -244,8 +244,8 @@ static volatile uint8_t fx_send[PATCHES][4];
 static uint8_t fx_mix_effective[4];
 static uint32_t fx_lfo_phase, fx_phaser_phase;
 
-/* Multiple parallel wet returns share one 100% wet budget. This prevents four
- * independently-maxed effects from summing to a clipped, harsh output. */
+/* Parallel wet returns share a 50% budget, leaving 6 dB for the dry path.
+ * Four independently-maxed effects therefore cannot swamp the instrument. */
 static void fm6_fx_mix_budget_update(void)
 {
     uint32_t total=0u;
