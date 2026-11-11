@@ -1,6 +1,8 @@
 #ifndef FM1LAB_PHYSICAL_CONTROLS_H
 #define FM1LAB_PHYSICAL_CONTROLS_H
 
+#include <stdint.h>
+
 /* Physical FM1 panel labels are the public names. Values are the verified
  * upstream fm1_controls.encoders[] scan indices, not physical numbering. */
 enum fm1lab_encoder {
