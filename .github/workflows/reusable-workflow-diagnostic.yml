@@ -1,0 +1,25 @@
+name: Reusable workflow diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/ubuntu-runner-smoke-test
+    paths:
+      - ".github/workflows/reusable-workflow-diagnostic.yml"
+
+permissions: {}
+
+jobs:
+  reusable-smoke-test:
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      sdk: false
+      build: |
+        set -euo pipefail
+        printf 'Reusable fm1-build workflow reached its build step\n' > reusable-diagnostic.txt
+      packages: |
+        reusable-diagnostic.txt
