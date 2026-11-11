@@ -15,7 +15,7 @@ int main(void)
     assert(FM1LAB_ENCODER_COUNT == 7);
     assert(FM1LAB_ADC_MASTER == 4u);
 
-    /* PRESETS becomes the lane selector on the sequencer page. */
+    /* SELECT is the lane selector; PRESETS remains the instrument selector. */
     assert(fm1lab_sequencer_lane_advance(0u, 1) == 1u);
     assert(fm1lab_sequencer_lane_advance(1u, 1) == 0u);
     assert(fm1lab_sequencer_lane_advance(0u, -1) == 1u);
