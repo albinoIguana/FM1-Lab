@@ -2478,7 +2478,8 @@ static void input(void)
         } else if (k == EN_PRESET) {
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
-            } else if (fm1lab_preset_target(patch_focus) == FM1LAB_PRESET_TARGET_PATCH) {
+            } else if (fm1lab_preset_target(patch_focus,
+                       (uint8_t)(set.levels[0] && set.levels[1] && set.levels[2] && set.levels[3])) == FM1LAB_PRESET_TARGET_PATCH) {
                 /* Focused mode browses individual voices, replacing only the
                  * selected patch. The four-patch Instrument identity is stable. */
                 uint8_t next = fm1lab_preset_cursor_advance(
