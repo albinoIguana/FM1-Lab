@@ -1066,7 +1066,7 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
     uint8_t repaired=0u;
     if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
     for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
-        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) ||
+        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) &&
            instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
             uint8_t playable[FM1LAB_PATCH_BYTES];
             uint8_t previous_level=instrument->patches[patch].level;
@@ -1081,19 +1081,24 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
     return repaired;
 }
 
-static void instrument_repair_placeholder_name(fm1lab_instrument_t *instrument)
+static uint8_t instrument_repair_placeholder_name(fm1lab_instrument_t *instrument)
 {
+    uint8_t changed=0u;
     if(!instrument || instrument->name[0]!='I' || instrument->name[1]!='N' ||
        instrument->name[2]!='S' || instrument->name[3]!='T' ||
-       instrument->name[4]!='R')return;
+       instrument->name[4]!='R')return 0u;
     char name[FM1LAB_PATCH_NAME_BYTES+1u];
     if(fm1lab_voice_name_get(instrument->patches[0].voice,name)!=0 || !name[0] ||
        instrument_patch_has_placeholder_name(instrument->patches[0].voice)) {
         name[0]='F';name[1]='M';name[2]=' ';name[3]='I';name[4]='N';
         name[5]='S';name[6]='T';name[7]='R';name[8]='U';name[9]='M';name[10]='\0';
     }
-    for(uint32_t i=0u;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++)
-        instrument->name[i]=i<FM1LAB_PATCH_NAME_BYTES && name[i]?name[i]:' ';
+    for(uint32_t i=0u;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++) {
+        char next=i<FM1LAB_PATCH_NAME_BYTES && name[i]?name[i]:' ';
+        if(instrument->name[i]!=next)changed=1u;
+        instrument->name[i]=next;
+    }
+    return changed;
 }
 
 static void instrument_load(uint32_t index, int from_audio)
@@ -1109,16 +1114,15 @@ static void instrument_load(uint32_t index, int from_audio)
         instrument_factory_defaults();
     }
     repaired_patches=instrument_repair_missing_voices(&current_instrument);
-    /* Old banks can retain a generic INSTR nn name even when patch 1 is valid. */
-    instrument_repair_placeholder_name(&current_instrument);
+    uint8_t repaired_name=instrument_repair_placeholder_name(&current_instrument);
     instrument_index = (uint8_t)index;
     patch_preset_cursor = (uint8_t)(index * FM1LAB_PATCH_COUNT + set.patch);
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     instrument_loaded = 1u;
-    instrument_dirty = repaired_patches;
-    if (repaired_patches) set_dirty = 1u;
+    instrument_dirty = (uint8_t)(repaired_patches || repaired_name);
+    if (instrument_dirty) set_dirty = 1u;
     instrument_sync_settings();
     if (from_audio == 1) {
         /* PRESET changes replace this lane's engine bank. The master chain
@@ -1997,12 +2001,10 @@ void app_init(void)
             startup_instrument_scratch=factory_instrument;
             fm1lab_insert_state_init(&startup_insert_scratch);
         }
-        if(instrument_repair_missing_voices(&startup_instrument_scratch)) {
-            instrument_repair_placeholder_name(&startup_instrument_scratch);
+        uint8_t other_repaired=instrument_repair_missing_voices(&startup_instrument_scratch);
+        uint8_t other_renamed=instrument_repair_placeholder_name(&startup_instrument_scratch);
+        if(other_repaired || other_renamed)
             (void)fm1lab_store_library_save_full(other_index,&startup_instrument_scratch,&startup_insert_scratch);
-        } else {
-            instrument_repair_placeholder_name(&startup_instrument_scratch);
-        }
         sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
         instrument_apply_engine_bank(other_lane,&startup_instrument_scratch,&startup_insert_scratch,0u);
