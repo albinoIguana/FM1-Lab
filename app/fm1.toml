@@ -1,4 +1,4 @@
-# Diagnostic previous-good baseline; no runtime changes.
+# Diagnostic previous-good baseline; no runtime changes; stack audit only.
 # FM1-Lab native foundation. Pinned fm1-base and felucca-bsp platform.
 name = "fm1lab"
 id_prefix = "FM-1_97"
