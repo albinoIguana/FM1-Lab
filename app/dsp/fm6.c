@@ -108,7 +108,9 @@ static int32_t fm6_patch_gain_q15[PATCHES];
 static uint8_t fm6_voice_work[VOICES] PLAT_POOL;
 static int64_t fm6_patch_mix[2][PATCHES][FM6_N] PLAT_POOL;
 static int32_t fm6_voice_bus[2][FM6_N] PLAT_POOL;
+#if defined(FM1_CPU1) || defined(FM6_TEST)
 static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES / 2u] PLAT_POOL;
+#endif
 static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
 static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 #if defined(PLAT_WEB)
