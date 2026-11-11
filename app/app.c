@@ -728,6 +728,26 @@ static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH
     }
     return 0;
 }
+static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
+{
+    if(voice_index>=FM1LAB_DX7_VOICE_COUNT || !out) return -1;
+    const char *source=fm1lab_dx7_voice_z85+voice_index*FM1LAB_DX7_Z85_BYTES;
+    for(uint32_t group=0;group<39u;group++) {
+        uint64_t value=0u;
+        for(uint32_t digit=0;digit<5u;digit++) {
+            int decoded=fm1lab_digitone_z85_digit(source[group*5u+digit]);
+            if(decoded<0) return -1;
+            value=value*85u+(uint32_t)decoded;
+        }
+        if(value>0xffffffffu) return -1;
+        out[group*4u]=(uint8_t)(value>>24);
+        out[group*4u+1u]=(uint8_t)(value>>16);
+        out[group*4u+2u]=(uint8_t)(value>>8);
+        out[group*4u+3u]=(uint8_t)value;
+    }
+    return 0;
+}
+
 static int fm1lab_dx7_legacy_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
 {
     if(voice_index>=FM1LAB_DX7_LEGACY_VOICE_COUNT || !out) return -1;
@@ -1889,6 +1909,7 @@ void app_init(void)
         }
     }
     fm6_set_swing((uint8_t)set.swing);
+    if(FM1B_BLE)plat_ble_enable((uint8_t)!set.ble_off);
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode=set.performance.arp_mode;
