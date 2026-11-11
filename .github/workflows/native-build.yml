@@ -87,6 +87,20 @@ jobs:
         git diff --exit-code -- app/fm1lab_dx7_data.h
         bash tests/test-fm6-engine.sh
         sh build.sh --release 0.1
+        # Preserve the exact native image and its symbol context for crash
+        # symbolication. The .fwsc package alone cannot identify a faulting PC.
+        test -s app/build/fm1lab.elf
+        test -s app/build/fm1lab.dis
+        "$JIELI_TOOLCHAIN/common/bin/objdump" -t app/build/fm1lab.elf > app/build/fm1lab.sym
+        test -s app/build/fm1lab.sym
+        {
+          echo "FM1-Lab commit: $(git rev-parse HEAD)"
+          echo "fm1-base commit: $(git -C base rev-parse HEAD)"
+          echo "felucca-bsp commit: $(git -C base/bsp rev-parse HEAD)"
+          echo "Felucca commit: $(git -C upstream/felucca rev-parse HEAD)"
+          echo "JieLi toolchain: $(basename "$(readlink -f "$JIELI_TOOLCHAIN")")"
+          echo "AC79 SDK commit: $(git -C "$AC79_SDK" rev-parse HEAD)"
+        } > app/build/fm1lab.build-info.txt
         # Emit the real ELF section sizes. The linker has separate RAM,
         # RAMTEXT and POOL regions; a single "RAM used" number is misleading.
         python3 - <<'PY'
@@ -116,4 +130,10 @@ jobs:
         print("  limits: RAM .data+.bss 98304; RAMTEXT 32768; POOL 344064 (8192 minimum spare)")
         PY
         python3 base/tools/build.py app --host
-      packages: app/build/fm1lab-0.1.fwsc
+      packages: |
+        app/build/fm1lab-0.1.fwsc
+        app/build/fm1lab.elf
+        app/build/fm1lab.dis
+        app/build/fm1lab.sym
+        app/build/fm1lab.bin
+        app/build/fm1lab.build-info.txt
