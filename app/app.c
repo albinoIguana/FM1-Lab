@@ -1890,7 +1890,9 @@ void app_init(void)
         }
     }
     fm6_set_swing((uint8_t)set.swing);
-    if(FM1B_BLE)plat_ble_enable((uint8_t)!set.ble_off);
+    /* Defer BLE startup to fm1-base's APP_BLE_AT_BOOT hook. app_init runs
+     * before audio_init; the own BLE stack locks the top-of-RAM vector window
+     * after attaching its IRQs, which would block the later ALNK0 registration. */
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode=set.performance.arp_mode;
