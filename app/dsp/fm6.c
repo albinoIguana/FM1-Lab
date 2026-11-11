@@ -736,8 +736,10 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
         int32_t chorus_l_feedback=fx_chorus[chorus_l_index];
         int32_t chorus_r_feedback=fx_chorus_r[chorus_r_index];
         if(fx_mix_effective[0]) { chorus=chorus_l_feedback; chorus_r=chorus_r_feedback; }
-        fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0][0]+(int64_t)chorus_l_feedback*fx_feedback[0]/100u);
-        fx_chorus_r[cp]=fm6_sat_q23((int64_t)sends[0][1]+(int64_t)chorus_r_feedback*fx_feedback[0]/100u);
+        fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0][0]+
+            (int32_t)((int32_t)chorus_l_feedback*(int32_t)fx_feedback[0]/100));
+        fx_chorus_r[cp]=fm6_sat_q23((int64_t)sends[0][1]+
+            (int32_t)((int32_t)chorus_r_feedback*(int32_t)fx_feedback[0]/100));
         fx_chorus_pos=(uint16_t)((cp+1u)&(FM6_CHORUS_SIZE-1u));
         fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
     }
@@ -746,8 +748,10 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
         uint32_t delay_length=256u+(uint32_t)fx_time[1]*78u;
         delay_feedback_l=fx_delay[(dp-delay_length)&(FM6_DELAY_SIZE-1u)];
         delay_feedback_r=fx_delay_r[(dp-delay_length)&(FM6_DELAY_SIZE-1u)];
-        fx_delay[dp]=fm6_sat_q23((int64_t)sends[1][0]+(int64_t)delay_feedback_l*fx_feedback[1]/100u);
-        fx_delay_r[dp]=fm6_sat_q23((int64_t)sends[1][1]+(int64_t)delay_feedback_r*fx_feedback[1]/100u);
+        fx_delay[dp]=fm6_sat_q23((int64_t)sends[1][0]+
+            (int32_t)((int32_t)delay_feedback_l*(int32_t)fx_feedback[1]/100));
+        fx_delay_r[dp]=fm6_sat_q23((int64_t)sends[1][1]+
+            (int32_t)((int32_t)delay_feedback_r*(int32_t)fx_feedback[1]/100));
         fx_delay_pos=(uint16_t)((dp+1u)&(FM6_DELAY_SIZE-1u));
     }
     if(fx_enabled[2]) {
@@ -764,19 +768,22 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
             : reverb_type==2u
                 ? 60u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*10u/100u
                 : 40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
-        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][0]+(int64_t)a_l*decay/100);
-        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][0]+(int64_t)b_l*(decay+3u)/100);
-        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][0]+(int64_t)c_l*(decay+6u)/100);
-        fx_comb_a_r[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][1]+(int64_t)a_r*decay/100);
-        fx_comb_b_r[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][1]+(int64_t)b_r*(decay+3u)/100);
-        fx_comb_c_r[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][1]+(int64_t)c_r*(decay+6u)/100);
+        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(a_l*(int32_t)decay/100));
+        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(b_l*(int32_t)(decay+3u)/100));
+        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(c_l*(int32_t)(decay+6u)/100));
+        fx_comb_a_r[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(a_r*(int32_t)decay/100));
+        fx_comb_b_r[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(b_r*(int32_t)(decay+3u)/100));
+        fx_comb_c_r[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(c_r*(int32_t)(decay+6u)/100));
         fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&2047u);
         fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&4095u);
         fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&8191u);
     }
-    if(fx_enabled[3]) {
-        int32_t in_l=fm6_sat_q23((int64_t)sends[3][0]+(int64_t)fx_phaser_feedback_l*fx_feedback[3]/100u);
-        int32_t in_r=fm6_sat_q23((int64_t)sends[3][1]+(int64_t)fx_phaser_feedback_r*fx_feedback[3]/100u);
+    if(fx_enabled[3] && (sends[3][0] || sends[3][1] ||
+       fx_phaser_feedback_l || fx_phaser_feedback_r)) {
+        int32_t in_l=fm6_sat_q23((int64_t)sends[3][0]+
+            (int32_t)((int32_t)fx_phaser_feedback_l*(int32_t)fx_feedback[3]/100));
+        int32_t in_r=fm6_sat_q23((int64_t)sends[3][1]+
+            (int32_t)((int32_t)fx_phaser_feedback_r*(int32_t)fx_feedback[3]/100));
         phaser_l=fm6_phaser_channel(in_l,fx_phaser_state_l,(fx_phaser_phase>>16)&0xFFFFu);
         phaser_r=fm6_phaser_channel(in_r,fx_phaser_state_r,((fx_phaser_phase+0x40000000u)>>16)&0xFFFFu);
         fx_phaser_feedback_l=phaser_l; fx_phaser_feedback_r=phaser_r;
@@ -785,10 +792,10 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
     int64_t wet_l=input_l,wet_r=input_r;
     /* FX state runs 32x below the Q24 dry bus. This preserves the int32
      * delay/comb memory footprint while reserving 30 dB for feedback growth. */
-    if(fx_enabled[0]) { wet_l+=(int64_t)chorus*FM6_FX_HEADROOM_SCALE*fx_mix_effective[0]/100; wet_r+=(int64_t)chorus_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[0]/100; }
-    if(fx_enabled[1]) { wet_l+=(int64_t)delay_feedback_l*FM6_FX_HEADROOM_SCALE*fx_mix_effective[1]/100; wet_r+=(int64_t)delay_feedback_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[1]/100; }
-    if(fx_enabled[2]) { wet_l+=(int64_t)reverb*FM6_FX_HEADROOM_SCALE*fx_mix_effective[2]/100; wet_r+=(int64_t)reverb_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[2]/100; }
-    if(fx_enabled[3]) { wet_l+=(int64_t)phaser_l*FM6_FX_HEADROOM_SCALE*fx_mix_effective[3]/100; wet_r+=(int64_t)phaser_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[3]/100; }
+    if(fx_enabled[0]) { wet_l+=(int64_t)((chorus*(int32_t)fx_mix_effective[0]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((chorus_r*(int32_t)fx_mix_effective[0]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
+    if(fx_enabled[1]) { wet_l+=(int64_t)((delay_feedback_l*(int32_t)fx_mix_effective[1]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((delay_feedback_r*(int32_t)fx_mix_effective[1]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
+    if(fx_enabled[2]) { wet_l+=(int64_t)((reverb*(int32_t)fx_mix_effective[2]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((reverb_r*(int32_t)fx_mix_effective[2]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
+    if(fx_enabled[3]) { wet_l+=(int64_t)((phaser_l*(int32_t)fx_mix_effective[3]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((phaser_r*(int32_t)fx_mix_effective[3]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
     *left=wet_l; *right=wet_r;
 }
 
