@@ -10,9 +10,12 @@ enum {
 
 /* Patch focus is explicit UI state: the PRESETS encoder must not infer it
  * from the current page, because focus persists while editing that patch. */
-static inline uint8_t fm1lab_preset_target(uint8_t patch_focus)
+static inline uint8_t fm1lab_preset_target(uint8_t patch_focus, uint8_t all_patches_active)
 {
-    return patch_focus ? FM1LAB_PRESET_TARGET_PATCH : FM1LAB_PRESET_TARGET_INSTRUMENT;
+    /* A fully layered Home view is the Instrument overview, even if a prior
+     * K1-K4 level edit left transient patch focus set. */
+    return patch_focus && !all_patches_active
+        ? FM1LAB_PRESET_TARGET_PATCH : FM1LAB_PRESET_TARGET_INSTRUMENT;
 }
 
 /* PRESETS is active on Home, or on the main Sequencer page when a
