@@ -8,12 +8,11 @@ credits = "FM1-Lab native app on fm1-base; Felucca FM6 core, 32-Instrument four-
 unity_opt = "z"
 ir_pass = "tools/identity_ir.py"
 stack_check = true
-cpu2 = false
+cpu2 = true
 cpu2_fallback = true
 cpu2_stack = 4096
-# The browser simulator exercises the same CPU2 voice split. Its worker is
-# serialized by the host simulator; the worklet measures both halves and
-# models their parallel critical path against the FM1 audio-block deadline.
+# Native firmware uses the FM1 SoC's second core as a voice-render worker.
+# On a fault/late job, the base runtime falls back to the single-core renderer.
 web_cflags = ["-DFM1B_CPU2=1"]
 web_link = ["web/emu/web_exports.c"]
 ble = true
