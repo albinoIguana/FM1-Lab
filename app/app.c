@@ -2440,7 +2440,8 @@ static void input(void)
             sequencer_select_event(e);
             app_say("NOTE","SELECTED");
         } else if (k == EN_SELECT && (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS)) {
-            if(instrument_apply_pending)continue;
+            /* Track focus is UI-only; a queued voice-bank apply belongs to
+             * the previous lane and must not swallow SELECT detents here. */
             if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","TRACK NOT CHANGED");continue;}
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
             set.patch = seq_ui_patch[seq_ui_lane];
