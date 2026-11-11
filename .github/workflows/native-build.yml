@@ -2,7 +2,7 @@ name: Native FM1 build
 
 on:
   push:
-    branches: [main]
+    branches: [main, test/shipwreck-single-core-startup-candidate]
     paths:
       - "app/**"
       - "patches/**"
