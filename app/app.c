@@ -1066,7 +1066,7 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
     uint8_t repaired=0u;
     if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
     for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
-        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) ||
+        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) &&
            instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
             uint8_t playable[FM1LAB_PATCH_BYTES];
             uint8_t previous_level=instrument->patches[patch].level;
