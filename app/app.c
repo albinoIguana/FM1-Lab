@@ -1084,7 +1084,8 @@ static void instrument_repair_placeholder_name(fm1lab_instrument_t *instrument)
        instrument->name[2]!='S' || instrument->name[3]!='T' ||
        instrument->name[4]!='R')return;
     char name[FM1LAB_PATCH_NAME_BYTES+1u];
-    if(fm1lab_voice_name_get(instrument->patches[0].voice,name)!=0 || !name[0]) {
+    if(fm1lab_voice_name_get(instrument->patches[0].voice,name)!=0 || !name[0] ||
+       instrument_patch_has_placeholder_name(instrument->patches[0].voice)) {
         name[0]='F';name[1]='M';name[2]=' ';name[3]='I';name[4]='N';
         name[5]='S';name[6]='T';name[7]='R';name[8]='U';name[9]='M';name[10]='\0';
     }
