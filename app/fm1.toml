@@ -6,6 +6,7 @@ usb_product = "FM1-Lab"
 licence = "GPL-3.0-only"
 credits = "FM1-Lab native app on fm1-base; Felucca FM6 core, 32-Instrument four-bank storage, DX7 ENV/LFO editors, two-lane sequencer, held-note arpeggiator, and parallel chorus/delay/reverb sends."
 unity_opt = "s"
+stack_check = true
 cpu2 = true
 cpu2_fallback = true
 cpu2_stack = 4096
