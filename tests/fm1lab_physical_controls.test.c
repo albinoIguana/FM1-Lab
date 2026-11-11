@@ -24,9 +24,6 @@ int main(void)
     assert(fm1lab_sequencer_lane_advance(1u, -1) == 0u);
     assert(fm1lab_sequencer_lane_advance(1u, -2) == 0u);
     assert(fm1lab_sequencer_lane_advance(0u, 0) == 0u);
-    return 0;
-}
-
     /* Global page: K1 trim, K2/K3 are existing swing/tempo, K4 BLE direction. */
     assert(fm1lab_master_trim_advance(100u, 1) == 100u);
     assert(fm1lab_master_trim_advance(50u, -7) == 43u);
@@ -40,3 +37,6 @@ int main(void)
     assert(fm1lab_ble_enabled_from_turn(0u, 2) == 1u);
     assert(fm1lab_ble_enabled_from_turn(1u, -2) == 0u);
     assert(fm1lab_ble_enabled_from_turn(1u, 0) == 1u);
+
+    return 0;
+}
