@@ -1636,6 +1636,10 @@ uint8_t fm6_test_arpeggiator_amp_level(void)
     uint32_t level=(uint32_t)(arp_amp_gain_q15<0?0:arp_amp_gain_q15);
     return (uint8_t)(level>=32768u?127u:level*127u/32768u);
 }
+uint8_t fm6_test_fx_mix_effective(uint8_t effect)
+{
+    return effect<4u?fx_mix_effective[effect]:0u;
+}
 #endif
 void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled)
 {
