@@ -241,7 +241,7 @@ static volatile uint8_t fx_enabled[4], fx_mix[4]={18u,24u,20u,35u},
     fx_time[4]={48u,52u,45u,35u}, fx_feedback[4]={40u,42u,60u,20u},
     fx_depth[4]={50u,50u,50u,65u};
 static volatile uint8_t fx_send[PATCHES][4];
-static uint8_t fx_mix_effective[4];
+static volatile uint8_t fx_mix_effective[4];
 static uint32_t fx_lfo_phase, fx_phaser_phase;
 
 /* Parallel wet returns share a 50% budget, leaving 6 dB for the dry path.
