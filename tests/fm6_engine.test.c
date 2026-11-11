@@ -285,9 +285,9 @@ int main(void) {
         for(unsigned fx=0u;fx<4u;fx++) {
             unsigned effective=fm6_test_fx_mix_effective((uint8_t)fx);
             total_wet+=effective;
-            assert(effective==25u);
+            assert(effective==12u);
         }
-        assert(total_wet==100u);
+        assert(total_wet==48u);
     }
     fm6_init();
     {
