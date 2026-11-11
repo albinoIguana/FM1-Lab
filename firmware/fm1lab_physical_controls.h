@@ -17,8 +17,8 @@ enum fm1lab_encoder {
 /* MASTER is an ADC input, not one of the seven rotary encoders. */
 enum { FM1LAB_ADC_MASTER = 4u };
 
-/* In the sequencer, PRESETS selects lane A/B instead of changing Instruments.
- * Every encoder detent advances one lane; negative turns wrap symmetrically. */
+/* SELECT chooses sequencer lane A/B. PRESETS changes the selected lane's
+ * Instrument on the first Sequencer page; negative SELECT turns wrap too. */
 static inline unsigned fm1lab_sequencer_lane_advance(unsigned lane, int delta)
 {
     int next = ((int)(lane & 1u) + delta) % 2;
