@@ -17,13 +17,14 @@ enum fm1lab_encoder {
 /* MASTER is an ADC input, not one of the seven rotary encoders. */
 enum { FM1LAB_ADC_MASTER = 4u };
 
-/* SELECT chooses sequencer lane A/B. PRESETS changes the selected lane's
- * Instrument on the first Sequencer page; negative SELECT turns wrap too. */
+/* SELECT is a directional two-track selector: clockwise selects T2,
+ * counter-clockwise selects T1. Use direction, not raw quadrature count:
+ * the device encoder can report multiple counts for one physical detent. */
 static inline unsigned fm1lab_sequencer_lane_advance(unsigned lane, int delta)
 {
-    int next = ((int)(lane & 1u) + delta) % 2;
-    if (next < 0) next += 2;
-    return (unsigned)next;
+    if (delta > 0) return 1u;
+    if (delta < 0) return 0u;
+    return lane & 1u;
 }
 
 #endif
