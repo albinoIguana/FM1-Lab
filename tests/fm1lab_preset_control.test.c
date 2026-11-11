@@ -5,8 +5,10 @@
 int main(void)
 {
     /* Home starts in whole-Instrument mode; selecting a patch changes target. */
-    assert(fm1lab_preset_target(0u) == FM1LAB_PRESET_TARGET_INSTRUMENT);
-    assert(fm1lab_preset_target(1u) == FM1LAB_PRESET_TARGET_PATCH);
+    assert(fm1lab_preset_target(0u, 0u) == FM1LAB_PRESET_TARGET_INSTRUMENT);
+    assert(fm1lab_preset_target(1u, 0u) == FM1LAB_PRESET_TARGET_PATCH);
+    /* With all four Home layers active, PRESETS selects the Instrument. */
+    assert(fm1lab_preset_target(1u, 1u) == FM1LAB_PRESET_TARGET_INSTRUMENT);
 
     /* Home and the highlighted track on the main Sequencer page are allowed. */
     assert(fm1lab_preset_encoder_enabled(0u, 0u, 7u, 0u));
