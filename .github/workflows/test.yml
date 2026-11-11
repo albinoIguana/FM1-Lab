@@ -25,6 +25,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Patch and test both FM1 flash variants
+        run: |
+          python3 tools/apply-fm1-flash-compat.py
+          bash tests/test-flash-compat.sh
       - name: Verify generated curated DX7 firmware bank
         run: |
           python3 tools/generate_dx7_library.py
