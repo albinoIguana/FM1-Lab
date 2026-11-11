@@ -9,7 +9,7 @@ unity_opt = "s"
 ir_pass = "tools/identity_ir.py"
 stack_check = true
 ir_pass = "tools/identity_ir.py"
-cpu2 = true
+cpu2 = false
 cpu2_fallback = true
 cpu2_stack = 4096
 # The browser simulator exercises the same CPU2 voice split. Its worker is
