@@ -1052,9 +1052,7 @@ static int instrument_patch_has_placeholder_name(const uint8_t *voice)
 {
     if(!voice)return 1;
     const char *name=(const char *)voice+145u;
-    if(fm1lab_strncmp(name,"PATCH ",6u)==0 ||
-       fm1lab_strncmp(name,"VOICE ",6u)==0 ||
-       fm1lab_strncmp(name,"INIT",4u)==0)return 1;
+    if(fm1lab_strncmp(name,"PATCH 1",7u)==0)return 1;
     uint8_t blank=1u;
     for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)
         if(voice[145u+i]!=' ' && voice[145u+i]!=0u)blank=0u;
