@@ -1785,8 +1785,8 @@ void app_init(void)
     web_device_xruns = 0u;
 #endif
     fm6_init();
-#if defined(PLAT_WEB)
-    (void)plat_cpu2_set(1); /* browser model only; device CPU2 remains off pending hardware qualification */
+#if FM1B_CPU2
+    (void)plat_cpu2_set(1); /* start the second-core render worker before audio begins */
 #endif
     settings_defaults();
     loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
@@ -2423,7 +2423,7 @@ static void input(void)
         } else if (k == EN_SELECT && page == PAGE_SEQ_PIANO) {
             sequencer_select_event(e);
             app_say("NOTE","SELECTED");
-        } else if (k == EN_SELECT && page == PAGE_SEQ) {
+        } else if (k == EN_SELECT && (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS)) {
             if(instrument_apply_pending)continue;
             if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","TRACK NOT CHANGED");continue;}
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
@@ -2797,7 +2797,7 @@ static void cv_text_fit(int32_t x,int32_t y,const felucca_font_t *font,const cha
 static void cell(int32_t x, int32_t y, int32_t w, const char *s, int on)   /* a labelled box, lit when on */
 {
     cv_rect(x, y, w, 18, on ? C_HI : C_LINE);
-    cv_text(x + (w - text_w(&FONT_XS, s)) / 2, y + 2, &FONT_XS, s, on ? C_BLACK : C_GRAY);
+    cv_text(x + (w - text_w(&FONT_XS, s)) / 2, y + 2, &FONT_XS, s, on ? C_BLACK : C_PEWTER);
 }
 
 static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uint16_t off)
@@ -2952,8 +2952,8 @@ static void draw_algorithm_diagram(void)
     uint16_t accent=patch_color(set.patch);
     char t[12];
     (void)fm1lab_voice_global_get(voice,FM1LAB_GLOBAL_ALGORITHM,&algorithm);
-    cv_text(7,5,&FONT_XS,"OPERATOR ROUTING",C_GRAY);
-    cv_text(178,5,&FONT_XS,"ALG",C_GRAY);
+    cv_text(7,5,&FONT_XS,"OPERATOR ROUTING",C_PEWTER);
+    cv_text(178,5,&FONT_XS,"ALG",C_PEWTER);
     int_text(algorithm,t); cv_text(205,5,&FONT_XS,t,accent);
 
     /* Draw modulation links behind the operator blocks. */
@@ -2999,8 +2999,8 @@ static void draw_algorithm_diagram(void)
         cv_rect(nx[i]+3,ny[i]+22,30,1,carrier?accent:C_DIM);
     }
     cv_text(8,113,&FONT_XS,"CARRIER",accent);
-    cv_text(75,113,&FONT_XS,"MODULATOR",C_GRAY);
-    cv_text(166,113,&FONT_XS,"ALGO: ROUTING",C_GRAY);
+    cv_text(75,113,&FONT_XS,"MODULATOR",C_PEWTER);
+    cv_text(166,113,&FONT_XS,"ALGO: ROUTING",C_PEWTER);
 }
 
 static int patch_name_is_factory(const char *name)
@@ -3050,16 +3050,6 @@ static const char *patch_display_name(uint32_t patch)
     return fallback[patch];
 }
 
-static const char *patch_description(uint32_t patch)
-{
-    if(patch>=FM1LAB_PATCH_COUNT || instrument_index>=FM1LAB_DX7_INSTRUMENT_COUNT)
-        return "USER PATCH";
-    if(fm1lab_strcmp(instrument_display_name(),
-                     fm1lab_dx7_instrument_names[instrument_index])!=0)
-        return "USER PATCH";
-    return fm1lab_dx7_patch_descriptions[(uint32_t)instrument_index*FM1LAB_PATCH_COUNT+patch];
-}
-
 static void draw_home_panel(void)
 {
     char t[24];
@@ -3079,13 +3069,12 @@ static void draw_home_panel(void)
         int_text((int32_t)p + 1, t + 6);
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
         cv_text(x + 65, y + 5, &FONT_XS, enabled ? "ON" : "MUTED",
-                enabled ? RGB(75,235,135) : C_GRAY);
+                enabled ? RGB(75,235,135) : C_PEWTER);
         cv_text_fit(x+12,y+23,&FONT_B,patch_display_name(p),C_WHITE,96);
-        cv_text_fit(x+12,y+37,&FONT_XS,patch_description(p),C_GRAY,96);
-        cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_GRAY);
+        cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_PEWTER);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
         cv_text(x + 34, y + 49, &FONT_XS, t, accent);
-        cv_text(x + 59, y + 49, &FONT_XS, "LEVEL", C_GRAY);
+        cv_text(x + 59, y + 49, &FONT_XS, "LEVEL", C_PEWTER);
         int_text(set.levels[p], t);
         cv_text(x + 91, y + 49, &FONT_XS, t, C_WHITE);
         cv_rect(x + 12, y + 69, 96, 5, RGB(31, 43, 55));
@@ -3112,7 +3101,7 @@ static void draw_macro_panel(void)
         cv_rect(x + 9, y + 42, 98, 6, RGB(31, 43, 55));
         cv_rect(x + 9, y + 42, (int32_t)value * 98 / 100, 6, accent);
         cv_rect(x + 9 + (int32_t)value * 98 / 100, y + 39, 2, 12, C_WHITE);
-        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
+        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_PEWTER);
     }
 }
 static void draw_instrument_macro_panel(void)
@@ -3132,10 +3121,10 @@ static void draw_instrument_macro_panel(void)
         int_text((int32_t)value, t);
         cv_text(x + 88, y + 7, &FONT_B, t, accent);
         cv_rect(x + 9, y + 42, 98, 6, RGB(31,43,55));
-        cv_rect(x + 9 + 49, y + 40, 1, 10, C_GRAY);
+        cv_rect(x + 9 + 49, y + 40, 1, 10, C_PEWTER);
         if (value >= 50u) cv_rect(x + 9 + 49, y + 42, (int32_t)(value - 50u) * 49 / 50, 6, accent);
         else cv_rect(x + 9 + (int32_t)value * 49 / 50, y + 42, (int32_t)(50u - value) * 49 / 50, 6, accent);
-        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
+        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_PEWTER);
     }
 }
 static void draw_chaos_panel(void)
@@ -3155,19 +3144,19 @@ static void draw_chaos_panel(void)
             cv_text(x+9,y+27,&FONT_B,t,accent);
             cv_rect(x+9,y+49,94,6,C_LINE);
             cv_rect(x+9,y+49,(int32_t)set.performance.chaos_amount*94/100,6,accent);
-            cv_text(x+9,y+64,&FONT_XS,"DRY  TO  DESTROY",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"DRY  TO  DESTROY",C_PEWTER);
         }else if(i==1u){
             cv_text(x+9,y+27,&FONT_B,divisions[slot],accent);
-            cv_text(x+9,y+64,&FONT_XS,"LOCKED TO MASTER BPM",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"LOCKED TO MASTER BPM",C_PEWTER);
         }else if(i==2u){
             int_text(bits,t);text_cat(t," BIT");
             cv_text(x+9,y+27,&FONT_B,t,accent);
             cv_rect(x+9,y+49,94,6,C_LINE);
             cv_rect(x+9,y+49,(int32_t)set.performance.chaos_tone*94/100,6,accent);
-            cv_text(x+9,y+64,&FONT_XS,"16-BIT  TO  2-BIT",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"16-BIT  TO  2-BIT",C_PEWTER);
         }else{
             cv_text(x+9,y+27,&FONT_B,shapes[set.performance.chaos_shape],accent);
-            cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_PEWTER);
         }
     }
 }
@@ -3190,11 +3179,11 @@ static void draw_operator_map(void)
             text_cat(t,i==0u?" OCT":" CENTS");
             cv_text(x+9,y+25,&FONT_B,t,accent);
             cv_rect(x+9,y+48,94,5,C_LINE);
-            cv_rect(x+9+47,y+45,1,11,C_GRAY);
+            cv_rect(x+9+47,y+45,1,11,C_PEWTER);
             int width=i==0u?((value<0?-value:value)*47/4):((value<0?-value:value)*47/100);
             if(value<0)cv_rect(x+56-width,y+48,width,5,accent);
             else if(value>0)cv_rect(x+56,y+48,width,5,accent);
-            cv_text(x+9,y+63,&FONT_XS,i==0u?"-4  /  0  /  +4":"-100c  /  0  /  +100c",C_GRAY);
+            cv_text(x+9,y+63,&FONT_XS,i==0u?"-4  /  0  /  +4":"-100c  /  0  /  +100c",C_PEWTER);
         } /* Reserved cards intentionally left blank until they have useful controls. */
     }
 }
@@ -3209,7 +3198,7 @@ static void draw_amp_panel(void)
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,labels[i],C_PEWTER);
         if(i==0u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",values[i]?RGB(75,235,135):RGB(255,82,101));
         else {int_text(values[i],t);cv_text(x+7,y+23,&FONT_B,t,accent);cv_rect(x+48,y+29,55,5,C_LINE);cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);}
     }
@@ -3261,8 +3250,8 @@ static void draw_eq_panel(void)
         if(response[i]>bottom)response[i]=bottom;
     }
     cv_text(9,3,&FONT_XS,(v->eq_enabled&1u)?"3-BAND PARAMETRIC / ON":"3-BAND PARAMETRIC / BYPASS",
-            (v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
-    for(int32_t y=zero-48;y<=zero+48;y+=24)cv_rect(left,y,right-left,1,y==zero?C_GRAY:C_DIM);
+            (v->eq_enabled&1u)?RGB(75,235,135):C_PEWTER);
+    for(int32_t y=zero-48;y<=zero+48;y+=24)cv_rect(left,y,right-left,1,y==zero?C_PEWTER:C_DIM);
     for(int32_t x=left;x<=right;x+=36)cv_rect(x,top,1,bottom-top,C_DIM);
     for(uint32_t i=1u;i<109u;i++)
         fm1lab_plot_line(left+(int32_t)(i-1u)*2,response[i-1u],left+(int32_t)i*2,response[i],RGB(36,215,232));
@@ -3270,10 +3259,10 @@ static void draw_eq_panel(void)
         int32_t marker=left+(int32_t)selected->frequency*(right-left)/100;
         cv_rect(marker-1,top,2,bottom-top,colors[eq_ui_band]);
     }
-    cv_text(12,125,&FONT_XS,"20",C_GRAY); cv_text(65,125,&FONT_XS,"200",C_GRAY);
-    cv_text(119,125,&FONT_XS,"2K",C_GRAY); cv_text(174,125,&FONT_XS,"10K",C_GRAY);
-    cv_text(211,125,&FONT_XS,"20K",C_GRAY);
-    cv_text(10,138,&FONT_XS,"K1 BYPASS",C_GRAY);
+    cv_text(12,125,&FONT_XS,"20",C_PEWTER); cv_text(65,125,&FONT_XS,"200",C_PEWTER);
+    cv_text(119,125,&FONT_XS,"2K",C_PEWTER); cv_text(174,125,&FONT_XS,"10K",C_PEWTER);
+    cv_text(211,125,&FONT_XS,"20K",C_PEWTER);
+    cv_text(10,138,&FONT_XS,"K1 BYPASS",C_PEWTER);
     cv_text(10,153,&FONT_XS,bands[eq_ui_band],colors[eq_ui_band]);
     int_text((int32_t)eq_frequency_hz(selected->frequency),t); text_cat(t,"Hz");
     cv_text(66,153,&FONT_XS,t,C_WHITE);
@@ -3281,7 +3270,7 @@ static void draw_eq_panel(void)
     cv_text(143,153,&FONT_XS,t,C_WHITE);
     int_text(selected->q,t); text_cat(t," Q");
     cv_text(187,153,&FONT_XS,t,C_WHITE);
-    cv_text(10,165,&FONT_XS,"K2 BAND  K3 FREQ  K4 GAIN  /  SELECT Q",C_GRAY);
+    cv_text(10,165,&FONT_XS,"K2 BAND  K3 FREQ  K4 GAIN  /  SELECT Q",C_PEWTER);
 }
 
 static void draw_compressor_panel(void)
@@ -3293,7 +3282,7 @@ static void draw_compressor_panel(void)
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,i==0u?"K1  BYPASS":i==1u?"K2  RATIO":i==2u?"K3  THRESHOLD":"K4  ATTACK",C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,i==0u?"K1  BYPASS":i==1u?"K2  RATIO":i==2u?"K3  THRESHOLD":"K4  ATTACK",C_PEWTER);
         if(i==0u) cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?RGB(75,235,135):RGB(255,82,101));
         else {
             if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
@@ -3313,7 +3302,7 @@ static void draw_global_panel(uint32_t pct)
         int32_t x = panel_grid_x(i);
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
         instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), colors[i], colors[i]);
-        cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_GRAY);
+        cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_PEWTER);
         if (i == 0) {
             int_text((int32_t)pct, t); text_cat(t, "%");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
@@ -3322,7 +3311,7 @@ static void draw_global_panel(uint32_t pct)
             cv_text(x + 9, y + 25, &FONT_B, t, colors[i]);
             cv_rect(x+9,y+49,94,6,C_LINE);
             cv_rect(x+9,y+49,((int32_t)set.swing-50)*94/25,6,colors[i]);
-            cv_text(x+9,y+63,&FONT_XS,set.swing==50u?"STRAIGHT":"SWING",C_GRAY);
+            cv_text(x+9,y+63,&FONT_XS,set.swing==50u?"STRAIGHT":"SWING",C_PEWTER);
         } else if (i == 2) {
             int_text((int32_t)transport_ui_bpm, t); text_cat(t, " BPM");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
@@ -3360,25 +3349,25 @@ static void draw_envelope_panel(void)
         rw=right-left-aw-dw-sw;
         x1=left+aw; x2=x1+dw; x3=x2+sw; x4=x3+rw;
         sy=baseline-(int32_t)adsr[2]*96/99;
-        cv_text(10,3,&FONT_XS,"AMPLITUDE / ALL CARRIERS",C_GRAY);
+        cv_text(10,3,&FONT_XS,"AMPLITUDE / ALL CARRIERS",C_PEWTER);
         cv_rect(left,top,right-left,1,C_DIM); cv_rect(left,71,right-left,1,C_DIM);
-        cv_rect(left,baseline,right-left,1,C_GRAY);
+        cv_rect(left,baseline,right-left,1,C_PEWTER);
         cv_rect(left,top,1,baseline-top,C_DIM); cv_rect(right,top,1,baseline-top,C_DIM);
         fm1lab_plot_line(left,baseline,x1,top,accent);
         fm1lab_plot_line(x1,top,x2,sy,accent);
         fm1lab_plot_line(x2,sy,x3,sy,accent);
         fm1lab_plot_line(x3,sy,x4,baseline,accent);
         cv_rect(x1-2,top-2,5,5,C_WHITE); cv_rect(x2-2,sy-2,5,5,accent);
-        cv_text(12,132,&FONT_XS,"ATTACK",C_GRAY); cv_text(67,132,&FONT_XS,"DECAY",C_GRAY);
-        cv_text(119,132,&FONT_XS,"SUSTAIN",C_GRAY); cv_text(180,132,&FONT_XS,"RELEASE",C_GRAY);
+        cv_text(12,132,&FONT_XS,"ATTACK",C_PEWTER); cv_text(67,132,&FONT_XS,"DECAY",C_PEWTER);
+        cv_text(119,132,&FONT_XS,"SUSTAIN",C_PEWTER); cv_text(180,132,&FONT_XS,"RELEASE",C_PEWTER);
         int_text(adsr[0],t); cv_text(12,149,&FONT_B,t,accent);
-        cv_text(12,167,&FONT_XS,env_rate_word(adsr[0]),C_GRAY);
+        cv_text(12,167,&FONT_XS,env_rate_word(adsr[0]),C_PEWTER);
         int_text(adsr[1],t); cv_text(67,149,&FONT_B,t,accent);
-        cv_text(67,167,&FONT_XS,env_rate_word(adsr[1]),C_GRAY);
+        cv_text(67,167,&FONT_XS,env_rate_word(adsr[1]),C_PEWTER);
         int_text(adsr[2],t); cv_text(129,149,&FONT_B,t,accent);
-        cv_text(129,167,&FONT_XS,"LEVEL",C_GRAY);
+        cv_text(129,167,&FONT_XS,"LEVEL",C_PEWTER);
         int_text(adsr[3],t); cv_text(190,149,&FONT_B,t,accent);
-        cv_text(190,167,&FONT_XS,env_rate_word(adsr[3]),C_GRAY);
+        cv_text(190,167,&FONT_XS,env_rate_word(adsr[3]),C_PEWTER);
         /* Rate direction is shown by the live rate labels above; no clipped footer. */
     }
 }
@@ -3399,10 +3388,10 @@ static void draw_operator_workbench(uint8_t view)
             env_operator==3u?"OP 3":env_operator==4u?"OP 4":env_operator==5u?"OP 5":"OP 6",accent);
         cv_text(42,126,&FONT_XS,fm1lab_voice_operator_is_carrier(voice,env_operator)?
             "CARRIER / SOURCE":"MODULATOR / TONE",C_WHITE);
-        cv_text(8,143,&FONT_XS,"K1 COARSE",C_GRAY);int_text(coarse,t);cv_text(66,143,&FONT_B,t,accent);
-        cv_text(118,143,&FONT_XS,"K2 FINE",C_GRAY);int_text(fine,t);cv_text(169,143,&FONT_B,t,accent);
-        cv_text(8,158,&FONT_XS,"K3 OUTPUT",C_GRAY);int_text(output,t);cv_text(66,158,&FONT_B,t,accent);
-        cv_text(118,158,&FONT_XS,"K4 TUNE",C_GRAY);int_text(detune,t);cv_text(169,158,&FONT_B,t,accent);
+        cv_text(8,143,&FONT_XS,"K1 COARSE",C_PEWTER);int_text(coarse,t);cv_text(66,143,&FONT_B,t,accent);
+        cv_text(118,143,&FONT_XS,"K2 FINE",C_PEWTER);int_text(fine,t);cv_text(169,143,&FONT_B,t,accent);
+        cv_text(8,158,&FONT_XS,"K3 OUTPUT",C_PEWTER);int_text(output,t);cv_text(66,158,&FONT_B,t,accent);
+        cv_text(118,158,&FONT_XS,"K4 TUNE",C_PEWTER);int_text(detune,t);cv_text(169,158,&FONT_B,t,accent);
     } else {
         static const char *const stages[4]={"ATTACK","DECAY 1","DECAY 2","RELEASE"};
         uint8_t rates[4]={0u},levels[4]={0u};
@@ -3429,9 +3418,9 @@ static void draw_operator_workbench(uint8_t view)
         py[2]=bottom-(int32_t)levels[1]*(bottom-top)/99;
         py[3]=bottom-(int32_t)levels[2]*(bottom-top)/99;
         py[4]=py[0];
-        cv_text(8,4,&FONT_XS,view==1u?"OPERATOR EG  /  RATE":"OPERATOR EG  /  TARGET LEVEL",C_GRAY);
+        cv_text(8,4,&FONT_XS,view==1u?"OPERATOR EG  /  RATE":"OPERATOR EG  /  TARGET LEVEL",C_PEWTER);
         cv_text(8,20,&FONT_B,fm1lab_voice_operator_is_carrier(voice,env_operator)?"CARRIER: OUTPUT":"MODULATOR: HARMONICS",accent);
-        cv_rect(left,bottom,right-left,1,C_GRAY);
+        cv_rect(left,bottom,right-left,1,C_PEWTER);
         cv_rect(left,top,1,bottom-top,C_DIM);
         for(uint32_t i=0;i<4u;i++)
             fm1lab_plot_line(px[i],py[i],px[i+1u],py[i+1u],accent);
@@ -3443,10 +3432,10 @@ static void draw_operator_workbench(uint8_t view)
             if(label_x<2)label_x=2;
             if(label_x+text_w(&FONT_XS,stages[i])>238)
                 label_x=238-text_w(&FONT_XS,stages[i]);
-            cv_text(label_x,115,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
+            cv_text(label_x,115,&FONT_XS,stages[i],i==0u?C_WHITE:C_PEWTER);
             int_text(view==2u?levels[i]:rates[i],t);
             cv_text(cx-text_w(&FONT_B,t)/2,132,&FONT_B,t,accent);
-            cv_text(cx-(view==2u?15:12),147,&FONT_XS,view==2u?"TARGET":"RATE",C_GRAY);
+            cv_text(cx-(view==2u?15:12),147,&FONT_XS,view==2u?"TARGET":"RATE",C_PEWTER);
             if(view==1u) {
                 cv_rect(cx-13,161,26,3,C_LINE);
                 cv_rect(cx-13,161,(int32_t)rates[i]*26/99,3,accent);
@@ -3482,7 +3471,7 @@ static void draw_lfo_panel(uint32_t modulation)
         cv_text(x + 9, y + 8, &FONT_XS, labels[modulation][i], C_WHITE);
         if (!modulation && i == 0u) {
             cv_text(x + 9, y + 26, &FONT_B, waves[value % 6u], accent);
-            cv_text(x + 9, y + 64, &FONT_XS, "PER-PATCH WAVE", C_GRAY);
+            cv_text(x + 9, y + 64, &FONT_XS, "PER-PATCH WAVE", C_PEWTER);
         } else {
             if (modulation && i >= 2u) cv_text(x + 9, y + 26, &FONT_B, value ? "ON" : "OFF", accent);
             else {
@@ -3491,9 +3480,9 @@ static void draw_lfo_panel(uint32_t modulation)
                 cv_rect(x + 9, y + 46, (int32_t)value * 94 / maxima[modulation][i], 5, accent);
             }
             if (!modulation) cv_text(x + 9, y + 64, &FONT_XS,
-                i == 1u ? "SLOW  >  FAST" : i == 2u ? "PITCH WOBBLE" : "VOLUME TREMOLO", C_GRAY);
+                i == 1u ? "SLOW  >  FAST" : i == 2u ? "PITCH WOBBLE" : "VOLUME TREMOLO", C_PEWTER);
             else cv_text(x + 9, y + 64, &FONT_XS,
-                i == 0u ? "FADE-IN TIME" : i == 1u ? "KEY RESPONSE" : i == 2u ? "RESET LFO" : "RESET OSC", C_GRAY);
+                i == 0u ? "FADE-IN TIME" : i == 1u ? "KEY RESPONSE" : i == 2u ? "RESET LFO" : "RESET OSC", C_PEWTER);
         }
     }
 }
@@ -3534,7 +3523,9 @@ static void draw_sequencer_panel(void)
      * but expand row height so short patterns fill the same vertical space. */
     int32_t row_gap=2;
     int32_t row_height=(46-(int32_t)(rows-1u)*row_gap)/(int32_t)rows;
-    cv_text(6,0,&FONT_XS,"TRACK 1",patch_color(seq_ui_patch[0]));
+    cv_rect(2,13,236,1,seq_ui_lane==0u?C_PEWTER:C_LINE);
+    cv_text(6,0,&FONT_XS,"TRACK 1",seq_ui_lane==0u?C_WHITE:patch_color(seq_ui_patch[0]));
+    cv_text(48,0,&FONT_XS,seq_ui_lane==0u?"ACTIVE":"",C_PEWTER);
     cv_text(78,0,&FONT_XS,seq_ui_instrument_name[0],C_WHITE);
     for(uint32_t row=0;row<rows;row++) {
         uint8_t first=(uint8_t)(row*16u);
@@ -3547,7 +3538,9 @@ static void draw_sequencer_panel(void)
                           seq_ui_accent[0],patch_color(seq_ui_patch[0]));
     }
 
-    cv_text(6,66,&FONT_XS,"TRACK 2",patch_color(seq_ui_patch[1]));
+    cv_rect(2,79,236,1,seq_ui_lane==1u?C_PEWTER:C_LINE);
+    cv_text(6,66,&FONT_XS,"TRACK 2",seq_ui_lane==1u?C_WHITE:patch_color(seq_ui_patch[1]));
+    cv_text(48,66,&FONT_XS,seq_ui_lane==1u?"ACTIVE":"",C_PEWTER);
     cv_text(78,66,&FONT_XS,seq_ui_instrument_name[1],C_WHITE);
     for(uint32_t row=0;row<rows;row++) {
         uint8_t first=(uint8_t)(row*16u);
@@ -3561,11 +3554,11 @@ static void draw_sequencer_panel(void)
     }
 
     cv_text(6,139,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
-            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
-    cv_text(6,166,&FONT_XS,"K1 STEP",C_GRAY);
-    cv_text(66,166,&FONT_XS,"K2 CLEAR",C_GRAY);
-    cv_text(126,166,&FONT_XS,"K3 VEL",C_GRAY);
-    cv_text(186,166,&FONT_XS,"K4 GATE",C_GRAY);
+            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_PEWTER));
+    cv_text(6,166,&FONT_XS,"K1 STEP",C_PEWTER);
+    cv_text(66,166,&FONT_XS,"K2 CLEAR",C_PEWTER);
+    cv_text(126,166,&FONT_XS,"K3 VEL",C_PEWTER);
+    cv_text(186,166,&FONT_XS,"K4 GATE",C_PEWTER);
 }
 static void draw_sequencer_piano_panel(void)
 {
@@ -3605,7 +3598,7 @@ static void draw_sequencer_piano_panel(void)
             cv_rect(x+5,gy,2,gh,RGB(242,212,59));
         if((col%4u)==0u) {
             int_text((int32_t)step+1,value);
-            cv_text(x+1,101,&FONT_XS,value,C_GRAY);
+            cv_text(x+1,101,&FONT_XS,value,C_PEWTER);
         }
     }
     for(uint32_t i=0;i<seq_event_count[lane];i++) {
@@ -3631,20 +3624,20 @@ static void draw_sequencer_piano_panel(void)
     }
 
     /* Four encoder readouts, arranged as a compact 2x2 grid. */
-    cv_text(12,116,&FONT_XS,"K1 LEN",C_GRAY);
+    cv_text(12,116,&FONT_XS,"K1 LEN",C_PEWTER);
     if(selected)int_text((selected->duration+1u)/2u,value);
     else {value[0]='-';value[1]='\0';}
     cv_text_fit(58,116,&FONT_B,value,C_WHITE,48);
-    cv_text(124,116,&FONT_XS,"K2 PITCH",C_GRAY);
+    cv_text(124,116,&FONT_XS,"K2 PITCH",C_PEWTER);
     if(selected)note_name(selected->pitch,pitch);
     else {pitch[0]='-';pitch[1]='-';pitch[2]='\0';}
     cv_text_fit(178,116,&FONT_B,pitch,accent,50);
 
-    cv_text(12,137,&FONT_XS,"K3 ACC",C_GRAY);
+    cv_text(12,137,&FONT_XS,"K3 ACC",C_PEWTER);
     if(selected)int_text(selected->accent,value);
     else {value[0]='-';value[1]='\0';}
     cv_text_fit(58,137,&FONT_B,value,C_WHITE,48);
-    cv_text(124,137,&FONT_XS,"K4 VEL",C_GRAY);
+    cv_text(124,137,&FONT_XS,"K4 VEL",C_PEWTER);
     if(selected)int_text(selected->velocity,value);
     else {value[0]='-';value[1]='\0';}
     cv_text_fit(178,137,&FONT_B,value,C_WHITE,50);
@@ -3658,13 +3651,13 @@ static void draw_save_panel(void)
     char t[32];
     const uint16_t accent=RGB(36,215,232);
     instrument_card(5,4,230,170,panel_fill(),accent,accent);
-    cv_text(14,12,&FONT_XS,"SAVE SLOT  /  PRESET KNOB",C_GRAY);
+    cv_text(14,12,&FONT_XS,"SAVE SLOT  /  PRESET KNOB",C_PEWTER);
     int_text((int32_t)save_slot+1,t);text_cat(t," / 32");
     cv_text(14,30,&FONT_B,t,accent);
-    cv_text(14,55,&FONT_XS,"PATCH  /  SELECT KNOB",C_GRAY);
+    cv_text(14,55,&FONT_XS,"PATCH  /  SELECT KNOB",C_PEWTER);
     int_text((int32_t)save_patch+1,t);text_cat(t," / 4");
     cv_text(14,73,&FONT_B,t,patch_color(save_patch));
-    cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  24 CHARS",C_GRAY);
+    cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  24 CHARS",C_PEWTER);
     if(save_name_target) {
         for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)t[i]=(char)current_instrument.patches[save_patch].voice[145u+i];
         t[FM1LAB_PATCH_NAME_BYTES]='\0';
@@ -3676,14 +3669,14 @@ static void draw_save_panel(void)
     int32_t cursor_x=14+(int32_t)save_name_cursor*(save_name_target?8:7);
     cv_rect(cursor_x,137,save_name_target?7:6,2,C_WHITE);
     cv_text(14,151,&FONT_XS,"K1 CURSOR  K2 CHAR  K3 NAME TYPE",C_WHITE);
-    cv_text(14,165,&FONT_XS,"SAVE AGAIN TO WRITE   HOME TO EXIT",C_GRAY);
+    cv_text(14,165,&FONT_XS,"SAVE AGAIN TO WRITE   HOME TO EXIT",C_PEWTER);
 }
 static void draw_sequencer_options_card(uint32_t index,const char *label,const char *value,
         const char *hint,uint16_t accent)
 {
     int32_t x=panel_grid_x(index),y=panel_grid_y(index,UI_GRID_TOP,UI_GRID_ROW_STEP);
     instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
-    cv_text(x+9,y+9,&FONT_XS,label,C_GRAY);
+    cv_text(x+9,y+9,&FONT_XS,label,C_PEWTER);
     cv_text(x+9,y+28,&FONT_B,value,accent);
     cv_text(x+9,y+67,&FONT_XS,hint,C_WHITE);
 }
@@ -3709,7 +3702,7 @@ static void draw_arp_card(uint32_t index, const char *label, const char *value,
 {
     int32_t x=panel_grid_x(index), y=panel_grid_y(index,UI_GRID_TOP,UI_GRID_ROW_STEP);
     instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
-    cv_text(x+9,y+9,&FONT_XS,label,C_GRAY);
+    cv_text(x+9,y+9,&FONT_XS,label,C_PEWTER);
     cv_text(x+9,y+28,&FONT_B,value,accent);
     cv_text(x+9,y+67,&FONT_XS,hint,C_WHITE);
 }
@@ -3742,10 +3735,10 @@ static void draw_arp_latch_panel(void)
 {
     uint16_t accent=RGB(227,75,210);
     instrument_card(8,22,224,126,panel_fill(),accent,accent);
-    cv_text(20,34,&FONT_XS,"NOTE HOLD BEHAVIOR",C_GRAY);
+    cv_text(20,34,&FONT_XS,"NOTE HOLD BEHAVIOR",C_PEWTER);
     cv_text(20,62,&FONT_B,arp_ui_latch?"LATCH ON":"LATCH OFF",arp_ui_latch?RGB(75,235,135):accent);
     cv_text(20,96,&FONT_XS,arp_ui_latch?"RELEASED KEYS STAY IN THE ARP":"RELEASED KEYS LEAVE THE ARP",C_WHITE);
-    cv_text(20,126,&FONT_XS,"K1  TOGGLE LATCH",C_GRAY);
+    cv_text(20,126,&FONT_XS,"K1  TOGGLE LATCH",C_PEWTER);
 }
 static void draw_arp_steps_panel(void)
 {
@@ -3754,8 +3747,8 @@ static void draw_arp_steps_panel(void)
     int32_t gap=2, width=(224-(int32_t)(arp_ui_length-1u)*gap)/(int32_t)arp_ui_length;
     int32_t top=29, height=91, bottom=top+height;
     uint16_t gain_color=RGB(36,215,232), accent_color=RGB(227,75,210), tie_color=RGB(242,212,59);
-    cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP LOOP":"16 STEP LOOP",C_GRAY);
-    cv_text(151,2,&FONT_XS,active?"PLAYING":"STANDBY",active?RGB(75,235,135):C_GRAY);
+    cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP LOOP":"16 STEP LOOP",C_PEWTER);
+    cv_text(151,2,&FONT_XS,active?"PLAYING":"STANDBY",active?RGB(75,235,135):C_PEWTER);
     cv_rect(5,18,214,1,RGB(35,51,64));
     for(uint32_t i=0;i<arp_ui_length;i++) {
         int32_t x=8+(int32_t)i*(width+gap);
@@ -3766,7 +3759,7 @@ static void draw_arp_steps_panel(void)
         uint8_t is_selected=(uint8_t)(i==arp_ui_step);
         uint32_t bands=7u;
         int_text((int32_t)i+1,t);
-        cv_text(x+(width-text_w(&FONT_XS,t))/2,21,&FONT_XS,t,is_selected?C_WHITE:C_GRAY);
+        cv_text(x+(width-text_w(&FONT_XS,t))/2,21,&FONT_XS,t,is_selected?C_WHITE:C_PEWTER);
         cv_rect(x,top,width,height,is_selected?C_WHITE:RGB(43,59,72));
         cv_rect(x+1,top+1,width-2,height-2,RGB(12,20,29));
         cv_rect(x+2,top+2,width-4,2,emphasis?accent_color:RGB(34,49,61));
@@ -3796,15 +3789,15 @@ static void draw_arp_steps_panel(void)
             cv_rect(x,top,1,height,C_WHITE);cv_rect(x+width-1,top,1,height,C_WHITE);
         }
     }
-    cv_text(5,128,&FONT_XS,"STEP",C_GRAY);
+    cv_text(5,128,&FONT_XS,"STEP",C_PEWTER);
     int_text((int32_t)arp_ui_step+1,t);cv_text(31,128,&FONT_XS,t,C_WHITE);
     cv_text(55,128,&FONT_XS,"GAIN",gain_color);
     int_text(arp_ui_gain[arp_ui_step],t);cv_text(83,128,&FONT_XS,t,C_WHITE);
     cv_text(112,128,&FONT_XS,"ACC",accent_color);
     int_text(arp_ui_accent[arp_ui_step],t);cv_text(135,128,&FONT_XS,t,C_WHITE);
     cv_text(163,128,&FONT_XS,"TIE",tie_color);
-    cv_text(193,128,&FONT_XS,arp_ui_step_gate[arp_ui_step]?"ON":"OFF",arp_ui_step_gate[arp_ui_step]?tie_color:C_GRAY);
-    cv_text(5,151,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 TIE",C_GRAY);
+    cv_text(193,128,&FONT_XS,arp_ui_step_gate[arp_ui_step]?"ON":"OFF",arp_ui_step_gate[arp_ui_step]?tie_color:C_PEWTER);
+    cv_text(5,151,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 TIE",C_PEWTER);
 }
 
 static void draw_delete_overlay(void)
@@ -3838,7 +3831,7 @@ static void draw_seq_clear_prompt(void)
     cv_text(120-text_w(&FONT_XS,"TURN K2 TO CONFIRM")/2,96,&FONT_XS,"TURN K2 TO CONFIRM",C_WHITE);
     t[0]='T';t[1]=(char)('1'+seq_ui_lane);t[2]=' ';t[3]='S';t[4]='T';t[5]='E';t[6]='P';t[7]=' ';
     int_text((int32_t)seq_ui_step+1,t+8);
-    cv_text(120-text_w(&FONT_XS,t)/2,115,&FONT_XS,t,C_GRAY);
+    cv_text(120-text_w(&FONT_XS,t)/2,115,&FONT_XS,t,C_PEWTER);
 }
 
 static void draw_fx_panel(uint8_t fx)
@@ -3855,12 +3848,12 @@ static void draw_fx_panel(uint8_t fx)
     for(uint32_t k=0;k<4u;++k) {
         int32_t x=panel_grid_x(k),y=panel_grid_y(k,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(k,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,labels[k],C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,labels[k],C_PEWTER);
         if(k==0u) cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?RGB(75,235,135):RGB(255,82,101));
         else if(k==1u && fx==FM6_FX_REVERB) {
             uint8_t type=values[k]<=2u?values[k]:1u;
             cv_text(x+7,y+23,&FONT_B,types[type],accent);
-            cv_text(x+7,y+43,&FONT_XS,"ROOM / HALL / PLATE",C_GRAY);
+            cv_text(x+7,y+43,&FONT_XS,"ROOM / HALL / PLATE",C_PEWTER);
         } else {
             int_text(values[k],t);
             cv_text(x+7,y+23,&FONT_B,t,accent);
@@ -3923,7 +3916,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_FX_DELAY: return RGB(85,160,255);
     case PAGE_FX_REVERB: return RGB(150,120,255);
     case PAGE_FX_PHASER: return RGB(227,75,210);
-    default: return C_GRAY;
+    default: return C_PEWTER;
     }
 }
 
@@ -3971,11 +3964,11 @@ static void draw(void)
     /* Global status strip: tempo, physical battery gauge, and active arp. */
     int_text(transport_ui_bpm, t);
     text_cat(t, " BPM");
-    cv_text(4, 1, &FONT_XS, t, C_GRAY);
+    cv_text(4, 1, &FONT_XS, t, C_PEWTER);
 
     int battery = plat_battery(); /* 0..3 battery bars, 4 USB powered, -1 unknown */
-    cv_rect(183, 2, 23, 7, C_GRAY);
-    cv_rect(206, 4, 2, 3, C_GRAY);
+    cv_rect(183, 2, 23, 7, C_PEWTER);
+    cv_rect(206, 4, 2, 3, C_PEWTER);
     if (battery >= 0) {
         uint32_t bars = battery > 3 ? 4u : (uint32_t)battery;
         if (bars) cv_rect(185, 4, (int32_t)(bars * 5u), 3,
@@ -3985,7 +3978,7 @@ static void draw(void)
 
     /* Page identity replaces the generic FACTORY instrument label. */
     cv_text_fit(8,15,&FONT_B,page==PAGE_HOME?instrument_display_name():page_title(page),accent,140);
-    cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
+    cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_PEWTER);
     if(seq_record_armed)cv_text(205,16,&FONT_XS,"REC",RGB(255,80,90));
     if (page == PAGE_HOME) {
         cv_text(151, 17, &FONT_XS, seq_ui_lane ? "T2" : "T1", patch_color(seq_ui_patch[seq_ui_lane]));
@@ -4026,7 +4019,7 @@ static void draw(void)
     if (page == PAGE_HOME) {
         int_text((int32_t)instrument_index + 1, t);
         text_cat(t, "/32");
-        cv_text(6, 4, &FONT_XS, t, C_GRAY);
+        cv_text(6, 4, &FONT_XS, t, C_PEWTER);
     }
     {
         char diag[40], number[12];
@@ -4057,7 +4050,7 @@ static void draw(void)
 #else
         text_cat(diag, " C1");
 #endif
-        cv_text_fit(62, 4, &FONT_XS, diag, C_GRAY, 132);
+        cv_text_fit(62, 4, &FONT_XS, diag, C_PEWTER, 132);
     }
     page_counter(page, t, sizeof(t));
     cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, accent);
