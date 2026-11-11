@@ -23,6 +23,7 @@ static void test_blank_library_slot_detection(void)
 
 int main(void)
 {
+    test_blank_library_slot_detection();
     fm1lab_instrument_t instrument;
     uint8_t voice[FM1LAB_PATCH_BYTES];
     uint8_t expected[FM1LAB_PATCH_BYTES];
