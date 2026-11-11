@@ -37,6 +37,25 @@ static uint32_t web_device_xruns;
 #define FM1LAB_WEB_EXPORT
 #endif
 
+typedef union {
+    settings_v1_t v1;
+    settings_v2_t v2;
+    settings_v3_t v3;
+    settings_v4_t v4;
+    settings_v5_t v5;
+    settings_v6_t v6;
+    settings_v7_t v7;
+    settings_v8_t v8;
+    settings_v9_t v9;
+    settings_v10_t v10;
+    settings_v11_t v11;
+} settings_migration_scratch_t;
+
+/* Startup migration is single-threaded and runs once. Keep legacy records in
+ * one reusable buffer rather than reserving every historical version on the
+ * FM1 main stack at the same time. */
+static settings_migration_scratch_t settings_migration;
+
 static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
@@ -1723,17 +1742,6 @@ void app_overload(void)
 
 void app_init(void)
 {
-    settings_v1_t old_v1;
-    settings_v2_t old_v2;
-    settings_v3_t old_v3;
-    settings_v4_t old_v4;
-    settings_v5_t old_v5;
-    settings_v6_t old_v6;
-    settings_v7_t old_v7;
-    settings_v8_t old_v8;
-    settings_v9_t old_v9;
-    settings_v11_t old_v11;
-    settings_v10_t old_v10;
     int performance_loaded = 0;
     int loaded;
 #if defined(PLAT_WEB)
@@ -1752,47 +1760,47 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v11, sizeof old_v11) == (int)sizeof old_v11 &&
-            settings_import_v11(&set, &old_v11) == 0) {
+        if (plat_store_load(OBJ_SETTINGS, &settings_migration.v11, sizeof settings_migration.v11) == (int)sizeof settings_migration.v11 &&
+            settings_import_v11(&set, &settings_migration.v11) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V11 -> V12 converts sequencer event positions to 32nd-note ticks */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v10, sizeof old_v10) == (int)sizeof old_v10 &&
-            settings_import_v10(&set, &old_v10) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v10, sizeof settings_migration.v10) == (int)sizeof settings_migration.v10 &&
+            settings_import_v10(&set, &settings_migration.v10) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V10 -> V12 adds persistent MAELSTROM controls and migrates event timing */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v9, sizeof old_v9) == (int)sizeof old_v9 &&
-            settings_import_v9(&set, &old_v9) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v9, sizeof settings_migration.v9) == (int)sizeof settings_migration.v9 &&
+            settings_import_v9(&set, &settings_migration.v9) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V9 -> V11 stores the migrated polyphonic event pattern and MAELSTROM defaults */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v8, sizeof old_v8) == (int)sizeof old_v8 &&
-            settings_import_v8(&set, &old_v8) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v8, sizeof settings_migration.v8) == (int)sizeof settings_migration.v8 &&
+            settings_import_v8(&set, &settings_migration.v8) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V8 -> V10 repairs the accidental ARP step-2 seed */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v7, sizeof old_v7) == (int)sizeof old_v7 &&
-            settings_import_v7(&set, &old_v7) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v7, sizeof settings_migration.v7) == (int)sizeof settings_migration.v7 &&
+            settings_import_v7(&set, &settings_migration.v7) == 0) {
             performance_loaded = 1;
             set_dirty = 1u;
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v6, sizeof old_v6) == (int)sizeof old_v6 &&
-            settings_import_v6(&set, &old_v6) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v6, sizeof settings_migration.v6) == (int)sizeof settings_migration.v6 &&
+            settings_import_v6(&set, &settings_migration.v6) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V6 macro-step values become neutral full-length gates */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v5, sizeof old_v5) == (int)sizeof old_v5 &&
-            settings_import_v5(&set, &old_v5) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v5, sizeof settings_migration.v5) == (int)sizeof settings_migration.v5 &&
+            settings_import_v5(&set, &settings_migration.v5) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* migrate previous current record; initialize arp controls */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v4, sizeof old_v4) == (int)sizeof old_v4 &&
-            settings_import_v4(&set, &old_v4) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v4, sizeof settings_migration.v4) == (int)sizeof settings_migration.v4 &&
+            settings_import_v4(&set, &settings_migration.v4) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* migrate v4 settings; compressor starts bypassed */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v3, sizeof old_v3) == (int)sizeof old_v3 &&
-            settings_import_v3(&set, &old_v3) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v3, sizeof settings_migration.v3) == (int)sizeof settings_migration.v3 &&
+            settings_import_v3(&set, &settings_migration.v3) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* migrate v3 three-bus performance into v4 four-bus state */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v2, sizeof old_v2) == (int)sizeof old_v2 &&
-                   settings_import_v2(&set, &old_v2) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v2, sizeof settings_migration.v2) == (int)sizeof settings_migration.v2 &&
+                   settings_import_v2(&set, &settings_migration.v2) == 0) {
             set_dirty = 1u; /* migrate v2 settings into the CRC-protected performance record */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v1, sizeof old_v1) == (int)sizeof old_v1 &&
-                   settings_import_v1(&set, &old_v1) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v1, sizeof settings_migration.v1) == (int)sizeof settings_migration.v1 &&
+                   settings_import_v1(&set, &settings_migration.v1) == 0) {
             set_dirty = 1u; /* migrate the original compact settings record */
         }
         settings_seal(&set);
