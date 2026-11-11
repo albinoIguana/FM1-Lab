@@ -56,6 +56,11 @@ typedef union {
  * FM1 main stack at the same time. */
 static settings_migration_scratch_t settings_migration;
 
+/* app_init scans and migrates banks serially; reuse these large records rather
+ * than reserving multiple instrument/insert objects in the startup stack frame. */
+static fm1lab_instrument_t startup_instrument_scratch;
+static fm1lab_insert_state_t startup_insert_scratch;
+
 static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
@@ -1920,7 +1925,6 @@ void app_init(void)
     }
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
         int size = plat_store_size(OBJ_INSTRUMENTS0 + bank);
-        fm1lab_instrument_t probe;
         /* Only a genuinely absent object may be initialized automatically.
          * A present but malformed bank is user data: leave it untouched so a
          * CRC/read failure cannot silently factory-reset eight Instruments. */
@@ -1929,19 +1933,18 @@ void app_init(void)
             continue;
         }
         if (size == 3840) {
-            if (fm1lab_store_library_load(bank * 8u, &probe) != 0)
+            if (fm1lab_store_library_load(bank * 8u, &startup_instrument_scratch) != 0)
                 app_say("BANK ERROR", "DATA PRESERVED");
             continue;
         }
         if (bank < 3u && size == (int)sizeof(fm1lab_instrument_t)) {
-            fm1lab_instrument_t legacy;
-            if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &legacy, sizeof legacy) ==
-                    (int)sizeof legacy && fm1lab_instrument_valid(&legacy)) {
+            if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &startup_instrument_scratch, sizeof startup_instrument_scratch) ==
+                    (int)sizeof startup_instrument_scratch && fm1lab_instrument_valid(&startup_instrument_scratch)) {
                 /* V1's final voice byte was only a 63 sentinel, not pan. */
                 for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p)
-                    fm1lab_patch_set_pan(&legacy,p,64u);
+                    fm1lab_patch_set_pan(&startup_instrument_scratch,p,64u);
                 if (!fm1lab_store_library_format_bank(bank, &factory_instrument))
-                    (void)fm1lab_store_library_save(bank, &legacy);
+                    (void)fm1lab_store_library_save(bank, &startup_instrument_scratch);
                 continue;
             }
         }
@@ -1955,18 +1958,16 @@ void app_init(void)
     patch_focus = 0u;
     instrument_load(seq_ui_instrument[seq_ui_lane], 0);
     {
-        fm1lab_instrument_t other;
-        fm1lab_insert_state_t other_inserts;
         uint8_t other_lane=(uint8_t)(seq_ui_lane^1u);
         uint32_t other_index=seq_ui_instrument[other_lane];
-        if(fm1lab_store_library_load_full(other_index,&other,&other_inserts)!=0 ||
-           !fm1lab_instrument_valid(&other) || !fm1lab_insert_state_valid(&other_inserts)){
-            other=factory_instrument;
-            fm1lab_insert_state_init(&other_inserts);
+        if(fm1lab_store_library_load_full(other_index,&startup_instrument_scratch,&startup_insert_scratch)!=0 ||
+           !fm1lab_instrument_valid(&startup_instrument_scratch) || !fm1lab_insert_state_valid(&startup_insert_scratch)){
+            startup_instrument_scratch=factory_instrument;
+            fm1lab_insert_state_init(&startup_insert_scratch);
         }
-        sequencer_cache_instrument_name(other_lane,other.name);
+        sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
-        instrument_apply_engine_bank(other_lane,&other,&other_inserts,0u);
+        instrument_apply_engine_bank(other_lane,&startup_instrument_scratch,&startup_insert_scratch,0u);
     }
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         fm6_patch_set_enabled(p, 1u);
