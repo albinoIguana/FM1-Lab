@@ -108,7 +108,9 @@ static int32_t fm6_patch_gain_q15[PATCHES];
 static uint8_t fm6_voice_work[VOICES] PLAT_POOL;
 static int64_t fm6_patch_mix[2][PATCHES][FM6_N] PLAT_POOL;
 static int32_t fm6_voice_bus[2][FM6_N] PLAT_POOL;
+#if defined(FM1_CPU1) || defined(FM6_TEST)
 static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES / 2u] PLAT_POOL;
+#endif
 static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
 static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 #if defined(PLAT_WEB)
@@ -1292,7 +1294,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fm6_render_voice_range(0u, active_voice_count,
                                        fm6_patch_mix[0], fm6_voice_bus[0]);
             }
-#else
+#elif defined(FM1_CPU1)
             if (plat_cpu2_on()) {
                 fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
@@ -1323,6 +1325,9 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fm6_render_voice_range(0u, active_voice_count,
                                        fm6_patch_mix[0], fm6_voice_bus[0]);
             }
+#else
+            fm6_render_voice_range(0u, active_voice_count,
+                                   fm6_patch_mix[0], fm6_voice_bus[0]);
 #endif
         } else {
             fm6_render_voice_range(0u, active_voice_count,

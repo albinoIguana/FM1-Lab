@@ -5,8 +5,10 @@ usb_manufacturer = "FM1-Lab"
 usb_product = "FM1-Lab"
 licence = "GPL-3.0-only"
 credits = "FM1-Lab native app on fm1-base; Felucca FM6 core, 32-Instrument four-bank storage, DX7 ENV/LFO editors, two-lane sequencer, held-note arpeggiator, and parallel chorus/delay/reverb sends."
-unity_opt = "s"
-cpu2 = true
+unity_opt = "z"
+ir_pass = "tools/identity_ir.py"
+stack_check = true
+cpu2 = false
 cpu2_fallback = true
 cpu2_stack = 4096
 # The browser simulator exercises the same CPU2 voice split. Its worker is

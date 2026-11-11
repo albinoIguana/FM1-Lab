@@ -51,18 +51,21 @@ jobs:
             "rel = k->v > k->floor_ ? (uint32_t)k->v - (uint32_t)k->floor_ : 0u;",
         }
         for old, new in fixes.items():
-            if old not in source:
+            if old in source:
+                source = source.replace(old, new, 1)
+            elif new not in source:
                 raise SystemExit(f"Expected upstream warning site not found: {old}")
-            source = source.replace(old, new, 1)
         sense.write_text(source)
 
         build = Path("base/tools/build.py")
         source = build.read_text()
         old = 'CFLAGS = ["-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]'
         new = 'CFLAGS = ["-Werror", "-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]'
-        if old not in source:
+        if old in source:
+            source = source.replace(old, new, 1)
+        elif new not in source:
             raise SystemExit("Expected FM1 base CFLAGS definition not found")
-        build.write_text(source.replace(old, new, 1))
+        build.write_text(source)
         PY
         python3 - <<'PY'
         from pathlib import Path
