@@ -241,6 +241,7 @@ static volatile uint8_t fx_enabled[4], fx_mix[4]={18u,24u,20u,35u},
     fx_time[4]={48u,52u,45u,35u}, fx_feedback[4]={40u,42u,60u,20u},
     fx_depth[4]={50u,50u,50u,65u};
 static volatile uint8_t fx_send[PATCHES][4];
+static uint16_t fx_send_gain_q15[PATCHES][4] PLAT_POOL;
 static volatile uint8_t fx_mix_effective[4];
 static uint32_t fx_lfo_phase, fx_phaser_phase;
 
@@ -1366,6 +1367,13 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
         }
         if(!fx_source_count)fx_source_count=1u;
+        /* Compute per-patch Q15 gains once per quantum. The audio sample loop
+         * must not use 64-bit division (the FM1 runtime does not link __divdi3). */
+        uint32_t send_divisor=100u*fx_source_count;
+        for(uint32_t patch=0u;patch<PATCHES;patch++)
+            for(uint32_t fx=0u;fx<4u;fx++)
+                fx_send_gain_q15[patch][fx]=(uint16_t)(
+                    (uint32_t)fx_send[patch][fx]*32768u/send_divisor);
         for (i = 0; i < count; i++) {
             int32_t delta=(int32_t)master_gain_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
@@ -1458,12 +1466,10 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 int64_t send_l=(sample*instrument[p].pan_l_current_q15)>>15;
                 int64_t send_r=(sample*instrument[p].pan_r_current_q15)>>15;
                 for(uint32_t fx=0;fx<4u;fx++) if(fx_enabled[fx]) {
-                    send_accum[fx][0]+=send_l*fx_send[p][fx];
-                    send_accum[fx][1]+=send_r*fx_send[p][fx];
+                    send_accum[fx][0]+=(send_l*fx_send_gain_q15[p][fx])>>15;
+                    send_accum[fx][1]+=(send_r*fx_send_gain_q15[p][fx])>>15;
                 }
             }
-            for(uint32_t fx=0u;fx<4u;fx++) for(uint32_t channel=0u;channel<2u;channel++)
-                send_accum[fx][channel]/=(int64_t)(100u*fx_source_count);
 #ifdef FM6_TEST
             for(uint32_t fx=0;fx<4u;fx++) for(uint32_t channel=0;channel<2u;channel++) {
                 uint64_t send_abs=fm6_test_abs_i64(send_accum[fx][channel]);
