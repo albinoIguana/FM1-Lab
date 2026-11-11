@@ -6,9 +6,6 @@ usb_product = "FM1-Lab"
 licence = "GPL-3.0-only"
 credits = "FM1-Lab native app on fm1-base; Felucca FM6 core, 32-Instrument four-bank storage, DX7 ENV/LFO editors, two-lane sequencer, held-note arpeggiator, and parallel chorus/delay/reverb sends."
 unity_opt = "s"
-cpu2 = true
-cpu2_fallback = true
-cpu2_stack = 4096
 # The browser simulator exercises the same CPU2 voice split. Its worker is
 # serialized by the host simulator; the worklet measures both halves and
 # models their parallel critical path against the FM1 audio-block deadline.
