@@ -18,6 +18,8 @@
 #include "../firmware/fm1lab_physical_controls.h"
 #include "fm1lab_preset_control.h"
 #include <stddef.h>
+
+#define C_PEWTER RGB(155,165,175)
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
 static size_t fm1lab_strlen(const char *s) { size_t n=0u; while(s && s[n])++n; return n; }
 static int fm1lab_strcmp(const char *a,const char *b) {
@@ -889,6 +891,7 @@ static void fm1lab_seed_factory_library(void)
         }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
         if(!fm1lab_is_untouched_factory(&existing) &&
+           !fm1lab_instrument_is_blank_library_slot(&existing) &&
            !fm1lab_is_previous_factory_instrument(index,&existing) &&
            !fm1lab_is_previous_digitone_instrument(index,&existing) &&
            !fm1lab_is_previous_dx7_instrument(index,&existing)) continue;
@@ -1048,18 +1051,54 @@ static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
 static int instrument_patch_has_placeholder_name(const uint8_t *voice)
 {
     if(!voice)return 1;
-    if(fm1lab_strncmp((const char *)voice+145u,"PATCH 1",7u)==0)return 1;
+    const char *name=(const char *)voice+145u;
+    if(fm1lab_strncmp(name,"PATCH ",6u)==0 ||
+       fm1lab_strncmp(name,"VOICE ",6u)==0 ||
+       fm1lab_strncmp(name,"INIT",4u)==0)return 1;
     uint8_t blank=1u;
     for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)
         if(voice[145u+i]!=' ' && voice[145u+i]!=0u)blank=0u;
     return blank;
 }
 
+static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
+{
+    uint8_t repaired=0u;
+    if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
+    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
+        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) ||
+           instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
+            uint8_t playable[FM1LAB_PATCH_BYTES];
+            uint8_t previous_level=instrument->patches[patch].level;
+            fm1lab_factory_voice_build(playable,patch);
+            if(fm1lab_patch_replace_voice(instrument,patch,playable)==0) {
+                if(!previous_level)instrument->patches[patch].level=31u;
+                repaired=1u;
+            }
+        }
+    }
+    return repaired;
+}
+
+static void instrument_repair_placeholder_name(fm1lab_instrument_t *instrument)
+{
+    if(!instrument || instrument->name[0]!='I' || instrument->name[1]!='N' ||
+       instrument->name[2]!='S' || instrument->name[3]!='T' ||
+       instrument->name[4]!='R')return;
+    char name[FM1LAB_PATCH_NAME_BYTES+1u];
+    if(fm1lab_voice_name_get(instrument->patches[0].voice,name)!=0 || !name[0]) {
+        name[0]='F';name[1]='M';name[2]=' ';name[3]='I';name[4]='N';
+        name[5]='S';name[6]='T';name[7]='R';name[8]='U';name[9]='M';name[10]='\0';
+    }
+    for(uint32_t i=0u;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++)
+        instrument->name[i]=i<FM1LAB_PATCH_NAME_BYTES && name[i]?name[i]:' ';
+}
+
 static void instrument_load(uint32_t index, int from_audio)
 {
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
-    uint8_t repaired_first_patch = 0u;
+    uint8_t repaired_patches = 0u;
     int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
     if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
         current_instrument = candidate;
@@ -1067,26 +1106,16 @@ static void instrument_load(uint32_t index, int from_audio)
     } else {
         instrument_factory_defaults();
     }
-    /* Older valid library records can have an Instrument placeholder in patch 1:
-     * valid metadata and CRC, but no carrier output. Repair just that slot. */
-    if (!fm1lab_voice_has_audible_carrier(current_instrument.patches[0].voice) ||
-        instrument_patch_has_placeholder_name(current_instrument.patches[0].voice)) {
-        uint8_t playable[FM1LAB_PATCH_BYTES];
-        uint8_t previous_level = current_instrument.patches[0].level;
-        fm1lab_factory_voice_build(playable, 0u);
-        if (fm1lab_patch_set_voice(&current_instrument, 0u, playable) == 0) {
-            current_instrument.patches[0].level = previous_level ? previous_level : 31u;
-            repaired_first_patch = 1u;
-        }
-    }
+    repaired_patches=instrument_repair_missing_voices(&current_instrument);
+    if(repaired_patches)instrument_repair_placeholder_name(&current_instrument);
     instrument_index = (uint8_t)index;
     patch_preset_cursor = (uint8_t)(index * FM1LAB_PATCH_COUNT + set.patch);
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     instrument_loaded = 1u;
-    instrument_dirty = repaired_first_patch;
-    if (repaired_first_patch) set_dirty = 1u;
+    instrument_dirty = repaired_patches;
+    if (repaired_patches) set_dirty = 1u;
     instrument_sync_settings();
     if (from_audio == 1) {
         /* PRESET changes replace this lane's engine bank. The master chain
@@ -1964,6 +1993,10 @@ void app_init(void)
            !fm1lab_instrument_valid(&startup_instrument_scratch) || !fm1lab_insert_state_valid(&startup_insert_scratch)){
             startup_instrument_scratch=factory_instrument;
             fm1lab_insert_state_init(&startup_insert_scratch);
+        }
+        if(instrument_repair_missing_voices(&startup_instrument_scratch)) {
+            instrument_repair_placeholder_name(&startup_instrument_scratch);
+            (void)fm1lab_store_library_save_full(other_index,&startup_instrument_scratch,&startup_insert_scratch);
         }
         sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
