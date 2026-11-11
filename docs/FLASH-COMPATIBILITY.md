@@ -53,3 +53,7 @@ Automated tests cannot prove the electrical behavior of either flash chip. Befor
 - Confirm unknown JEDEC IDs remain read-only and do not attempt erase/program.
 
 No physical qualification is implied by a green CI run. This branch remains a diagnostic candidate; it does not change the production installer or authorize a flash.
+
+## Candidate installer publication
+
+A successful native build from `test/shipwreck-single-core-startup-candidate` is eligible for the same GitHub Pages Web Installer pipeline used by `main`. The publishing workflow downloads the `packages` artifact from that exact completed build run and embeds its run number, commit, build date, and SHA-256 in the installer metadata. The installer shell and browser emulator remain sourced from `main`; only the firmware package is run-pinned to the candidate build. Physical qualification remains outstanding as listed above.
