@@ -4005,6 +4005,7 @@ static void draw(void)
         text_cat(diag, " SH ");
         int_text((int32_t)app_audio_overload_shed_count(), number);
         text_cat(diag, number);
+#if FM1B_CPU2
         if (plat_cpu2_on()) {
 #if defined(PLAT_WEB)
             text_cat(diag, " C2 SIM");
@@ -4019,6 +4020,9 @@ static void draw(void)
         } else {
             text_cat(diag, " C1");
         }
+#else
+        text_cat(diag, " C1");
+#endif
         cv_text_fit(62, 4, &FONT_XS, diag, C_GRAY, 132);
     }
     page_counter(page, t, sizeof(t));
@@ -4129,6 +4133,7 @@ int app_expect(const char *what, int *got)
         *got = (int)app_audio_xruns();
     else if (!fm1lab_strcmp(what, "shed"))
         *got = (int)app_audio_overload_shed_count();
+#if FM1B_CPU2
     else if (!fm1lab_strcmp(what, "cpu2"))
         *got = plat_cpu2_on();
     else if (!fm1lab_strcmp(what, "cpu2stack"))
@@ -4141,6 +4146,10 @@ int app_expect(const char *what, int *got)
         *got = (int)plat_cpu2_bad();
     else if (!fm1lab_strcmp(what, "cpu2why"))
         *got = plat_cpu2_gave_up();
+#else
+    else if (!fm1lab_strncmp(what, "cpu2", 4))
+        *got = 0;
+#endif
     else if (!fm1lab_strcmp(what, "vel"))           /* the last key's velocity and pressure */
         *got = ui.vel[ui.last_key];
     else if (!fm1lab_strcmp(what, "prs"))
