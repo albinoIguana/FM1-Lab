@@ -50,7 +50,7 @@ class FlashNorModel:
             raise PermissionError("WEL is clear")
         if offset < 0 or offset % SECTOR_BYTES or offset + SECTOR_BYTES > FLASH_BYTES:
             raise ValueError("invalid 4 KiB erase range")
-        self.memory[offset:offset + SECTOR_BYTES] = b"\\xFF" * SECTOR_BYTES
+        self.memory[offset:offset + SECTOR_BYTES] = b"\xFF" * SECTOR_BYTES
         self.write_enabled = False
 
 
@@ -72,15 +72,15 @@ class DualFlashProtocolTests(unittest.TestCase):
                 self.assertEqual(part.read(offset, 256), payload)
                 part.write_enable()
                 part.erase_4k(offset)
-                self.assertEqual(part.read(offset, 256), b"\\xFF" * 256)
+                self.assertEqual(part.read(offset, 256), b"\xFF" * 256)
 
     def test_write_enable_is_required_and_consumed(self):
         for part in self.make_parts():
             with self.subTest(jedec=hex(part.read_jedec())):
                 with self.assertRaises(PermissionError):
-                    part.page_program(0x97000, b"\\x00")
+                    part.page_program(0x97000, b"\x00")
                 part.write_enable()
-                part.page_program(0x97000, b"\\x00")
+                part.page_program(0x97000, b"\x00")
                 with self.assertRaises(PermissionError):
                     part.erase_4k(0x97000)
 
@@ -89,7 +89,7 @@ class DualFlashProtocolTests(unittest.TestCase):
             with self.subTest(jedec=hex(part.read_jedec())):
                 part.write_enable()
                 with self.assertRaises(ValueError):
-                    part.page_program(0x00FF, b"\\x00\\x00")
+                    part.page_program(0x00FF, b"\x00\x00")
                 part.write_enable()
                 with self.assertRaises(ValueError):
                     part.erase_4k(0x97001)
@@ -98,15 +98,15 @@ class DualFlashProtocolTests(unittest.TestCase):
         for part in self.make_parts():
             with self.subTest(jedec=hex(part.read_jedec())):
                 part.write_enable()
-                part.page_program(0x97000, b"\\x0F")
+                part.page_program(0x97000, b"\x0F")
                 part.write_enable()
                 with self.assertRaises(ValueError):
-                    part.page_program(0x97000, b"\\xF0")
+                    part.page_program(0x97000, b"\xF0")
                 part.write_enable()
                 part.erase_4k(0x97000)
                 part.write_enable()
-                part.page_program(0x97000, b"\\xF0")
-                self.assertEqual(part.read(0x97000, 1), b"\\xF0")
+                part.page_program(0x97000, b"\xF0")
+                self.assertEqual(part.read(0x97000, 1), b"\xF0")
 
     def test_capacity_boundary_and_overflow_are_rejected(self):
         for part in self.make_parts():
@@ -116,7 +116,7 @@ class DualFlashProtocolTests(unittest.TestCase):
                     part.read(FLASH_BYTES, 1)
                 part.write_enable()
                 with self.assertRaises(ValueError):
-                    part.page_program(FLASH_BYTES - 1, b"\\x00\\x00")
+                    part.page_program(FLASH_BYTES - 1, b"\x00\x00")
 
 
 if __name__ == "__main__":
