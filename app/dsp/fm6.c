@@ -253,8 +253,8 @@ static void fm6_fx_mix_budget_update(void)
         if(fx_enabled[fx])total+=fx_mix[fx];
     for(uint32_t fx=0u;fx<4u;fx++) {
         if(!fx_enabled[fx])fx_mix_effective[fx]=0u;
-        else if(total<=100u)fx_mix_effective[fx]=fx_mix[fx];
-        else fx_mix_effective[fx]=(uint8_t)((uint32_t)fx_mix[fx]*100u/total);
+        else if(total<=50u)fx_mix_effective[fx]=fx_mix[fx];
+        else fx_mix_effective[fx]=(uint8_t)((uint32_t)fx_mix[fx]*50u/total);
     }
 }
 static void fm6_pan_gains(uint8_t pan, int32_t *left_q15, int32_t *right_q15)
