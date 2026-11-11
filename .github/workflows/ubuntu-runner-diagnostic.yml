@@ -1,0 +1,20 @@
+name: Ubuntu runner diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/ubuntu-runner-smoke-test
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Confirm runner allocation
+        run: |
+          echo "Ubuntu runner allocated"
+          uname -a
+          date -u
