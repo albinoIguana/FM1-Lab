@@ -69,7 +69,6 @@ static fm1lab_instrument_t current_instrument;
 static fm1lab_insert_state_t current_inserts;
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
-static uint8_t patch_preset_cursor;
 static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
@@ -101,6 +100,7 @@ static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
 static uint8_t seq_event_count[2], seq_event_store_ready;
 static uint8_t seq_selected_event[2]={255u,255u};
 static uint16_t transport_ui_bpm=120u;
+static volatile uint8_t master_trim_pct=100u;
 static uint8_t arp_ui_latch, arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
 static uint8_t arp_ui_output, arp_ui_random, arp_ui_macro_dest, arp_ui_depth=50u;
@@ -665,43 +665,6 @@ static int fm1lab_digitone_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_
     return 0;
 }
 
-static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
-{
-    if(voice_index>=FM1LAB_DX7_VOICE_COUNT || !out) return -1;
-    const char *source=fm1lab_dx7_voice_z85+voice_index*FM1LAB_DX7_Z85_BYTES;
-    for(uint32_t group=0;group<39u;group++) {
-        uint64_t value=0u;
-        for(uint32_t digit=0;digit<5u;digit++) {
-            int decoded=fm1lab_digitone_z85_digit(source[group*5u+digit]);
-            if(decoded<0) return -1;
-            value=value*85u+(uint32_t)decoded;
-        }
-        if(value>0xffffffffu) return -1;
-        out[group*4u]=(uint8_t)(value>>24);
-        out[group*4u+1u]=(uint8_t)(value>>16);
-        out[group*4u+2u]=(uint8_t)(value>>8);
-        out[group*4u+3u]=(uint8_t)value;
-    }
-    return 0;
-}
-
-/* Replace only the focused patch's DX7 voice. Mixer, tuning, pan, and macro
- * state belong to the patch slot and survive preset browsing. */
-static int fm1lab_patch_preset_load(uint8_t cursor)
-{
-    uint8_t voice[FM1LAB_PATCH_BYTES];
-    if (cursor >= FM1LAB_DX7_VOICE_COUNT || set.patch >= FM1LAB_PATCH_COUNT ||
-        fm1lab_dx7_decode_voice(cursor, voice) != 0 ||
-        fm1lab_patch_replace_voice(&current_instrument, set.patch, voice) != 0)
-        return -1;
-
-    patch_preset_cursor = cursor;
-    instrument_dirty = 1u;
-    set_dirty = 1u;
-    voice_dirty = 1u;
-    return 0;
-}
-
 static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !out) return -1;
@@ -1125,7 +1088,6 @@ static void instrument_load(uint32_t index, int from_audio)
     repaired_patches=instrument_repair_missing_voices(&current_instrument);
     uint8_t repaired_name=instrument_repair_placeholder_name(&current_instrument);
     instrument_index = (uint8_t)index;
-    patch_preset_cursor = (uint8_t)(index * FM1LAB_PATCH_COUNT + set.patch);
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
@@ -1722,6 +1684,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 #endif
     ui_events_drain();
     midi_in();
+    master_q12=fm1lab_master_gain_scale(master_q12,master_trim_pct);
     fm6_render(lr, n, master_q12);
 #if defined(PLAT_WEB)
     {
@@ -1794,6 +1757,7 @@ void app_init(void)
 {
     int performance_loaded = 0;
     int loaded;
+    master_trim_pct=100u;
 #if defined(PLAT_WEB)
     web_device_cpu_q12 = web_device_cpu_pct = 0u;
     web_device_core0_q12 = web_device_core2_q12 = 0u;
@@ -2155,12 +2119,18 @@ static void octave_step(int32_t d)
 int fm1lab_ble_off(void) { return set.ble_off; }
 
 /* REC held a second: Bluetooth off or on (kept with the settings, so it stays so at the next power-on) */
+static void ble_set_enabled(uint8_t enabled)
+{
+    enabled=(uint8_t)!!enabled;
+    if((uint8_t)!set.ble_off==enabled)return;
+    set.ble_off=(uint8_t)!enabled;
+    set_dirty=1u;
+    if(FM1B_BLE)plat_ble_enable(enabled);
+    app_say("BLUETOOTH",enabled?"ON":"OFF");
+}
 static void ble_toggle(void)
 {
-    set.ble_off = (uint8_t)!set.ble_off;
-    set_dirty = 1;
-    plat_ble_enable(!set.ble_off);
-    app_say("BLUETOOTH", set.ble_off ? "OFF" : "ON");
+    ble_set_enabled(set.ble_off);
 }
 
 /* REC: a Bluetooth MIDI device (FM1B_BLE_CENTRAL, lib/btdev): look for devices, then connect to the one ALGORITHM
@@ -2260,7 +2230,6 @@ static void input(void)
                 if(page==PAGE_HOME && !patch_focus) {
                     set.patch=0u;
                     patch_focus=1u;
-                    patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT);
                     seq_ui_patch[seq_ui_lane]=0u;
                 }
                 page=PAGE_MACRO;
@@ -2465,7 +2434,6 @@ static void input(void)
             set.patch = (uint8_t)next;
             if (page == PAGE_HOME) {
                 patch_focus = 1u;
-                patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT+set.patch);
                 seq_ui_patch[seq_ui_lane] = set.patch;
                 performance_publish();
             }
@@ -2488,21 +2456,11 @@ static void input(void)
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             app_say("PATCH PITCH", "K1 OCTAVE / K2 FINE");
         } else if (k == EN_PRESET) {
+            /* PRESETS always selects the complete four-patch Instrument.
+             * SELECT owns patch focus; that focus never repurposes PRESETS. */
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
-            } else if (fm1lab_preset_target(patch_focus,
-                       (uint8_t)(set.levels[0] && set.levels[1] && set.levels[2] && set.levels[3])) == FM1LAB_PRESET_TARGET_PATCH) {
-                /* Focused mode browses individual voices, replacing only the
-                 * selected patch. The four-patch Instrument identity is stable. */
-                uint8_t next = fm1lab_preset_cursor_advance(
-                    patch_preset_cursor, e, FM1LAB_DX7_VOICE_COUNT);
-                if (fm1lab_patch_preset_load(next) != 0) {
-                    app_say("PATCH PRESET","LOAD FAILED");
-                    continue;
-                }
-                app_say("PATCH PRESET", patch_display_name(set.patch));
             } else {
-                /* Overview mode changes the complete four-patch Instrument. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
@@ -2511,6 +2469,7 @@ static void input(void)
                     (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
                 if(next<0)next+=(int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
                 if((uint32_t)next!=instrument_index) {
+                    patch_focus=0u;
                     instrument_load((uint32_t)next,1);
                     performance_publish();set_dirty=1u;
                     int_text(next+1,t);
@@ -2520,7 +2479,10 @@ static void input(void)
         } else if (k >= EN_K1 && k <= EN_K4) {
             uint32_t index = (uint32_t)k - EN_K1;
             if (page == PAGE_GLOBAL) {
-                if(index==1u) {
+                if(index==0u) {
+                    master_trim_pct=(uint8_t)fm1lab_master_trim_advance(master_trim_pct,e);
+                    app_say("MASTER TRIM",master_trim_pct==0u?"MUTED":"UPDATED");
+                } else if(index==1u) {
                     set.swing=(uint16_t)clamp((int32_t)set.swing+e,50,75);
                     fm6_set_swing((uint8_t)set.swing);
                     set_dirty=1u;
@@ -2529,6 +2491,12 @@ static void input(void)
                     transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
                     performance_publish(); set_dirty=1u;
                     app_say("MASTER TEMPO","UPDATED");
+                } else if(index==3u) {
+                    if(FM1B_BLE) {
+                        uint8_t enabled=(uint8_t)fm1lab_ble_enabled_from_turn(
+                            (uint8_t)!set.ble_off,e);
+                        ble_set_enabled(enabled);
+                    } else app_say("BLUETOOTH","NOT AVAILABLE");
                 }
             } else if (page == PAGE_SEQ_OPTIONS) {
                 if(index==0u && e!=0) {
@@ -2689,7 +2657,7 @@ static void input(void)
                 }
             } else if (page == PAGE_CHAOS) {
                 if(index==0u)set.performance.chaos_amount=(uint8_t)clamp((int32_t)set.performance.chaos_amount+e,0,100);
-                else if(index==1u)set.performance.chaos_rate=(uint8_t)clamp((int32_t)set.performance.chaos_rate+e,0,100);
+                else if(index==1u)set.performance.chaos_rate=(uint8_t)fm1lab_chaos_rate_advance(set.performance.chaos_rate,e);
                 else if(index==2u)set.performance.chaos_tone=(uint8_t)clamp((int32_t)set.performance.chaos_tone+e,0,100);
                 else {int32_t shape=((int32_t)set.performance.chaos_shape+e)%6;if(shape<0)shape+=6;set.performance.chaos_shape=(uint8_t)shape;}
                 performance_publish();set_dirty=1u;
@@ -2766,7 +2734,6 @@ static void input(void)
                  * continues to adjust that layer's level. */
                 patch_focus = 1u;
                 set.patch = (uint8_t)index;
-                patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT+set.patch);
                 seq_ui_patch[seq_ui_lane] = set.patch;
                 performance_publish();
                 int32_t value = (int32_t)set.levels[index] + e;
@@ -3165,7 +3132,7 @@ static void draw_chaos_panel(void)
             cv_text(x+9,y+64,&FONT_XS,"DRY  TO  DESTROY",C_PEWTER);
         }else if(i==1u){
             cv_text(x+9,y+27,&FONT_B,divisions[slot],accent);
-            cv_text(x+9,y+64,&FONT_XS,"LOCKED TO MASTER BPM",C_PEWTER);
+            cv_text_fit(x+9,y+64,&FONT_XS,"MASTER BPM LOCK",C_PEWTER,98);
         }else if(i==2u){
             int_text(bits,t);text_cat(t," BIT");
             cv_text(x+9,y+27,&FONT_B,t,accent);
@@ -3314,6 +3281,7 @@ static void draw_compressor_panel(void)
 static void draw_global_panel(uint32_t pct)
 {
     char t[24];
+    pct=(pct*master_trim_pct+50u)/100u;
     const char *labels[4] = {"MASTER", "SWING", "TEMPO", "MIDI / BLE"};
     uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
     for (uint32_t i = 0; i < 4u; ++i) {
@@ -3324,6 +3292,7 @@ static void draw_global_panel(uint32_t pct)
         if (i == 0) {
             int_text((int32_t)pct, t); text_cat(t, "%");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text_fit(x+9,y+63,&FONT_XS,"K1 SOFTWARE TRIM",C_PEWTER,98);
         } else if (i == 1) {
             int_text((int32_t)set.swing,t);text_cat(t,"%");
             cv_text(x + 9, y + 25, &FONT_B, t, colors[i]);
@@ -3334,8 +3303,11 @@ static void draw_global_panel(uint32_t pct)
             int_text((int32_t)transport_ui_bpm, t); text_cat(t, " BPM");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
         } else {
-            int_text((int32_t)midi_count, t);
-            cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text(x + 9, y + 27, &FONT_B, set.ble_off ? "BLE OFF" : "BLE ON",
+                    set.ble_off ? C_PEWTER : RGB(75,235,135));
+            int_text((int32_t)midi_count,t);
+            cv_text(x+9,y+63,&FONT_XS,"MIDI EVENTS",C_PEWTER);
+            cv_text(x+78,y+63,&FONT_XS,t,colors[i]);
         }
     }
 }
