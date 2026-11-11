@@ -274,6 +274,23 @@ int main(void) {
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
     fm6_init();
     {
+        fm6_performance_state_t wet_budget;
+        unsigned total_wet=0u;
+        fm6_performance_state_get(&wet_budget);
+        for(unsigned fx=0u;fx<4u;fx++) {
+            wet_budget.fx_enabled[fx]=1u;
+            wet_budget.fx_mix[fx]=100u;
+        }
+        assert(fm6_performance_state_update(&wet_budget)==0);
+        for(unsigned fx=0u;fx<4u;fx++) {
+            unsigned effective=fm6_test_fx_mix_effective((uint8_t)fx);
+            total_wet+=effective;
+            assert(effective==25u);
+        }
+        assert(total_wet==100u);
+    }
+    fm6_init();
+    {
         fm6_performance_state_t state,check;
         fm6_performance_state_get(&state);
         state.chaos_amount=73u;state.chaos_rate=88u;state.chaos_tone=29u;state.chaos_shape=5u;
