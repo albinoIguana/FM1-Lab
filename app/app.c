@@ -1785,8 +1785,8 @@ void app_init(void)
     web_device_xruns = 0u;
 #endif
     fm6_init();
-#if FM1B_CPU2
-    (void)plat_cpu2_set(1); /* start the second-core render worker before audio begins */
+#if defined(PLAT_WEB)
+    (void)plat_cpu2_set(1); /* browser model only; physical FM1 CPU2 stays disabled pending hardware qualification */
 #endif
     settings_defaults();
     loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
