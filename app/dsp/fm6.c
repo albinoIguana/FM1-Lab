@@ -241,7 +241,22 @@ static volatile uint8_t fx_enabled[4], fx_mix[4]={18u,24u,20u,35u},
     fx_time[4]={48u,52u,45u,35u}, fx_feedback[4]={40u,42u,60u,20u},
     fx_depth[4]={50u,50u,50u,65u};
 static volatile uint8_t fx_send[PATCHES][4];
+static uint8_t fx_mix_effective[4];
 static uint32_t fx_lfo_phase, fx_phaser_phase;
+
+/* Multiple parallel wet returns share one 100% wet budget. This prevents four
+ * independently-maxed effects from summing to a clipped, harsh output. */
+static void fm6_fx_mix_budget_update(void)
+{
+    uint32_t total=0u;
+    for(uint32_t fx=0u;fx<4u;fx++)
+        if(fx_enabled[fx])total+=fx_mix[fx];
+    for(uint32_t fx=0u;fx<4u;fx++) {
+        if(!fx_enabled[fx])fx_mix_effective[fx]=0u;
+        else if(total<=100u)fx_mix_effective[fx]=fx_mix[fx];
+        else fx_mix_effective[fx]=(uint8_t)((uint32_t)fx_mix[fx]*100u/total);
+    }
+}
 static void fm6_pan_gains(uint8_t pan, int32_t *left_q15, int32_t *right_q15)
 {
     /* Constant-voltage balance pan: center preserves the existing mono level. */
@@ -720,7 +735,7 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
         uint32_t chorus_r_index=(cp-(chorus_delay+160u))&(FM6_CHORUS_SIZE-1u);
         int32_t chorus_l_feedback=fx_chorus[chorus_l_index];
         int32_t chorus_r_feedback=fx_chorus_r[chorus_r_index];
-        if(fx_mix[0]) { chorus=chorus_l_feedback; chorus_r=chorus_r_feedback; }
+        if(fx_mix_effective[0]) { chorus=chorus_l_feedback; chorus_r=chorus_r_feedback; }
         fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0][0]+(int64_t)chorus_l_feedback*fx_feedback[0]/100u);
         fx_chorus_r[cp]=fm6_sat_q23((int64_t)sends[0][1]+(int64_t)chorus_r_feedback*fx_feedback[0]/100u);
         fx_chorus_pos=(uint16_t)((cp+1u)&(FM6_CHORUS_SIZE-1u));
@@ -739,7 +754,7 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
         int32_t a_l=fx_comb_a[fx_comb_pos_a],b_l=fx_comb_b[fx_comb_pos_b],c_l=fx_comb_c[fx_comb_pos_c];
         int32_t a_r=fx_comb_a_r[fx_comb_pos_a],b_r=fx_comb_b_r[fx_comb_pos_b],c_r=fx_comb_c_r[fx_comb_pos_c];
         uint8_t reverb_type=fx_depth[2]<=2u?fx_depth[2]:1u;
-        if(fx_mix[2]) {
+        if(fx_mix_effective[2]) {
             if(reverb_type==2u) { reverb=(a_l*2+b_l*2+c_l)/5; reverb_r=(a_r*2+b_r*2+c_r)/5; }
             else if(reverb_type==0u) { reverb=(a_l*3+b_l+c_l)/5; reverb_r=(a_r*3+b_r+c_r)/5; }
             else { reverb=(a_l+b_l+c_l)/3; reverb_r=(a_r+b_r+c_r)/3; }
@@ -770,10 +785,10 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
     int64_t wet_l=input_l,wet_r=input_r;
     /* FX state runs 32x below the Q24 dry bus. This preserves the int32
      * delay/comb memory footprint while reserving 30 dB for feedback growth. */
-    if(fx_enabled[0]) { wet_l+=(int64_t)chorus*FM6_FX_HEADROOM_SCALE*fx_mix[0]/100; wet_r+=(int64_t)chorus_r*FM6_FX_HEADROOM_SCALE*fx_mix[0]/100; }
-    if(fx_enabled[1]) { wet_l+=(int64_t)delay_feedback_l*FM6_FX_HEADROOM_SCALE*fx_mix[1]/100; wet_r+=(int64_t)delay_feedback_r*FM6_FX_HEADROOM_SCALE*fx_mix[1]/100; }
-    if(fx_enabled[2]) { wet_l+=(int64_t)reverb*FM6_FX_HEADROOM_SCALE*fx_mix[2]/100; wet_r+=(int64_t)reverb_r*FM6_FX_HEADROOM_SCALE*fx_mix[2]/100; }
-    if(fx_enabled[3]) { wet_l+=(int64_t)phaser_l*FM6_FX_HEADROOM_SCALE*fx_mix[3]/100; wet_r+=(int64_t)phaser_r*FM6_FX_HEADROOM_SCALE*fx_mix[3]/100; }
+    if(fx_enabled[0]) { wet_l+=(int64_t)chorus*FM6_FX_HEADROOM_SCALE*fx_mix_effective[0]/100; wet_r+=(int64_t)chorus_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[0]/100; }
+    if(fx_enabled[1]) { wet_l+=(int64_t)delay_feedback_l*FM6_FX_HEADROOM_SCALE*fx_mix_effective[1]/100; wet_r+=(int64_t)delay_feedback_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[1]/100; }
+    if(fx_enabled[2]) { wet_l+=(int64_t)reverb*FM6_FX_HEADROOM_SCALE*fx_mix_effective[2]/100; wet_r+=(int64_t)reverb_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[2]/100; }
+    if(fx_enabled[3]) { wet_l+=(int64_t)phaser_l*FM6_FX_HEADROOM_SCALE*fx_mix_effective[3]/100; wet_r+=(int64_t)phaser_r*FM6_FX_HEADROOM_SCALE*fx_mix_effective[3]/100; }
     *left=wet_l; *right=wet_r;
 }
 
@@ -963,7 +978,7 @@ void fm6_init(void)
     fx_phaser_feedback_l=fx_phaser_feedback_r=0;
     for(uint32_t fx=0;fx<4u;fx++) fx_enabled[fx]=0u;
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<4u;fx++) fx_send[p][fx]=fx==3u?0u:100u;
-    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_mix[3]=35u; fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_time[3]=35u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
+    fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_mix[3]=35u; fm6_fx_mix_budget_update(); fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_time[3]=35u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
     seq_lane_base[0]=0u; seq_lane_base[1]=4u; seq_lane_instrument[0]=seq_lane_instrument[1]=0u; seq_length=16u; seq_position=0u; seq_play_position=0u; seq_tick_position=0u;seq_tick_counter=0u;seq_running=0u;
     seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=seq_clear_pending[1]=0u;
     arp_capture_head=arp_capture_tail=0u;
@@ -1651,8 +1666,11 @@ void fm6_fx_set_enabled(uint8_t effect,uint8_t enabled)
         }
     }
     fx_enabled[effect]=next;
+    fm6_fx_mix_budget_update();
 }
-void fm6_fx_set_mix(uint8_t effect,uint8_t mix) { if(effect<4u) fx_mix[effect]=mix>100u?100u:mix; }
+void fm6_fx_set_mix(uint8_t effect,uint8_t mix) {
+    if(effect<4u) { fx_mix[effect]=mix>100u?100u:mix; fm6_fx_mix_budget_update(); }
+}
 void fm6_fx_set_time(uint8_t effect,uint8_t value) { if(effect<4u) fx_time[effect]=value>100u?100u:value; }
 void fm6_fx_set_feedback(uint8_t effect,uint8_t value) { if(effect<4u) fx_feedback[effect]=value>(effect==0u?70u:90u)?(effect==0u?70u:90u):value; }
 void fm6_fx_set_depth(uint8_t effect,uint8_t value) { if(effect<4u) fx_depth[effect]=value>100u?100u:value; }
@@ -1833,6 +1851,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
         fx_depth[fx]=s->fx_depth[fx];
         for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){fx_send[patch][fx]=s->fx_send[patch][fx];fx_send[patch+FM1LAB_PATCH_COUNT][fx]=s->fx_send[patch][fx];}
     }
+    fm6_fx_mix_budget_update();
     return 0;
 }
 /* Call during initialization, before audio rendering starts. Runtime transport
