@@ -1052,7 +1052,9 @@ static int instrument_patch_has_placeholder_name(const uint8_t *voice)
 {
     if(!voice)return 1;
     const char *name=(const char *)voice+145u;
-    if(fm1lab_strncmp(name,"PATCH 1",7u)==0)return 1;
+    if(fm1lab_strncmp(name,"PATCH ",6u)==0 ||
+       fm1lab_strncmp(name,"VOICE ",6u)==0 ||
+       fm1lab_strncmp(name,"INIT",4u)==0)return 1;
     uint8_t blank=1u;
     for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)
         if(voice[145u+i]!=' ' && voice[145u+i]!=0u)blank=0u;
@@ -1064,13 +1066,14 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
     uint8_t repaired=0u;
     if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
     for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
-        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) &&
+        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) ||
            instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
             uint8_t playable[FM1LAB_PATCH_BYTES];
             uint8_t previous_level=instrument->patches[patch].level;
             fm1lab_factory_voice_build(playable,patch);
             if(fm1lab_patch_replace_voice(instrument,patch,playable)==0) {
-                if(!previous_level)instrument->patches[patch].level=31u;
+                instrument->patches[patch].enabled=1u;
+                instrument->patches[patch].level=previous_level?previous_level:31u;
                 repaired=1u;
             }
         }
@@ -1106,7 +1109,8 @@ static void instrument_load(uint32_t index, int from_audio)
         instrument_factory_defaults();
     }
     repaired_patches=instrument_repair_missing_voices(&current_instrument);
-    if(repaired_patches)instrument_repair_placeholder_name(&current_instrument);
+    /* Old banks can retain a generic INSTR nn name even when patch 1 is valid. */
+    instrument_repair_placeholder_name(&current_instrument);
     instrument_index = (uint8_t)index;
     patch_preset_cursor = (uint8_t)(index * FM1LAB_PATCH_COUNT + set.patch);
     seq_ui_instrument[seq_ui_lane]=instrument_index;
@@ -1996,6 +2000,8 @@ void app_init(void)
         if(instrument_repair_missing_voices(&startup_instrument_scratch)) {
             instrument_repair_placeholder_name(&startup_instrument_scratch);
             (void)fm1lab_store_library_save_full(other_index,&startup_instrument_scratch,&startup_insert_scratch);
+        } else {
+            instrument_repair_placeholder_name(&startup_instrument_scratch);
         }
         sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
