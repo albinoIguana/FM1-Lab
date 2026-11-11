@@ -25,8 +25,8 @@ REPO = "https://github.com/albinoIguana/FM1-Lab"
 CREDITS = " An independent FM1-Lab firmware build; preserve the fm1-base, Felucca and M-VAVE notices."
 
 def strip_module(src: str) -> str:
-    src = re.sub(r"^export\\s+", "", src, flags=re.M)
-    return re.sub(r"^import .*?;\\n", "", src, flags=re.M)
+    src = re.sub(r"^export\s+", "", src, flags=re.M)
+    return re.sub(r"^import .*?;\n", "", src, flags=re.M)
 
 def product_of(raw: bytes) -> str:
     if len(raw) < BLOCKS * BLK:
@@ -38,7 +38,7 @@ def product_of(raw: bytes) -> str:
 def main(package: Path, out: Path) -> None:
     raw = package.read_bytes()
     product = product_of(raw)
-    if not re.fullmatch(re.escape(PRODUCT_PREFIX) + r"\\d{6}", product):
+    if not re.fullmatch(re.escape(PRODUCT_PREFIX) + r"\d{6}", product):
         raise SystemExit(f"Unexpected package identity {product!r}; expected {PRODUCT_PREFIX} plus six release digits")
     if LOADER_MARK not in raw:
         raise SystemExit("Package does not contain the Felucca update loader; refusing to publish")
@@ -62,7 +62,7 @@ def main(package: Path, out: Path) -> None:
     package_sha256 = hashlib.sha256(raw).hexdigest()
 
     html_doc = (web / "installer.html").read_text(encoding="utf-8")
-    library = "\\n".join(
+    library = "\n".join(
         strip_module((web / filename).read_text(encoding="utf-8"))
         for filename in ("fm1ports.js", "fm1pkg.js", "fm1ota.js")
     )
@@ -133,7 +133,7 @@ def main(package: Path, out: Path) -> None:
         "loader": "FELUCCA-LOADER-1",
         "installer_source": "fm1-base (pinned submodule)",
         "mbootloader_offered": False,
-    }, indent=2) + "\\n", encoding="utf-8")
+    }, indent=2) + "\n", encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     print(f"Built Web MIDI installer: {out / 'index.html'}")
     print(f"Package: {pkg_name}; identity {product}; {len(raw)} bytes")
