@@ -1292,7 +1292,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fm6_render_voice_range(0u, active_voice_count,
                                        fm6_patch_mix[0], fm6_voice_bus[0]);
             }
-#else
+#elif defined(FM1_CPU1)
             if (plat_cpu2_on()) {
                 fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
@@ -1310,35 +1310,6 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                     } else {
                         /* If core 1 was late or faulted mid-job, roll back its
                          * voice state before rendering that half on core 0. */
-                        for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
-                            voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
-                        fm6_render_voice_range(split, active_voice_count,
-                                               fm6_patch_mix[0], fm6_voice_bus[0]);
-                    }
-                } else {
-                    fm6_render_voice_range(0u, active_voice_count,
-                                           fm6_patch_mix[0], fm6_voice_bus[0]);
-                }
-            } else {
-                fm6_render_voice_range(0u, active_voice_count,
-                                       fm6_patch_mix[0], fm6_voice_bus[0]);
-            }
-#elif defined(FM1_CPU1)
-            if (plat_cpu2_on()) {
-                fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
-                for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
-                    fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
-                if (plat_cpu2_run(fm6_cpu2_voice_job, 0u)) {
-                    fm6_render_voice_range(0u, split,
-                                           fm6_patch_mix[0], fm6_voice_bus[0]);
-                    uint32_t wait_t0 = plat_ticks24();
-                    int wait_rc = plat_cpu2_wait();
-                    fm6_cpu2_wait_us = (plat_ticks24() - wait_t0) / PLAT_TICKS_PER_US;
-                    if (wait_rc == 0) {
-                        for (p = 0; p < PATCHES; ++p)
-                            for (i = 0; i < FM6_N; ++i)
-                                fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
-                    } else {
                         for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                             voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
                         fm6_render_voice_range(split, active_voice_count,
