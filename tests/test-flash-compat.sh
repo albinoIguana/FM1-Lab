@@ -12,3 +12,4 @@ trap 'rm -rf "$TMP"' EXIT
 python3 -m unittest discover -s tests -p 'test_flash_rescue_ids.py'
 python3 tests/flash_nor_model.py
 python3 tools/apply-fm1-flash-compat.py --check
+python3 tests/test-ble-startup-order.py
