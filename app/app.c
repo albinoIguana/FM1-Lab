@@ -1066,7 +1066,7 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
     uint8_t repaired=0u;
     if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
     for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
-        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) &&
+        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) ||
            instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
             uint8_t playable[FM1LAB_PATCH_BYTES];
             uint8_t previous_level=instrument->patches[patch].level;
@@ -1088,8 +1088,17 @@ static uint8_t instrument_repair_placeholder_name(fm1lab_instrument_t *instrumen
        instrument->name[2]!='S' || instrument->name[3]!='T' ||
        instrument->name[4]!='R')return 0u;
     char name[FM1LAB_PATCH_NAME_BYTES+1u];
-    if(fm1lab_voice_name_get(instrument->patches[0].voice,name)!=0 || !name[0] ||
-       instrument_patch_has_placeholder_name(instrument->patches[0].voice)) {
+    uint8_t found=0u;
+    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
+        char candidate[FM1LAB_PATCH_NAME_BYTES+1u];
+        if(fm1lab_voice_name_get(instrument->patches[patch].voice,candidate)==0 &&
+           candidate[0] && !instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
+            for(uint32_t i=0u;i<=FM1LAB_PATCH_NAME_BYTES;i++)name[i]=candidate[i];
+            found=1u;
+            break;
+        }
+    }
+    if(!found) {
         name[0]='F';name[1]='M';name[2]=' ';name[3]='I';name[4]='N';
         name[5]='S';name[6]='T';name[7]='R';name[8]='U';name[9]='M';name[10]='\0';
     }
