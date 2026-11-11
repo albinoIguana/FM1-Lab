@@ -28,3 +28,33 @@ static inline unsigned fm1lab_sequencer_lane_advance(unsigned lane, int delta)
 }
 
 #endif
+
+/* Global-page controls. The hardware MASTER pot remains the primary volume
+ * control; K1 provides a software trim. BLE and Maelstrom use direction-based
+ * selectors so multi-count encoder reports still produce one clear action. */
+static inline unsigned fm1lab_master_trim_advance(unsigned current, int delta)
+{
+    int next=(int)current+delta;
+    if(next<0)next=0;
+    if(next>100)next=100;
+    return (unsigned)next;
+}
+static inline uint32_t fm1lab_master_gain_scale(uint32_t master_q12, unsigned trim_pct)
+{
+    if(trim_pct>100u)trim_pct=100u;
+    if(master_q12>4096u)master_q12=4096u;
+    return (master_q12*trim_pct)/100u;
+}
+static inline unsigned fm1lab_chaos_rate_advance(unsigned current, int delta)
+{
+    int next=(int)current+delta*10;
+    if(next<0)next=0;
+    if(next>100)next=100;
+    return (unsigned)next;
+}
+static inline unsigned fm1lab_ble_enabled_from_turn(unsigned current, int delta)
+{
+    if(delta>0)return 1u;
+    if(delta<0)return 0u;
+    return current?1u:0u;
+}
