@@ -1349,6 +1349,16 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                                    fm6_patch_mix[0], fm6_voice_bus[0]);
         }
 
+        /* Normalize the shared FX sends by the number of patches that
+         * actually contribute audio in this quantum. Four full-level layers
+         * should not drive each delay/comb bus at four times a one-layer level. */
+        uint32_t fx_source_count=0u;
+        for(uint32_t patch=0u;patch<PATCHES;patch++) {
+            for(uint32_t frame=0u;frame<count;frame++) {
+                if(fm6_patch_mix[0][patch][frame]) { ++fx_source_count; break; }
+            }
+        }
+        if(!fx_source_count)fx_source_count=1u;
         for (i = 0; i < count; i++) {
             int32_t delta=(int32_t)master_gain_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
@@ -1441,10 +1451,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 int64_t send_l=(sample*instrument[p].pan_l_current_q15)>>15;
                 int64_t send_r=(sample*instrument[p].pan_r_current_q15)>>15;
                 for(uint32_t fx=0;fx<4u;fx++) if(fx_enabled[fx]) {
-                    send_accum[fx][0]+=send_l*fx_send[p][fx]/100;
-                    send_accum[fx][1]+=send_r*fx_send[p][fx]/100;
+                    send_accum[fx][0]+=send_l*fx_send[p][fx];
+                    send_accum[fx][1]+=send_r*fx_send[p][fx];
                 }
             }
+            for(uint32_t fx=0u;fx<4u;fx++) for(uint32_t channel=0u;channel<2u;channel++)
+                send_accum[fx][channel]/=(int64_t)(100u*fx_source_count);
 #ifdef FM6_TEST
             for(uint32_t fx=0;fx<4u;fx++) for(uint32_t channel=0;channel<2u;channel++) {
                 uint64_t send_abs=fm6_test_abs_i64(send_accum[fx][channel]);
