@@ -53,7 +53,10 @@ jobs:
       attestations: write
     with:
       sdk: true
-      test: bash tests/test-native-instrument.sh
+      test: |
+        cc -std=c11 -Wall -Wextra -Werror -I firmware tests/fm1lab_input_route.test.c -o /tmp/fm1lab-input-route-test
+        /tmp/fm1lab-input-route-test
+        bash tests/test-fm6-engine.sh
       tests-block: true
       build: |
         set -euo pipefail
