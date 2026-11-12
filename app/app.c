@@ -4511,6 +4511,15 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             corrupt.name[n]=c?c:' ';
         }
         if(fm1lab_store_library_save_full(0u,&corrupt,&inserts0)!=0)return 1;
+        if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0) {
+            app_host_name_migration_stage=21u; return 1;
+        }
+        if(memcmp(loaded.patches,seed0.patches,sizeof loaded.patches)!=0) {
+            app_host_name_migration_stage=22u; return 1;
+        }
+        if(memcmp(loaded.name,corrupt.name,sizeof loaded.name)!=0) {
+            app_host_name_migration_stage=23u; return 1;
+        }
         app_host_name_migration_stage=2u;
         edited=seed1;
         if(fm1lab_voice_name_get(edited.patches[0].voice,patch_name)!=0)return 1;
