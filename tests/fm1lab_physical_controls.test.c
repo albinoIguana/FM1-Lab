@@ -11,18 +11,25 @@ int main(void)
     assert(FM1LAB_ENCODER_KNOB_3 == 5);
     assert(FM1LAB_ENCODER_KNOB_4 == 6);
 
-    assert(fm1lab_sequencer_select_is_track_input(7u, 7u, 8u));
-    assert(fm1lab_sequencer_select_is_track_input(8u, 7u, 8u));
-    assert(!fm1lab_sequencer_select_is_track_input(0u, 7u, 8u));
-    /* Either rotation direction toggles the selected track. Multi-count
-     * reports from one physical detent still cause exactly one switch. */
-    assert(fm1lab_sequencer_lane_advance(0u, 1) == 1u);
-    assert(fm1lab_sequencer_lane_advance(0u, -1) == 1u);
-    assert(fm1lab_sequencer_lane_advance(1u, 1) == 0u);
-    assert(fm1lab_sequencer_lane_advance(1u, -1) == 0u);
-    assert(fm1lab_sequencer_lane_advance(0u, 2) == 1u);
-    assert(fm1lab_sequencer_lane_advance(1u, -4) == 0u);
-    assert(fm1lab_sequencer_lane_advance(0u, 0) == 0u);
+    /* Exercise the same encoder/page/delta dispatch used by input() after
+     * it polls plat_enc(k). Both directions switch the two-track selector. */
+    unsigned next_lane=99u;
+    assert(fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
+        FM1LAB_ENCODER_SELECT,1,0u,&next_lane) && next_lane==1u);
+    assert(fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
+        FM1LAB_ENCODER_SELECT,-1,0u,&next_lane) && next_lane==1u);
+    assert(fm1lab_sequencer_track_select_dispatch(8u,7u,8u,
+        FM1LAB_ENCODER_SELECT,-1,1u,&next_lane) && next_lane==0u);
+    assert(fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
+        FM1LAB_ENCODER_SELECT,4,1u,&next_lane) && next_lane==0u);
+    assert(!fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
+        FM1LAB_ENCODER_PRESETS,1,0u,&next_lane));
+    assert(!fm1lab_sequencer_track_select_dispatch(0u,7u,8u,
+        FM1LAB_ENCODER_SELECT,1,0u,&next_lane));
+    assert(!fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
+        FM1LAB_ENCODER_SELECT,0,0u,&next_lane));
+    assert(!fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
+        FM1LAB_ENCODER_SELECT,1,0u,0));
 
     assert(fm1lab_master_trim_advance(100u, 1) == 100u);
     assert(fm1lab_master_trim_advance(100u, -1) == 99u);

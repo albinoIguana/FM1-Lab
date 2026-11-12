@@ -2210,6 +2210,7 @@ static void input(void)
 {
     uint32_t keys, btn = plat_buttons(), k;
     int32_t e;
+    unsigned next_lane;
     touch_poll();                            /* the sensed keys' presses, velocities and pressure */
     keys = touch_keys();
     sequencer_arp_capture_poll();
@@ -2471,12 +2472,12 @@ static void input(void)
         } else if (k == EN_SELECT && page == PAGE_SEQ_PIANO) {
             sequencer_select_event(e);
             app_say("NOTE","SELECTED");
-        } else if (k == EN_SELECT && fm1lab_sequencer_select_is_track_input(
-                       page, PAGE_SEQ, PAGE_SEQ_OPTIONS)) {
-            /* This is the physical SELECT path used by the two-track UI.
-             * Save the current Instrument before switching the active bank. */
+        } else if (fm1lab_sequencer_track_select_dispatch(
+                       page, PAGE_SEQ, PAGE_SEQ_OPTIONS, k, e, seq_ui_lane, &next_lane)) {
+            /* k is the encoder index polled by plat_enc(k). Save the current
+             * Instrument before committing the dispatched track change. */
             if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","TRACK NOT CHANGED");continue;}
-            seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
+            seq_ui_lane = (uint8_t)next_lane;
             set.patch = seq_ui_patch[seq_ui_lane];
             patch_focus = 0u;
             instrument_load(seq_ui_instrument[seq_ui_lane],2);
