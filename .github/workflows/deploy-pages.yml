@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: ["Native FM1 build"]
     types: [completed]
+    # Candidate is intentionally published only after its own verified Native FM1 build.
     branches: ["main", "fix/shipwreck-patch-presets-track-audio"]
 
 permissions:
