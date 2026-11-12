@@ -8,13 +8,12 @@ enum {
     FM1LAB_PRESET_TARGET_PATCH = 1u
 };
 
-/* PRESETS always selects a complete four-patch Instrument. SELECT owns
- * individual patch focus; changing focus never changes PRESETS semantics. */
+/* A focused Home patch card changes only that voice. With no focused card,
+ * PRESETS changes the complete four-patch Instrument. */
 static inline uint8_t fm1lab_preset_target(uint8_t patch_focus, uint8_t all_patches_active)
 {
-    (void)patch_focus;
     (void)all_patches_active;
-    return FM1LAB_PRESET_TARGET_INSTRUMENT;
+    return patch_focus ? FM1LAB_PRESET_TARGET_PATCH : FM1LAB_PRESET_TARGET_INSTRUMENT;
 }
 
 /* PRESETS is active on Home, or on the main Sequencer page when a
