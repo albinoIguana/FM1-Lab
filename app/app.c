@@ -8,6 +8,7 @@
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
 #include "fm1lab_cpu2_startup.h"
+#include "fm1lab_audio_peak_window.h"
 #include "fm1lab_settings_record.h"
 #include "fm1lab_sequencer_record.h"
 #include "fm1lab_instrument.h"
@@ -51,8 +52,8 @@ static volatile uint32_t render_pre_limiter_peak_window_q23, render_limiter_redu
 static void app_audio_timing_reset_window(void)
 {
     render_peak_window_us=0u;
-    render_pre_limiter_peak_window_q23=0u;
-    render_limiter_reduction_window_q15=0u;
+    fm1lab_audio_peak_window_reset(&render_pre_limiter_peak_window_q23,
+                                   &render_limiter_reduction_window_q15);
 }
 #if defined(PLAT_WEB)
 
@@ -1776,10 +1777,9 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         render_voice_peak=fm6_callback_voice_peak_count();
         render_pre_limiter_peak_q23=fm6_pre_limiter_peak_q23();
         render_limiter_reduction_q15=fm6_limiter_reduction_q15();
-        if(render_pre_limiter_peak_q23>render_pre_limiter_peak_window_q23)
-            render_pre_limiter_peak_window_q23=render_pre_limiter_peak_q23;
-        if(render_limiter_reduction_q15>render_limiter_reduction_window_q15)
-            render_limiter_reduction_window_q15=render_limiter_reduction_q15;
+        fm1lab_audio_peak_window_update(&render_pre_limiter_peak_window_q23,
+            &render_limiter_reduction_window_q15,
+            render_pre_limiter_peak_q23,render_limiter_reduction_q15);
         render_quanta=fm6_render_quantum_count();
         render_cpu2_quanta=fm6_cpu2_quantum_count();
         render_cpu2_dispatches=fm6_cpu2_dispatch_count();
