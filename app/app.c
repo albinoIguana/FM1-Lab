@@ -4222,6 +4222,7 @@ static void draw(void)
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 19, screen_bg());
     if (page == PAGE_HOME) {
+        t[0]='\\0';
         if(patch_focus) {
             text_cat(t,"PRE: P");
             int_text((int32_t)set.patch+1,t+fm1lab_strlen(t));
