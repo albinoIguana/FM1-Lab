@@ -1620,6 +1620,9 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             uint64_t abs_l = fm6_abs_i64(out_l);
             uint64_t abs_r = fm6_abs_i64(out_r);
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
+            /* Reuse the stereo peak already required by the limiter. This
+             * diagnostic adds one max compare/conditional store per sample,
+             * not a second absolute-value scan of the audio buffer. */
             if(peak>fm6_callback_pre_limiter_peak_q23)
                 fm6_callback_pre_limiter_peak_q23=peak>UINT32_MAX?UINT32_MAX:(uint32_t)peak;
             uint32_t target_gain = 32768u;
