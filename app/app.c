@@ -1844,11 +1844,10 @@ void app_init(void)
     web_device_core0_pct = web_device_core2_pct = 0u;
     web_device_xruns = 0u;
 #endif
-#if defined(FM1B_CPU2) && FM1B_CPU2
-    /* fm1-base permits CPU2 startup only here: app_init runs after cpu2_boot
-     * and before audio_init / TIMER5. Start it before engine initialization. */
+#if defined(FM1B_CPU2) && FM1B_CPU2 && !defined(PLAT_WEB)
+    /* Physical fm1-base permits CPU2 startup only here: app_init runs after
+     * cpu2_boot and before audio_init / TIMER5. Start and self-test it first. */
     (void)plat_cpu2_set(1);
-#if !defined(PLAT_WEB)
     /* Prove a real job can execute from flash and return shared data before
      * the first audio interrupt. A failed self-test leaves the safe CPU0 path. */
     if (plat_cpu2_on()) {
@@ -1863,8 +1862,11 @@ void app_init(void)
         }
     }
 #endif
-#endif
     fm6_init();
+#if defined(FM1B_CPU2) && FM1B_CPU2 && defined(PLAT_WEB)
+    /* The browser simulator's CPU2 model expects the engine initialized first. */
+    (void)plat_cpu2_set(1);
+#endif
     settings_defaults();
     loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
     if (loaded == (int)sizeof set && settings_valid(&set)) {
