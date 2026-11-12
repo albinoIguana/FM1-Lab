@@ -8,11 +8,11 @@ credits = "FM1-Lab native app on fm1-base; Felucca FM6 core, 32-Instrument four-
 unity_opt = "z"
 ir_pass = "tools/identity_ir.py"
 stack_check = true
-cpu2 = false
+cpu2 = true
 cpu2_fallback = true
 cpu2_stack = 4096
-# Native firmware uses the FM1 SoC's second core as a voice-render worker.
-# On a fault/late job, the base runtime falls back to the single-core renderer.
+# Enable the FM1 SoC's second core for the FM6 voice-render worker.
+# Keep platform fallback enabled so a failed/late worker does not corrupt audio.
 web_cflags = ["-DFM1B_CPU2=1"]
 web_link = ["web/emu/web_exports.c"]
 ble = true
