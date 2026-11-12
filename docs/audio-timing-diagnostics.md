@@ -2,6 +2,9 @@
 
 These values describe one completed audio callback unless the name says
 "peak" or "count". They are diagnostic counters, not polyphony guarantees.
+On the FM1, press **GLO** from HOME for GLOBAL, press GLO again for the
+read-only AUDIO DIAG page, and press GLO once more to return HOME. The peak
+window resets on each physical button press and then begins accumulating again.
 
 | Readout | Meaning |
 |---|---|
