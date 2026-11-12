@@ -26,6 +26,7 @@ static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voice
     /* 128 frames are four 32-frame quanta. The timing counters are callback
      * sums/maxima, not values carried over from earlier render calls. */
     assert(fm6_callback_voice_peak_count()==expected_voices);
+    assert(fm6_render_quantum_count()==4u);
     assert(fm6_cpu2_quantum_count()==4u);
     if(mode==1u) {
         assert(fm6_cpu2_dispatch_count()==4u);
