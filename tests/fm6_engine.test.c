@@ -259,6 +259,34 @@ static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
 
+static void render_hardware_callback_stress(uint8_t mode, int32_t *destination)
+{
+    int32_t block[256u * 2u];
+    fm6_init();
+    for (unsigned patch=0u; patch<FM6_ENGINE_PATCH_COUNT; ++patch) {
+        fm6_patch_set_enabled((uint8_t)patch,1u);
+        fm6_patch_set_level((uint8_t)patch,31u);
+    }
+    fm6_test_set_cpu2_mode(mode);
+    for (unsigned note=0u; note<8u; ++note)
+        fm6_note_on_mask((uint8_t)(48u+note), (uint8_t)(104u-note*3u), 0x0fu);
+
+    /* Model real 256-frame FM1 DMA callbacks, not a single four-quantum
+     * render. Keep polyphony busy while notes are released and replaced. */
+    for (unsigned callback=0u; callback<96u; ++callback) {
+        if (callback && (callback%8u)==0u) {
+            unsigned note_index=(callback/8u-1u)&7u;
+            uint8_t old_note=(uint8_t)(48u+note_index);
+            uint8_t new_note=(uint8_t)(60u+callback/8u);
+            fm6_note_off_mask(old_note,0x0fu);
+            fm6_note_on_mask(new_note,(uint8_t)(100u-(callback/8u)%5u),0x0fu);
+        }
+        fm6_render(block,256u,4096u);
+        assert(peak(block,256u*2u)>0);
+        memcpy(destination+callback*256u*2u,block,sizeof block);
+    }
+}
+
 int main(void) {
     /* A single patch's active voices split across the cores, not by fixed
      * patch index. A partial worker failure must restore state before fallback. */
