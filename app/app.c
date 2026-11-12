@@ -2618,10 +2618,15 @@ static void input(void)
         } else if (k == EN_PRESET) {
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
+            } else if(page==PAGE_HOME &&
+                      fm1lab_preset_target(patch_focus,0u)==FM1LAB_PRESET_TARGET_PATCH) {
+                if(fm1lab_patch_preset_step(e)==0)
+                    app_say("PATCH PRESET",patch_display_name(set.patch));
+                else
+                    app_say("PATCH PRESET","LOAD FAILED");
             } else {
-                /* PRESETS always selects the complete four-patch Instrument,
-                 * including while a Home patch card is focused for editing.
-                 * Patch focus must never steal the Instrument selector. */
+                /* Unfocused HOME: change the complete four-patch Instrument.
+                 * Focused HOME: change only that patch's voice preset. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
