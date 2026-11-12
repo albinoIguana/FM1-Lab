@@ -139,6 +139,7 @@ static int32_t patch_lfo_delay[PATCHES];
 static uint32_t age_counter;
 static uint32_t overload_shed_count;
 static volatile uint32_t overload_last_voice_count;
+static volatile uint32_t overload_shed_voice_history[16];
 static int32_t output_gain_q12;
 static int32_t limiter_gain_q15;
 static int16_t pitch_bend_16;
@@ -1037,6 +1038,7 @@ void fm6_overload(void)
      * next FM6 block has rendered its short fade. */
     if (oldest) {
         overload_last_voice_count=fm6_active_voices();
+        overload_shed_voice_history[overload_shed_count&15u]=overload_last_voice_count;
         oldest->fade_out = 32u;
         ++overload_shed_count;
     }
@@ -1044,6 +1046,12 @@ void fm6_overload(void)
 
 uint32_t fm6_overload_shed_count(void) { return overload_shed_count; }
 uint32_t fm6_overload_last_voice_count(void) { return overload_last_voice_count; }
+uint32_t fm6_overload_shed_voice_at(uint32_t age)
+{
+    uint32_t count=overload_shed_count;
+    if(age>=count || age>=16u)return 0u;
+    return overload_shed_voice_history[(count-1u-age)&15u];
+}
 
 void fm6_panic(void)
 {
