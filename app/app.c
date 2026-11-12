@@ -4525,6 +4525,19 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             app_host_name_migration_stage=21u; return 1;
         }
         app_host_name_migration_stage=3u;
+        for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
+            char expected=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            if(!expected) expected=' ';
+            if(loaded.name[n]!=expected) {
+                app_host_name_migration_stage=24u; return 1;
+            }
+        }
+        {
+            fm1lab_instrument_t probe=loaded;
+            if(!fm1lab_restore_factory_instrument_name(&probe,&seed0)) {
+                app_host_name_migration_stage=25u; return 1;
+            }
+        }
         fm1lab_seed_factory_library();
         app_host_name_migration_stage=4u;
         if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0) {
