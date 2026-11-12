@@ -1802,7 +1802,7 @@ static void settings_defaults(void)
     settings_seal(&set);
 }
 
-/* Called by fm1-base after a measured audio block exceeds 90% of its
+/* Called by fm1-base after a measured audio block exceeds 85% of its
  * 5.8 ms deadline. The DSP fades the globally oldest voice over 32 samples;
  * no allocation, flash access, UI work, or cross-patch allocator mutation. */
 #if defined(PLAT_WEB)
