@@ -4413,7 +4413,8 @@ int app_expect(const char *what, int *got)
             app_host_event_trace[1]==EV_INSTRUMENT_LOAD &&
             app_host_event_trace[2]==EV_PERFORMANCE_APPLY &&
             app_host_event_callback[0]==1u && app_host_event_callback[1]==1u &&
-            app_host_event_callback[2]<=3u && app_host_event_callback[2]>app_host_event_callback[1];
+            app_host_event_callback[2]<=3u && app_host_event_callback[2]>app_host_event_callback[1] &&
+            !instrument_apply_pending && !performance_update_pending;
     else if (!fm1lab_strcmp(what, "name_migration"))
         *got = app_host_name_migration_pass;
 #endif
@@ -4472,7 +4473,8 @@ int app_host_fails(void)
          app_host_event_trace[1]==EV_INSTRUMENT_LOAD &&
          app_host_event_trace[2]==EV_PERFORMANCE_APPLY &&
          app_host_event_callback[0]==1u && app_host_event_callback[1]==1u &&
-         app_host_event_callback[2]<=3u && app_host_event_callback[2]>app_host_event_callback[1]))
+         app_host_event_callback[2]<=3u && app_host_event_callback[2]>app_host_event_callback[1] &&
+         !instrument_apply_pending && !performance_update_pending))
         failures++;
     return failures;
 }
