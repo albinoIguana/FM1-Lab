@@ -25,6 +25,17 @@
 #endif
 #ifndef FM6_TEST
 #include "plat.h"
+#else
+#include <time.h>
+/* Host-only microsecond clock for validating counter aggregation. It is not
+ * used to estimate FM1 hardware performance or set polyphony limits. */
+#define PLAT_TICKS_PER_US 1u
+static uint32_t plat_ticks24(void)
+{
+    struct timespec now;
+    (void)timespec_get(&now,TIME_UTC);
+    return (uint32_t)((uint64_t)now.tv_sec*1000000u+(uint32_t)(now.tv_nsec/1000u))&0x00ffffffu;
+}
 #endif
 
 /* FM6 core source: Apache-2.0, Copyright Google / Pascal Gauthier / Leo Kuroshita.
