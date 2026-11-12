@@ -50,7 +50,7 @@ replace_once(main,
     """#if FM1B_AUDIO_ASIDE && FM1B_AUDIO_AHEAD
         uint32_t ok;
         static uint32_t aside_render_us;
-        static uint8_t behind;""")
+        static uint8_t behind;                      /* (renders in a row that ran past their half) */""")
 replace_once(main,
     """        ok = audio_commit(half);                    /* the block rendered last time */
         render_block(aside);                        /* the next: one running past its half leaves the next half
@@ -66,7 +66,7 @@ replace_once(main,
         ok = audio_commit(half);""",
     """#elif FM1B_AUDIO_ASIDE
         uint32_t ok, render_us;
-        fm1_audio_ack_half();
+        fm1_audio_ack_half();                       /* (now: a new pending after the render = the DMA moved on) */
         render_us = render_block(aside);
         ok = audio_commit(half, render_us, HALF_FRAMES * 1000000u / FS);""")
 
