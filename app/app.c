@@ -83,6 +83,8 @@ static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
+/* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
+static uint8_t patch_focus;
 /* Patch focus belongs only to HOME. Leaving HOME always clears it. */
 static void page_change(uint8_t next_page)
 {
@@ -90,10 +92,8 @@ static void page_change(uint8_t next_page)
         patch_focus = 0u;
     if (next_page != PAGE_HOME)
         patch_focus = 0u;
-    page_change(next_page);
+    page = next_page;
 }
-/* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
-static uint8_t patch_focus;
 static uint8_t patch_preset_cursor[FM1LAB_PATCH_COUNT];
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u;
