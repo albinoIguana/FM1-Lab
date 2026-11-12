@@ -117,6 +117,12 @@ static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES / 2u] PLAT_POOL;
 #endif
 static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
 static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
+/* Per-callback accounting. Tick sums retain sub-microsecond quantum precision;
+ * maxima remain separate so they are never mistaken for callback totals. */
+static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
+static volatile uint32_t fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
+static volatile uint32_t fm6_callback_voice_peak;
+
 #if defined(PLAT_WEB)
 static volatile uint32_t fm6_cpu2_total_job_ticks_accum;
 #endif
@@ -1225,25 +1231,33 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
     }
 }
 
+/* CPU0-only wrapper: measures every CPU0 voice-range pass, including a
+ * CPU2 fallback rerender, and accumulates the whole callback cost. */
+static void fm6_render_voice_range_cpu0(uint32_t first, uint32_t end,
+                                        int64_t patch_mix[PATCHES][FM6_N],
+                                        int32_t bus[FM6_N])
+{
+    uint32_t t0=plat_ticks24();
+    fm6_render_voice_range(first,end,patch_mix,bus);
+    fm6_cpu0_voice_ticks += plat_ticks24()-t0;
+}
+
 static void fm6_cpu2_voice_job(uint32_t unused)
 {
     (void)unused;
-#ifndef FM6_TEST
     uint32_t t0 = plat_ticks24();
-#endif
     fm6_render_voice_range(fm6_cpu2_job_start,
                            fm6_cpu2_job_start + fm6_cpu2_job_count,
                            fm6_patch_mix[1], fm6_voice_bus[1]);
-#ifndef FM6_TEST
     {
         uint32_t elapsed = plat_ticks24() - t0;
+        fm6_cpu2_job_ticks_sum += elapsed;
         uint32_t elapsed_us=elapsed / PLAT_TICKS_PER_US;
         if(elapsed_us>fm6_cpu2_job_us)fm6_cpu2_job_us=elapsed_us;
 #if defined(PLAT_WEB)
         fm6_cpu2_total_job_ticks_accum += elapsed;
 #endif
     }
-#endif
 }
 
 #ifdef FM6_TEST
@@ -1260,6 +1274,13 @@ static void *fm6_cpu2_test_thread(void *unused)
 
 uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
 uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
+uint32_t fm6_cpu0_voice_us(void) { return fm6_cpu0_voice_ticks/PLAT_TICKS_PER_US; }
+uint32_t fm6_cpu2_job_sum_us(void) { return fm6_cpu2_job_ticks_sum/PLAT_TICKS_PER_US; }
+uint32_t fm6_cpu2_wait_sum_us(void) { return fm6_cpu2_wait_ticks_sum/PLAT_TICKS_PER_US; }
+uint32_t fm6_cpu2_quantum_count(void) { return fm6_cpu2_quanta; }
+uint32_t fm6_cpu2_dispatch_count(void) { return fm6_cpu2_dispatches; }
+uint32_t fm6_cpu2_fallback_count(void) { return fm6_cpu2_fallbacks; }
+uint32_t fm6_callback_voice_peak_count(void) { return fm6_callback_voice_peak; }
 uint32_t fm6_cpu2_total_job_ticks(void)
 {
 #if defined(PLAT_WEB)
@@ -1273,6 +1294,13 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
     fm6_cpu2_job_us=0u;
     fm6_cpu2_wait_us=0u;
+    fm6_cpu0_voice_ticks=0u;
+    fm6_cpu2_job_ticks_sum=0u;
+    fm6_cpu2_wait_ticks_sum=0u;
+    fm6_cpu2_quanta=0u;
+    fm6_cpu2_dispatches=0u;
+    fm6_cpu2_fallbacks=0u;
+    fm6_callback_voice_peak=0u;
 #ifdef FM6_TEST
     fm6_zero_bytes(fm6_test_patch_peak_q24, sizeof fm6_test_patch_peak_q24);
     fm6_test_dry_peak_q24 = 0u;
@@ -1306,7 +1334,9 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             if (voices[v].used)
                 fm6_voice_work[active_voice_count++] = (uint8_t)v;
 
+        if(active_voice_count>fm6_callback_voice_peak)fm6_callback_voice_peak=active_voice_count;
         if (active_voice_count > 1u) {
+            ++fm6_cpu2_quanta;
             uint32_t split = (active_voice_count + 1u) / 2u;
             fm6_cpu2_job_start = split;
             fm6_cpu2_job_count = active_voice_count - split;
@@ -1321,7 +1351,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                         abort();
                     /* CPU0 renders its half while CPU2's host twin renders
                      * the other half, matching the hardware overlap. */
-                    fm6_render_voice_range(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
+                    fm6_render_voice_range_cpu0(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
                     if (pthread_join(worker, 0) != 0)
                         abort();
                     for (p = 0; p < PATCHES; ++p)
@@ -1330,16 +1360,17 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 } else {
                     uint32_t partial = fm6_cpu2_job_count / 2u;
                     if (!partial) partial = 1u;
-                    fm6_render_voice_range(split, split + partial,
+                    fm6_render_voice_range_cpu0(split, split + partial,
                                            fm6_patch_mix[1], fm6_voice_bus[1]);
-                    fm6_render_voice_range(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
+                    fm6_render_voice_range_cpu0(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
                     for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                         voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
-                    fm6_render_voice_range(split, active_voice_count,
+                    fm6_render_voice_range_cpu0(split, active_voice_count,
                                            fm6_patch_mix[0], fm6_voice_bus[0]);
                 }
             } else {
-                fm6_render_voice_range(0u, active_voice_count,
+                ++fm6_cpu2_fallbacks;
+                fm6_render_voice_range_cpu0(0u, active_voice_count,
                                        fm6_patch_mix[0], fm6_voice_bus[0]);
             }
 #elif defined(FM1_CPU1)
@@ -1348,38 +1379,43 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
                 if (plat_cpu2_run(fm6_cpu2_voice_job, 0u)) {
-                    fm6_render_voice_range(0u, split,
+                    ++fm6_cpu2_dispatches;
+                    fm6_render_voice_range_cpu0(0u, split,
                                            fm6_patch_mix[0], fm6_voice_bus[0]);
                     uint32_t wait_t0 = plat_ticks24();
                     int wait_rc = plat_cpu2_wait();
                     uint32_t wait_us=(plat_ticks24() - wait_t0) / PLAT_TICKS_PER_US;
+                    uint32_t wait_ticks=plat_ticks24()-wait_t0;
+                    fm6_cpu2_wait_ticks_sum += wait_ticks;
                     if(wait_us>fm6_cpu2_wait_us)fm6_cpu2_wait_us=wait_us;
                     if (wait_rc == 0) {
                         for (p = 0; p < PATCHES; ++p)
                             for (i = 0; i < FM6_N; ++i)
                                 fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
                     } else {
+                        ++fm6_cpu2_fallbacks;
                         /* If core 1 was late or faulted mid-job, roll back its
                          * voice state before rendering that half on core 0. */
                         for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                             voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
-                        fm6_render_voice_range(split, active_voice_count,
+                        fm6_render_voice_range_cpu0(split, active_voice_count,
                                                fm6_patch_mix[0], fm6_voice_bus[0]);
                     }
                 } else {
-                    fm6_render_voice_range(0u, active_voice_count,
+                    ++fm6_cpu2_fallbacks;
+                    fm6_render_voice_range_cpu0(0u, active_voice_count,
                                            fm6_patch_mix[0], fm6_voice_bus[0]);
                 }
             } else {
-                fm6_render_voice_range(0u, active_voice_count,
+                fm6_render_voice_range_cpu0(0u, active_voice_count,
                                        fm6_patch_mix[0], fm6_voice_bus[0]);
             }
 #else
-            fm6_render_voice_range(0u, active_voice_count,
+            fm6_render_voice_range_cpu0(0u, active_voice_count,
                                    fm6_patch_mix[0], fm6_voice_bus[0]);
 #endif
         } else {
-            fm6_render_voice_range(0u, active_voice_count,
+            fm6_render_voice_range_cpu0(0u, active_voice_count,
                                    fm6_patch_mix[0], fm6_voice_bus[0]);
         }
 
