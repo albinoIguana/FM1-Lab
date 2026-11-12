@@ -4500,35 +4500,22 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         app_host_name_migration_stage=0u;
         if(fm1lab_seed_dx7_instrument(0u,&seed0)!=0 ||
            fm1lab_seed_dx7_instrument(1u,&seed1)!=0 ||
-           fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0 ||
-           fm1lab_store_library_load_full(1u,&loaded,&inserts1)!=0)
+           fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0)
             return 1;
         app_host_name_migration_stage=1u;
         corrupt=seed0;
         if(fm1lab_voice_name_get(corrupt.patches[0].voice,patch_name)!=0)return 1;
         for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\0';
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
             corrupt.name[n]=c?c:' ';
         }
         if(fm1lab_store_library_save_full(0u,&corrupt,&inserts0)!=0)return 1;
-        if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0) {
+        app_host_name_migration_stage=2u;
+        if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0 ||
+           memcmp(loaded.patches,seed0.patches,sizeof loaded.patches)!=0 ||
+           memcmp(loaded.name,corrupt.name,sizeof loaded.name)!=0) {
             app_host_name_migration_stage=21u; return 1;
         }
-        if(memcmp(loaded.patches,seed0.patches,sizeof loaded.patches)!=0) {
-            app_host_name_migration_stage=22u; return 1;
-        }
-        if(memcmp(loaded.name,corrupt.name,sizeof loaded.name)!=0) {
-            app_host_name_migration_stage=23u; return 1;
-        }
-        app_host_name_migration_stage=2u;
-        edited=seed1;
-        if(fm1lab_voice_name_get(edited.patches[0].voice,patch_name)!=0)return 1;
-        for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\0';
-            edited.name[n]=c?c:' ';
-        }
-        edited.patches[0].voice[0]^=1u; /* a single user edit must block migration */
-        if(fm1lab_store_library_save_full(1u,&edited,&inserts1)!=0)return 1;
         app_host_name_migration_stage=3u;
         fm1lab_seed_factory_library();
         app_host_name_migration_stage=4u;
@@ -4542,11 +4529,28 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             app_host_name_migration_stage=43u; return 1;
         }
         app_host_name_migration_stage=5u;
+
+        /* An edited slot whose patches differ from its seed must not have its
+         * voice-derived name or patch bytes rewritten by a later migration. */
+        if(fm1lab_store_library_load_full(1u,&loaded,&inserts1)!=0)return 1;
+        edited=seed1;
+        if(fm1lab_voice_name_get(edited.patches[0].voice,patch_name)!=0)return 1;
+        for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            edited.name[n]=c?c:' ';
+        }
+        edited.patches[0].voice[0]^=1u;
+        if(fm1lab_store_library_save_full(1u,&edited,&inserts1)!=0)return 1;
+        app_host_name_migration_stage=6u;
+        fm1lab_seed_factory_library();
+        app_host_name_migration_stage=7u;
         if(fm1lab_store_library_load_full(1u,&loaded,&inserts1)!=0 ||
            memcmp(loaded.name,edited.name,sizeof loaded.name)!=0 ||
-           memcmp(loaded.patches,edited.patches,sizeof loaded.patches)!=0)
-            return 1;
-        app_host_name_migration_stage=6u;
+           memcmp(loaded.patches,edited.patches,sizeof loaded.patches)!=0) {
+            app_host_name_migration_stage=71u; return 1;
+        }
+        app_host_name_migration_stage=8u;
+
         blank=factory_instrument;
         memset(blank.name,' ',sizeof blank.name);
         if(fm1lab_store_library_load_full(31u,&loaded,&inserts31)!=0)
@@ -4557,14 +4561,13 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
            instrument_dirty!=0u ||
            fm1lab_strcmp(instrument_display_name(),"INSTRUMENT 32")!=0)
             return 1;
-        app_host_name_migration_stage=7u;
+        app_host_name_migration_stage=9u;
         if(instrument_load(0u,0)!=FM1LAB_LOAD_OK ||
            memcmp(current_instrument.name,seed0.name,sizeof seed0.name)!=0 ||
            instrument_dirty!=0u)
             return 1;
-        app_host_name_migration_stage=8u;
+        app_host_name_migration_stage=10u;
         app_host_name_migration_pass=1u;
-        app_host_name_migration_stage=9u;
         return 1;
     }
     if(fm1lab_strcmp(cmd,"fm1lab_event_budget"))return 0;
