@@ -23,6 +23,18 @@ static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voice
                          (uint8_t)(92u - note * 4u), mask);
     assert(fm6_active_voices() == expected_voices);
     fm6_render(destination, TEST_FRAMES, 4096u);
+    /* 128 frames are four 32-frame quanta. The timing counters are callback
+     * sums/maxima, not values carried over from earlier render calls. */
+    assert(fm6_callback_voice_peak_count()==expected_voices);
+    assert(fm6_cpu2_quantum_count()==4u);
+    if(mode==1u) {
+        assert(fm6_cpu2_dispatch_count()==4u);
+        assert(fm6_cpu2_fallback_count()==0u);
+        assert(fm6_cpu2_job_sum_us()>=fm6_cpu2_last_job_us());
+    } else {
+        assert(fm6_cpu2_dispatch_count()==0u);
+        assert(fm6_cpu2_fallback_count()==4u);
+    }
 }
 static int32_t peak(const int32_t *samples, unsigned count) {
     int32_t result = 0;
