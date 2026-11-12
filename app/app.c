@@ -2263,8 +2263,7 @@ static void input(void)
 {
     uint32_t keys, btn = plat_buttons(), k;
     int32_t e;
-    unsigned next_lane;
-    touch_poll();                            /* the sensed keys' presses, velocities and pressure */
+        touch_poll();                            /* the sensed keys' presses, velocities and pressure */
     keys = touch_keys();
     sequencer_arp_capture_poll();
     sequencer_record_step_advance();
