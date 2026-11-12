@@ -2310,7 +2310,7 @@ static void input(void)
         if (!(btn & bit) || (ui.btn & bit))
             continue;
         if (k != B_HOME && k != B_GLO && k != B_ENV && k != B_LFO &&
-            k != B_EDIT && k != B_SEQ && k != B_ARP && k != B_FX && k != B_SAVE)
+            k != B_EDIT && k != B_SEL && k != B_SEQ && k != B_ARP && k != B_FX && k != B_SAVE)
             app_audio_timing_reset_window();
         if (k == B_OCTDN)
             octave_step(-1);
