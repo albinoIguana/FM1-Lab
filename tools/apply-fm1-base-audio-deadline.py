@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Backport FM1 Open's 7/8 DMA-half render deadline guard to fm1-base."""
+"""Backport FM1 Open's safe aside-buffer DMA commit to the pinned fm1-base."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "base"
 
 
-def replace_once(path, old, new):
+def replace_once(path: Path, old: str, new: str) -> None:
     source = path.read_text()
     if new in source:
         return
@@ -15,19 +15,44 @@ def replace_once(path, old, new):
     path.write_text(source.replace(old, new, 1))
 
 
+# The pinned fm1-base predates audio_aside/audio_commit.c. Add the audited
+# aside renderer here rather than relying on an unsupported TOML key.
 audio = BASE / "device/audio_commit.c"
-replace_once(audio,
-    "static uint32_t audio_commit(uint32_t half)",
-    "static uint32_t audio_commit(uint32_t half, uint32_t render_us, uint32_t budget_us)")
-replace_once(audio,
-    "    uint32_t ie = fm1_icfg() & 0x200u, ok = 0, i;   /* (icfg bit 9: the global enable) */",
-    """    uint32_t ie, ok = 0, i;
-    /* Match fm1_open: reserve the final 1/8 of the DMA half for a safe copy. */
+audio_source = """/* FM1 Open-style aside buffer and deadline-safe DMA commit.
+ * Included by main_fm1.c after HALF_WORDS and abuf are declared. */
+static int32_t aside[HALF_WORDS] __attribute__((aligned(4)));
+
+static uint32_t audio_commit(uint32_t half, uint32_t render_us, uint32_t budget_us)
+{
+    volatile int32_t *dst = &abuf[half * HALF_WORDS];
+    uint32_t ie, ok = 0u, i;
+
+    /* Match fm1_open: reserve the final 1/8 of the DMA half for the copy. */
     if (!budget_us || render_us >= budget_us - (budget_us >> 3))
         return 0u;
-    ie = fm1_icfg() & 0x200u;                       /* (icfg bit 9: the global enable) */""")
+
+    ie = fm1_icfg() & 0x200u; /* global interrupt enable */
+    fm1_irq_off();
+    if (fm1_audio_free_half() == half && !(fm1_audio_pending() & FM1_AUDIO_HALF)) {
+        for (i = 0; i < HALF_WORDS; ++i)
+            dst[i] = aside[i];
+        ok = fm1_audio_free_half() == half && !(fm1_audio_pending() & FM1_AUDIO_HALF);
+    }
+    if (ie)
+        fm1_irq_on();
+    return ok;
+}
+"""
+if not audio.exists():
+    audio.write_text(audio_source)
+elif audio.read_text() != audio_source:
+    raise SystemExit("Unexpected base/device/audio_commit.c already exists; inspect before replacing it")
 
 main = BASE / "device/main_fm1.c"
+replace_once(main,
+    "static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));",
+    """static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));
+#include "audio_commit.c" /* separate render buffer and guarded DMA-half commit */""")
 replace_once(main,
     "static void render_block(int32_t *o)                /* ALNK0: one half, measured */",
     "static uint32_t render_block(int32_t *o)             /* ALNK0: one half, measured */")
@@ -44,53 +69,22 @@ replace_once(main,
     return us;
 }""")
 replace_once(main,
-    """#if FM1B_AUDIO_ASIDE && FM1B_AUDIO_AHEAD
-        uint32_t ok;
-        static uint8_t behind;                      /* (renders in a row that ran past their half) */""",
-    """#if FM1B_AUDIO_ASIDE && FM1B_AUDIO_AHEAD
-        uint32_t ok;
-        static uint32_t aside_render_us;
-        static uint8_t behind;                      /* (renders in a row that ran past their half) */""")
-replace_once(main,
-    """        ok = audio_commit(half);                    /* the block rendered last time */
-        render_block(aside);                        /* the next: one running past its half leaves the next half
-                                                     * pending, served as soon as this returns (a block's worth of
-                                                     * latency for a render up to two halves long) */""",
-    """        ok = audio_commit(half, aside_render_us, HALF_FRAMES * 1000000u / FS);
-        aside_render_us = render_block(aside);""")
-replace_once(main,
-    """#elif FM1B_AUDIO_ASIDE
-        uint32_t ok;
-        fm1_audio_ack_half();                       /* (now: a new pending after the render = the DMA moved on) */
-        render_block(aside);
-        ok = audio_commit(half);""",
-    """#elif FM1B_AUDIO_ASIDE
-        uint32_t ok, render_us;
-        fm1_audio_ack_half();                       /* (now: a new pending after the render = the DMA moved on) */
+    """        uint32_t half = fm1_audio_free_half();
+        render_block(&abuf[half * HALF_WORDS]);
+        fm1_audio_ack_half();
+        if (fm1_audio_free_half() != half) {
+            fm1b_dbg.late++;                         /* the DMA moved on while we rendered */
+            audio_xruns++;
+        }""",
+    """        uint32_t half = fm1_audio_free_half(), render_us, ok;
+        fm1_audio_ack_half();
         render_us = render_block(aside);
-        ok = audio_commit(half, render_us, HALF_FRAMES * 1000000u / FS);""")
+        ok = audio_commit(half, render_us, HALF_FRAMES * 1000000u / FS);
+        if (fm1_audio_pending() & FM1_AUDIO_HALF)
+            fm1_audio_ack_half();
+        if (!ok) {
+            fm1b_dbg.late++;                         /* late render or unsafe DMA commit */
+            audio_xruns++;
+        }""")
 
-test = BASE / "tests/audio_commit_test.c"
-source = test.read_text()
-source = source.replace("audio_commit(1u)", "audio_commit(1u, 1000u, 5804u)")
-source = source.replace("audio_commit(0u)", "audio_commit(0u, 1000u, 5804u)")
-if "audio_commit(1u, 5079u, 5804u)" not in source:
-    anchor = """    setup(1u, FM1_AUDIO_HALF, 0u, 0x300u);
-    r = audio_commit(1u, 1000u, 5804u);
-    want("a new half pending: late, nothing written", r == 0u && half_is(0u, 0) && half_is(1u, 0));
-"""
-    addition = anchor + """
-    setup(1u, 0u, 0u, 0x300u);
-    r = audio_commit(1u, 5079u, 5804u);             /* exactly 7/8 of 5804 us */
-    want("at the 7/8 deadline guard: late, nothing written",
-         r == 0u && half_is(0u, 0) && half_is(1u, 0));
-    setup(1u, 0u, 0u, 0x300u);
-    r = audio_commit(1u, 6000u, 5804u);
-    want("past the DMA half budget: late, nothing written",
-         r == 0u && half_is(0u, 0) && half_is(1u, 0));
-"""
-    if anchor not in source:
-        raise SystemExit("Expected audio_commit_test insertion point not found")
-    test.write_text(source.replace(anchor, addition, 1))
-
-print("Applied fm1-base 7/8 DMA-half render deadline guard.")
+print("Applied FM1 Open-style aside buffer and 7/8 DMA deadline guard.")
