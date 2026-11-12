@@ -4111,7 +4111,9 @@ static void draw(void)
             text_cat(diag, number);
 #endif
         } else {
-            text_cat(diag, " C1");
+            text_cat(diag, " C2!");
+            int_text((int32_t)plat_cpu2_gave_up(), number);
+            text_cat(diag, number);
         }
 #else
         text_cat(diag, " C1");
