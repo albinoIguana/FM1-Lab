@@ -133,6 +133,7 @@ static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
 static volatile uint32_t fm6_render_quanta, fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
 static volatile uint32_t fm6_callback_voice_peak;
+static volatile uint32_t fm6_callback_pre_limiter_peak_q23, fm6_callback_limiter_reduction_q15;
 
 #if defined(PLAT_WEB)
 static volatile uint32_t fm6_cpu2_total_job_ticks_accum;
@@ -1304,6 +1305,8 @@ uint32_t fm6_cpu2_quantum_count(void) { return fm6_cpu2_quanta; }
 uint32_t fm6_cpu2_dispatch_count(void) { return fm6_cpu2_dispatches; }
 uint32_t fm6_cpu2_fallback_count(void) { return fm6_cpu2_fallbacks; }
 uint32_t fm6_callback_voice_peak_count(void) { return fm6_callback_voice_peak; }
+uint32_t fm6_pre_limiter_peak_q23(void) { return fm6_callback_pre_limiter_peak_q23; }
+uint32_t fm6_limiter_reduction_q15(void) { return fm6_callback_limiter_reduction_q15; }
 uint32_t fm6_cpu2_total_job_ticks(void)
 {
 #if defined(PLAT_WEB)
@@ -1325,6 +1328,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     fm6_cpu2_dispatches=0u;
     fm6_cpu2_fallbacks=0u;
     fm6_callback_voice_peak=0u;
+    fm6_callback_pre_limiter_peak_q23=0u;
+    fm6_callback_limiter_reduction_q15=0u;
 #ifdef FM6_TEST
     fm6_zero_bytes(fm6_test_patch_peak_q24, sizeof fm6_test_patch_peak_q24);
     fm6_test_dry_peak_q24 = 0u;
@@ -1596,6 +1601,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             uint64_t abs_l = fm6_abs_i64(out_l);
             uint64_t abs_r = fm6_abs_i64(out_r);
             uint64_t peak = abs_l > abs_r ? abs_l : abs_r;
+            if(peak>fm6_callback_pre_limiter_peak_q23)
+                fm6_callback_pre_limiter_peak_q23=peak>UINT32_MAX?UINT32_MAX:(uint32_t)peak;
             uint32_t target_gain = 32768u;
             if (peak > FM6_LIMITER_CEILING_Q23) {
                 /* AC79's PI32V2 runtime has no __udivdi3. Scale the peak
@@ -1616,6 +1623,9 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 limiter_gain_q15 += (int32_t)(release ? release : 1u); /* ~5.8 ms release */
                 if (limiter_gain_q15 > 32768) limiter_gain_q15 = 32768;
             }
+            uint32_t reduction_q15=32768u-(uint32_t)limiter_gain_q15;
+            if(reduction_q15>fm6_callback_limiter_reduction_q15)
+                fm6_callback_limiter_reduction_q15=reduction_q15;
             out_l = (out_l * limiter_gain_q15) >> 15;
             out_r = (out_r * limiter_gain_q15) >> 15;
             if (out_l > FM6_LIMITER_CEILING_Q23) out_l = FM6_LIMITER_CEILING_Q23;
