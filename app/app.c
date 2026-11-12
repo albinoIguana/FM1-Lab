@@ -921,7 +921,7 @@ static uint8_t fm1lab_restore_factory_instrument_name(
         return 0u;
     uint8_t seed_name_matches=1u;
     for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-        char expected=n<FM1LAB_STORE_NAME_BYTES?seed->name[n]:'\\0';
+        char expected=n<FM1LAB_STORE_NAME_BYTES?seed->name[n]:'\0';
         if(!expected) expected=' ';
         if(existing->name[n]!=expected) { seed_name_matches=0u; break; }
     }
@@ -4578,7 +4578,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         {
             char stored_seed_name[FM1LAB_INSTRUMENT_NAME_BYTES];
             for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-                char c=n<FM1LAB_STORE_NAME_BYTES?seed0.name[n]:'\\0';
+                char c=n<FM1LAB_STORE_NAME_BYTES?seed0.name[n]:'\0';
                 stored_seed_name[n]=c?c:' ';
             }
             if(memcmp(loaded.name,stored_seed_name,sizeof loaded.name)!=0) {
@@ -4626,7 +4626,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
            instrument_dirty!=0u)
             return 1;
         for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char c=n<FM1LAB_STORE_NAME_BYTES?seed0.name[n]:'\\0';
+            char c=n<FM1LAB_STORE_NAME_BYTES?seed0.name[n]:'\0';
             if(current_instrument.name[n]!=(c?c:' ')) return 1;
         }
         app_host_name_migration_stage=10u;
