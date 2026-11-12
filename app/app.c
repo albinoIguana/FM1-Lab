@@ -3489,12 +3489,11 @@ static void draw_audio_diag_panel(void)
             cv_text(x+8,y+6,&FONT_XS,"VOICES / SHEDDING",C_PEWTER);
             int_text((int32_t)render_voice_peak,value);text_cat(value," voices");
             cv_text(x+8,y+21,&FONT_B,value,colors[i]);
-            int_text((int32_t)render_quanta,detail);text_cat(detail," Q  D");
-            int_text((int32_t)render_cpu2_dispatches,value);text_cat(detail,value);text_cat(detail," F");
-            int_text((int32_t)render_cpu2_fallbacks,value);text_cat(detail,value);
+            int_text((int32_t)render_quanta,detail);text_cat(detail," Q  C2 ");
+            int_text((int32_t)render_cpu2_quanta,value);text_cat(detail,value);
             cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
-            int_text((int32_t)fm6_overload_shed_count(),detail);text_cat(detail," sheds  last ");
-            int_text((int32_t)fm6_overload_last_voice_count(),value);text_cat(detail,value);
+            int_text((int32_t)fm6_overload_shed_count(),detail);text_cat(detail," SHED  @ ");
+            int_text((int32_t)fm6_overload_last_voice_count(),value);text_cat(detail,value);text_cat(detail," V");
             cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
         }
     }
@@ -4259,7 +4258,7 @@ void app_ui_init(void)
 
 void app_frame(void)
 {
-    static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw, last_startup_draw;
+    static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw, last_startup_draw, last_diag_redraw;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     if (startup_active) {
         uint32_t elapsed = now - startup_started_at;
@@ -4274,6 +4273,10 @@ void app_frame(void)
             return; /* keep the power-on ident clean; don't consume control input */
     }
     input();
+    if(page==PAGE_DIAG && (uint32_t)(now-last_diag_redraw)>=100u) {
+        last_diag_redraw=now;
+        ui.redraw=1u;
+    }
     if(seq_record_redraw){ui.redraw=1u;seq_record_redraw=0u;}
     if (performance_update_dirty && !performance_update_pending) performance_publish();
     speak();
