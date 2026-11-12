@@ -24,7 +24,7 @@ static uint32_t fm1_audio_free_half(void)
 }
 static uint8_t fm1_audio_pending(void) { return (uint8_t)sim_pending; }
 
-#include "audio_commit.c"
+#include "audio_commit.inc"
 
 static unsigned failures;
 static void want(const char *label, int ok)
