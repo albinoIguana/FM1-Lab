@@ -7,6 +7,7 @@
 #define FM1LAB_STORE_BANK_COUNT 4u
 #define FM1LAB_STORE_INSTRUMENTS_PER_BANK 8u
 #define FM1LAB_STORE_INSTRUMENT_COUNT 32u
+#define FM1LAB_STORE_NAME_BYTES 11u
 
 /* Uses four 3,840-byte bank objects plus one versioned sidecar in the existing
  * pooled flash area. Control task only; the sidecar stores one global stereo
