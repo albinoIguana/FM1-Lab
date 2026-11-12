@@ -61,4 +61,11 @@ static inline uint8_t fm1lab_input_track_next(uint8_t lane, int delta)
     return delta ? (uint8_t)((lane ^ 1u) & 1u) : (uint8_t)(lane & 1u);
 }
 
+static inline uint8_t fm1lab_input_focus_after_page_change(
+        uint8_t current_page, uint8_t next_page, uint8_t patch_focus)
+{
+    return (current_page == FM1LAB_INPUT_PAGE_HOME &&
+            next_page == FM1LAB_INPUT_PAGE_HOME) ? patch_focus : 0u;
+}
+
 #endif
