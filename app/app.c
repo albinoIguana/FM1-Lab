@@ -766,10 +766,7 @@ static int fm1lab_patch_preset_step(int delta)
     uint8_t cursor;
     if (!delta || set.patch >= FM1LAB_PATCH_COUNT) return -1;
     cursor=patch_preset_cursor[lane][set.patch];
-    if(cursor==255u)
-        next=(uint8_t)(delta>0?0u:FM1LAB_DX7_VOICE_COUNT-1u);
-    else
-        next=fm1lab_preset_cursor_advance(cursor,delta,FM1LAB_DX7_VOICE_COUNT);
+    next=fm1lab_preset_cursor_step(cursor,delta,FM1LAB_DX7_VOICE_COUNT);
     if (fm1lab_dx7_decode_voice(next,voice) != 0 ||
         fm1lab_patch_replace_voice(&current_instrument,set.patch,voice) != 0)
         return -1;

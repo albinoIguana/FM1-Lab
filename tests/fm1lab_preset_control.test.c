@@ -25,5 +25,9 @@ int main(void)
     assert(fm1lab_preset_cursor_advance(12u, -3, 128u) == 9u);
     assert(fm1lab_preset_cursor_advance(12u, 0, 128u) == 12u);
     assert(fm1lab_preset_cursor_advance(12u, 99, 0u) == 0u);
+    assert(fm1lab_preset_cursor_step(255u, 1, 128u) == 0u);
+    assert(fm1lab_preset_cursor_step(255u, -1, 128u) == 127u);
+    assert(fm1lab_preset_cursor_step(4u, 1, 128u) == 5u);
+    assert(fm1lab_preset_cursor_step(4u, -1, 128u) == 3u);
     return 0;
 }

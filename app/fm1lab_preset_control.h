@@ -36,4 +36,14 @@ static inline uint8_t fm1lab_preset_cursor_advance(uint8_t cursor, int delta,
     return (uint8_t)next;
 }
 
+/* A newly loaded Instrument has no selected DX7 voice. Its first positive
+ * detent selects voice 0; its first negative detent selects the final voice. */
+static inline uint8_t fm1lab_preset_cursor_step(uint8_t cursor, int delta,
+                                                uint32_t voice_count)
+{
+    if (!voice_count) return 0u;
+    if (cursor == 255u) return (uint8_t)(delta < 0 ? voice_count - 1u : 0u);
+    return fm1lab_preset_cursor_advance(cursor, delta, voice_count);
+}
+
 #endif
