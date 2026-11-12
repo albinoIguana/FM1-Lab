@@ -11,6 +11,7 @@ enum fm1lab_input_result {
     FM1LAB_INPUT_RESULT_LOAD_FAILED,
     FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED,
     FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED,
+    FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED,
     FM1LAB_INPUT_RESULT_PATCH_FAILED
 };
 
@@ -84,7 +85,7 @@ static inline enum fm1lab_input_result fm1lab_input_apply(
             next = (uint8_t)value;
         }
         if (next == state->instrument)
-            return save_failed ? FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED
+            return save_failed ? FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED
                                : FM1LAB_INPUT_RESULT_NONE;
         load_result = ops->load_instrument(context, state->lane, next,
                                             FM1LAB_INPUT_LOAD_ENGINE_BANK);
