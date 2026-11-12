@@ -4215,9 +4215,13 @@ static void draw(void)
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 19, screen_bg());
     if (page == PAGE_HOME) {
-        int_text((int32_t)instrument_index + 1, t);
-        text_cat(t, "/32");
-        cv_text(6, 4, &FONT_XS, t, C_PEWTER);
+        if(patch_focus) {
+            text_cat(t,"PRE: P");
+            int_text((int32_t)set.patch+1,t+fm1lab_strlen(t));
+        } else {
+            text_cat(t,"PRE: INST");
+        }
+        cv_text_fit(6,4,&FONT_XS,t,C_PEWTER,52);
     }
     {
         char diag[48], number[12];
