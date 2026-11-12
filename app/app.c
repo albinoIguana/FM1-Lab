@@ -1314,6 +1314,10 @@ static void ui_events_drain(void)
         uint8_t b = ui_events[tail].b, c = ui_events[tail].c;
         uint8_t heavy=(uint8_t)(type==EV_INSTRUMENT_LOAD ||
             type==EV_PERFORMANCE_APPLY || type==EV_PATCH_VOICE);
+        /* Preserve FIFO order: process notes/light events ahead of the next
+         * expensive update, but leave a second expensive update queued for the
+         * next audio callback. Never pop or account for an event we defer. */
+        if(heavy && heavy_done) break;
 #ifdef PLAT_HOST
         if(app_host_event_test_active && app_host_event_trace_count<3u) {
             uint8_t at=app_host_event_trace_count++;
@@ -1321,10 +1325,6 @@ static void ui_events_drain(void)
             app_host_event_callback[at]=app_host_render_callbacks-app_host_event_start_callback;
         }
 #endif
-        /* Preserve FIFO order: process notes/light events ahead of the next
-         * expensive update, but leave a second expensive update queued for the
-         * next audio callback. Never pop an event we are deferring. */
-        if(heavy && heavy_done) break;
         ui_event_tail = (uint8_t)((tail + 1u) & 63u);
         if (type == EV_NOTE_ON)
             fm6_note_on_mask(a, b, c);
