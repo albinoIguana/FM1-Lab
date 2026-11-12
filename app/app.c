@@ -938,16 +938,30 @@ static void fm1lab_seed_factory_library(void)
         fm1lab_instrument_t existing,seed;
         fm1lab_insert_state_t inserts;
         if(fm1lab_store_library_load_full(index,&existing,&inserts)!=0) continue;
+#ifdef PLAT_HOST
+        if(app_host_migration_probe && index==0u) app_host_factory_slot0_loaded=1u;
+#endif
         if(fm1lab_seed_dx7_instrument(index,&seed)!=0) {
             app_say("DX7 LIBRARY","DECODE FAILED");
             return;
         }
         /* One-time repair: helper refuses any slot whose patch bytes differ
          * from the factory seed, including legitimately voice-derived names. */
-        if(fm1lab_restore_factory_instrument_name(&existing,&seed) &&
-           fm1lab_store_library_save_full(index,&existing,&inserts)!=0) {
-            app_say("DX7 LIBRARY","NAME REPAIR FAILED");
-            return;
+        uint8_t restored_name=fm1lab_restore_factory_instrument_name(&existing,&seed);
+#ifdef PLAT_HOST
+        if(app_host_migration_probe && index==0u && restored_name)
+            app_host_factory_name_changed=1u;
+#endif
+        if(restored_name) {
+            int save_result=fm1lab_store_library_save_full(index,&existing,&inserts);
+#ifdef PLAT_HOST
+            if(app_host_migration_probe && index==0u && save_result==0)
+                app_host_factory_save_ok=1u;
+#endif
+            if(save_result!=0) {
+                app_say("DX7 LIBRARY","NAME REPAIR FAILED");
+                return;
+            }
         }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
         if(!fm1lab_is_untouched_factory(&existing) &&
@@ -1221,6 +1235,8 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
 static uint32_t app_host_input_failures, app_host_render_callbacks;
 static uint8_t app_host_event_test_active, app_host_event_trace_count;
 static uint8_t app_host_name_migration_pass, app_host_name_migration_stage;
+static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
+static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
 static uint8_t app_host_event_trace[3];
 static uint32_t app_host_event_callback[3], app_host_event_start_callback;
 #endif
@@ -4538,7 +4554,15 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
                 app_host_name_migration_stage=25u; return 1;
             }
         }
+        app_host_factory_slot0_loaded=0u;
+        app_host_factory_name_changed=0u;
+        app_host_factory_save_ok=0u;
+        app_host_migration_probe=1u;
         fm1lab_seed_factory_library();
+        app_host_migration_probe=0u;
+        if(!app_host_factory_slot0_loaded) { app_host_name_migration_stage=51u; return 1; }
+        if(!app_host_factory_name_changed) { app_host_name_migration_stage=52u; return 1; }
+        if(!app_host_factory_save_ok) { app_host_name_migration_stage=53u; return 1; }
         app_host_name_migration_stage=4u;
         if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0) {
             app_host_name_migration_stage=41u; return 1;
