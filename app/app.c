@@ -86,7 +86,7 @@ static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
-enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_DIAG, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -2319,8 +2319,9 @@ static void input(void)
             patch_focus = 0u;
             app_say("INSTRUMENT", seq_ui_lane ? "TRACK 2 PATCH" : "TRACK 1 PATCH");
         } else if (k == B_GLO) {
-            page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
-            app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
+            page = page==PAGE_HOME?PAGE_GLOBAL:page==PAGE_GLOBAL?PAGE_DIAG:PAGE_HOME;
+            app_say(page==PAGE_GLOBAL?"GLOBAL":page==PAGE_DIAG?"AUDIO DIAGNOSTICS":"HOME",
+                    page==PAGE_DIAG?"TIMING / LOAD":"SETTINGS");
         } else if (k == B_ENV) {
             page = PAGE_ENV;
             app_say("ENVELOPE", "PATCH ADSR");
@@ -2480,6 +2481,7 @@ static void input(void)
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
         ui.redraw = 1;
+        if(page==PAGE_DIAG) continue; /* diagnostic page is read-only */
         /* PRESETS is active on Home, plus the main Sequencer page when its
          * selected track is highlighted. All other pages ignore the encoder. */
         if (k == EN_PRESET && !fm1lab_preset_encoder_enabled(
@@ -3448,6 +3450,56 @@ static void draw_global_panel(uint32_t pct)
     }
 }
 
+static void draw_audio_diag_panel(void)
+{
+    char value[24], detail[32];
+    const uint16_t colors[4]={RGB(255,170,75),RGB(36,215,232),RGB(75,220,150),RGB(227,75,210)};
+    for(uint32_t i=0u;i<4u;i++) {
+        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),colors[i],colors[i]);
+        if(i==0u) {
+            cv_text(x+8,y+6,&FONT_XS,"RENDER / PEAK",C_PEWTER);
+            int_text((int32_t)render_last_us,value);text_cat(value," us");
+            cv_text(x+8,y+21,&FONT_B,value,colors[i]);
+            int_text((int32_t)render_peak_window_us,detail);text_cat(detail," / ");
+            int_text((int32_t)render_peak_all_us,value);text_cat(detail,value);
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)render_shed_threshold_us,detail);text_cat(detail," shed  ");
+            int_text((int32_t)render_dma_guard_us,value);text_cat(detail,value);
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        } else if(i==1u) {
+            cv_text(x+8,y+6,&FONT_XS,"CPU0 BUSY / VOICE",C_PEWTER);
+            int_text((int32_t)render_core0_active_us,value);text_cat(value," us");
+            cv_text(x+8,y+21,&FONT_B,value,colors[i]);
+            int_text((int32_t)render_cpu0_voice_us,detail);text_cat(detail," voice");
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)render_ui_us,detail);text_cat(detail," UI  ");
+            int_text((int32_t)render_midi_us,value);text_cat(detail,value);text_cat(detail," MIDI");
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        } else if(i==2u) {
+            cv_text(x+8,y+6,&FONT_XS,"CPU2 JOB / WAIT",C_PEWTER);
+            int_text((int32_t)render_cpu2_job_sum_us,value);text_cat(value," us job");
+            cv_text_fit(x+8,y+21,&FONT_B,value,colors[i],UI_GRID_CARD_W-16);
+            int_text((int32_t)render_cpu2_wait_sum_us,detail);text_cat(detail," us wait");
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)render_cpu2_job_us,detail);text_cat(detail," / ");
+            int_text((int32_t)render_cpu2_wait_us,value);text_cat(detail,value);text_cat(detail," max");
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        } else {
+            cv_text(x+8,y+6,&FONT_XS,"VOICES / SHEDDING",C_PEWTER);
+            int_text((int32_t)render_voice_peak,value);text_cat(value," voices");
+            cv_text(x+8,y+21,&FONT_B,value,colors[i]);
+            int_text((int32_t)render_quanta,detail);text_cat(detail," Q  D");
+            int_text((int32_t)render_cpu2_dispatches,value);text_cat(detail,value);text_cat(detail," F");
+            int_text((int32_t)render_cpu2_fallbacks,value);text_cat(detail,value);
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)fm6_overload_shed_count(),detail);text_cat(detail," sheds  last ");
+            int_text((int32_t)fm6_overload_last_voice_count(),value);text_cat(detail,value);
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        }
+    }
+}
+
 static const char *env_rate_word(uint8_t value)
 {
     if (value >= 85u) return "FAST";
@@ -3997,6 +4049,7 @@ static const char *page_title(uint8_t current)
     case PAGE_HOME: return "HOME";
     case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
     case PAGE_GLOBAL: return "GLOBAL";
+    case PAGE_DIAG: return "AUDIO DIAG";
     case PAGE_OPERATOR_MAP: return "PATCH PITCH";
     case PAGE_ENV: return "PATCH ADSR";
     case PAGE_LFO: return lfo_view==0u?"OPERATOR":lfo_view==1u?"OP EG RATES":"OP EG TARGETS";
@@ -4029,6 +4082,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_INSTRUMENT_MACRO: return RGB(150,120,255);
     case PAGE_CHAOS: return RGB(255,85,65);
     case PAGE_GLOBAL: return RGB(85,190,255);
+    case PAGE_DIAG: return RGB(255,170,75);
     case PAGE_OPERATOR_MAP: return RGB(36,215,232);
     case PAGE_ENV: return RGB(255,170,75);
     case PAGE_LFO: return RGB(75,220,150);
@@ -4134,6 +4188,7 @@ static void draw(void)
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
     else if (page == PAGE_FX_PHASER) draw_fx_panel(3u);
+    else if (page == PAGE_DIAG) draw_audio_diag_panel();
     else draw_global_panel(pct);
     if(ui.delete_until && (int32_t)(ui.delete_until-plat_ms())>0)draw_delete_overlay();
     if(page==PAGE_SEQ && seq_clear_prompt)draw_seq_clear_prompt();
