@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <string.h>
 #include "../app/fm1lab_input_dispatch.h"
+#include "../app/fm1lab_instrument.h"
+enum { TEST_INSTRUMENT_COUNT = 32u };
 
 typedef struct {
     uint8_t fail_save;
@@ -36,7 +38,7 @@ static int fake_load(void *opaque, uint8_t lane, uint8_t instrument, int mode)
     fake_engine_t *fake = (fake_engine_t *)opaque;
     fake->load_calls++;
     if (fake->load_busy) return 1;
-    if (lane > 1u || instrument >= FM1LAB_STORE_INSTRUMENT_COUNT) return -1;
+    if (lane > 1u || instrument >= TEST_INSTRUMENT_COUNT) return -1;
     fake->active_lane = lane;
     fake->engine_target = (uint8_t)(lane * FM1LAB_PATCH_COUNT);
     if (mode == FM1LAB_INPUT_LOAD_ENGINE_BANK) {
@@ -158,6 +160,7 @@ static void test_track_round_trip_and_isolation(void)
     assert(state.track_instrument[1] == 8u && state.instrument == 8u);
     assert(fake.bank_instrument[1] == 8u);
     assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
+    state.instrument_apply_pending = 0u; /* model completion of the queued bank apply */
 
     /* T2 -> T1 restores T1's own Instrument and patch selection. */
     assert(fm1lab_input_apply(&state,
@@ -187,6 +190,7 @@ static void test_busy_and_save_failure_statuses(void)
         == FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED);
     assert(fake.save_calls == 1u && fake.load_calls == 1u);
     assert(state.instrument == 4u); /* failed save does not swallow PRESETS */
+    state.instrument_apply_pending = 0u; /* queued apply completed */
 
     state.lane = 0u;
     state.instrument = 4u;
