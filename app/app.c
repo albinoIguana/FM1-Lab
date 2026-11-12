@@ -88,6 +88,10 @@ _Static_assert((unsigned)PAGE_HOME == (unsigned)FM1LAB_INPUT_PAGE_HOME &&
                (unsigned)PAGE_SEQ_OPTIONS == (unsigned)FM1LAB_INPUT_PAGE_SEQ_OPTIONS &&
                (unsigned)PAGE_COUNT == (unsigned)FM1LAB_INPUT_PAGE_COUNT,
                "input router page values must match app pages");
+_Static_assert((unsigned)EN_SELECT == (unsigned)FM1LAB_ENCODER_SELECT,
+               "SELECT encoder ID must match the physical-control map");
+_Static_assert((unsigned)EN_PRESET == (unsigned)FM1LAB_ENCODER_PRESETS,
+               "PRESETS encoder ID must match the physical-control map");
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -4361,6 +4365,16 @@ int app_expect(const char *what, int *got)
         *got = voice_note;
     else if (!fm1lab_strcmp(what, "dirty"))
         *got = set_dirty;
+    else if (!fm1lab_strcmp(what, "lane"))
+        *got = seq_ui_lane;
+    else if (!fm1lab_strcmp(what, "focus"))
+        *got = patch_focus;
+    else if (!fm1lab_strcmp(what, "instrument"))
+        *got = instrument_index;
+    else if (!fm1lab_strncmp(what, "trackinst", 9))
+        *got = seq_ui_instrument[(uint32_t)atoi(what + 9) & 1u];
+    else if (!fm1lab_strcmp(what, "pending"))
+        *got = instrument_apply_pending;
     else if (!fm1lab_strcmp(what, "page"))
         *got = page;
     else if (!fm1lab_strcmp(what, "cpu"))
