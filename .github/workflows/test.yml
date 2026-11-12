@@ -40,6 +40,8 @@ jobs:
           git diff --exit-code -- app/fm1lab_dx7_data.h
       - name: Test Digitone conversion primitives
         run: python3 -m unittest discover -s tests -p 'test_digitone_converter.py'
+      - name: Test intercept-based polyphony fit
+        run: python3 -m unittest discover -s tests -p 'test_fit_polyphony.py'
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
