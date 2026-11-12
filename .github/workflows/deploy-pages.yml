@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Native FM1 build"]
     types: [completed]
-    branches: ["main", "test/shipwreck-single-core-startup-candidate", "fix/shipwreck-timing-instrumentation"]
+    branches: ["main", "test/shipwreck-single-core-startup-candidate", "fix/shipwreck-timing-instrumentation", "fix/shipwreck-patch-presets-track-audio"]
 
 permissions:
   contents: read
