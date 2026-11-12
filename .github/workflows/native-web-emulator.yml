@@ -12,7 +12,6 @@ on:
       - ".gitmodules"
       - ".github/workflows/native-web-emulator.yml"
   pull_request:
-    branches: [main]
     paths:
       - "app/**"
       - "tests/fm6_engine.test.c"
