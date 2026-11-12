@@ -34,6 +34,13 @@ static uint32_t web_device_cpu_q12, web_device_cpu_pct;
 static uint32_t web_device_core0_q12, web_device_core2_q12;
 static uint32_t web_device_core0_pct, web_device_core2_pct;
 static uint32_t web_device_xruns;
+#endif
+/* Per-callback timing on the physical device: wall time is compared with the
+ * sample-derived deadline; CPU2 job and wait are the longest quantum values. */
+static volatile uint32_t render_last_us, render_budget_us, render_deadline_misses;
+static volatile uint32_t render_core0_active_us, render_cpu2_job_us, render_cpu2_wait_us;
+#if defined(PLAT_WEB)
+
 #define FM1LAB_WEB_EXPORT __attribute__((used, visibility("default")))
 #else
 #define FM1LAB_WEB_EXPORT
@@ -1718,14 +1725,27 @@ uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count();
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
-#if defined(PLAT_WEB)
     uint32_t render_t0 = plat_ticks24();
+#if defined(PLAT_WEB)
     uint32_t cpu2_t0 = fm6_cpu2_total_job_ticks();
 #endif
     ui_events_drain();
     midi_in();
     master_q12=fm1lab_master_gain_scale(master_q12,master_trim_pct);
     fm6_render(lr, n, master_q12);
+    {
+        uint32_t elapsed_ticks=plat_ticks24()-render_t0;
+        uint32_t elapsed_us=elapsed_ticks/PLAT_TICKS_PER_US;
+        uint32_t budget_us=(n*1000000u)/FM6_SAMPLE_RATE_HZ;
+        uint32_t wait_us=fm6_cpu2_last_wait_us();
+        if(wait_us>elapsed_us)wait_us=elapsed_us;
+        render_last_us=elapsed_us;
+        render_budget_us=budget_us;
+        render_core0_active_us=elapsed_us-wait_us;
+        render_cpu2_job_us=fm6_cpu2_last_job_us();
+        render_cpu2_wait_us=wait_us;
+        if(budget_us && elapsed_us>budget_us)++render_deadline_misses;
+    }
 #if defined(PLAT_WEB)
     {
         uint32_t elapsed = plat_ticks24() - render_t0;
@@ -4062,11 +4082,13 @@ static void draw(void)
         cv_text(6, 4, &FONT_XS, t, C_PEWTER);
     }
     {
-        char diag[40], number[12];
-        int_text((int32_t)app_audio_cpu_pct(), diag);
-        /* Compact live hardware telemetry: render load, DMA misses, and shed voices. */
-        char suffix[24] = "% CPU  XR ";
-        text_cat(diag, suffix);
+        char diag[48], number[12];
+        uint32_t render_pct=render_budget_us?
+            (render_last_us*100u)/render_budget_us:0u;
+        int_text((int32_t)render_pct, diag);
+        /* Show measured callback deadline load, DMA misses, shed voices, and
+         * both sides of the CPU2 hand-off rather than only a generic CPU gauge. */
+        text_cat(diag, "% R XR ");
         int_text((int32_t)app_audio_xruns(), number);
         text_cat(diag, number);
         text_cat(diag, " SH ");
@@ -4077,11 +4099,11 @@ static void draw(void)
 #if defined(PLAT_WEB)
             text_cat(diag, " C2 SIM");
 #else
-            text_cat(diag, " C2 S");
-            int_text((int32_t)plat_cpu2_stack(), number);
+            text_cat(diag, " J");
+            int_text((int32_t)render_cpu2_job_us, number);
             text_cat(diag, number);
             text_cat(diag, " W");
-            int_text((int32_t)fm6_cpu2_last_wait_us(), number);
+            int_text((int32_t)render_cpu2_wait_us, number);
             text_cat(diag, number);
 #endif
         } else {
@@ -4209,6 +4231,14 @@ int app_expect(const char *what, int *got)
         *got = (int)fm6_cpu2_last_job_us();
     else if (!fm1lab_strcmp(what, "cpu2wait"))
         *got = (int)fm6_cpu2_last_wait_us();
+    else if (!fm1lab_strcmp(what, "renderus"))
+        *got = (int)render_last_us;
+    else if (!fm1lab_strcmp(what, "renderbudget"))
+        *got = (int)render_budget_us;
+    else if (!fm1lab_strcmp(what, "renderlate"))
+        *got = (int)render_deadline_misses;
+    else if (!fm1lab_strcmp(what, "core0us"))
+        *got = (int)render_core0_active_us;
     else if (!fm1lab_strcmp(what, "cpu2bad"))
         *got = (int)plat_cpu2_bad();
     else if (!fm1lab_strcmp(what, "cpu2why"))
