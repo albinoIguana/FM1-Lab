@@ -34,6 +34,10 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror tests/fm1lab_cpu2_startup.test.c -o /tmp/fm1-cpu2-startup-test
           /tmp/fm1-cpu2-startup-test
+      - name: Test held clipping peaks and diagnostic-window reset
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/fm1lab_audio_peak_window.test.c -o /tmp/fm1-audio-peak-window-test
+          /tmp/fm1-audio-peak-window-test
       - name: Patch and test both FM1 flash variants
         run: |
           python3 tools/apply-fm1-flash-compat.py
