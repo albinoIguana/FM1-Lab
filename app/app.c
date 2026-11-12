@@ -906,6 +906,28 @@ static int fm1lab_is_previous_factory_instrument(uint32_t index,
     fm1lab_seed_instrument(index,&previous);
     return fm1lab_same_library_instrument(existing,&previous);
 }
+/* Restore only the historical voice-derived placeholder name, and only
+ * when every patch is byte-identical to this slot's factory seed. */
+static uint8_t fm1lab_restore_factory_instrument_name(
+        fm1lab_instrument_t *existing,const fm1lab_instrument_t *seed)
+{
+    char patch_one_name[FM1LAB_PATCH_NAME_BYTES+1u];
+    if(!existing || !seed ||
+       memcmp(existing->patches,seed->patches,sizeof existing->patches)!=0)
+        return 0u;
+    if(memcmp(existing->name,seed->name,sizeof existing->name)==0 ||
+       fm1lab_voice_name_get(existing->patches[0].voice,patch_one_name)!=0)
+        return 0u;
+    for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
+        char expected=n<FM1LAB_PATCH_NAME_BYTES?patch_one_name[n]:'\0';
+        if(!expected) expected=' ';
+        if(existing->name[n]!=expected) return 0u;
+    }
+    for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)
+        existing->name[n]=seed->name[n];
+    return 1u;
+}
+
 static void fm1lab_seed_factory_library(void)
 {
     /* Curated CC0 six-operator DX7 library: 8 bass, 8 choir, one FM rhythm,
@@ -920,28 +942,12 @@ static void fm1lab_seed_factory_library(void)
             app_say("DX7 LIBRARY","DECODE FAILED");
             return;
         }
-        /* One-time repair: restore a corrupted name only when all patch
-         * bytes still match this slot's seed and the stored name equals patch 1.
-         * This preserves edited Instruments and legitimately named DX7 seeds. */
-        if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
-           memcmp(existing.name,seed.name,sizeof existing.name)!=0) {
-            char patch_one_name[FM1LAB_PATCH_NAME_BYTES+1u];
-            if(fm1lab_voice_name_get(existing.patches[0].voice,patch_one_name)==0) {
-                uint8_t matches_patch_name=1u;
-                for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-                    char expected=n<FM1LAB_PATCH_NAME_BYTES?patch_one_name[n]:'\0';
-                    if(!expected) expected=' ';
-                    if(existing.name[n]!=expected) { matches_patch_name=0u; break; }
-                }
-                if(matches_patch_name) {
-                    for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)
-                        existing.name[n]=seed.name[n];
-                    if(fm1lab_store_library_save_full(index,&existing,&inserts)!=0) {
-                        app_say("DX7 LIBRARY","NAME REPAIR FAILED");
-                        return;
-                    }
-                }
-            }
+        /* One-time repair: helper refuses any slot whose patch bytes differ
+         * from the factory seed, including legitimately voice-derived names. */
+        if(fm1lab_restore_factory_instrument_name(&existing,&seed) &&
+           fm1lab_store_library_save_full(index,&existing,&inserts)!=0) {
+            app_say("DX7 LIBRARY","NAME REPAIR FAILED");
+            return;
         }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
         if(!fm1lab_is_untouched_factory(&existing) &&
