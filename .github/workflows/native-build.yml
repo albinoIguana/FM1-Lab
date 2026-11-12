@@ -90,6 +90,8 @@ jobs:
         PY
         python3 tools/generate_dx7_library.py
         git diff --exit-code -- app/fm1lab_dx7_data.h
+        cc -std=c11 -Wall -Wextra -Werror -I firmware tests/fm1lab_input_route.test.c -o /tmp/fm1lab-input-route-test
+        /tmp/fm1lab-input-route-test
         bash tests/test-fm6-engine.sh
         sh build.sh --release 0.1
         # Preserve the exact native image and its symbol context for crash
