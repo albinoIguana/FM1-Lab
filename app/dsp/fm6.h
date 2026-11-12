@@ -110,6 +110,7 @@ void fm6_init(void);
 void fm6_panic(void);
 void fm6_overload(void); /* gracefully shed one oldest voice after an audio deadline warning */
 uint32_t fm6_overload_shed_count(void);
+uint32_t fm6_overload_last_voice_count(void);
 uint32_t fm6_cpu2_total_job_ticks(void);
 void fm6_note_on(uint8_t note, uint8_t velocity);
 void fm6_note_on_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask);
