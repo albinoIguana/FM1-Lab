@@ -79,6 +79,10 @@ jobs:
         env:
           FM6_TSAN: "1"
         run: bash tests/test-native-instrument.sh
+      - name: Build and exercise the real FM1 app input path
+        run: |
+          python3 base/tools/build.py app --host
+          app/build/host/fm1lab_host tests/fm1lab-input-e2e.txt app/build/host
       - name: Build official M-VAVE browser simulator
         run: bash scripts/build-m-vave-simulator.sh
       - name: Verify required native engine API
