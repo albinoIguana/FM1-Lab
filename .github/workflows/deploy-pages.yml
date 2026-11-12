@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Native FM1 build"]
     types: [completed]
-    branches: ["main"]
+    branches: ["main", "test/shipwreck-single-core-startup-candidate", "fix/shipwreck-timing-instrumentation"]
 
 permissions:
   contents: read
@@ -62,12 +62,18 @@ jobs:
           FM1_BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
           FM1_BUILD_SHA: ${{ github.event.workflow_run.head_sha }}
           FM1_BUILD_DATE: ${{ github.event.workflow_run.created_at }}
+          FM1_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           node --check native-emulator/worklet.js
           mkdir -p _site/src _site/m-vave _site/native-emulator
-          python3 scripts/build-web-installer.py /tmp/fm1-release/app/build/fm1lab-0.1.fwsc _site/install
-          test -s _site/install/firmware/fm1lab-0.1.fwsc
-          grep -q \"firmware/fm1lab-0.1.fwsc\" _site/install/index.html
+          if [ "$FM1_HEAD_BRANCH" = "test/shipwreck-single-core-startup-candidate" ] || [ "$FM1_HEAD_BRANCH" = "fix/shipwreck-timing-instrumentation" ]; then
+            install_path="_site/install-candidate"
+          else
+            install_path="_site/install"
+          fi
+          python3 scripts/build-web-installer.py /tmp/fm1-release/app/build/fm1lab-0.1.fwsc "$install_path"
+          test -s "$install_path/firmware/fm1lab-0.1.fwsc"
+          grep -q "firmware/fm1lab-0.1.fwsc" "$install_path/index.html"
           cp index.html _site/index.html
           cp .nojekyll _site/.nojekyll
           cp -R src/. _site/src/
