@@ -11,9 +11,6 @@ stack_check = true
 cpu2 = true
 cpu2_fallback = true
 cpu2_stack = 4096
-# Render into a private block, then commit only while the DMA still owns the
-# intended free half. This follows fm1-base's audio_commit path.
-audio_aside = true
 # Enable the FM1 SoC's second core for the FM6 voice-render worker.
 # Platform fallback replays a dropped worker on CPU0; audio_aside protects
 # the DMA buffer, while the app records render-deadline misses separately.
