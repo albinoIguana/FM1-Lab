@@ -1824,10 +1824,13 @@ void app_init(void)
     web_device_core0_pct = web_device_core2_pct = 0u;
     web_device_xruns = 0u;
 #endif
-    fm6_init();
-#if defined(PLAT_WEB)
-    (void)plat_cpu2_set(1); /* browser model only; physical FM1 CPU2 stays disabled pending hardware qualification */
+#if defined(FM1B_CPU2) && FM1B_CPU2
+    /* fm1-base permits CPU2 startup only here: app_init runs after cpu2_boot
+     * and before audio_init / TIMER5. Start it before engine initialization;
+     * the renderer still checks plat_cpu2_on() and safely falls back to core 0. */
+    (void)plat_cpu2_set(1);
 #endif
+    fm6_init();
     settings_defaults();
     loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
     if (loaded == (int)sizeof set && settings_valid(&set)) {
