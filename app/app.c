@@ -76,6 +76,10 @@ static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
 static fm1lab_insert_state_t current_inserts;
+#ifdef PLAT_HOST
+static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
+static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
+#endif
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
 static volatile uint8_t instrument_apply_pending;
@@ -1235,8 +1239,6 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
 static uint32_t app_host_input_failures, app_host_render_callbacks;
 static uint8_t app_host_event_test_active, app_host_event_trace_count;
 static uint8_t app_host_name_migration_pass, app_host_name_migration_stage;
-static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
-static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
 static uint8_t app_host_event_trace[3];
 static uint32_t app_host_event_callback[3], app_host_event_start_callback;
 #endif
