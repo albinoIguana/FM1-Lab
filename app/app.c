@@ -83,6 +83,11 @@ static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
+_Static_assert(PAGE_HOME == FM1LAB_INPUT_PAGE_HOME &&
+               PAGE_SEQ == FM1LAB_INPUT_PAGE_SEQ &&
+               PAGE_SEQ_OPTIONS == FM1LAB_INPUT_PAGE_SEQ_OPTIONS &&
+               PAGE_COUNT == FM1LAB_INPUT_PAGE_COUNT,
+               "input router page values must match app pages");
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
@@ -2588,7 +2593,9 @@ static void input(void)
         }
         /* PRESETS outside HOME/SEQ/SEQ OPTIONS remain inert, as before. */
         if (k == EN_PRESET && page != PAGE_HOME &&
-            page != PAGE_SEQ && page != PAGE_SEQ_OPTIONS)
+            page != PAGE_SEQ && page != PAGE_SEQ_OPTIONS &&
+            page != PAGE_SAVE && page != PAGE_ARP_STEPS &&
+            page != PAGE_OPERATOR_MAP)
             continue;
         if(page==PAGE_SAVE) {
             if(k==EN_PRESET) {
