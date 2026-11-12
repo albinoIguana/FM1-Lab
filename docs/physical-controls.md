@@ -5,7 +5,7 @@
 | MASTER | ADC channel 4 | Master output level |
 | SELECT | `encoders[0]` | Selects one of four patches on HOME; cycles FX pages in the FX section |
 | ALGORITHM | `encoders[1]` | Algorithm editing / BLE device selection; selects EQ band on the EQ page |
-| PRESETS | `encoders[2]` | Instrument/preset navigation |
+| PRESETS | `encoders[2]` | Instrument/preset navigation; selects Track 1/2 on the SEQ and SEQ OPTIONS pages |
 | KNOB 1 | `encoders[3]` | HOME: patch 1 volume; macro page: BRIGHTNESS; FX parameter 1 |
 | KNOB 2 | `encoders[4]` | HOME: patch 2 volume; macro page: BODY; FX parameter 2 |
 | KNOB 3 | `encoders[5]` | HOME: patch 3 volume; macro page: MOTION; FX parameter 3 |
