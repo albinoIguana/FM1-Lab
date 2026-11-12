@@ -44,6 +44,7 @@ static volatile uint32_t render_cpu0_voice_us, render_cpu2_job_sum_us, render_cp
 static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
 static volatile uint32_t render_peak_all_us, render_peak_window_us;
 static volatile uint32_t render_voice_peak, render_quanta, render_cpu2_quanta, render_cpu2_dispatches, render_cpu2_fallbacks;
+static volatile uint32_t render_pre_limiter_peak_q23, render_limiter_reduction_q15;
 static void app_audio_timing_reset_window(void) { render_peak_window_us=0u; }
 #if defined(PLAT_WEB)
 
@@ -1763,6 +1764,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         render_cpu2_wait_sum_us=wait_sum_us;
         render_ui_us=ui_us; render_midi_us=midi_us; render_gain_us=gain_us;
         render_voice_peak=fm6_callback_voice_peak_count();
+        render_pre_limiter_peak_q23=fm6_pre_limiter_peak_q23();
+        render_limiter_reduction_q15=fm6_limiter_reduction_q15();
         render_quanta=fm6_render_quantum_count();
         render_cpu2_quanta=fm6_cpu2_quantum_count();
         render_cpu2_dispatches=fm6_cpu2_dispatch_count();
@@ -3499,6 +3502,11 @@ static void draw_audio_diag_panel(void)
             int_text((int32_t)fm6_overload_shed_count(),detail);text_cat(detail," SHED  @ ");
             int_text((int32_t)fm6_overload_last_voice_count(),value);text_cat(detail,value);text_cat(detail," V");
             cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            uint32_t pre_pct=(uint32_t)(((uint64_t)render_pre_limiter_peak_q23*100u)/8388607u);
+            uint32_t gr_pct=(uint32_t)(((uint64_t)render_limiter_reduction_q15*100u)/32768u);
+            int_text((int32_t)pre_pct,detail);text_cat(detail,"% PRE  ");
+            int_text((int32_t)gr_pct,value);text_cat(detail,value);text_cat(detail,"% GR");
+            cv_text_fit(x+8,y+74,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
         }
     }
 }
