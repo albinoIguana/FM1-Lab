@@ -172,6 +172,7 @@ uint32_t fm6_cpu2_last_wait_us(void);
 uint32_t fm6_cpu0_voice_us(void);
 uint32_t fm6_cpu2_job_sum_us(void);
 uint32_t fm6_cpu2_wait_sum_us(void);
+uint32_t fm6_render_quantum_count(void);
 uint32_t fm6_cpu2_quantum_count(void);
 uint32_t fm6_cpu2_dispatch_count(void);
 uint32_t fm6_cpu2_fallback_count(void);
