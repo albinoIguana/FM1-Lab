@@ -113,11 +113,7 @@ jobs:
         /tmp/fm1lab-input-route-test
         bash tests/test-fm6-engine.sh
         sh build.sh --release 0.1
-        FM1_BUILD_NUMBER="${GITHUB_RUN_NUMBER:-local}" \\
-          FM1_BUILD_RUN_ID="${GITHUB_RUN_ID:-}" \\
-          FM1_BUILD_SHA="$(git rev-parse HEAD)" \\
-          FM1_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \\
-          python3 scripts/build-web-installer.py app/build/fm1lab-0.1.fwsc app/build/web-installer
+        FM1_BUILD_NUMBER="${GITHUB_RUN_NUMBER:-local}" FM1_BUILD_RUN_ID="${GITHUB_RUN_ID:-}" FM1_BUILD_SHA="$(git rev-parse HEAD)" FM1_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" python3 scripts/build-web-installer.py app/build/fm1lab-0.1.fwsc app/build/web-installer
         # Preserve the exact native image and its symbol context for crash
         # symbolication. The .fwsc package alone cannot identify a faulting PC.
         test -s app/build/fm1lab.elf
