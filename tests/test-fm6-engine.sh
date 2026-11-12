@@ -25,3 +25,15 @@ cc -std=c11 -O2 -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable \
   "$ROOT/app/dsp/fm6.c" "$ROOT/tests/fm6_dx7_library_audit.test.c" -o "$DX7_BIN"
 "$DX7_BIN"
 "$BIN"
+
+# Mirror Clipper's CORES=2/ThreadSanitizer regression: the CPU2 host twin
+# really runs concurrently with CPU0, and any unsynchronized shared access
+# fails CI rather than being hidden by the serial simulator.
+if [[ "${FM6_TSAN:-0}" == "1" ]]; then
+  TSAN_BIN="$TMP/fm6-engine-tsan"
+  cc -std=c11 -O1 -g -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable \
+    -fsanitize=thread -fno-omit-frame-pointer -pthread \
+    -I"$ROOT/app/dsp" -I"$TMP" \
+    "$ROOT/app/dsp/fm6.c" "$ROOT/tests/fm6_engine.test.c" -o "$TSAN_BIN"
+  TSAN_OPTIONS=halt_on_error=1 "$TSAN_BIN"
+fi
