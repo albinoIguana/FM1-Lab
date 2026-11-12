@@ -4523,10 +4523,15 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         app_host_name_migration_stage=3u;
         fm1lab_seed_factory_library();
         app_host_name_migration_stage=4u;
-        if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0 ||
-           memcmp(loaded.name,seed0.name,sizeof loaded.name)!=0 ||
-           memcmp(loaded.patches,seed0.patches,sizeof loaded.patches)!=0)
-            return 1;
+        if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0) {
+            app_host_name_migration_stage=41u; return 1;
+        }
+        if(memcmp(loaded.name,seed0.name,sizeof loaded.name)!=0) {
+            app_host_name_migration_stage=42u; return 1;
+        }
+        if(memcmp(loaded.patches,seed0.patches,sizeof loaded.patches)!=0) {
+            app_host_name_migration_stage=43u; return 1;
+        }
         app_host_name_migration_stage=5u;
         if(fm1lab_store_library_load_full(1u,&loaded,&inserts1)!=0 ||
            memcmp(loaded.name,edited.name,sizeof loaded.name)!=0 ||
