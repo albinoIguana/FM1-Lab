@@ -120,7 +120,7 @@ static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 /* Per-callback accounting. Tick sums retain sub-microsecond quantum precision;
  * maxima remain separate so they are never mistaken for callback totals. */
 static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
-static volatile uint32_t fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
+static volatile uint32_t fm6_render_quanta, fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
 static volatile uint32_t fm6_callback_voice_peak;
 
 #if defined(PLAT_WEB)
@@ -1280,6 +1280,7 @@ uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
 uint32_t fm6_cpu0_voice_us(void) { return fm6_cpu0_voice_ticks/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_job_sum_us(void) { return fm6_cpu2_job_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_wait_sum_us(void) { return fm6_cpu2_wait_ticks_sum/PLAT_TICKS_PER_US; }
+uint32_t fm6_render_quantum_count(void) { return fm6_render_quanta; }
 uint32_t fm6_cpu2_quantum_count(void) { return fm6_cpu2_quanta; }
 uint32_t fm6_cpu2_dispatch_count(void) { return fm6_cpu2_dispatches; }
 uint32_t fm6_cpu2_fallback_count(void) { return fm6_cpu2_fallbacks; }
@@ -1300,6 +1301,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     fm6_cpu0_voice_ticks=0u;
     fm6_cpu2_job_ticks_sum=0u;
     fm6_cpu2_wait_ticks_sum=0u;
+    fm6_render_quanta=0u;
     fm6_cpu2_quanta=0u;
     fm6_cpu2_dispatches=0u;
     fm6_cpu2_fallbacks=0u;
@@ -1311,6 +1313,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 #endif
     uint32_t base;
     for (base = 0; base < frames; base += FM6_N) {
+        ++fm6_render_quanta;
         int32_t patch_pan_l_q15[PATCHES], patch_pan_r_q15[PATCHES];
         uint32_t p, v, i;
         uint32_t count = frames - base < FM6_N ? frames - base : FM6_N;
