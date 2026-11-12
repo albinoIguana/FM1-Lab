@@ -160,6 +160,7 @@ jobs:
         print("  limits: RAM .data+.bss 98304; RAMTEXT 32768; POOL 344064 (8192 minimum spare)")
         PY
         python3 base/tools/build.py app --host
+        app/build/host/fm1lab_host tests/fm1lab-input-e2e.txt app/build/host
       packages: |
         app/build/fm1lab-0.1.fwsc
         app/build/fm1lab.elf
