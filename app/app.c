@@ -1813,6 +1813,26 @@ void app_overload(void)
     fm6_overload();
 }
 
+#if defined(FM1B_CPU2) && FM1B_CPU2
+static uint8_t cpu2_selftest_failed;
+#if !defined(PLAT_WEB)
+static volatile uint32_t cpu2_selftest_out;
+
+/* Same 64-step flash-code/shared-memory self-test used by Clipper before audio. */
+static uint32_t cpu2_selftest_lcg(uint32_t x)
+{
+    for (uint32_t i = 0; i < 64u; ++i)
+        x = x * 1664525u + 1013904223u;
+    return x;
+}
+
+static void cpu2_selftest_job(uint32_t seed)
+{
+    cpu2_selftest_out = cpu2_selftest_lcg(seed);
+}
+#endif
+#endif
+
 void app_init(void)
 {
     int performance_loaded = 0;
@@ -1826,9 +1846,23 @@ void app_init(void)
 #endif
 #if defined(FM1B_CPU2) && FM1B_CPU2
     /* fm1-base permits CPU2 startup only here: app_init runs after cpu2_boot
-     * and before audio_init / TIMER5. Start it before engine initialization;
-     * the renderer still checks plat_cpu2_on() and safely falls back to core 0. */
+     * and before audio_init / TIMER5. Start it before engine initialization. */
     (void)plat_cpu2_set(1);
+#if !defined(PLAT_WEB)
+    /* Prove a real job can execute from flash and return shared data before
+     * the first audio interrupt. A failed self-test leaves the safe CPU0 path. */
+    if (plat_cpu2_on()) {
+        const uint32_t seed = 20261010u;
+        cpu2_selftest_out = 0u;
+        if (!plat_cpu2_run(cpu2_selftest_job, seed) ||
+            plat_cpu2_wait() != 0 ||
+            cpu2_selftest_out != cpu2_selftest_lcg(seed)) {
+            cpu2_selftest_failed = 1u;
+            if (plat_cpu2_on())
+                (void)plat_cpu2_set(0);
+        }
+    }
+#endif
 #endif
     fm6_init();
     settings_defaults();
@@ -4097,22 +4131,24 @@ static void draw(void)
         int_text((int32_t)app_audio_overload_shed_count(), number);
         text_cat(diag, number);
 #if FM1B_CPU2
-        if (plat_cpu2_on()) {
 #if defined(PLAT_WEB)
-            text_cat(diag, " C2 SIM");
+        text_cat(diag, " C2 SIM");
 #else
+        if (cpu2_selftest_failed) {
+            text_cat(diag, " C2!S");
+        } else if (plat_cpu2_on()) {
             text_cat(diag, " J");
             int_text((int32_t)render_cpu2_job_us, number);
             text_cat(diag, number);
             text_cat(diag, " W");
             int_text((int32_t)render_cpu2_wait_us, number);
             text_cat(diag, number);
-#endif
         } else {
             text_cat(diag, " C2!");
             int_text((int32_t)plat_cpu2_gave_up(), number);
             text_cat(diag, number);
         }
+#endif
 #else
         text_cat(diag, " C1");
 #endif
@@ -4245,6 +4281,8 @@ int app_expect(const char *what, int *got)
         *got = (int)render_core0_active_us;
     else if (!fm1lab_strcmp(what, "cpu2bad"))
         *got = (int)plat_cpu2_bad();
+    else if (!fm1lab_strcmp(what, "cpu2selftest"))
+        *got = (int)cpu2_selftest_failed;
     else if (!fm1lab_strcmp(what, "cpu2why"))
         *got = plat_cpu2_gave_up();
 #else
