@@ -2,9 +2,14 @@
 
 These values describe one completed audio callback unless the name says
 "peak" or "count". They are diagnostic counters, not polyphony guarantees.
+The platform's `plat_ticks24()` name is historical: its documented free-running
+counter is 32-bit and wraps every 2^32 ticks. Unsigned subtraction of two reads
+is the intended elapsed-time calculation; no 24-bit mask is appropriate.
 On the FM1, press **GLO** from HOME for GLOBAL, press GLO again for the
-read-only AUDIO DIAG page, and press GLO once more to return HOME. The peak
-window resets on each physical button press and then begins accumulating again.
+read-only AUDIO DIAG page, and press GLO once more to return HOME. The render-time peak window resets on physical control presses that change or
+perform something, but not on page-navigation buttons (HOME, GLO, ENV, LFO,
+EDIT, SEL, SEQ, ARP, FX, SAVE). The touch piano keys are scanned separately
+and do not reset it. Opening AUDIO DIAG therefore preserves the test window.
 
 | Readout | Meaning |
 |---|---|
@@ -24,6 +29,8 @@ window resets on each physical button press and then begins accumulating again.
 | `cpu2dispatch` / `cpu2fallback` | Successful CPU2 dispatches and quanta rendered/finalized through the CPU0 fallback path. |
 | `uius` / `midius` / `gainus` | Callback time spent draining queued UI events, processing MIDI input, and applying master gain. |
 | `voicepeak` | Maximum simultaneous active FM voices observed in any quantum of this callback. |
+| `prelimpeak` | Maximum absolute stereo sample immediately before the final output limiter, in Q23 units. The device page displays it as percent of full scale. |
+| `limitergr` | Maximum gain reduction applied by the final stereo-linked limiter during this callback, displayed as a percentage. This is limiter action, not compressor gain reduction. |
 | `renderpeakall` | All-time maximum callback render duration since boot. |
 | `renderpeak` | Maximum callback render duration since the most recent physical button press. |
 | `shedvoice0` ... `shedvoice15` | Active voice count at each of the 16 most recent overload-shed events; 0 is newest. |
@@ -40,7 +47,9 @@ Compare `renderus` with both limits, not only `renderbudget`. The 85%
 shedding threshold occurs before the 7/8 DMA commit guard. The DMA commit
 itself is outside `renderus`.
 
-The event-drain and MIDI sub-timings help explain an unexpectedly expensive
+The pre-limiter peak and limiter gain-reduction readouts show whether the final
+output stage is being driven into limiting. They do not replace a full internal
+headroom audit of every FX bus. The event-drain and MIDI sub-timings help explain an unexpectedly expensive
 callback at low voice counts. They are included in `renderus`, not in the
 FM6 voice-only sums.
 
