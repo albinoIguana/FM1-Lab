@@ -89,10 +89,8 @@ static uint8_t patch_focus;
 /* Patch focus belongs only to HOME. Leaving HOME always clears it. */
 static void page_change(uint8_t next_page)
 {
-    if (page == PAGE_HOME && next_page != PAGE_HOME)
-        patch_focus = 0u;
-    if (next_page != PAGE_HOME)
-        patch_focus = 0u;
+    patch_focus = fm1lab_input_focus_after_page_change(
+        page, next_page, patch_focus);
     page = next_page;
 }
 static uint8_t patch_preset_cursor[FM1LAB_PATCH_COUNT];
@@ -2561,6 +2559,9 @@ static void input(void)
                 break;
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED:
                 app_say("SAVE FAILED", "PRESET CHANGED");
+                break;
+            case FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED:
+                app_say("SAVE FAILED", "PRESET UNCHANGED");
                 break;
             case FM1LAB_INPUT_RESULT_PATCH_FAILED:
                 app_say("PATCH PRESET", "LOAD FAILED");
