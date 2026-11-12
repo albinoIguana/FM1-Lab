@@ -1101,26 +1101,12 @@ static void instrument_sync_settings(void)
 
 static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
 
-static int instrument_patch_has_placeholder_name(const uint8_t *voice)
-{
-    if(!voice)return 1;
-    const char *name=(const char *)voice+145u;
-    if(fm1lab_strncmp(name,"PATCH ",6u)==0 ||
-       fm1lab_strncmp(name,"VOICE ",6u)==0 ||
-       fm1lab_strncmp(name,"INIT",4u)==0)return 1;
-    uint8_t blank=1u;
-    for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)
-        if(voice[145u+i]!=' ' && voice[145u+i]!=0u)blank=0u;
-    return blank;
-}
-
 static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
 {
     uint8_t repaired=0u;
     if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
     for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
-        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) ||
-           instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
+        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice)) {
             uint8_t playable[FM1LAB_PATCH_BYTES];
             uint8_t previous_level=instrument->patches[patch].level;
             fm1lab_factory_voice_build(playable,patch);
@@ -1141,7 +1127,6 @@ static int instrument_load(uint32_t index, int from_audio)
     if (index >= USER_INSTRUMENT_COUNT) return FM1LAB_LOAD_INVALID;
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
-    uint8_t repaired_patches = 0u;
     uint8_t previous_instrument=seq_ui_instrument[seq_ui_lane&1u];
     int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
     if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
@@ -1150,7 +1135,9 @@ static int instrument_load(uint32_t index, int from_audio)
     } else {
         instrument_factory_defaults();
     }
-    repaired_patches=instrument_repair_missing_voices(&current_instrument);
+    /* Missing-carrier recovery is an in-memory safety fallback only.
+     * It must not mark a loaded Instrument dirty or silently rewrite storage. */
+    (void)instrument_repair_missing_voices(&current_instrument);
     instrument_index = (uint8_t)index;
     if(previous_instrument!=instrument_index)
         for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++)
@@ -1159,8 +1146,7 @@ static int instrument_load(uint32_t index, int from_audio)
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     instrument_loaded = 1u;
-    instrument_dirty = repaired_patches;
-    if (instrument_dirty) set_dirty = 1u;
+    instrument_dirty = 0u;
     instrument_sync_settings();
     if (from_audio == 1) {
         /* PRESET changes replace this lane's engine bank. The master chain
