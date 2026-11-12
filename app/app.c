@@ -1211,11 +1211,30 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
     return result == FM1LAB_LOAD_OK ? 0 : result == FM1LAB_LOAD_BUSY ? 1 : -1;
 }
 
+#ifdef PLAT_HOST
+static uint32_t app_host_input_failures;
+#endif
 static int app_input_patch_preset_step(void *opaque, uint8_t patch, int delta)
 {
     (void)opaque;
+#ifdef PLAT_HOST
+    fm1lab_instrument_t before=current_instrument;
+    uint8_t before_index=instrument_index;
+#endif
     set.patch = patch;
-    return fm1lab_patch_preset_step(delta);
+    int result=fm1lab_patch_preset_step(delta);
+#ifdef PLAT_HOST
+    if(result==0) {
+        if(memcmp(before.name,current_instrument.name,sizeof before.name)!=0 ||
+           before_index!=instrument_index)
+            app_host_input_failures++;
+        for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++)
+            if(p!=patch && memcmp(&before.patches[p],&current_instrument.patches[p],
+                                  sizeof before.patches[p])!=0)
+                app_host_input_failures++;
+    }
+#endif
+    return result;
 }
 
 static void app_input_publish(void *opaque)
@@ -4417,6 +4436,11 @@ int app_expect(const char *what, int *got)
     else
         return 0;
     return 1;
+}
+
+int app_host_fails(void)
+{
+    return (int)app_host_input_failures;
 }
 #endif
 

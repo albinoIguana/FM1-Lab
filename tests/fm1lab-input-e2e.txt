@@ -71,4 +71,20 @@ spin SELECT -1
 wait 40
 expect lane 0
 expect instrument 2
+
+# T1's patch selection is independent of T2's and survives the round trip.
+tap HOME
+wait 40
+spin SELECT 1
+wait 40
+expect focus 1
+expect patch 1
+tap SEQ
+wait 40
+spin SELECT 1
+wait 40
+expect lane 1
+spin SELECT -1
+wait 40
+expect lane 0
 expect patch 1

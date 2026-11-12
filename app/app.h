@@ -48,4 +48,8 @@ void app_say(const char *a, const char *b);   /* a short message on the screen a
 
 /* the host simulator's checks (host/plat_host.c "expect"): octave, wave, note (-1 none), dirty, turnsN */
 #define APP_HOST_EXPECT
+#ifdef PLAT_HOST
+#define APP_HOST_FAILS
+int app_host_fails(void);
+#endif
 int app_expect(const char *what, int *got);
