@@ -75,7 +75,7 @@ jobs:
         elif new not in source:
             raise SystemExit("Expected FM1 base CFLAGS definition not found")
         timeout_old = "flags += cpu2_stack_flags()"
-        timeout_new = timeout_old + '\\n        flags += ["-DFM1_CPU1_TIMEOUT_US=1500u"]'
+        timeout_new = timeout_old + '\n        flags += ["-DFM1_CPU1_TIMEOUT_US=1500u"]'
         if timeout_old in source:
             source = source.replace(timeout_old, timeout_new, 1)
         elif timeout_new not in source:
