@@ -2319,7 +2319,7 @@ static void input(void)
             patch_focus = 0u;
             app_say("INSTRUMENT", seq_ui_lane ? "TRACK 2 PATCH" : "TRACK 1 PATCH");
         } else if (k == B_GLO) {
-            page = page==PAGE_HOME?PAGE_GLOBAL:page==PAGE_GLOBAL?PAGE_DIAG:PAGE_HOME;
+            page = page==PAGE_GLOBAL?PAGE_DIAG:page==PAGE_DIAG?PAGE_HOME:PAGE_GLOBAL;
             app_say(page==PAGE_GLOBAL?"GLOBAL":page==PAGE_DIAG?"AUDIO DIAGNOSTICS":"HOME",
                     page==PAGE_DIAG?"TIMING / LOAD":"SETTINGS");
         } else if (k == B_ENV) {
