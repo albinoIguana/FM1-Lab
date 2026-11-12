@@ -15,7 +15,7 @@ fi
 python3 "$FELUCCA/tools/gen_tables.py" "$TMP/felucca_tables.h"
 python3 "$FELUCCA/tools/gen_fm6_patches.py" "$TMP/felucca_fm6.h"
 
-cc -std=c11 -O2 -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable \
+cc -std=c11 -O2 -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable -pthread \
   -I"$ROOT/app/dsp" -I"$TMP" \
   "$ROOT/app/dsp/fm6.c" "$ROOT/tests/fm6_engine.test.c" -o "$BIN"
 
