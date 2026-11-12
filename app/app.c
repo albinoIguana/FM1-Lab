@@ -913,6 +913,29 @@ static void fm1lab_seed_factory_library(void)
             app_say("DX7 LIBRARY","DECODE FAILED");
             return;
         }
+        /* One-time repair: restore a corrupted name only when all patch
+         * bytes still match this slot's seed and the stored name equals patch 1.
+         * This preserves edited Instruments and legitimately named DX7 seeds. */
+        if(memcmp(existing.patches,seed.patches,sizeof existing.patches)==0 &&
+           memcmp(existing.name,seed.name,sizeof existing.name)!=0) {
+            char patch_one_name[FM1LAB_PATCH_NAME_BYTES+1u];
+            if(fm1lab_voice_name_get(existing.patches[0].voice,patch_one_name)==0) {
+                uint8_t matches_patch_name=1u;
+                for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
+                    char expected=n<FM1LAB_PATCH_NAME_BYTES?patch_one_name[n]:'\0';
+                    if(!expected) expected=' ';
+                    if(existing.name[n]!=expected) { matches_patch_name=0u; break; }
+                }
+                if(matches_patch_name) {
+                    for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)
+                        existing.name[n]=seed.name[n];
+                    if(fm1lab_store_library_save_full(index,&existing,&inserts)!=0) {
+                        app_say("DX7 LIBRARY","NAME REPAIR FAILED");
+                        return;
+                    }
+                }
+            }
+        }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
         if(!fm1lab_is_untouched_factory(&existing) &&
            !fm1lab_instrument_is_blank_library_slot(&existing) &&
@@ -1105,35 +1128,6 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
     return repaired;
 }
 
-static uint8_t instrument_repair_placeholder_name(fm1lab_instrument_t *instrument)
-{
-    uint8_t changed=0u;
-    if(!instrument || instrument->name[0]!='I' || instrument->name[1]!='N' ||
-       instrument->name[2]!='S' || instrument->name[3]!='T' ||
-       instrument->name[4]!='R')return 0u;
-    char name[FM1LAB_PATCH_NAME_BYTES+1u];
-    uint8_t found=0u;
-    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
-        char candidate[FM1LAB_PATCH_NAME_BYTES+1u];
-        if(fm1lab_voice_name_get(instrument->patches[patch].voice,candidate)==0 &&
-           candidate[0] && !instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
-            for(uint32_t i=0u;i<=FM1LAB_PATCH_NAME_BYTES;i++)name[i]=candidate[i];
-            found=1u;
-            break;
-        }
-    }
-    if(!found) {
-        name[0]='F';name[1]='M';name[2]=' ';name[3]='I';name[4]='N';
-        name[5]='S';name[6]='T';name[7]='R';name[8]='U';name[9]='M';name[10]='\0';
-    }
-    for(uint32_t i=0u;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++) {
-        char next=i<FM1LAB_PATCH_NAME_BYTES && name[i]?name[i]:' ';
-        if(instrument->name[i]!=next)changed=1u;
-        instrument->name[i]=next;
-    }
-    return changed;
-}
-
 enum { FM1LAB_LOAD_OK = 0, FM1LAB_LOAD_BUSY = 1, FM1LAB_LOAD_INVALID = 2 };
 static int instrument_load(uint32_t index, int from_audio)
 {
@@ -1150,13 +1144,12 @@ static int instrument_load(uint32_t index, int from_audio)
         instrument_factory_defaults();
     }
     repaired_patches=instrument_repair_missing_voices(&current_instrument);
-    uint8_t repaired_name=instrument_repair_placeholder_name(&current_instrument);
     instrument_index = (uint8_t)index;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     instrument_loaded = 1u;
-    instrument_dirty = (uint8_t)(repaired_patches || repaired_name);
+    instrument_dirty = repaired_patches;
     if (instrument_dirty) set_dirty = 1u;
     instrument_sync_settings();
     if (from_audio == 1) {
@@ -2145,10 +2138,7 @@ void app_init(void)
             startup_instrument_scratch=factory_instrument;
             fm1lab_insert_state_init(&startup_insert_scratch);
         }
-        uint8_t other_repaired=instrument_repair_missing_voices(&startup_instrument_scratch);
-        uint8_t other_renamed=instrument_repair_placeholder_name(&startup_instrument_scratch);
-        if(other_repaired || other_renamed)
-            (void)fm1lab_store_library_save_full(other_index,&startup_instrument_scratch,&startup_insert_scratch);
+        (void)instrument_repair_missing_voices(&startup_instrument_scratch);
         sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
         instrument_apply_engine_bank(other_lane,&startup_instrument_scratch,&startup_insert_scratch,0u);
@@ -3210,7 +3200,12 @@ static const char *instrument_display_name(void)
     static char name[FM1LAB_INSTRUMENT_NAME_BYTES + 1u];
     uint32_t i=0u; while(i<FM1LAB_INSTRUMENT_NAME_BYTES && current_instrument.name[i]) { name[i]=current_instrument.name[i]; ++i; }
     while(i && name[i-1u]==' ') --i;
-    if(!i) { name[0]='I';name[1]='N';name[2]='S';name[3]='T';name[4]='R';name[5]='U';name[6]='M';name[7]='E';name[8]='N';name[9]='T';i=10u; }
+    if(!i) {
+        static const char fallback[]="INSTRUMENT ";
+        for(i=0u;i<sizeof fallback-1u;i++) name[i]=fallback[i];
+        int_text((int32_t)instrument_index+1,name+i);
+        i+=(uint32_t)fm1lab_strlen(name+i);
+    }
     name[i]='\0'; return name;
 }
 
