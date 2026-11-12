@@ -17,6 +17,7 @@
 #include "fm1lab_dx7_legacy_data.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include "fm1lab_preset_control.h"
+#include "fm1lab_input_route.h"
 #include <stddef.h>
 
 #define C_PEWTER RGB(175,185,195)
@@ -82,6 +83,15 @@ static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
 static uint8_t page = PAGE_HOME;
+/* Patch focus belongs only to HOME. Leaving HOME always clears it. */
+static void page_change(uint8_t next_page)
+{
+    if (page == PAGE_HOME && next_page != PAGE_HOME)
+        patch_focus = 0u;
+    if (next_page != PAGE_HOME)
+        patch_focus = 0u;
+    page_change(next_page);
+}
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
 static uint8_t patch_preset_cursor[FM1LAB_PATCH_COUNT];
@@ -1120,8 +1130,11 @@ static uint8_t instrument_repair_placeholder_name(fm1lab_instrument_t *instrumen
     return changed;
 }
 
-static void instrument_load(uint32_t index, int from_audio)
+enum { FM1LAB_LOAD_OK = 0, FM1LAB_LOAD_BUSY = 1, FM1LAB_LOAD_INVALID = 2 };
+static int instrument_load(uint32_t index, int from_audio)
 {
+    if (instrument_apply_pending) return FM1LAB_LOAD_BUSY;
+    if (index >= USER_INSTRUMENT_COUNT) return FM1LAB_LOAD_INVALID;
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
     uint8_t repaired_patches = 0u;
@@ -1155,6 +1168,7 @@ static void instrument_load(uint32_t index, int from_audio)
     } else {
         instrument_apply_engine();
     }
+    return FM1LAB_LOAD_OK;
 }
 
 static int instrument_save_to(uint32_t index)
@@ -1178,7 +1192,7 @@ static void save_screen_open(void)
     save_patch=set.patch;
     save_name_target=0u;
     save_name_cursor=0u;
-    page=PAGE_SAVE;
+    page_change(PAGE_SAVE);
     app_say("SAVE INSTRUMENT","CHOOSE SLOT / NAME");
 }
 static void save_name_step(int delta)
@@ -1918,7 +1932,7 @@ void app_init(void)
         }
         settings_seal(&set);
     }
-    page = PAGE_HOME;
+    page_change(PAGE_HOME);
     /* A cold start always opens the first patch of the active Instrument.
      * Patch focus is transient UI state, not a preference to restore. */
     set.patch = 0u;
@@ -2288,20 +2302,20 @@ static void input(void)
         else if (k == B_REC)
             ui.rec_t = plat_ms();                /* short release arms recording; long hold retains Bluetooth toggle */
         else if (k == B_HOME) {
-            page = PAGE_HOME;
+            page_change(PAGE_HOME);
             set.patch = seq_ui_patch[seq_ui_lane];
             patch_focus = 0u;
             app_say("INSTRUMENT", seq_ui_lane ? "TRACK 2 PATCH" : "TRACK 1 PATCH");
         } else if (k == B_GLO) {
-            page = page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL;
+            page_change(page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL);
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
         } else if (k == B_ENV) {
-            page = PAGE_ENV;
+            page_change(PAGE_ENV);
             app_say("ENVELOPE", "PATCH ADSR");
         } else if (k == B_LFO) {
             if (page == PAGE_LFO || page == PAGE_LFO_MOD) lfo_view = (uint8_t)((lfo_view + 1u) % 5u);
             else lfo_view = 0u;
-            page = lfo_view < 3u ? PAGE_LFO : PAGE_LFO_MOD;
+            page_change(lfo_view < 3u ? PAGE_LFO : PAGE_LFO_MOD);
             app_say("FM WORKBENCH", lfo_view==0u?"OPERATOR":lfo_view==1u?"EG RATES":
                 lfo_view==2u?"EG TARGETS":lfo_view==3u?"LFO MOTION":"LFO RESPONSE");
         } else if (k == B_SEL) {
@@ -2310,32 +2324,32 @@ static void input(void)
                 sequencer_events_publish();
                 if(seq_event_count[seq_ui_lane] && seq_selected_event[seq_ui_lane]>=seq_event_count[seq_ui_lane])
                     seq_selected_event[seq_ui_lane]=0u;
-                page = PAGE_SEQ_PIANO;
+                page_change(PAGE_SEQ_PIANO);
                 seq_clear_prompt=0u;seq_clear_turn=0;
                 app_say("PIANO ROLL",seq_ui_lane?"TRACK 2":"TRACK 1");
             } else if (page == PAGE_SEQ_PIANO) {
-                page = PAGE_SEQ;
+                page_change(PAGE_SEQ);
                 seq_clear_prompt=0u;seq_clear_turn=0;
                 app_say("SEQUENCER","TWO LANES");
             } else if (page == PAGE_CHAOS) {
-                page = PAGE_HOME;
+                page_change(PAGE_HOME);
                 app_say("HOME", "ALL FOUR PATCHES");
             } else {
-                page = PAGE_CHAOS;
+                page_change(PAGE_CHAOS);
                 app_say("MAELSTROM", "SHIPWRECK v0.1");
             }
         } else if (k == B_EDIT) {
             if(page==PAGE_SEQ_PIANO) {
                 sequencer_event_delete_selected();
             } else if(page==PAGE_MACRO) {
-                page=PAGE_HOME;app_say("HOME","PATCHES");
+                page_change(PAGE_HOME);app_say("HOME","PATCHES");
             } else {
                 if(page==PAGE_HOME && !patch_focus) {
                     set.patch=0u;
                     patch_focus=1u;
                     seq_ui_patch[seq_ui_lane]=0u;
                 }
-                page=PAGE_MACRO;
+                page_change(PAGE_MACRO);
                 app_say("PATCH MACROS",patch_display_name(set.patch));
             }
         } else if (k == B_SEQ) {
@@ -2343,8 +2357,8 @@ static void input(void)
         } else if (k == B_ARP) {
             ui.arp_hold_t=plat_ms();ui.arp_hold_fired=0u;
         } else if (k == B_FX) {
-            if (page < PAGE_FX_AMP || page > PAGE_FX_EQ) page = PAGE_FX_AMP;
-            else page = page >= PAGE_FX_EQ ? PAGE_FX_AMP : (uint8_t)(page + 1u);
+            if (page < PAGE_FX_AMP || page > PAGE_FX_EQ) page_change(PAGE_FX_AMP);
+            else page_change(page >= PAGE_FX_EQ ? PAGE_FX_AMP : (uint8_t)(page + 1u));
             app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PHASER");
         } else if (k == B_PLAY) {
             /* PLAY is a global transport toggle; the current page only
@@ -2363,7 +2377,7 @@ static void input(void)
                 settings_seal(&set);
                 int settings_result=plat_store_save(OBJ_SETTINGS,&set,sizeof set);
                 if(instrument_result==0 && settings_result==0) {
-                    set_dirty=0u;page=PAGE_HOME;patch_focus=0u;
+                    set_dirty=0u;page_change(PAGE_HOME);patch_focus=0u;
                     app_say("INSTRUMENT SAVED",instrument_display_name());
                 } else app_say("SAVE FAILED","CHECK SLOT / STORAGE");
             }
@@ -2382,9 +2396,9 @@ static void input(void)
             }
         } else {
             if(!ui.arp_hold_fired) {
-                if(page==PAGE_ARP)page=PAGE_ARP_STEPS;
-                else if(page==PAGE_ARP_STEPS)page=PAGE_ARP_LATCH;
-                else page=PAGE_ARP;
+                if(page==PAGE_ARP)page_change(PAGE_ARP_STEPS);
+                else if(page==PAGE_ARP_STEPS)page_change(PAGE_ARP_LATCH);
+                else page_change(PAGE_ARP);
                 app_say("ARPEGGIATOR",page==PAGE_ARP?"ENGINE":page==PAGE_ARP_STEPS?"STEP EDITOR":"LATCH");
             }
             ui.arp_hold_t=0u;ui.arp_hold_fired=0u;
@@ -2417,8 +2431,8 @@ static void input(void)
             }
         } else {
             if(!ui.seq_hold_fired) {
-                if(page==PAGE_SEQ)page=PAGE_SEQ_OPTIONS;
-                else page=PAGE_SEQ;
+                if(page==PAGE_SEQ)page_change(PAGE_SEQ_OPTIONS);
+                else page_change(PAGE_SEQ);
                 app_say("SEQUENCER",page==PAGE_SEQ_OPTIONS?"RECORD MODE":"TWO LANES");
             }
             ui.seq_hold_t=0u;ui.seq_hold_fired=0u;
@@ -2454,10 +2468,107 @@ static void input(void)
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
         ui.redraw = 1;
-        /* PRESETS is active on Home, plus the main Sequencer page when its
-         * selected track is highlighted. All other pages ignore the encoder. */
-        if (k == EN_PRESET && !fm1lab_preset_encoder_enabled(
-                page, PAGE_HOME, PAGE_SEQ, (uint8_t)(seq_ui_lane < 2u)))
+        /* One exclusive route owns HOME and both Sequencer pages. K1-K4
+         * and unrelated page controls continue through their existing handlers. */
+        enum fm1lab_input_action action = fm1lab_input_route(page, (uint8_t)k, patch_focus);
+        if (action != FM1LAB_INPUT_NONE) {
+            switch (action) {
+            case FM1LAB_INPUT_PATCH_FOCUS_STEP: {
+                int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
+                if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
+                set.patch = (uint8_t)next;
+                patch_focus = 1u;
+                seq_ui_patch[seq_ui_lane] = set.patch;
+                performance_publish();
+                set_dirty = 1u;
+                app_say("PATCH", patch_display_name(set.patch));
+                break;
+            }
+            case FM1LAB_INPUT_PATCH_PRESET_STEP:
+                if (instrument_apply_pending) {
+                    app_say("LOAD BUSY", "PATCH NOT CHANGED");
+                } else if (fm1lab_patch_preset_step(e) == 0) {
+                    app_say("PATCH PRESET", patch_display_name(set.patch));
+                } else {
+                    app_say("PATCH PRESET", "LOAD FAILED");
+                }
+                break;
+            case FM1LAB_INPUT_INSTRUMENT_STEP:
+            case FM1LAB_INPUT_TRACK_INSTRUMENT_STEP: {
+                int save_failed;
+                int32_t next;
+                int load_status;
+                if (instrument_apply_pending) {
+                    app_say("LOAD BUSY", "PRESET NOT CHANGED");
+                    break;
+                }
+                /* A failed save is reported but does not swallow the user's
+                 * PRESETS turn: the requested preset change still proceeds. */
+                save_failed = instrument_dirty && instrument_save() != 0;
+                next = ((int32_t)seq_ui_instrument[seq_ui_lane] + e) %
+                    (int32_t)USER_INSTRUMENT_COUNT;
+                if (next < 0) next += (int32_t)USER_INSTRUMENT_COUNT;
+                if ((uint32_t)next == instrument_index) {
+                    if (save_failed) app_say("SAVE FAILED", "PRESET UNCHANGED");
+                    else app_say("INSTRUMENT", "ALREADY SELECTED");
+                    break;
+                }
+                patch_focus = 0u;
+                load_status = instrument_load((uint32_t)next, 1);
+                if (load_status == FM1LAB_LOAD_BUSY) {
+                    app_say("LOAD BUSY", "PRESET NOT CHANGED");
+                } else if (load_status != FM1LAB_LOAD_OK) {
+                    app_say("LOAD FAILED", "PRESET NOT CHANGED");
+                } else {
+                    performance_publish();
+                    set_dirty = 1u;
+                    if (save_failed) app_say("SAVE FAILED", "PRESET CHANGED");
+                    else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP)
+                        app_say("TRACK INSTRUMENT", "LOADING");
+                    else {
+                        int_text(next + 1, t);
+                        app_say("INSTRUMENT", t);
+                    }
+                }
+                break;
+            }
+            case FM1LAB_INPUT_TRACK_TOGGLE: {
+                uint8_t previous_lane = seq_ui_lane;
+                uint8_t next_lane = fm1lab_input_track_next(seq_ui_lane, e);
+                int load_status;
+                if (instrument_apply_pending) {
+                    app_say("LOAD BUSY", "TRACK NOT CHANGED");
+                    break;
+                }
+                if (instrument_dirty && instrument_save() != 0) {
+                    app_say("SAVE FAILED", "TRACK NOT CHANGED");
+                    break;
+                }
+                if (next_lane == previous_lane)
+                    break;
+                seq_ui_lane = next_lane;
+                load_status = instrument_load(seq_ui_instrument[seq_ui_lane], 2);
+                if (load_status != FM1LAB_LOAD_OK) {
+                    seq_ui_lane = previous_lane;
+                    app_say(load_status == FM1LAB_LOAD_BUSY ? "LOAD BUSY" : "LOAD FAILED",
+                            "TRACK NOT CHANGED");
+                    break;
+                }
+                set.patch = seq_ui_patch[seq_ui_lane];
+                performance_publish();
+                set_dirty = 1u;
+                app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
+                break;
+            }
+            case FM1LAB_INPUT_NONE:
+            default:
+                break;
+            }
+            continue; /* exactly one routed action handled this encoder report */
+        }
+        /* PRESETS outside HOME/SEQ/SEQ OPTIONS remain inert, as before. */
+        if (k == EN_PRESET && page != PAGE_HOME &&
+            page != PAGE_SEQ && page != PAGE_SEQ_OPTIONS)
             continue;
         if(page==PAGE_SAVE) {
             if(k==EN_PRESET) {
@@ -2511,18 +2622,6 @@ static void input(void)
         } else if (k == EN_SELECT && page == PAGE_SEQ_PIANO) {
             sequencer_select_event(e);
             app_say("NOTE","SELECTED");
-        } else if (fm1lab_sequencer_track_select_dispatch(
-                       page, PAGE_SEQ, PAGE_SEQ_OPTIONS, k, e, seq_ui_lane, &next_lane)) {
-            /* k is the encoder index polled by plat_enc(k). Save the current
-             * Instrument before committing the dispatched track change. */
-            if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","TRACK NOT CHANGED");continue;}
-            seq_ui_lane = (uint8_t)next_lane;
-            set.patch = seq_ui_patch[seq_ui_lane];
-            patch_focus = 0u;
-            instrument_load(seq_ui_instrument[seq_ui_lane],2);
-            performance_publish();set_dirty=1u;
-            app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
-
         } else if (k == EN_ALGO && page == PAGE_FX_COMPRESSOR) {
             compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
             app_say("COMP MAKEUP","UPDATED");
@@ -2530,7 +2629,7 @@ static void input(void)
             int32_t next = (int32_t)(page - PAGE_FX_AMP) + e;
             next %= 7;
             if (next < 0) next += 7;
-            page = (uint8_t)(PAGE_FX_AMP + next);
+            page_change((uint8_t)(PAGE_FX_AMP + next));
             app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PARAMETRIC EQ");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
@@ -2548,43 +2647,13 @@ static void input(void)
             if(arp_ui_step>=arp_ui_length)arp_ui_step=(uint8_t)(arp_ui_length-1u);
             performance_publish();set_dirty=1u;
             app_say("ARP LENGTH",arp_ui_length==8u?"8 STEPS":"16 STEPS");
-        } else if (k == EN_PRESET && page == PAGE_SEQ && seq_ui_lane < 2u) {
-            if(instrument_apply_pending)continue;
-            if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","INSTRUMENT NOT CHANGED");continue;}
-            int32_t next=((int32_t)seq_ui_instrument[seq_ui_lane]+e)%(int32_t)USER_INSTRUMENT_COUNT;
-            if(next<0)next+=(int32_t)USER_INSTRUMENT_COUNT;
-            patch_focus=0u;
-            instrument_load((uint32_t)next,1);
-            performance_publish();set_dirty=1u;
-            app_say("TRACK INSTRUMENT","LOADING");
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             app_say("PATCH PITCH", "K1 OCTAVE / K2 FINE");
         } else if (k == EN_PRESET) {
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
-            } else if(page==PAGE_HOME &&
-                      fm1lab_preset_target(patch_focus,0u)==FM1LAB_PRESET_TARGET_PATCH) {
-                if(fm1lab_patch_preset_step(e)==0)
-                    app_say("PATCH PRESET",patch_display_name(set.patch));
-                else
-                    app_say("PATCH PRESET","LOAD FAILED");
             } else {
-                /* No patch card focused: PRESETS changes the complete
-                 * four-patch Instrument. The Sequencer always uses this mode. */
-                if(instrument_dirty && instrument_save()!=0) {
-                    app_say("SAVE FAILED","PRESET NOT CHANGED");
-                    continue;
-                }
-                int32_t next=((int32_t)seq_ui_instrument[seq_ui_lane]+e)%
-                    (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
-                if(next<0)next+=(int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
-                if((uint32_t)next!=instrument_index) {
-                    patch_focus=0u;
-                    instrument_load((uint32_t)next,1);
-                    performance_publish();set_dirty=1u;
-                    int_text(next+1,t);
-                    app_say("INSTRUMENT",t);
-                }
+                app_say("PRESET", "NOT AVAILABLE");
             }
         } else if (k >= EN_K1 && k <= EN_K4) {
             uint32_t index = (uint32_t)k - EN_K1;
