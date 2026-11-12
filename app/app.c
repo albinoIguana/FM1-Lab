@@ -4611,6 +4611,26 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         }
         app_host_name_migration_stage=8u;
 
+        /* A valid audible voice named INIT is user data, not a missing voice. */
+        {
+            fm1lab_instrument_t named_init=seed1;
+            fm1lab_insert_state_t inserts2;
+            static const char init_name[FM1LAB_PATCH_NAME_BYTES] =
+                {'I','N','I','T',' ',' ',' ',' ',' ',' '};
+            if(fm1lab_store_library_load_full(2u,&loaded,&inserts2)!=0 ||
+               !fm1lab_voice_has_audible_carrier(named_init.patches[0].voice))
+                return 1;
+            for(uint32_t n=0u;n<FM1LAB_PATCH_NAME_BYTES;n++)
+                named_init.patches[0].voice[145u+n]=(uint8_t)init_name[n];
+            if(fm1lab_store_library_save_full(2u,&named_init,&inserts2)!=0 ||
+               instrument_load(2u,0)!=FM1LAB_LOAD_OK ||
+               memcmp(current_instrument.patches[0].voice,
+                      named_init.patches[0].voice,FM1LAB_PATCH_BYTES)!=0 ||
+               instrument_dirty!=0u) {
+                app_host_name_migration_stage=81u; return 1;
+            }
+        }
+
         blank=factory_instrument;
         memset(blank.name,' ',sizeof blank.name);
         if(fm1lab_store_library_load_full(31u,&loaded,&inserts31)!=0)
