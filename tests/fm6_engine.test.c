@@ -782,6 +782,8 @@ int main(void) {
     assert(stress_peak > 0u);
     assert(fm6_test_output_peak() <= 7470000u);
     assert(fm6_test_limiter_events() > 0u);
+    assert(fm6_pre_limiter_peak_q23() >= fm6_test_output_peak());
+    assert(fm6_limiter_reduction_q15() > 0u);
     assert(stereo_frames > 0u); /* chorus is actually contributing stereo output */
     assert(fm6_sequencer_step() > 0u);
     fm6_panic();
