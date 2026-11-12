@@ -28,7 +28,7 @@ jobs:
       - name: Apply and test FM1 DMA deadline guard
         run: |
           python3 tools/apply-fm1-base-audio-deadline.py
-          cc -std=c11 -Wall -Wextra -Werror -I base/device base/tests/audio_commit_test.c -o /tmp/fm1-audio-commit-test
+          cc -std=c11 -Wall -Wextra -Werror -I base/device tests/fm1lab_audio_commit.test.c -o /tmp/fm1-audio-commit-test
           /tmp/fm1-audio-commit-test
       - name: Patch and test both FM1 flash variants
         run: |
