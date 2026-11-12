@@ -39,6 +39,7 @@ expect patch 1
 spin PRESET 1
 wait 40
 expect instrument 1
+expect presetcursor 0
 expect trackinst1 1
 
 # HOME with no patch focus changes the complete Instrument.
@@ -79,6 +80,9 @@ spin SELECT 1
 wait 40
 expect focus 1
 expect patch 1
+spin PRESET 1
+wait 40
+expect presetcursor 0
 tap SEQ
 wait 40
 spin SELECT 1
@@ -88,6 +92,7 @@ spin SELECT -1
 wait 40
 expect lane 0
 expect patch 1
+expect presetcursor 0
 
 # Force note-on, Instrument-load, and performance-apply events into the same
 # queue. The app's host-only assertion checks FIFO order and callback spacing.

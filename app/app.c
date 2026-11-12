@@ -4400,6 +4400,8 @@ int app_expect(const char *what, int *got)
         *got = seq_ui_lane;
     else if (!fm1lab_strcmp(what, "focus"))
         *got = patch_focus;
+    else if (!fm1lab_strcmp(what, "presetcursor"))
+        *got = patch_preset_cursor[seq_ui_lane&1u][set.patch];
     else if (!fm1lab_strcmp(what, "instrument"))
         *got = instrument_index;
     else if (!fm1lab_strncmp(what, "trackinst", 9))
