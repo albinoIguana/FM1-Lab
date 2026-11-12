@@ -17,7 +17,7 @@ def replace_once(path: Path, old: str, new: str) -> None:
 
 # The pinned fm1-base predates audio_aside/audio_commit.c. Add the audited
 # aside renderer here rather than relying on an unsupported TOML key.
-audio = BASE / "device/audio_commit.c"
+audio = BASE / "device/audio_commit.inc"
 audio_source = """/* FM1 Open-style aside buffer and deadline-safe DMA commit.
  * Included by main_fm1.c after HALF_WORDS and abuf are declared. */
 static int32_t aside[HALF_WORDS] __attribute__((aligned(4)));
@@ -46,13 +46,13 @@ static uint32_t audio_commit(uint32_t half, uint32_t render_us, uint32_t budget_
 if not audio.exists():
     audio.write_text(audio_source)
 elif audio.read_text() != audio_source:
-    raise SystemExit("Unexpected base/device/audio_commit.c already exists; inspect before replacing it")
+    raise SystemExit("Unexpected base/device/audio_commit.inc already exists; inspect before replacing it")
 
 main = BASE / "device/main_fm1.c"
 replace_once(main,
     "static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));",
     """static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));
-#include "audio_commit.c" /* separate render buffer and guarded DMA-half commit */""")
+#include "audio_commit.inc" /* separate render buffer and guarded DMA-half commit */""")
 replace_once(main,
     "static void render_block(int32_t *o)                /* ALNK0: one half, measured */",
     "static uint32_t render_block(int32_t *o)             /* ALNK0: one half, measured */")
