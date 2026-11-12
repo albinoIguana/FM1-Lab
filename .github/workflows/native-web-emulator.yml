@@ -11,6 +11,16 @@ on:
       - "upstream/felucca"
       - ".gitmodules"
       - ".github/workflows/native-web-emulator.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "tests/fm6_engine.test.c"
+      - "firmware/**"
+      - "base"
+      - "upstream/felucca"
+      - ".gitmodules"
+      - ".github/workflows/native-web-emulator.yml"
   workflow_dispatch:
 
 permissions:
@@ -79,6 +89,7 @@ jobs:
           retention-days: 14
 
       - name: Publish browser preview on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git fetch origin main
           remote_sha="$(git rev-parse FETCH_HEAD)"
