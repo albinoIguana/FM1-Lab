@@ -1214,6 +1214,7 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
 #ifdef PLAT_HOST
 static uint32_t app_host_input_failures, app_host_render_callbacks;
 static uint8_t app_host_event_test_active, app_host_event_trace_count;
+static uint8_t app_host_name_migration_pass;
 static uint8_t app_host_event_trace[3];
 static uint32_t app_host_event_callback[3], app_host_event_start_callback;
 #endif
@@ -4413,6 +4414,8 @@ int app_expect(const char *what, int *got)
             app_host_event_trace[2]==EV_PERFORMANCE_APPLY &&
             app_host_event_callback[0]==1u && app_host_event_callback[1]==1u &&
             app_host_event_callback[2]<=3u && app_host_event_callback[2]>app_host_event_callback[1];
+    else if (!fm1lab_strcmp(what, "name_migration"))
+        *got = app_host_name_migration_pass;
 #endif
     else if (!fm1lab_strcmp(what, "page"))
         *got = page;
@@ -4477,6 +4480,57 @@ int app_host_fails(void)
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
+    if(!fm1lab_strcmp(cmd,"fm1lab_name_migration_test")) {
+        fm1lab_instrument_t seed0,seed1,corrupt,edited,loaded,blank;
+        fm1lab_insert_state_t inserts0,inserts1,inserts31;
+        char patch_name[FM1LAB_PATCH_NAME_BYTES+1u];
+        app_host_name_migration_pass=0u;
+        if(fm1lab_seed_dx7_instrument(0u,&seed0)!=0 ||
+           fm1lab_seed_dx7_instrument(1u,&seed1)!=0 ||
+           fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0 ||
+           fm1lab_store_library_load_full(1u,&loaded,&inserts1)!=0)
+            return 1;
+        corrupt=seed0;
+        if(fm1lab_voice_name_get(corrupt.patches[0].voice,patch_name)!=0)return 1;
+        for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            corrupt.name[n]=c?c:' ';
+        }
+        if(fm1lab_store_library_save_full(0u,&corrupt,&inserts0)!=0)return 1;
+        edited=seed1;
+        if(fm1lab_voice_name_get(edited.patches[0].voice,patch_name)!=0)return 1;
+        for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            edited.name[n]=c?c:' ';
+        }
+        edited.patches[0].voice[0]^=1u; /* a single user edit must block migration */
+        if(fm1lab_store_library_save_full(1u,&edited,&inserts1)!=0)return 1;
+        fm1lab_seed_factory_library();
+        if(fm1lab_store_library_load_full(0u,&loaded,&inserts0)!=0 ||
+           memcmp(loaded.name,seed0.name,sizeof loaded.name)!=0 ||
+           memcmp(loaded.patches,seed0.patches,sizeof loaded.patches)!=0)
+            return 1;
+        if(fm1lab_store_library_load_full(1u,&loaded,&inserts1)!=0 ||
+           memcmp(loaded.name,edited.name,sizeof loaded.name)!=0 ||
+           memcmp(loaded.patches,edited.patches,sizeof loaded.patches)!=0)
+            return 1;
+        blank=factory_instrument;
+        memset(blank.name,' ',sizeof blank.name);
+        if(fm1lab_store_library_load_full(31u,&loaded,&inserts31)!=0)
+            fm1lab_insert_state_init(&inserts31);
+        if(fm1lab_store_library_save_full(31u,&blank,&inserts31)!=0 ||
+           instrument_load(31u,0)!=FM1LAB_LOAD_OK ||
+           memcmp(current_instrument.name,blank.name,sizeof blank.name)!=0 ||
+           instrument_dirty!=0u ||
+           fm1lab_strcmp(instrument_display_name(),"INSTRUMENT 32")!=0)
+            return 1;
+        if(instrument_load(0u,0)!=FM1LAB_LOAD_OK ||
+           memcmp(current_instrument.name,seed0.name,sizeof seed0.name)!=0 ||
+           instrument_dirty!=0u)
+            return 1;
+        app_host_name_migration_pass=1u;
+        return 1;
+    }
     if(fm1lab_strcmp(cmd,"fm1lab_event_budget"))return 0;
     if(ui_event_head!=ui_event_tail || instrument_apply_pending || performance_update_pending)
         return 1;

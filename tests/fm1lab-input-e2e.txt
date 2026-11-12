@@ -94,3 +94,5 @@ expect patch 1
 fm1lab_event_budget
 wait 30
 expect eventbudget 1
+fm1lab_name_migration_test
+expect name_migration 1
