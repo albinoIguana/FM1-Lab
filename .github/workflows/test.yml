@@ -2,7 +2,7 @@ name: FM1-Lab native engine checks
 
 on:
   push:
-    branches: ["main", "fix/shipwreck-patch-presets-track-audio"]
+    branches: ["main", "fix/shipwreck-patch-presets-track-audio", "fix/shipwreck-timing-instrumentation"]
   pull_request:
     branches: ["main"]
 
