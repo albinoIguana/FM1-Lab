@@ -96,6 +96,7 @@ wait 30
 expect eventbudget 1
 fm1lab_name_migration_test
 expect name_migration 1
+expect namemigstage 9
 
 # Simulate an outstanding audio apply. SELECT must refuse the lane switch
 # and publish both refusal lines while the pending flag remains set.
