@@ -106,7 +106,7 @@ static void test_home_patch_and_instrument_actions(void)
     enum fm1lab_input_action action =
         fm1lab_input_route(FM1LAB_INPUT_PAGE_HOME, 0u, state.patch_focus);
     assert(action == FM1LAB_INPUT_PATCH_FOCUS_STEP);
-    assert(fm1lab_input_apply(&state, action, 1, FM1LAB_STORE_INSTRUMENT_COUNT,
+    assert(fm1lab_input_apply(&state, action, 1, TEST_INSTRUMENT_COUNT,
         FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.patch == 1u && state.patch_focus == 1u);
     assert(state.track_patch[0] == 1u);
@@ -114,7 +114,7 @@ static void test_home_patch_and_instrument_actions(void)
 
     action = fm1lab_input_route(FM1LAB_INPUT_PAGE_HOME, 2u, state.patch_focus);
     assert(action == FM1LAB_INPUT_PATCH_PRESET_STEP);
-    assert(fm1lab_input_apply(&state, action, 2, FM1LAB_STORE_INSTRUMENT_COUNT,
+    assert(fm1lab_input_apply(&state, action, 2, TEST_INSTRUMENT_COUNT,
         FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_APPLIED);
     assert(fake.patch_calls == 1u && fake.patch_preset[1] == 2u);
     assert(state.instrument == 3u && state.track_instrument[0] == 3u);
@@ -122,7 +122,7 @@ static void test_home_patch_and_instrument_actions(void)
     state.patch_focus = 0u;
     action = fm1lab_input_route(FM1LAB_INPUT_PAGE_HOME, 2u, state.patch_focus);
     assert(action == FM1LAB_INPUT_INSTRUMENT_STEP);
-    assert(fm1lab_input_apply(&state, action, 1, FM1LAB_STORE_INSTRUMENT_COUNT,
+    assert(fm1lab_input_apply(&state, action, 1, TEST_INSTRUMENT_COUNT,
         FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.instrument == 4u && state.track_instrument[0] == 4u);
     assert(fake.bank_instrument[0] == 4u);
@@ -146,7 +146,7 @@ static void test_track_round_trip_and_isolation(void)
     /* T1 -> T2; a multi-count report still toggles exactly once. */
     assert(fm1lab_input_apply(&state,
         fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 1u), 5,
-        FM1LAB_STORE_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
+        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
         == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.lane == 1u && state.instrument == 7u && state.patch == 2u);
     assert(fake.engine_target == FM1LAB_PATCH_COUNT);
@@ -155,7 +155,7 @@ static void test_track_round_trip_and_isolation(void)
     /* PRESETS on SEQ OPTIONS changes only T2's Instrument/bank. */
     assert(fm1lab_input_apply(&state,
         fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ_OPTIONS, 2u, 0u), 1,
-        FM1LAB_STORE_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
+        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
         == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.track_instrument[1] == 8u && state.instrument == 8u);
     assert(fake.bank_instrument[1] == 8u);
@@ -165,7 +165,7 @@ static void test_track_round_trip_and_isolation(void)
     /* T2 -> T1 restores T1's own Instrument and patch selection. */
     assert(fm1lab_input_apply(&state,
         fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 0u), -1,
-        FM1LAB_STORE_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
+        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
         == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.lane == 0u && state.instrument == 3u && state.patch == 1u);
     assert(fake.engine_target == 0u);
@@ -179,14 +179,14 @@ static void test_busy_and_save_failure_statuses(void)
     fake_engine_t fake;
     memset(&fake, 0, sizeof fake);
     assert(fm1lab_input_apply(&state, FM1LAB_INPUT_INSTRUMENT_STEP, 1,
-        FM1LAB_STORE_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
+        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
         == FM1LAB_INPUT_RESULT_LOAD_BUSY);
     assert(fake.load_calls == 0u && fake.save_calls == 0u);
 
     state.instrument_apply_pending = 0u;
     fake.fail_save = 1u;
     assert(fm1lab_input_apply(&state, FM1LAB_INPUT_INSTRUMENT_STEP, 1,
-        FM1LAB_STORE_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
+        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
         == FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED);
     assert(fake.save_calls == 1u && fake.load_calls == 1u);
     assert(state.instrument == 4u); /* failed save does not swallow PRESETS */
@@ -198,7 +198,7 @@ static void test_busy_and_save_failure_statuses(void)
     state.instrument_dirty = 1u;
     fake.fail_save = 1u;
     assert(fm1lab_input_apply(&state, FM1LAB_INPUT_TRACK_TOGGLE, 1,
-        FM1LAB_STORE_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
+        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
         == FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED);
     assert(state.lane == 0u);
 }
