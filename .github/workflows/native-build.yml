@@ -19,6 +19,7 @@ on:
       - "build.sh"
       - ".github/workflows/native-build.yml"
       - ".github/workflows/deploy-pages.yml"
+      - ".github/workflows/native-web-emulator.yml"
       - "scripts/build-web-installer.py"
       - "native-emulator/**"
   pull_request:
