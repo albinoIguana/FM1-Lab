@@ -1304,6 +1304,7 @@ uint32_t fm6_cpu0_voice_us(void) { return fm6_cpu0_voice_ticks/PLAT_TICKS_PER_US
 uint32_t fm6_cpu2_job_sum_us(void) { return fm6_cpu2_job_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_wait_sum_us(void) { return fm6_cpu2_wait_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_backup_sum_us(void) { return fm6_cpu2_backup_ticks_sum/PLAT_TICKS_PER_US; }
+uint32_t fm6_cpu2_backup_sum_ns(void) { return (fm6_cpu2_backup_ticks_sum*1000u)/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_backup_voice_count(void) { return fm6_cpu2_backup_voice_total; }
 void fm6_cpu2_disable(void) { fm6_cpu2_split_disabled=1u; }
 uint8_t fm6_cpu2_split_is_disabled(void) { return fm6_cpu2_split_disabled; }
