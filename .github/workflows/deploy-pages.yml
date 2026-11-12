@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Native FM1 build"]
     types: [completed]
-    branches: ["main", "test/shipwreck-single-core-startup-candidate"]
+    branches: ["main", "test/shipwreck-single-core-startup-candidate", "fix/shipwreck-timing-instrumentation"]
 
 permissions:
   contents: read
@@ -66,7 +66,7 @@ jobs:
         run: |
           node --check native-emulator/worklet.js
           mkdir -p _site/src _site/m-vave _site/native-emulator
-          if [ "$FM1_HEAD_BRANCH" = "test/shipwreck-single-core-startup-candidate" ]; then
+          if [ "$FM1_HEAD_BRANCH" = "test/shipwreck-single-core-startup-candidate" ] || [ "$FM1_HEAD_BRANCH" = "fix/shipwreck-timing-instrumentation" ]; then
             install_path="_site/install-candidate"
           else
             install_path="_site/install"
