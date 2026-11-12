@@ -2,7 +2,7 @@ name: Native FM1 browser emulator
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/shipwreck-patch-presets-track-audio]
     paths:
       - "app/**"
       - "tests/fm6_engine.test.c"
@@ -79,6 +79,7 @@ jobs:
           retention-days: 14
 
       - name: Publish browser preview on main
+        if: github.ref == 'refs/heads/main'
         run: |
           git fetch origin main
           remote_sha="$(git rev-parse FETCH_HEAD)"
