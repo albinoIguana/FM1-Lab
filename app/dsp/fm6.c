@@ -131,7 +131,7 @@ static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 /* Per-callback accounting. Tick sums retain sub-microsecond quantum precision;
  * maxima remain separate so they are never mistaken for callback totals. */
 static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
-static volatile uint32_t fm6_cpu2_backup_ticks_sum, fm6_cpu2_backup_voice_count;
+static volatile uint32_t fm6_cpu2_backup_ticks_sum, fm6_cpu2_backup_voices;
 static volatile uint32_t fm6_render_quanta, fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
 static volatile uint8_t fm6_cpu2_split_disabled;
 static volatile uint32_t fm6_callback_voice_peak;
@@ -964,6 +964,7 @@ static fm1lab_voice_t *fm6_allocate_voice(uint32_t patch)
 void fm6_init(void)
 {
     uint32_t i;
+    fm6_cpu2_split_disabled=0u;
     fm6_zero_bytes(instrument, sizeof(instrument));
     fm6_zero_bytes(voices, sizeof(voices));
     fm6_zero_bytes(patch_lfo, sizeof(patch_lfo));
@@ -1303,7 +1304,7 @@ uint32_t fm6_cpu0_voice_us(void) { return fm6_cpu0_voice_ticks/PLAT_TICKS_PER_US
 uint32_t fm6_cpu2_job_sum_us(void) { return fm6_cpu2_job_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_wait_sum_us(void) { return fm6_cpu2_wait_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_backup_sum_us(void) { return fm6_cpu2_backup_ticks_sum/PLAT_TICKS_PER_US; }
-uint32_t fm6_cpu2_backup_voice_count(void) { return fm6_cpu2_backup_voice_count; }
+uint32_t fm6_cpu2_backup_voices(void) { return fm6_cpu2_backup_voices; }
 void fm6_cpu2_disable(void) { fm6_cpu2_split_disabled=1u; }
 uint8_t fm6_cpu2_split_is_disabled(void) { return fm6_cpu2_split_disabled; }
 uint32_t fm6_render_quantum_count(void) { return fm6_render_quanta; }
@@ -1330,7 +1331,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     fm6_cpu2_job_ticks_sum=0u;
     fm6_cpu2_wait_ticks_sum=0u;
     fm6_cpu2_backup_ticks_sum=0u;
-    fm6_cpu2_backup_voice_count=0u;
+    fm6_cpu2_backup_voices=0u;
     fm6_render_quanta=0u;
     fm6_cpu2_quanta=0u;
     fm6_cpu2_dispatches=0u;
@@ -1385,7 +1386,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
                 fm6_cpu2_backup_ticks_sum += plat_ticks24()-backup_t0;
-                fm6_cpu2_backup_voice_count += fm6_cpu2_job_count;
+                fm6_cpu2_backup_voices += fm6_cpu2_job_count;
                 if (fm6_test_cpu2_mode == 1u) {
                     pthread_t worker;
                     if (pthread_create(&worker, 0, fm6_cpu2_test_thread, 0) != 0)
@@ -1423,7 +1424,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
                 fm6_cpu2_backup_ticks_sum += plat_ticks24()-backup_t0;
-                fm6_cpu2_backup_voice_count += fm6_cpu2_job_count;
+                fm6_cpu2_backup_voices += fm6_cpu2_job_count;
                 if (plat_cpu2_run(fm6_cpu2_voice_job, 0u)) {
                     ++fm6_cpu2_dispatches;
                     fm6_render_voice_range_cpu0(0u, split,
