@@ -1352,6 +1352,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                     pthread_t worker;
                     if (pthread_create(&worker, 0, fm6_cpu2_test_thread, 0) != 0)
                         abort();
+                    ++fm6_cpu2_dispatches;
                     /* CPU0 renders its half while CPU2's host twin renders
                      * the other half, matching the hardware overlap. */
                     fm6_render_voice_range_cpu0(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
@@ -1361,6 +1362,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                         for (i = 0; i < FM6_N; ++i)
                             fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
                 } else {
+                    ++fm6_cpu2_fallbacks;
                     uint32_t partial = fm6_cpu2_job_count / 2u;
                     if (!partial) partial = 1u;
                     fm6_render_voice_range_cpu0(split, split + partial,
