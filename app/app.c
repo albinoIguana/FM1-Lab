@@ -43,7 +43,7 @@ static volatile uint32_t render_core0_active_us, render_cpu2_job_us, render_cpu2
 static volatile uint32_t render_cpu0_voice_us, render_cpu2_job_sum_us, render_cpu2_wait_sum_us;
 static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
 static volatile uint32_t render_peak_all_us, render_peak_window_us;
-static volatile uint32_t render_voice_peak, render_cpu2_quanta, render_cpu2_dispatches, render_cpu2_fallbacks;
+static volatile uint32_t render_voice_peak, render_quanta, render_cpu2_quanta, render_cpu2_dispatches, render_cpu2_fallbacks;
 static void app_audio_timing_reset_window(void) { render_peak_window_us=0u; }
 #if defined(PLAT_WEB)
 
@@ -1763,6 +1763,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         render_cpu2_wait_sum_us=wait_sum_us;
         render_ui_us=ui_us; render_midi_us=midi_us; render_gain_us=gain_us;
         render_voice_peak=fm6_callback_voice_peak_count();
+        render_quanta=fm6_render_quantum_count();
         render_cpu2_quanta=fm6_cpu2_quantum_count();
         render_cpu2_dispatches=fm6_cpu2_dispatch_count();
         render_cpu2_fallbacks=fm6_cpu2_fallback_count();
@@ -4317,6 +4318,7 @@ int app_expect(const char *what, int *got)
     else if (!fm1lab_strcmp(what, "renderpeak")) *got=(int)render_peak_window_us;
     else if (!fm1lab_strcmp(what, "renderpeakall")) *got=(int)render_peak_all_us;
     else if (!fm1lab_strcmp(what, "voicepeak")) *got=(int)render_voice_peak;
+    else if (!fm1lab_strcmp(what, "renderquanta")) *got=(int)render_quanta;
     else if (!fm1lab_strcmp(what, "cpu2quanta")) *got=(int)render_cpu2_quanta;
     else if (!fm1lab_strcmp(what, "cpu2dispatch")) *got=(int)render_cpu2_dispatches;
     else if (!fm1lab_strcmp(what, "cpu2fallback")) *got=(int)render_cpu2_fallbacks;
