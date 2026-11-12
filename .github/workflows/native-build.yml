@@ -3,7 +3,7 @@ name: Native FM1 build
 
 on:
   push:
-    branches: [main, test/shipwreck-single-core-startup-candidate]
+    branches: [main, test/shipwreck-single-core-startup-candidate, fix/shipwreck-patch-presets-track-audio]
     paths:
       - "app/**"
       - "patches/**"
