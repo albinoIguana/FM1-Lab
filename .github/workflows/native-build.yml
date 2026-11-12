@@ -1,12 +1,14 @@
+# Re-run trigger only: no build logic or firmware sources changed.
 name: Native FM1 build
 
 on:
   push:
-    branches: [main]
+    branches: [main, test/shipwreck-single-core-startup-candidate]
     paths:
       - "app/**"
       - "patches/**"
       - "tools/generate_dx7_library.py"
+      - "tools/apply-fm1-flash-compat.py"
       - "firmware/**"
       - "tests/**"
       - "docs/**"
@@ -36,6 +38,9 @@ jobs:
       build: |
         set -euo pipefail
         git submodule update --init --recursive base upstream/felucca
+        # Backport only the audited NOR wait/recovery changes; do not float BSP revisions.
+        python3 tools/apply-fm1-flash-compat.py
+        bash tests/test-flash-compat.sh
         # Keep the upstream BSP and FM1 base warning-clean without carrying a fork.
         # These two signed subtractions are promoted to int before the ternary's
         # unsigned zero branch; make their intended uint32_t arithmetic explicit.
@@ -51,18 +56,21 @@ jobs:
             "rel = k->v > k->floor_ ? (uint32_t)k->v - (uint32_t)k->floor_ : 0u;",
         }
         for old, new in fixes.items():
-            if old not in source:
+            if old in source:
+                source = source.replace(old, new, 1)
+            elif new not in source:
                 raise SystemExit(f"Expected upstream warning site not found: {old}")
-            source = source.replace(old, new, 1)
         sense.write_text(source)
 
         build = Path("base/tools/build.py")
         source = build.read_text()
         old = 'CFLAGS = ["-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]'
         new = 'CFLAGS = ["-Werror", "-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]'
-        if old not in source:
+        if old in source:
+            source = source.replace(old, new, 1)
+        elif new not in source:
             raise SystemExit("Expected FM1 base CFLAGS definition not found")
-        build.write_text(source.replace(old, new, 1))
+        build.write_text(source)
         PY
         python3 - <<'PY'
         from pathlib import Path
@@ -80,6 +88,20 @@ jobs:
         git diff --exit-code -- app/fm1lab_dx7_data.h
         bash tests/test-fm6-engine.sh
         sh build.sh --release 0.1
+        # Preserve the exact native image and its symbol context for crash
+        # symbolication. The .fwsc package alone cannot identify a faulting PC.
+        test -s app/build/fm1lab.elf
+        test -s app/build/fm1lab.dis
+        "$JIELI_TOOLCHAIN/common/bin/objdump" -t app/build/fm1lab.elf > app/build/fm1lab.sym
+        test -s app/build/fm1lab.sym
+        {
+          echo "FM1-Lab commit: $(git rev-parse HEAD)"
+          echo "fm1-base commit: $(git -C base rev-parse HEAD)"
+          echo "felucca-bsp commit: $(git -C base/bsp rev-parse HEAD)"
+          echo "Felucca commit: $(git -C upstream/felucca rev-parse HEAD)"
+          echo "JieLi toolchain: $(basename "$(readlink -f "$JIELI_TOOLCHAIN")")"
+          echo "AC79 SDK commit: $(git -C "$AC79_SDK" rev-parse HEAD)"
+        } > app/build/fm1lab.build-info.txt
         # Emit the real ELF section sizes. The linker has separate RAM,
         # RAMTEXT and POOL regions; a single "RAM used" number is misleading.
         python3 - <<'PY'
@@ -109,4 +131,10 @@ jobs:
         print("  limits: RAM .data+.bss 98304; RAMTEXT 32768; POOL 344064 (8192 minimum spare)")
         PY
         python3 base/tools/build.py app --host
-      packages: app/build/fm1lab-0.1.fwsc
+      packages: |
+        app/build/fm1lab-0.1.fwsc
+        app/build/fm1lab.elf
+        app/build/fm1lab.dis
+        app/build/fm1lab.sym
+        app/build/fm1lab.bin
+        app/build/fm1lab.build-info.txt

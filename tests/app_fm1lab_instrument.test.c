@@ -4,8 +4,26 @@
 #include <stdint.h>
 #include <string.h>
 
+static void test_blank_library_slot_detection(void)
+{
+    fm1lab_instrument_t blank;
+    uint8_t voice[FM1LAB_PATCH_BYTES] = {0};
+    fm1lab_instrument_init(&blank, "INSTR 01");
+    assert(fm1lab_instrument_is_blank_library_slot(&blank));
+
+    /* One audible carrier means this record is no longer an empty slot. */
+    voice[134] = 0u;
+    voice[105u + 16u] = 40u;
+    assert(fm1lab_patch_set_voice(&blank, 2u, voice) == 0);
+    assert(!fm1lab_instrument_is_blank_library_slot(&blank));
+
+    fm1lab_instrument_init(&blank, "MY SOUND");
+    assert(!fm1lab_instrument_is_blank_library_slot(&blank));
+}
+
 int main(void)
 {
+    test_blank_library_slot_detection();
     fm1lab_instrument_t instrument;
     uint8_t voice[FM1LAB_PATCH_BYTES];
     uint8_t expected[FM1LAB_PATCH_BYTES];

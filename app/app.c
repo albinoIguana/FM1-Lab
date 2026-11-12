@@ -18,6 +18,8 @@
 #include "../firmware/fm1lab_physical_controls.h"
 #include "fm1lab_preset_control.h"
 #include <stddef.h>
+
+#define C_PEWTER RGB(175,185,195)
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
 static size_t fm1lab_strlen(const char *s) { size_t n=0u; while(s && s[n])++n; return n; }
 static int fm1lab_strcmp(const char *a,const char *b) {
@@ -37,13 +39,36 @@ static uint32_t web_device_xruns;
 #define FM1LAB_WEB_EXPORT
 #endif
 
+typedef union {
+    settings_v1_t v1;
+    settings_v2_t v2;
+    settings_v3_t v3;
+    settings_v4_t v4;
+    settings_v5_t v5;
+    settings_v6_t v6;
+    settings_v7_t v7;
+    settings_v8_t v8;
+    settings_v9_t v9;
+    settings_v10_t v10;
+    settings_v11_t v11;
+} settings_migration_scratch_t;
+
+/* Startup migration is single-threaded and runs once. Keep legacy records in
+ * one reusable buffer rather than reserving every historical version on the
+ * FM1 main stack at the same time. */
+static settings_migration_scratch_t settings_migration;
+
+/* app_init scans and migrates banks serially; reuse these large records rather
+ * than reserving multiple instrument/insert objects in the startup stack frame. */
+static fm1lab_instrument_t startup_instrument_scratch;
+static fm1lab_insert_state_t startup_insert_scratch;
+
 static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
 static fm1lab_insert_state_t current_inserts;
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
-static uint8_t patch_preset_cursor;
 static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
@@ -75,6 +100,7 @@ static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
 static uint8_t seq_event_count[2], seq_event_store_ready;
 static uint8_t seq_selected_event[2]={255u,255u};
 static uint16_t transport_ui_bpm=120u;
+static volatile uint8_t master_trim_pct=100u;
 static uint8_t arp_ui_latch, arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
 static uint8_t arp_ui_division=3u, arp_ui_gate=75u, arp_ui_octaves=1u;
 static uint8_t arp_ui_output, arp_ui_random, arp_ui_macro_dest, arp_ui_depth=50u;
@@ -639,43 +665,6 @@ static int fm1lab_digitone_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_
     return 0;
 }
 
-static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
-{
-    if(voice_index>=FM1LAB_DX7_VOICE_COUNT || !out) return -1;
-    const char *source=fm1lab_dx7_voice_z85+voice_index*FM1LAB_DX7_Z85_BYTES;
-    for(uint32_t group=0;group<39u;group++) {
-        uint64_t value=0u;
-        for(uint32_t digit=0;digit<5u;digit++) {
-            int decoded=fm1lab_digitone_z85_digit(source[group*5u+digit]);
-            if(decoded<0) return -1;
-            value=value*85u+(uint32_t)decoded;
-        }
-        if(value>0xffffffffu) return -1;
-        out[group*4u]=(uint8_t)(value>>24);
-        out[group*4u+1u]=(uint8_t)(value>>16);
-        out[group*4u+2u]=(uint8_t)(value>>8);
-        out[group*4u+3u]=(uint8_t)value;
-    }
-    return 0;
-}
-
-/* Replace only the focused patch's DX7 voice. Mixer, tuning, pan, and macro
- * state belong to the patch slot and survive preset browsing. */
-static int fm1lab_patch_preset_load(uint8_t cursor)
-{
-    uint8_t voice[FM1LAB_PATCH_BYTES];
-    if (cursor >= FM1LAB_DX7_VOICE_COUNT || set.patch >= FM1LAB_PATCH_COUNT ||
-        fm1lab_dx7_decode_voice(cursor, voice) != 0 ||
-        fm1lab_patch_replace_voice(&current_instrument, set.patch, voice) != 0)
-        return -1;
-
-    patch_preset_cursor = cursor;
-    instrument_dirty = 1u;
-    set_dirty = 1u;
-    voice_dirty = 1u;
-    return 0;
-}
-
 static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *out)
 {
     if(index>=FM1LAB_DIGITONE_INSTRUMENT_COUNT || !out) return -1;
@@ -720,6 +709,26 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
     }
     return fm1lab_instrument_valid(out)?0:-1;
 }
+static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
+{
+    if(voice_index>=FM1LAB_DX7_VOICE_COUNT || !out) return -1;
+    const char *source=fm1lab_dx7_voice_z85+voice_index*FM1LAB_DX7_Z85_BYTES;
+    for(uint32_t group=0;group<39u;group++) {
+        uint64_t value=0u;
+        for(uint32_t digit=0;digit<5u;digit++) {
+            int decoded=fm1lab_digitone_z85_digit(source[group*5u+digit]);
+            if(decoded<0) return -1;
+            value=value*85u+(uint32_t)decoded;
+        }
+        if(value>0xffffffffu) return -1;
+        out[group*4u]=(uint8_t)(value>>24);
+        out[group*4u+1u]=(uint8_t)(value>>16);
+        out[group*4u+2u]=(uint8_t)(value>>8);
+        out[group*4u+3u]=(uint8_t)value;
+    }
+    return 0;
+}
+
 static int fm1lab_dx7_legacy_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH_BYTES])
 {
     if(voice_index>=FM1LAB_DX7_LEGACY_VOICE_COUNT || !out) return -1;
@@ -865,6 +874,7 @@ static void fm1lab_seed_factory_library(void)
         }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
         if(!fm1lab_is_untouched_factory(&existing) &&
+           !fm1lab_instrument_is_blank_library_slot(&existing) &&
            !fm1lab_is_previous_factory_instrument(index,&existing) &&
            !fm1lab_is_previous_digitone_instrument(index,&existing) &&
            !fm1lab_is_previous_dx7_instrument(index,&existing)) continue;
@@ -1024,18 +1034,70 @@ static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
 static int instrument_patch_has_placeholder_name(const uint8_t *voice)
 {
     if(!voice)return 1;
-    if(fm1lab_strncmp((const char *)voice+145u,"PATCH 1",7u)==0)return 1;
+    const char *name=(const char *)voice+145u;
+    if(fm1lab_strncmp(name,"PATCH ",6u)==0 ||
+       fm1lab_strncmp(name,"VOICE ",6u)==0 ||
+       fm1lab_strncmp(name,"INIT",4u)==0)return 1;
     uint8_t blank=1u;
     for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)
         if(voice[145u+i]!=' ' && voice[145u+i]!=0u)blank=0u;
     return blank;
 }
 
+static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
+{
+    uint8_t repaired=0u;
+    if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
+    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
+        if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice) ||
+           instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
+            uint8_t playable[FM1LAB_PATCH_BYTES];
+            uint8_t previous_level=instrument->patches[patch].level;
+            fm1lab_factory_voice_build(playable,patch);
+            if(fm1lab_patch_replace_voice(instrument,patch,playable)==0) {
+                instrument->patches[patch].enabled=1u;
+                instrument->patches[patch].level=previous_level?previous_level:31u;
+                repaired=1u;
+            }
+        }
+    }
+    return repaired;
+}
+
+static uint8_t instrument_repair_placeholder_name(fm1lab_instrument_t *instrument)
+{
+    uint8_t changed=0u;
+    if(!instrument || instrument->name[0]!='I' || instrument->name[1]!='N' ||
+       instrument->name[2]!='S' || instrument->name[3]!='T' ||
+       instrument->name[4]!='R')return 0u;
+    char name[FM1LAB_PATCH_NAME_BYTES+1u];
+    uint8_t found=0u;
+    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
+        char candidate[FM1LAB_PATCH_NAME_BYTES+1u];
+        if(fm1lab_voice_name_get(instrument->patches[patch].voice,candidate)==0 &&
+           candidate[0] && !instrument_patch_has_placeholder_name(instrument->patches[patch].voice)) {
+            for(uint32_t i=0u;i<=FM1LAB_PATCH_NAME_BYTES;i++)name[i]=candidate[i];
+            found=1u;
+            break;
+        }
+    }
+    if(!found) {
+        name[0]='F';name[1]='M';name[2]=' ';name[3]='I';name[4]='N';
+        name[5]='S';name[6]='T';name[7]='R';name[8]='U';name[9]='M';name[10]='\0';
+    }
+    for(uint32_t i=0u;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++) {
+        char next=i<FM1LAB_PATCH_NAME_BYTES && name[i]?name[i]:' ';
+        if(instrument->name[i]!=next)changed=1u;
+        instrument->name[i]=next;
+    }
+    return changed;
+}
+
 static void instrument_load(uint32_t index, int from_audio)
 {
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
-    uint8_t repaired_first_patch = 0u;
+    uint8_t repaired_patches = 0u;
     int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
     if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
         current_instrument = candidate;
@@ -1043,26 +1105,15 @@ static void instrument_load(uint32_t index, int from_audio)
     } else {
         instrument_factory_defaults();
     }
-    /* Older valid library records can have an Instrument placeholder in patch 1:
-     * valid metadata and CRC, but no carrier output. Repair just that slot. */
-    if (!fm1lab_voice_has_audible_carrier(current_instrument.patches[0].voice) ||
-        instrument_patch_has_placeholder_name(current_instrument.patches[0].voice)) {
-        uint8_t playable[FM1LAB_PATCH_BYTES];
-        uint8_t previous_level = current_instrument.patches[0].level;
-        fm1lab_factory_voice_build(playable, 0u);
-        if (fm1lab_patch_set_voice(&current_instrument, 0u, playable) == 0) {
-            current_instrument.patches[0].level = previous_level ? previous_level : 31u;
-            repaired_first_patch = 1u;
-        }
-    }
+    repaired_patches=instrument_repair_missing_voices(&current_instrument);
+    uint8_t repaired_name=instrument_repair_placeholder_name(&current_instrument);
     instrument_index = (uint8_t)index;
-    patch_preset_cursor = (uint8_t)(index * FM1LAB_PATCH_COUNT + set.patch);
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     instrument_loaded = 1u;
-    instrument_dirty = repaired_first_patch;
-    if (repaired_first_patch) set_dirty = 1u;
+    instrument_dirty = (uint8_t)(repaired_patches || repaired_name);
+    if (instrument_dirty) set_dirty = 1u;
     instrument_sync_settings();
     if (from_audio == 1) {
         /* PRESET changes replace this lane's engine bank. The master chain
@@ -1653,6 +1704,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 #endif
     ui_events_drain();
     midi_in();
+    master_q12=fm1lab_master_gain_scale(master_q12,master_trim_pct);
     fm6_render(lr, n, master_q12);
 #if defined(PLAT_WEB)
     {
@@ -1723,19 +1775,9 @@ void app_overload(void)
 
 void app_init(void)
 {
-    settings_v1_t old_v1;
-    settings_v2_t old_v2;
-    settings_v3_t old_v3;
-    settings_v4_t old_v4;
-    settings_v5_t old_v5;
-    settings_v6_t old_v6;
-    settings_v7_t old_v7;
-    settings_v8_t old_v8;
-    settings_v9_t old_v9;
-    settings_v11_t old_v11;
-    settings_v10_t old_v10;
     int performance_loaded = 0;
     int loaded;
+    master_trim_pct=100u;
 #if defined(PLAT_WEB)
     web_device_cpu_q12 = web_device_cpu_pct = 0u;
     web_device_core0_q12 = web_device_core2_q12 = 0u;
@@ -1744,7 +1786,7 @@ void app_init(void)
 #endif
     fm6_init();
 #if defined(PLAT_WEB)
-    (void)plat_cpu2_set(1); /* browser model only; device CPU2 remains off pending hardware qualification */
+    (void)plat_cpu2_set(1); /* browser model only; physical FM1 CPU2 stays disabled pending hardware qualification */
 #endif
     settings_defaults();
     loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
@@ -1752,47 +1794,47 @@ void app_init(void)
         performance_loaded = 1;
     } else {
         settings_defaults();
-        if (plat_store_load(OBJ_SETTINGS, &old_v11, sizeof old_v11) == (int)sizeof old_v11 &&
-            settings_import_v11(&set, &old_v11) == 0) {
+        if (plat_store_load(OBJ_SETTINGS, &settings_migration.v11, sizeof settings_migration.v11) == (int)sizeof settings_migration.v11 &&
+            settings_import_v11(&set, &settings_migration.v11) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V11 -> V12 converts sequencer event positions to 32nd-note ticks */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v10, sizeof old_v10) == (int)sizeof old_v10 &&
-            settings_import_v10(&set, &old_v10) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v10, sizeof settings_migration.v10) == (int)sizeof settings_migration.v10 &&
+            settings_import_v10(&set, &settings_migration.v10) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V10 -> V12 adds persistent MAELSTROM controls and migrates event timing */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v9, sizeof old_v9) == (int)sizeof old_v9 &&
-            settings_import_v9(&set, &old_v9) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v9, sizeof settings_migration.v9) == (int)sizeof settings_migration.v9 &&
+            settings_import_v9(&set, &settings_migration.v9) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V9 -> V11 stores the migrated polyphonic event pattern and MAELSTROM defaults */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v8, sizeof old_v8) == (int)sizeof old_v8 &&
-            settings_import_v8(&set, &old_v8) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v8, sizeof settings_migration.v8) == (int)sizeof settings_migration.v8 &&
+            settings_import_v8(&set, &settings_migration.v8) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V8 -> V10 repairs the accidental ARP step-2 seed */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v7, sizeof old_v7) == (int)sizeof old_v7 &&
-            settings_import_v7(&set, &old_v7) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v7, sizeof settings_migration.v7) == (int)sizeof settings_migration.v7 &&
+            settings_import_v7(&set, &settings_migration.v7) == 0) {
             performance_loaded = 1;
             set_dirty = 1u;
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v6, sizeof old_v6) == (int)sizeof old_v6 &&
-            settings_import_v6(&set, &old_v6) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v6, sizeof settings_migration.v6) == (int)sizeof settings_migration.v6 &&
+            settings_import_v6(&set, &settings_migration.v6) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* V6 macro-step values become neutral full-length gates */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v5, sizeof old_v5) == (int)sizeof old_v5 &&
-            settings_import_v5(&set, &old_v5) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v5, sizeof settings_migration.v5) == (int)sizeof settings_migration.v5 &&
+            settings_import_v5(&set, &settings_migration.v5) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* migrate previous current record; initialize arp controls */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v4, sizeof old_v4) == (int)sizeof old_v4 &&
-            settings_import_v4(&set, &old_v4) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v4, sizeof settings_migration.v4) == (int)sizeof settings_migration.v4 &&
+            settings_import_v4(&set, &settings_migration.v4) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* migrate v4 settings; compressor starts bypassed */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v3, sizeof old_v3) == (int)sizeof old_v3 &&
-            settings_import_v3(&set, &old_v3) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v3, sizeof settings_migration.v3) == (int)sizeof settings_migration.v3 &&
+            settings_import_v3(&set, &settings_migration.v3) == 0) {
             performance_loaded = 1;
             set_dirty = 1u; /* migrate v3 three-bus performance into v4 four-bus state */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v2, sizeof old_v2) == (int)sizeof old_v2 &&
-                   settings_import_v2(&set, &old_v2) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v2, sizeof settings_migration.v2) == (int)sizeof settings_migration.v2 &&
+                   settings_import_v2(&set, &settings_migration.v2) == 0) {
             set_dirty = 1u; /* migrate v2 settings into the CRC-protected performance record */
-        } else if (plat_store_load(OBJ_SETTINGS, &old_v1, sizeof old_v1) == (int)sizeof old_v1 &&
-                   settings_import_v1(&set, &old_v1) == 0) {
+        } else if (plat_store_load(OBJ_SETTINGS, &settings_migration.v1, sizeof settings_migration.v1) == (int)sizeof settings_migration.v1 &&
+                   settings_import_v1(&set, &settings_migration.v1) == 0) {
             set_dirty = 1u; /* migrate the original compact settings record */
         }
         settings_seal(&set);
@@ -1848,6 +1890,9 @@ void app_init(void)
         }
     }
     fm6_set_swing((uint8_t)set.swing);
+    /* Defer BLE startup to fm1-base's APP_BLE_AT_BOOT hook. app_init runs
+     * before audio_init; the own BLE stack locks the top-of-RAM vector window
+     * after attaching its IRQs, which would block the later ALNK0 registration. */
     if (performance_loaded && fm6_performance_state_set(&set.performance) == 0) {
         transport_ui_bpm = set.performance.tempo_bpm;
         arp_ui_mode=set.performance.arp_mode;
@@ -1912,7 +1957,6 @@ void app_init(void)
     }
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
         int size = plat_store_size(OBJ_INSTRUMENTS0 + bank);
-        fm1lab_instrument_t probe;
         /* Only a genuinely absent object may be initialized automatically.
          * A present but malformed bank is user data: leave it untouched so a
          * CRC/read failure cannot silently factory-reset eight Instruments. */
@@ -1921,19 +1965,18 @@ void app_init(void)
             continue;
         }
         if (size == 3840) {
-            if (fm1lab_store_library_load(bank * 8u, &probe) != 0)
+            if (fm1lab_store_library_load(bank * 8u, &startup_instrument_scratch) != 0)
                 app_say("BANK ERROR", "DATA PRESERVED");
             continue;
         }
         if (bank < 3u && size == (int)sizeof(fm1lab_instrument_t)) {
-            fm1lab_instrument_t legacy;
-            if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &legacy, sizeof legacy) ==
-                    (int)sizeof legacy && fm1lab_instrument_valid(&legacy)) {
+            if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &startup_instrument_scratch, sizeof startup_instrument_scratch) ==
+                    (int)sizeof startup_instrument_scratch && fm1lab_instrument_valid(&startup_instrument_scratch)) {
                 /* V1's final voice byte was only a 63 sentinel, not pan. */
                 for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p)
-                    fm1lab_patch_set_pan(&legacy,p,64u);
+                    fm1lab_patch_set_pan(&startup_instrument_scratch,p,64u);
                 if (!fm1lab_store_library_format_bank(bank, &factory_instrument))
-                    (void)fm1lab_store_library_save(bank, &legacy);
+                    (void)fm1lab_store_library_save(bank, &startup_instrument_scratch);
                 continue;
             }
         }
@@ -1947,18 +1990,20 @@ void app_init(void)
     patch_focus = 0u;
     instrument_load(seq_ui_instrument[seq_ui_lane], 0);
     {
-        fm1lab_instrument_t other;
-        fm1lab_insert_state_t other_inserts;
         uint8_t other_lane=(uint8_t)(seq_ui_lane^1u);
         uint32_t other_index=seq_ui_instrument[other_lane];
-        if(fm1lab_store_library_load_full(other_index,&other,&other_inserts)!=0 ||
-           !fm1lab_instrument_valid(&other) || !fm1lab_insert_state_valid(&other_inserts)){
-            other=factory_instrument;
-            fm1lab_insert_state_init(&other_inserts);
+        if(fm1lab_store_library_load_full(other_index,&startup_instrument_scratch,&startup_insert_scratch)!=0 ||
+           !fm1lab_instrument_valid(&startup_instrument_scratch) || !fm1lab_insert_state_valid(&startup_insert_scratch)){
+            startup_instrument_scratch=factory_instrument;
+            fm1lab_insert_state_init(&startup_insert_scratch);
         }
-        sequencer_cache_instrument_name(other_lane,other.name);
+        uint8_t other_repaired=instrument_repair_missing_voices(&startup_instrument_scratch);
+        uint8_t other_renamed=instrument_repair_placeholder_name(&startup_instrument_scratch);
+        if(other_repaired || other_renamed)
+            (void)fm1lab_store_library_save_full(other_index,&startup_instrument_scratch,&startup_insert_scratch);
+        sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
-        instrument_apply_engine_bank(other_lane,&other,&other_inserts,0u);
+        instrument_apply_engine_bank(other_lane,&startup_instrument_scratch,&startup_insert_scratch,0u);
     }
     for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         fm6_patch_set_enabled(p, 1u);
@@ -2097,12 +2142,18 @@ static void octave_step(int32_t d)
 int fm1lab_ble_off(void) { return set.ble_off; }
 
 /* REC held a second: Bluetooth off or on (kept with the settings, so it stays so at the next power-on) */
+static void ble_set_enabled(uint8_t enabled)
+{
+    enabled=(uint8_t)!!enabled;
+    if((uint8_t)!set.ble_off==enabled)return;
+    set.ble_off=(uint8_t)!enabled;
+    set_dirty=1u;
+    if(FM1B_BLE)plat_ble_enable(enabled);
+    app_say("BLUETOOTH",enabled?"ON":"OFF");
+}
 static void ble_toggle(void)
 {
-    set.ble_off = (uint8_t)!set.ble_off;
-    set_dirty = 1;
-    plat_ble_enable(!set.ble_off);
-    app_say("BLUETOOTH", set.ble_off ? "OFF" : "ON");
+    ble_set_enabled(set.ble_off);
 }
 
 /* REC: a Bluetooth MIDI device (FM1B_BLE_CENTRAL, lib/btdev): look for devices, then connect to the one ALGORITHM
@@ -2202,7 +2253,6 @@ static void input(void)
                 if(page==PAGE_HOME && !patch_focus) {
                     set.patch=0u;
                     patch_focus=1u;
-                    patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT);
                     seq_ui_patch[seq_ui_lane]=0u;
                 }
                 page=PAGE_MACRO;
@@ -2381,8 +2431,9 @@ static void input(void)
         } else if (k == EN_SELECT && page == PAGE_SEQ_PIANO) {
             sequencer_select_event(e);
             app_say("NOTE","SELECTED");
-        } else if (k == EN_SELECT && page == PAGE_SEQ) {
-            if(instrument_apply_pending)continue;
+        } else if (k == EN_SELECT && (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS)) {
+            /* Track focus is UI-only; a queued voice-bank apply belongs to
+             * the previous lane and must not swallow SELECT detents here. */
             if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","TRACK NOT CHANGED");continue;}
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
             set.patch = seq_ui_patch[seq_ui_lane];
@@ -2406,7 +2457,6 @@ static void input(void)
             set.patch = (uint8_t)next;
             if (page == PAGE_HOME) {
                 patch_focus = 1u;
-                patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT+set.patch);
                 seq_ui_patch[seq_ui_lane] = set.patch;
                 performance_publish();
             }
@@ -2429,20 +2479,11 @@ static void input(void)
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             app_say("PATCH PITCH", "K1 OCTAVE / K2 FINE");
         } else if (k == EN_PRESET) {
+            /* PRESETS always selects the complete four-patch Instrument.
+             * SELECT owns patch focus; that focus never repurposes PRESETS. */
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
-            } else if (fm1lab_preset_target(patch_focus) == FM1LAB_PRESET_TARGET_PATCH) {
-                /* Focused mode browses individual voices, replacing only the
-                 * selected patch. The four-patch Instrument identity is stable. */
-                uint8_t next = fm1lab_preset_cursor_advance(
-                    patch_preset_cursor, e, FM1LAB_DX7_VOICE_COUNT);
-                if (fm1lab_patch_preset_load(next) != 0) {
-                    app_say("PATCH PRESET","LOAD FAILED");
-                    continue;
-                }
-                app_say("PATCH PRESET", patch_display_name(set.patch));
             } else {
-                /* Overview mode changes the complete four-patch Instrument. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
@@ -2451,6 +2492,7 @@ static void input(void)
                     (int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
                 if(next<0)next+=(int32_t)FM1LAB_STORE_INSTRUMENT_COUNT;
                 if((uint32_t)next!=instrument_index) {
+                    patch_focus=0u;
                     instrument_load((uint32_t)next,1);
                     performance_publish();set_dirty=1u;
                     int_text(next+1,t);
@@ -2460,7 +2502,10 @@ static void input(void)
         } else if (k >= EN_K1 && k <= EN_K4) {
             uint32_t index = (uint32_t)k - EN_K1;
             if (page == PAGE_GLOBAL) {
-                if(index==1u) {
+                if(index==0u) {
+                    master_trim_pct=(uint8_t)fm1lab_master_trim_advance(master_trim_pct,e);
+                    app_say("MASTER TRIM",master_trim_pct==0u?"MUTED":"UPDATED");
+                } else if(index==1u) {
                     set.swing=(uint16_t)clamp((int32_t)set.swing+e,50,75);
                     fm6_set_swing((uint8_t)set.swing);
                     set_dirty=1u;
@@ -2469,6 +2514,12 @@ static void input(void)
                     transport_ui_bpm=(uint16_t)clamp((int32_t)transport_ui_bpm+e,30,300);
                     performance_publish(); set_dirty=1u;
                     app_say("MASTER TEMPO","UPDATED");
+                } else if(index==3u) {
+                    if(FM1B_BLE) {
+                        uint8_t enabled=(uint8_t)fm1lab_ble_enabled_from_turn(
+                            (uint8_t)!set.ble_off,e);
+                        ble_set_enabled(enabled);
+                    } else app_say("BLUETOOTH","NOT AVAILABLE");
                 }
             } else if (page == PAGE_SEQ_OPTIONS) {
                 if(index==0u && e!=0) {
@@ -2629,7 +2680,7 @@ static void input(void)
                 }
             } else if (page == PAGE_CHAOS) {
                 if(index==0u)set.performance.chaos_amount=(uint8_t)clamp((int32_t)set.performance.chaos_amount+e,0,100);
-                else if(index==1u)set.performance.chaos_rate=(uint8_t)clamp((int32_t)set.performance.chaos_rate+e,0,100);
+                else if(index==1u)set.performance.chaos_rate=(uint8_t)fm1lab_chaos_rate_advance(set.performance.chaos_rate,e);
                 else if(index==2u)set.performance.chaos_tone=(uint8_t)clamp((int32_t)set.performance.chaos_tone+e,0,100);
                 else {int32_t shape=((int32_t)set.performance.chaos_shape+e)%6;if(shape<0)shape+=6;set.performance.chaos_shape=(uint8_t)shape;}
                 performance_publish();set_dirty=1u;
@@ -2706,7 +2757,6 @@ static void input(void)
                  * continues to adjust that layer's level. */
                 patch_focus = 1u;
                 set.patch = (uint8_t)index;
-                patch_preset_cursor=(uint8_t)(instrument_index*FM1LAB_PATCH_COUNT+set.patch);
                 seq_ui_patch[seq_ui_lane] = set.patch;
                 performance_publish();
                 int32_t value = (int32_t)set.levels[index] + e;
@@ -2755,7 +2805,7 @@ static void cv_text_fit(int32_t x,int32_t y,const felucca_font_t *font,const cha
 static void cell(int32_t x, int32_t y, int32_t w, const char *s, int on)   /* a labelled box, lit when on */
 {
     cv_rect(x, y, w, 18, on ? C_HI : C_LINE);
-    cv_text(x + (w - text_w(&FONT_XS, s)) / 2, y + 2, &FONT_XS, s, on ? C_BLACK : C_GRAY);
+    cv_text(x + (w - text_w(&FONT_XS, s)) / 2, y + 2, &FONT_XS, s, on ? C_BLACK : C_PEWTER);
 }
 
 static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uint16_t off)
@@ -2910,8 +2960,8 @@ static void draw_algorithm_diagram(void)
     uint16_t accent=patch_color(set.patch);
     char t[12];
     (void)fm1lab_voice_global_get(voice,FM1LAB_GLOBAL_ALGORITHM,&algorithm);
-    cv_text(7,5,&FONT_XS,"OPERATOR ROUTING",C_GRAY);
-    cv_text(178,5,&FONT_XS,"ALG",C_GRAY);
+    cv_text(7,5,&FONT_XS,"OPERATOR ROUTING",C_PEWTER);
+    cv_text(178,5,&FONT_XS,"ALG",C_PEWTER);
     int_text(algorithm,t); cv_text(205,5,&FONT_XS,t,accent);
 
     /* Draw modulation links behind the operator blocks. */
@@ -2957,8 +3007,8 @@ static void draw_algorithm_diagram(void)
         cv_rect(nx[i]+3,ny[i]+22,30,1,carrier?accent:C_DIM);
     }
     cv_text(8,113,&FONT_XS,"CARRIER",accent);
-    cv_text(75,113,&FONT_XS,"MODULATOR",C_GRAY);
-    cv_text(166,113,&FONT_XS,"ALGO: ROUTING",C_GRAY);
+    cv_text(75,113,&FONT_XS,"MODULATOR",C_PEWTER);
+    cv_text(166,113,&FONT_XS,"ALGO: ROUTING",C_PEWTER);
 }
 
 static int patch_name_is_factory(const char *name)
@@ -3008,16 +3058,6 @@ static const char *patch_display_name(uint32_t patch)
     return fallback[patch];
 }
 
-static const char *patch_description(uint32_t patch)
-{
-    if(patch>=FM1LAB_PATCH_COUNT || instrument_index>=FM1LAB_DX7_INSTRUMENT_COUNT)
-        return "USER PATCH";
-    if(fm1lab_strcmp(instrument_display_name(),
-                     fm1lab_dx7_instrument_names[instrument_index])!=0)
-        return "USER PATCH";
-    return fm1lab_dx7_patch_descriptions[(uint32_t)instrument_index*FM1LAB_PATCH_COUNT+patch];
-}
-
 static void draw_home_panel(void)
 {
     char t[24];
@@ -3037,13 +3077,12 @@ static void draw_home_panel(void)
         int_text((int32_t)p + 1, t + 6);
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
         cv_text(x + 65, y + 5, &FONT_XS, enabled ? "ON" : "MUTED",
-                enabled ? RGB(75,235,135) : C_GRAY);
+                enabled ? RGB(75,235,135) : C_PEWTER);
         cv_text_fit(x+12,y+23,&FONT_B,patch_display_name(p),C_WHITE,96);
-        cv_text_fit(x+12,y+37,&FONT_XS,patch_description(p),C_GRAY,96);
-        cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_GRAY);
+        cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_PEWTER);
         int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
         cv_text(x + 34, y + 49, &FONT_XS, t, accent);
-        cv_text(x + 59, y + 49, &FONT_XS, "LEVEL", C_GRAY);
+        cv_text(x + 59, y + 49, &FONT_XS, "LEVEL", C_PEWTER);
         int_text(set.levels[p], t);
         cv_text(x + 91, y + 49, &FONT_XS, t, C_WHITE);
         cv_rect(x + 12, y + 69, 96, 5, RGB(31, 43, 55));
@@ -3070,7 +3109,7 @@ static void draw_macro_panel(void)
         cv_rect(x + 9, y + 42, 98, 6, RGB(31, 43, 55));
         cv_rect(x + 9, y + 42, (int32_t)value * 98 / 100, 6, accent);
         cv_rect(x + 9 + (int32_t)value * 98 / 100, y + 39, 2, 12, C_WHITE);
-        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
+        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_PEWTER);
     }
 }
 static void draw_instrument_macro_panel(void)
@@ -3090,10 +3129,10 @@ static void draw_instrument_macro_panel(void)
         int_text((int32_t)value, t);
         cv_text(x + 88, y + 7, &FONT_B, t, accent);
         cv_rect(x + 9, y + 42, 98, 6, RGB(31,43,55));
-        cv_rect(x + 9 + 49, y + 40, 1, 10, C_GRAY);
+        cv_rect(x + 9 + 49, y + 40, 1, 10, C_PEWTER);
         if (value >= 50u) cv_rect(x + 9 + 49, y + 42, (int32_t)(value - 50u) * 49 / 50, 6, accent);
         else cv_rect(x + 9 + (int32_t)value * 49 / 50, y + 42, (int32_t)(50u - value) * 49 / 50, 6, accent);
-        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_GRAY);
+        cv_text(x + 9, y + 60, &FONT_XS, hints[m], C_PEWTER);
     }
 }
 static void draw_chaos_panel(void)
@@ -3113,19 +3152,19 @@ static void draw_chaos_panel(void)
             cv_text(x+9,y+27,&FONT_B,t,accent);
             cv_rect(x+9,y+49,94,6,C_LINE);
             cv_rect(x+9,y+49,(int32_t)set.performance.chaos_amount*94/100,6,accent);
-            cv_text(x+9,y+64,&FONT_XS,"DRY  TO  DESTROY",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"DRY  TO  DESTROY",C_PEWTER);
         }else if(i==1u){
             cv_text(x+9,y+27,&FONT_B,divisions[slot],accent);
-            cv_text(x+9,y+64,&FONT_XS,"LOCKED TO MASTER BPM",C_GRAY);
+            cv_text_fit(x+9,y+64,&FONT_XS,"MASTER BPM LOCK",C_PEWTER,98);
         }else if(i==2u){
             int_text(bits,t);text_cat(t," BIT");
             cv_text(x+9,y+27,&FONT_B,t,accent);
             cv_rect(x+9,y+49,94,6,C_LINE);
             cv_rect(x+9,y+49,(int32_t)set.performance.chaos_tone*94/100,6,accent);
-            cv_text(x+9,y+64,&FONT_XS,"16-BIT  TO  2-BIT",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"16-BIT  TO  2-BIT",C_PEWTER);
         }else{
             cv_text(x+9,y+27,&FONT_B,shapes[set.performance.chaos_shape],accent);
-            cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_GRAY);
+            cv_text(x+9,y+64,&FONT_XS,"MODULATION SHAPE",C_PEWTER);
         }
     }
 }
@@ -3148,11 +3187,11 @@ static void draw_operator_map(void)
             text_cat(t,i==0u?" OCT":" CENTS");
             cv_text(x+9,y+25,&FONT_B,t,accent);
             cv_rect(x+9,y+48,94,5,C_LINE);
-            cv_rect(x+9+47,y+45,1,11,C_GRAY);
+            cv_rect(x+9+47,y+45,1,11,C_PEWTER);
             int width=i==0u?((value<0?-value:value)*47/4):((value<0?-value:value)*47/100);
             if(value<0)cv_rect(x+56-width,y+48,width,5,accent);
             else if(value>0)cv_rect(x+56,y+48,width,5,accent);
-            cv_text(x+9,y+63,&FONT_XS,i==0u?"-4  /  0  /  +4":"-100c  /  0  /  +100c",C_GRAY);
+            cv_text(x+9,y+63,&FONT_XS,i==0u?"-4  /  0  /  +4":"-100c  /  0  /  +100c",C_PEWTER);
         } /* Reserved cards intentionally left blank until they have useful controls. */
     }
 }
@@ -3167,7 +3206,7 @@ static void draw_amp_panel(void)
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,labels[i],C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,labels[i],C_PEWTER);
         if(i==0u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",values[i]?RGB(75,235,135):RGB(255,82,101));
         else {int_text(values[i],t);cv_text(x+7,y+23,&FONT_B,t,accent);cv_rect(x+48,y+29,55,5,C_LINE);cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);}
     }
@@ -3219,8 +3258,8 @@ static void draw_eq_panel(void)
         if(response[i]>bottom)response[i]=bottom;
     }
     cv_text(9,3,&FONT_XS,(v->eq_enabled&1u)?"3-BAND PARAMETRIC / ON":"3-BAND PARAMETRIC / BYPASS",
-            (v->eq_enabled&1u)?RGB(75,235,135):C_GRAY);
-    for(int32_t y=zero-48;y<=zero+48;y+=24)cv_rect(left,y,right-left,1,y==zero?C_GRAY:C_DIM);
+            (v->eq_enabled&1u)?RGB(75,235,135):C_PEWTER);
+    for(int32_t y=zero-48;y<=zero+48;y+=24)cv_rect(left,y,right-left,1,y==zero?C_PEWTER:C_DIM);
     for(int32_t x=left;x<=right;x+=36)cv_rect(x,top,1,bottom-top,C_DIM);
     for(uint32_t i=1u;i<109u;i++)
         fm1lab_plot_line(left+(int32_t)(i-1u)*2,response[i-1u],left+(int32_t)i*2,response[i],RGB(36,215,232));
@@ -3228,10 +3267,10 @@ static void draw_eq_panel(void)
         int32_t marker=left+(int32_t)selected->frequency*(right-left)/100;
         cv_rect(marker-1,top,2,bottom-top,colors[eq_ui_band]);
     }
-    cv_text(12,125,&FONT_XS,"20",C_GRAY); cv_text(65,125,&FONT_XS,"200",C_GRAY);
-    cv_text(119,125,&FONT_XS,"2K",C_GRAY); cv_text(174,125,&FONT_XS,"10K",C_GRAY);
-    cv_text(211,125,&FONT_XS,"20K",C_GRAY);
-    cv_text(10,138,&FONT_XS,"K1 BYPASS",C_GRAY);
+    cv_text(12,125,&FONT_XS,"20",C_PEWTER); cv_text(65,125,&FONT_XS,"200",C_PEWTER);
+    cv_text(119,125,&FONT_XS,"2K",C_PEWTER); cv_text(174,125,&FONT_XS,"10K",C_PEWTER);
+    cv_text(211,125,&FONT_XS,"20K",C_PEWTER);
+    cv_text(10,138,&FONT_XS,"K1 BYPASS",C_PEWTER);
     cv_text(10,153,&FONT_XS,bands[eq_ui_band],colors[eq_ui_band]);
     int_text((int32_t)eq_frequency_hz(selected->frequency),t); text_cat(t,"Hz");
     cv_text(66,153,&FONT_XS,t,C_WHITE);
@@ -3239,7 +3278,7 @@ static void draw_eq_panel(void)
     cv_text(143,153,&FONT_XS,t,C_WHITE);
     int_text(selected->q,t); text_cat(t," Q");
     cv_text(187,153,&FONT_XS,t,C_WHITE);
-    cv_text(10,165,&FONT_XS,"K2 BAND  K3 FREQ  K4 GAIN  /  SELECT Q",C_GRAY);
+    cv_text(10,165,&FONT_XS,"K2 BAND  K3 FREQ  K4 GAIN  /  SELECT Q",C_PEWTER);
 }
 
 static void draw_compressor_panel(void)
@@ -3251,7 +3290,7 @@ static void draw_compressor_panel(void)
     for(uint32_t i=0;i<4u;i++){
         int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,i==0u?"K1  BYPASS":i==1u?"K2  RATIO":i==2u?"K3  THRESHOLD":"K4  ATTACK",C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,i==0u?"K1  BYPASS":i==1u?"K2  RATIO":i==2u?"K3  THRESHOLD":"K4  ATTACK",C_PEWTER);
         if(i==0u) cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?RGB(75,235,135):RGB(255,82,101));
         else {
             if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
@@ -3265,28 +3304,33 @@ static void draw_compressor_panel(void)
 static void draw_global_panel(uint32_t pct)
 {
     char t[24];
+    pct=(pct*master_trim_pct+50u)/100u;
     const char *labels[4] = {"MASTER", "SWING", "TEMPO", "MIDI / BLE"};
     uint16_t colors[4] = {RGB(36,215,232), RGB(227,75,210), RGB(242,212,59), RGB(255,82,101)};
     for (uint32_t i = 0; i < 4u; ++i) {
         int32_t x = panel_grid_x(i);
         int32_t y = panel_grid_y(i, UI_GRID_TOP, UI_GRID_ROW_STEP);
         instrument_card(x, y, UI_GRID_CARD_W, UI_GRID_CARD_H, panel_fill(), colors[i], colors[i]);
-        cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_GRAY);
+        cv_text(x + 9, y + 8, &FONT_XS, labels[i], C_PEWTER);
         if (i == 0) {
             int_text((int32_t)pct, t); text_cat(t, "%");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text_fit(x+9,y+63,&FONT_XS,"K1 SOFTWARE TRIM",C_PEWTER,98);
         } else if (i == 1) {
             int_text((int32_t)set.swing,t);text_cat(t,"%");
             cv_text(x + 9, y + 25, &FONT_B, t, colors[i]);
             cv_rect(x+9,y+49,94,6,C_LINE);
             cv_rect(x+9,y+49,((int32_t)set.swing-50)*94/25,6,colors[i]);
-            cv_text(x+9,y+63,&FONT_XS,set.swing==50u?"STRAIGHT":"SWING",C_GRAY);
+            cv_text(x+9,y+63,&FONT_XS,set.swing==50u?"STRAIGHT":"SWING",C_PEWTER);
         } else if (i == 2) {
             int_text((int32_t)transport_ui_bpm, t); text_cat(t, " BPM");
             cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
         } else {
-            int_text((int32_t)midi_count, t);
-            cv_text(x + 9, y + 27, &FONT_B, t, colors[i]);
+            cv_text(x + 9, y + 27, &FONT_B, set.ble_off ? "BLE OFF" : "BLE ON",
+                    set.ble_off ? C_PEWTER : RGB(75,235,135));
+            int_text((int32_t)midi_count,t);
+            cv_text(x+9,y+63,&FONT_XS,"MIDI EVENTS",C_PEWTER);
+            cv_text(x+78,y+63,&FONT_XS,t,colors[i]);
         }
     }
 }
@@ -3318,25 +3362,25 @@ static void draw_envelope_panel(void)
         rw=right-left-aw-dw-sw;
         x1=left+aw; x2=x1+dw; x3=x2+sw; x4=x3+rw;
         sy=baseline-(int32_t)adsr[2]*96/99;
-        cv_text(10,3,&FONT_XS,"AMPLITUDE / ALL CARRIERS",C_GRAY);
+        cv_text(10,3,&FONT_XS,"AMPLITUDE / ALL CARRIERS",C_PEWTER);
         cv_rect(left,top,right-left,1,C_DIM); cv_rect(left,71,right-left,1,C_DIM);
-        cv_rect(left,baseline,right-left,1,C_GRAY);
+        cv_rect(left,baseline,right-left,1,C_PEWTER);
         cv_rect(left,top,1,baseline-top,C_DIM); cv_rect(right,top,1,baseline-top,C_DIM);
         fm1lab_plot_line(left,baseline,x1,top,accent);
         fm1lab_plot_line(x1,top,x2,sy,accent);
         fm1lab_plot_line(x2,sy,x3,sy,accent);
         fm1lab_plot_line(x3,sy,x4,baseline,accent);
         cv_rect(x1-2,top-2,5,5,C_WHITE); cv_rect(x2-2,sy-2,5,5,accent);
-        cv_text(12,132,&FONT_XS,"ATTACK",C_GRAY); cv_text(67,132,&FONT_XS,"DECAY",C_GRAY);
-        cv_text(119,132,&FONT_XS,"SUSTAIN",C_GRAY); cv_text(180,132,&FONT_XS,"RELEASE",C_GRAY);
+        cv_text(12,132,&FONT_XS,"ATTACK",C_PEWTER); cv_text(67,132,&FONT_XS,"DECAY",C_PEWTER);
+        cv_text(119,132,&FONT_XS,"SUSTAIN",C_PEWTER); cv_text(180,132,&FONT_XS,"RELEASE",C_PEWTER);
         int_text(adsr[0],t); cv_text(12,149,&FONT_B,t,accent);
-        cv_text(12,167,&FONT_XS,env_rate_word(adsr[0]),C_GRAY);
+        cv_text(12,167,&FONT_XS,env_rate_word(adsr[0]),C_PEWTER);
         int_text(adsr[1],t); cv_text(67,149,&FONT_B,t,accent);
-        cv_text(67,167,&FONT_XS,env_rate_word(adsr[1]),C_GRAY);
+        cv_text(67,167,&FONT_XS,env_rate_word(adsr[1]),C_PEWTER);
         int_text(adsr[2],t); cv_text(129,149,&FONT_B,t,accent);
-        cv_text(129,167,&FONT_XS,"LEVEL",C_GRAY);
+        cv_text(129,167,&FONT_XS,"LEVEL",C_PEWTER);
         int_text(adsr[3],t); cv_text(190,149,&FONT_B,t,accent);
-        cv_text(190,167,&FONT_XS,env_rate_word(adsr[3]),C_GRAY);
+        cv_text(190,167,&FONT_XS,env_rate_word(adsr[3]),C_PEWTER);
         /* Rate direction is shown by the live rate labels above; no clipped footer. */
     }
 }
@@ -3357,10 +3401,10 @@ static void draw_operator_workbench(uint8_t view)
             env_operator==3u?"OP 3":env_operator==4u?"OP 4":env_operator==5u?"OP 5":"OP 6",accent);
         cv_text(42,126,&FONT_XS,fm1lab_voice_operator_is_carrier(voice,env_operator)?
             "CARRIER / SOURCE":"MODULATOR / TONE",C_WHITE);
-        cv_text(8,143,&FONT_XS,"K1 COARSE",C_GRAY);int_text(coarse,t);cv_text(66,143,&FONT_B,t,accent);
-        cv_text(118,143,&FONT_XS,"K2 FINE",C_GRAY);int_text(fine,t);cv_text(169,143,&FONT_B,t,accent);
-        cv_text(8,158,&FONT_XS,"K3 OUTPUT",C_GRAY);int_text(output,t);cv_text(66,158,&FONT_B,t,accent);
-        cv_text(118,158,&FONT_XS,"K4 TUNE",C_GRAY);int_text(detune,t);cv_text(169,158,&FONT_B,t,accent);
+        cv_text(8,143,&FONT_XS,"K1 COARSE",C_PEWTER);int_text(coarse,t);cv_text(66,143,&FONT_B,t,accent);
+        cv_text(118,143,&FONT_XS,"K2 FINE",C_PEWTER);int_text(fine,t);cv_text(169,143,&FONT_B,t,accent);
+        cv_text(8,158,&FONT_XS,"K3 OUTPUT",C_PEWTER);int_text(output,t);cv_text(66,158,&FONT_B,t,accent);
+        cv_text(118,158,&FONT_XS,"K4 TUNE",C_PEWTER);int_text(detune,t);cv_text(169,158,&FONT_B,t,accent);
     } else {
         static const char *const stages[4]={"ATTACK","DECAY 1","DECAY 2","RELEASE"};
         uint8_t rates[4]={0u},levels[4]={0u};
@@ -3387,9 +3431,9 @@ static void draw_operator_workbench(uint8_t view)
         py[2]=bottom-(int32_t)levels[1]*(bottom-top)/99;
         py[3]=bottom-(int32_t)levels[2]*(bottom-top)/99;
         py[4]=py[0];
-        cv_text(8,4,&FONT_XS,view==1u?"OPERATOR EG  /  RATE":"OPERATOR EG  /  TARGET LEVEL",C_GRAY);
+        cv_text(8,4,&FONT_XS,view==1u?"OPERATOR EG  /  RATE":"OPERATOR EG  /  TARGET LEVEL",C_PEWTER);
         cv_text(8,20,&FONT_B,fm1lab_voice_operator_is_carrier(voice,env_operator)?"CARRIER: OUTPUT":"MODULATOR: HARMONICS",accent);
-        cv_rect(left,bottom,right-left,1,C_GRAY);
+        cv_rect(left,bottom,right-left,1,C_PEWTER);
         cv_rect(left,top,1,bottom-top,C_DIM);
         for(uint32_t i=0;i<4u;i++)
             fm1lab_plot_line(px[i],py[i],px[i+1u],py[i+1u],accent);
@@ -3401,10 +3445,10 @@ static void draw_operator_workbench(uint8_t view)
             if(label_x<2)label_x=2;
             if(label_x+text_w(&FONT_XS,stages[i])>238)
                 label_x=238-text_w(&FONT_XS,stages[i]);
-            cv_text(label_x,115,&FONT_XS,stages[i],i==0u?C_WHITE:C_GRAY);
+            cv_text(label_x,115,&FONT_XS,stages[i],i==0u?C_WHITE:C_PEWTER);
             int_text(view==2u?levels[i]:rates[i],t);
             cv_text(cx-text_w(&FONT_B,t)/2,132,&FONT_B,t,accent);
-            cv_text(cx-(view==2u?15:12),147,&FONT_XS,view==2u?"TARGET":"RATE",C_GRAY);
+            cv_text(cx-(view==2u?15:12),147,&FONT_XS,view==2u?"TARGET":"RATE",C_PEWTER);
             if(view==1u) {
                 cv_rect(cx-13,161,26,3,C_LINE);
                 cv_rect(cx-13,161,(int32_t)rates[i]*26/99,3,accent);
@@ -3440,7 +3484,7 @@ static void draw_lfo_panel(uint32_t modulation)
         cv_text(x + 9, y + 8, &FONT_XS, labels[modulation][i], C_WHITE);
         if (!modulation && i == 0u) {
             cv_text(x + 9, y + 26, &FONT_B, waves[value % 6u], accent);
-            cv_text(x + 9, y + 64, &FONT_XS, "PER-PATCH WAVE", C_GRAY);
+            cv_text(x + 9, y + 64, &FONT_XS, "PER-PATCH WAVE", C_PEWTER);
         } else {
             if (modulation && i >= 2u) cv_text(x + 9, y + 26, &FONT_B, value ? "ON" : "OFF", accent);
             else {
@@ -3449,9 +3493,9 @@ static void draw_lfo_panel(uint32_t modulation)
                 cv_rect(x + 9, y + 46, (int32_t)value * 94 / maxima[modulation][i], 5, accent);
             }
             if (!modulation) cv_text(x + 9, y + 64, &FONT_XS,
-                i == 1u ? "SLOW  >  FAST" : i == 2u ? "PITCH WOBBLE" : "VOLUME TREMOLO", C_GRAY);
+                i == 1u ? "SLOW  >  FAST" : i == 2u ? "PITCH WOBBLE" : "VOLUME TREMOLO", C_PEWTER);
             else cv_text(x + 9, y + 64, &FONT_XS,
-                i == 0u ? "FADE-IN TIME" : i == 1u ? "KEY RESPONSE" : i == 2u ? "RESET LFO" : "RESET OSC", C_GRAY);
+                i == 0u ? "FADE-IN TIME" : i == 1u ? "KEY RESPONSE" : i == 2u ? "RESET LFO" : "RESET OSC", C_PEWTER);
         }
     }
 }
@@ -3492,7 +3536,9 @@ static void draw_sequencer_panel(void)
      * but expand row height so short patterns fill the same vertical space. */
     int32_t row_gap=2;
     int32_t row_height=(46-(int32_t)(rows-1u)*row_gap)/(int32_t)rows;
-    cv_text(6,0,&FONT_XS,"TRACK 1",patch_color(seq_ui_patch[0]));
+    cv_rect(2,13,236,1,seq_ui_lane==0u?C_PEWTER:C_LINE);
+    cv_text(6,0,&FONT_XS,"TRACK 1",seq_ui_lane==0u?C_WHITE:patch_color(seq_ui_patch[0]));
+    cv_text(48,0,&FONT_XS,seq_ui_lane==0u?"ACTIVE":"",C_PEWTER);
     cv_text(78,0,&FONT_XS,seq_ui_instrument_name[0],C_WHITE);
     for(uint32_t row=0;row<rows;row++) {
         uint8_t first=(uint8_t)(row*16u);
@@ -3505,7 +3551,9 @@ static void draw_sequencer_panel(void)
                           seq_ui_accent[0],patch_color(seq_ui_patch[0]));
     }
 
-    cv_text(6,66,&FONT_XS,"TRACK 2",patch_color(seq_ui_patch[1]));
+    cv_rect(2,79,236,1,seq_ui_lane==1u?C_PEWTER:C_LINE);
+    cv_text(6,66,&FONT_XS,"TRACK 2",seq_ui_lane==1u?C_WHITE:patch_color(seq_ui_patch[1]));
+    cv_text(48,66,&FONT_XS,seq_ui_lane==1u?"ACTIVE":"",C_PEWTER);
     cv_text(78,66,&FONT_XS,seq_ui_instrument_name[1],C_WHITE);
     for(uint32_t row=0;row<rows;row++) {
         uint8_t first=(uint8_t)(row*16u);
@@ -3519,11 +3567,11 @@ static void draw_sequencer_panel(void)
     }
 
     cv_text(6,139,&FONT_XS,fm6_sequencer_running()?(seq_record_armed?"LIVE RECORD":"PLAYING"):(seq_record_armed?"REC ARMED":"STOPPED"),
-            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_GRAY));
-    cv_text(6,166,&FONT_XS,"K1 STEP",C_GRAY);
-    cv_text(66,166,&FONT_XS,"K2 CLEAR",C_GRAY);
-    cv_text(126,166,&FONT_XS,"K3 VEL",C_GRAY);
-    cv_text(186,166,&FONT_XS,"K4 GATE",C_GRAY);
+            fm6_sequencer_running()?RGB(75,235,135):(seq_record_armed?RGB(255,80,90):C_PEWTER));
+    cv_text(6,166,&FONT_XS,"K1 STEP",C_PEWTER);
+    cv_text(66,166,&FONT_XS,"K2 CLEAR",C_PEWTER);
+    cv_text(126,166,&FONT_XS,"K3 VEL",C_PEWTER);
+    cv_text(186,166,&FONT_XS,"K4 GATE",C_PEWTER);
 }
 static void draw_sequencer_piano_panel(void)
 {
@@ -3563,7 +3611,7 @@ static void draw_sequencer_piano_panel(void)
             cv_rect(x+5,gy,2,gh,RGB(242,212,59));
         if((col%4u)==0u) {
             int_text((int32_t)step+1,value);
-            cv_text(x+1,101,&FONT_XS,value,C_GRAY);
+            cv_text(x+1,101,&FONT_XS,value,C_PEWTER);
         }
     }
     for(uint32_t i=0;i<seq_event_count[lane];i++) {
@@ -3589,20 +3637,20 @@ static void draw_sequencer_piano_panel(void)
     }
 
     /* Four encoder readouts, arranged as a compact 2x2 grid. */
-    cv_text(12,116,&FONT_XS,"K1 LEN",C_GRAY);
+    cv_text(12,116,&FONT_XS,"K1 LEN",C_PEWTER);
     if(selected)int_text((selected->duration+1u)/2u,value);
     else {value[0]='-';value[1]='\0';}
     cv_text_fit(58,116,&FONT_B,value,C_WHITE,48);
-    cv_text(124,116,&FONT_XS,"K2 PITCH",C_GRAY);
+    cv_text(124,116,&FONT_XS,"K2 PITCH",C_PEWTER);
     if(selected)note_name(selected->pitch,pitch);
     else {pitch[0]='-';pitch[1]='-';pitch[2]='\0';}
     cv_text_fit(178,116,&FONT_B,pitch,accent,50);
 
-    cv_text(12,137,&FONT_XS,"K3 ACC",C_GRAY);
+    cv_text(12,137,&FONT_XS,"K3 ACC",C_PEWTER);
     if(selected)int_text(selected->accent,value);
     else {value[0]='-';value[1]='\0';}
     cv_text_fit(58,137,&FONT_B,value,C_WHITE,48);
-    cv_text(124,137,&FONT_XS,"K4 VEL",C_GRAY);
+    cv_text(124,137,&FONT_XS,"K4 VEL",C_PEWTER);
     if(selected)int_text(selected->velocity,value);
     else {value[0]='-';value[1]='\0';}
     cv_text_fit(178,137,&FONT_B,value,C_WHITE,50);
@@ -3616,13 +3664,13 @@ static void draw_save_panel(void)
     char t[32];
     const uint16_t accent=RGB(36,215,232);
     instrument_card(5,4,230,170,panel_fill(),accent,accent);
-    cv_text(14,12,&FONT_XS,"SAVE SLOT  /  PRESET KNOB",C_GRAY);
+    cv_text(14,12,&FONT_XS,"SAVE SLOT  /  PRESET KNOB",C_PEWTER);
     int_text((int32_t)save_slot+1,t);text_cat(t," / 32");
     cv_text(14,30,&FONT_B,t,accent);
-    cv_text(14,55,&FONT_XS,"PATCH  /  SELECT KNOB",C_GRAY);
+    cv_text(14,55,&FONT_XS,"PATCH  /  SELECT KNOB",C_PEWTER);
     int_text((int32_t)save_patch+1,t);text_cat(t," / 4");
     cv_text(14,73,&FONT_B,t,patch_color(save_patch));
-    cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  24 CHARS",C_GRAY);
+    cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  24 CHARS",C_PEWTER);
     if(save_name_target) {
         for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)t[i]=(char)current_instrument.patches[save_patch].voice[145u+i];
         t[FM1LAB_PATCH_NAME_BYTES]='\0';
@@ -3634,14 +3682,14 @@ static void draw_save_panel(void)
     int32_t cursor_x=14+(int32_t)save_name_cursor*(save_name_target?8:7);
     cv_rect(cursor_x,137,save_name_target?7:6,2,C_WHITE);
     cv_text(14,151,&FONT_XS,"K1 CURSOR  K2 CHAR  K3 NAME TYPE",C_WHITE);
-    cv_text(14,165,&FONT_XS,"SAVE AGAIN TO WRITE   HOME TO EXIT",C_GRAY);
+    cv_text(14,165,&FONT_XS,"SAVE AGAIN TO WRITE   HOME TO EXIT",C_PEWTER);
 }
 static void draw_sequencer_options_card(uint32_t index,const char *label,const char *value,
         const char *hint,uint16_t accent)
 {
     int32_t x=panel_grid_x(index),y=panel_grid_y(index,UI_GRID_TOP,UI_GRID_ROW_STEP);
     instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
-    cv_text(x+9,y+9,&FONT_XS,label,C_GRAY);
+    cv_text(x+9,y+9,&FONT_XS,label,C_PEWTER);
     cv_text(x+9,y+28,&FONT_B,value,accent);
     cv_text(x+9,y+67,&FONT_XS,hint,C_WHITE);
 }
@@ -3667,7 +3715,7 @@ static void draw_arp_card(uint32_t index, const char *label, const char *value,
 {
     int32_t x=panel_grid_x(index), y=panel_grid_y(index,UI_GRID_TOP,UI_GRID_ROW_STEP);
     instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),accent,accent);
-    cv_text(x+9,y+9,&FONT_XS,label,C_GRAY);
+    cv_text(x+9,y+9,&FONT_XS,label,C_PEWTER);
     cv_text(x+9,y+28,&FONT_B,value,accent);
     cv_text(x+9,y+67,&FONT_XS,hint,C_WHITE);
 }
@@ -3700,10 +3748,10 @@ static void draw_arp_latch_panel(void)
 {
     uint16_t accent=RGB(227,75,210);
     instrument_card(8,22,224,126,panel_fill(),accent,accent);
-    cv_text(20,34,&FONT_XS,"NOTE HOLD BEHAVIOR",C_GRAY);
+    cv_text(20,34,&FONT_XS,"NOTE HOLD BEHAVIOR",C_PEWTER);
     cv_text(20,62,&FONT_B,arp_ui_latch?"LATCH ON":"LATCH OFF",arp_ui_latch?RGB(75,235,135):accent);
     cv_text(20,96,&FONT_XS,arp_ui_latch?"RELEASED KEYS STAY IN THE ARP":"RELEASED KEYS LEAVE THE ARP",C_WHITE);
-    cv_text(20,126,&FONT_XS,"K1  TOGGLE LATCH",C_GRAY);
+    cv_text(20,126,&FONT_XS,"K1  TOGGLE LATCH",C_PEWTER);
 }
 static void draw_arp_steps_panel(void)
 {
@@ -3712,8 +3760,8 @@ static void draw_arp_steps_panel(void)
     int32_t gap=2, width=(224-(int32_t)(arp_ui_length-1u)*gap)/(int32_t)arp_ui_length;
     int32_t top=29, height=91, bottom=top+height;
     uint16_t gain_color=RGB(36,215,232), accent_color=RGB(227,75,210), tie_color=RGB(242,212,59);
-    cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP LOOP":"16 STEP LOOP",C_GRAY);
-    cv_text(151,2,&FONT_XS,active?"PLAYING":"STANDBY",active?RGB(75,235,135):C_GRAY);
+    cv_text(5,2,&FONT_XS,arp_ui_length==8u?"8 STEP LOOP":"16 STEP LOOP",C_PEWTER);
+    cv_text(151,2,&FONT_XS,active?"PLAYING":"STANDBY",active?RGB(75,235,135):C_PEWTER);
     cv_rect(5,18,214,1,RGB(35,51,64));
     for(uint32_t i=0;i<arp_ui_length;i++) {
         int32_t x=8+(int32_t)i*(width+gap);
@@ -3724,7 +3772,7 @@ static void draw_arp_steps_panel(void)
         uint8_t is_selected=(uint8_t)(i==arp_ui_step);
         uint32_t bands=7u;
         int_text((int32_t)i+1,t);
-        cv_text(x+(width-text_w(&FONT_XS,t))/2,21,&FONT_XS,t,is_selected?C_WHITE:C_GRAY);
+        cv_text(x+(width-text_w(&FONT_XS,t))/2,21,&FONT_XS,t,is_selected?C_WHITE:C_PEWTER);
         cv_rect(x,top,width,height,is_selected?C_WHITE:RGB(43,59,72));
         cv_rect(x+1,top+1,width-2,height-2,RGB(12,20,29));
         cv_rect(x+2,top+2,width-4,2,emphasis?accent_color:RGB(34,49,61));
@@ -3754,15 +3802,15 @@ static void draw_arp_steps_panel(void)
             cv_rect(x,top,1,height,C_WHITE);cv_rect(x+width-1,top,1,height,C_WHITE);
         }
     }
-    cv_text(5,128,&FONT_XS,"STEP",C_GRAY);
+    cv_text(5,128,&FONT_XS,"STEP",C_PEWTER);
     int_text((int32_t)arp_ui_step+1,t);cv_text(31,128,&FONT_XS,t,C_WHITE);
     cv_text(55,128,&FONT_XS,"GAIN",gain_color);
     int_text(arp_ui_gain[arp_ui_step],t);cv_text(83,128,&FONT_XS,t,C_WHITE);
     cv_text(112,128,&FONT_XS,"ACC",accent_color);
     int_text(arp_ui_accent[arp_ui_step],t);cv_text(135,128,&FONT_XS,t,C_WHITE);
     cv_text(163,128,&FONT_XS,"TIE",tie_color);
-    cv_text(193,128,&FONT_XS,arp_ui_step_gate[arp_ui_step]?"ON":"OFF",arp_ui_step_gate[arp_ui_step]?tie_color:C_GRAY);
-    cv_text(5,151,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 TIE",C_GRAY);
+    cv_text(193,128,&FONT_XS,arp_ui_step_gate[arp_ui_step]?"ON":"OFF",arp_ui_step_gate[arp_ui_step]?tie_color:C_PEWTER);
+    cv_text(5,151,&FONT_XS,"K1 STEP  K2 GAIN  K3 ACC  K4 TIE",C_PEWTER);
 }
 
 static void draw_delete_overlay(void)
@@ -3796,7 +3844,7 @@ static void draw_seq_clear_prompt(void)
     cv_text(120-text_w(&FONT_XS,"TURN K2 TO CONFIRM")/2,96,&FONT_XS,"TURN K2 TO CONFIRM",C_WHITE);
     t[0]='T';t[1]=(char)('1'+seq_ui_lane);t[2]=' ';t[3]='S';t[4]='T';t[5]='E';t[6]='P';t[7]=' ';
     int_text((int32_t)seq_ui_step+1,t+8);
-    cv_text(120-text_w(&FONT_XS,t)/2,115,&FONT_XS,t,C_GRAY);
+    cv_text(120-text_w(&FONT_XS,t)/2,115,&FONT_XS,t,C_PEWTER);
 }
 
 static void draw_fx_panel(uint8_t fx)
@@ -3813,12 +3861,12 @@ static void draw_fx_panel(uint8_t fx)
     for(uint32_t k=0;k<4u;++k) {
         int32_t x=panel_grid_x(k),y=panel_grid_y(k,UI_GRID_TOP,UI_GRID_ROW_STEP);
         panel_grid_card(k,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,labels[k],C_GRAY);
+        cv_text(x+7,y+6,&FONT_XS,labels[k],C_PEWTER);
         if(k==0u) cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?RGB(75,235,135):RGB(255,82,101));
         else if(k==1u && fx==FM6_FX_REVERB) {
             uint8_t type=values[k]<=2u?values[k]:1u;
             cv_text(x+7,y+23,&FONT_B,types[type],accent);
-            cv_text(x+7,y+43,&FONT_XS,"ROOM / HALL / PLATE",C_GRAY);
+            cv_text(x+7,y+43,&FONT_XS,"ROOM / HALL / PLATE",C_PEWTER);
         } else {
             int_text(values[k],t);
             cv_text(x+7,y+23,&FONT_B,t,accent);
@@ -3881,7 +3929,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_FX_DELAY: return RGB(85,160,255);
     case PAGE_FX_REVERB: return RGB(150,120,255);
     case PAGE_FX_PHASER: return RGB(227,75,210);
-    default: return C_GRAY;
+    default: return C_PEWTER;
     }
 }
 
@@ -3929,11 +3977,11 @@ static void draw(void)
     /* Global status strip: tempo, physical battery gauge, and active arp. */
     int_text(transport_ui_bpm, t);
     text_cat(t, " BPM");
-    cv_text(4, 1, &FONT_XS, t, C_GRAY);
+    cv_text(4, 1, &FONT_XS, t, C_PEWTER);
 
     int battery = plat_battery(); /* 0..3 battery bars, 4 USB powered, -1 unknown */
-    cv_rect(183, 2, 23, 7, C_GRAY);
-    cv_rect(206, 4, 2, 3, C_GRAY);
+    cv_rect(183, 2, 23, 7, C_PEWTER);
+    cv_rect(206, 4, 2, 3, C_PEWTER);
     if (battery >= 0) {
         uint32_t bars = battery > 3 ? 4u : (uint32_t)battery;
         if (bars) cv_rect(185, 4, (int32_t)(bars * 5u), 3,
@@ -3943,7 +3991,7 @@ static void draw(void)
 
     /* Page identity replaces the generic FACTORY instrument label. */
     cv_text_fit(8,15,&FONT_B,page==PAGE_HOME?instrument_display_name():page_title(page),accent,140);
-    cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_GRAY);
+    cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_PEWTER);
     if(seq_record_armed)cv_text(205,16,&FONT_XS,"REC",RGB(255,80,90));
     if (page == PAGE_HOME) {
         cv_text(151, 17, &FONT_XS, seq_ui_lane ? "T2" : "T1", patch_color(seq_ui_patch[seq_ui_lane]));
@@ -3984,7 +4032,7 @@ static void draw(void)
     if (page == PAGE_HOME) {
         int_text((int32_t)instrument_index + 1, t);
         text_cat(t, "/32");
-        cv_text(6, 4, &FONT_XS, t, C_GRAY);
+        cv_text(6, 4, &FONT_XS, t, C_PEWTER);
     }
     {
         char diag[40], number[12];
@@ -3997,6 +4045,7 @@ static void draw(void)
         text_cat(diag, " SH ");
         int_text((int32_t)app_audio_overload_shed_count(), number);
         text_cat(diag, number);
+#if FM1B_CPU2
         if (plat_cpu2_on()) {
 #if defined(PLAT_WEB)
             text_cat(diag, " C2 SIM");
@@ -4011,7 +4060,10 @@ static void draw(void)
         } else {
             text_cat(diag, " C1");
         }
-        cv_text_fit(62, 4, &FONT_XS, diag, C_GRAY, 132);
+#else
+        text_cat(diag, " C1");
+#endif
+        cv_text_fit(62, 4, &FONT_XS, diag, C_PEWTER, 132);
     }
     page_counter(page, t, sizeof(t));
     cv_text(240 - text_w(&FONT_XS, t) - 6, 4, &FONT_XS, t, accent);
@@ -4121,6 +4173,7 @@ int app_expect(const char *what, int *got)
         *got = (int)app_audio_xruns();
     else if (!fm1lab_strcmp(what, "shed"))
         *got = (int)app_audio_overload_shed_count();
+#if FM1B_CPU2
     else if (!fm1lab_strcmp(what, "cpu2"))
         *got = plat_cpu2_on();
     else if (!fm1lab_strcmp(what, "cpu2stack"))
@@ -4133,6 +4186,10 @@ int app_expect(const char *what, int *got)
         *got = (int)plat_cpu2_bad();
     else if (!fm1lab_strcmp(what, "cpu2why"))
         *got = plat_cpu2_gave_up();
+#else
+    else if (!fm1lab_strncmp(what, "cpu2", 4))
+        *got = 0;
+#endif
     else if (!fm1lab_strcmp(what, "vel"))           /* the last key's velocity and pressure */
         *got = ui.vel[ui.last_key];
     else if (!fm1lab_strcmp(what, "prs"))

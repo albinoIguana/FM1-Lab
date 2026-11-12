@@ -79,6 +79,26 @@ static uint64_t render_pan_send_peak(uint8_t pan, unsigned effect, unsigned chan
     return fm6_test_fx_send_peak(effect,channel);
 }
 
+static uint64_t render_fx_send_peak_layers(uint8_t patch_mask)
+{
+    static int32_t warmup[2048u * 2u];
+    uint8_t voice[156];
+    fm6_init();
+    memcpy(voice,fm6_patch_data(0u),155u);
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++) {
+        if(patch && fm6_patch_set_voice(patch,voice)!=0)return 0u;
+        uint8_t enabled=(uint8_t)((patch_mask&(1u<<patch))!=0u);
+        fm6_patch_set_enabled(patch,enabled);
+        fm6_patch_set_level(patch,enabled?31u:0u);
+    }
+    fm6_fx_set_enabled(FM6_FX_CHORUS,1u);
+    fm6_fx_set_send(0u,FM6_FX_CHORUS,100u);
+    fm6_render(warmup,2048u,4096u);
+    fm6_note_on_mask(60u,110u,patch_mask);
+    fm6_render(output,TEST_FRAMES,4096u);
+    return fm6_test_fx_send_peak(FM6_FX_CHORUS,0u);
+}
+
 static int32_t render_pan_channel_peak(uint8_t pan, unsigned channel)
 {
     static int32_t warmup[2048u * 2u];
@@ -274,6 +294,23 @@ int main(void) {
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
     fm6_init();
     {
+        fm6_performance_state_t wet_budget;
+        unsigned total_wet=0u;
+        fm6_performance_state_get(&wet_budget);
+        for(unsigned fx=0u;fx<4u;fx++) {
+            wet_budget.fx_enabled[fx]=1u;
+            wet_budget.fx_mix[fx]=100u;
+        }
+        assert(fm6_performance_state_update(&wet_budget)==0);
+        for(unsigned fx=0u;fx<4u;fx++) {
+            unsigned effective=fm6_test_fx_mix_effective((uint8_t)fx);
+            total_wet+=effective;
+            assert(effective==12u);
+        }
+        assert(total_wet==48u);
+    }
+    fm6_init();
+    {
         fm6_performance_state_t state,check;
         fm6_performance_state_get(&state);
         state.chaos_amount=73u;state.chaos_rate=88u;state.chaos_tone=29u;state.chaos_shape=5u;
@@ -417,6 +454,15 @@ int main(void) {
     int32_t center_r=render_pan_channel_peak(64u,1u);
     assert(center_l>0 && center_r>0);
     assert(center_l*100>center_r*99 && center_l*100<center_r*101);
+    /* Layering four identical patches must not multiply the shared FX send
+     * by four. The bus uses the average active-layer send level. */
+    {
+        uint64_t one=render_fx_send_peak_layers(0x01u);
+        uint64_t four=render_fx_send_peak_layers(0x0fu);
+        assert(one>0u && four>0u);
+        assert(four<=one*2u);
+        assert(four*2u>=one);
+    }
     /* Every shared FX bus receives the patch after its smoothed pan stage. */
     for(unsigned effect=0u;effect<FM6_FX_COUNT;effect++) {
         assert(render_pan_send_peak(0u,effect,0u)>0u);

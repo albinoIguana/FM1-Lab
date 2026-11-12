@@ -15,12 +15,28 @@ int main(void)
     assert(FM1LAB_ENCODER_COUNT == 7);
     assert(FM1LAB_ADC_MASTER == 4u);
 
-    /* PRESETS becomes the lane selector on the sequencer page. */
+    /* SELECT is directional and robust to quadrature counts larger than one. */
     assert(fm1lab_sequencer_lane_advance(0u, 1) == 1u);
-    assert(fm1lab_sequencer_lane_advance(1u, 1) == 0u);
-    assert(fm1lab_sequencer_lane_advance(0u, -1) == 1u);
+    assert(fm1lab_sequencer_lane_advance(1u, 1) == 1u);
+    assert(fm1lab_sequencer_lane_advance(0u, 2) == 1u);
+    assert(fm1lab_sequencer_lane_advance(1u, 4) == 1u);
+    assert(fm1lab_sequencer_lane_advance(0u, -1) == 0u);
     assert(fm1lab_sequencer_lane_advance(1u, -1) == 0u);
-    assert(fm1lab_sequencer_lane_advance(0u, 2) == 0u);
-    assert(fm1lab_sequencer_lane_advance(1u, -2) == 1u);
+    assert(fm1lab_sequencer_lane_advance(1u, -2) == 0u);
+    assert(fm1lab_sequencer_lane_advance(0u, 0) == 0u);
+    /* Global page: K1 trim, K2/K3 are existing swing/tempo, K4 BLE direction. */
+    assert(fm1lab_master_trim_advance(100u, 1) == 100u);
+    assert(fm1lab_master_trim_advance(50u, -7) == 43u);
+    assert(fm1lab_master_trim_advance(3u, -8) == 0u);
+    assert(fm1lab_master_gain_scale(4096u, 100u) == 4096u);
+    assert(fm1lab_master_gain_scale(4096u, 50u) == 2048u);
+    assert(fm1lab_master_gain_scale(4096u, 0u) == 0u);
+    assert(fm1lab_chaos_rate_advance(0u, 1) == 10u);
+    assert(fm1lab_chaos_rate_advance(90u, 2) == 100u);
+    assert(fm1lab_chaos_rate_advance(10u, -2) == 0u);
+    assert(fm1lab_ble_enabled_from_turn(0u, 2) == 1u);
+    assert(fm1lab_ble_enabled_from_turn(1u, -2) == 0u);
+    assert(fm1lab_ble_enabled_from_turn(1u, 0) == 1u);
+
     return 0;
 }

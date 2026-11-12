@@ -8,11 +8,13 @@ enum {
     FM1LAB_PRESET_TARGET_PATCH = 1u
 };
 
-/* Patch focus is explicit UI state: the PRESETS encoder must not infer it
- * from the current page, because focus persists while editing that patch. */
-static inline uint8_t fm1lab_preset_target(uint8_t patch_focus)
+/* PRESETS always selects a complete four-patch Instrument. SELECT owns
+ * individual patch focus; changing focus never changes PRESETS semantics. */
+static inline uint8_t fm1lab_preset_target(uint8_t patch_focus, uint8_t all_patches_active)
 {
-    return patch_focus ? FM1LAB_PRESET_TARGET_PATCH : FM1LAB_PRESET_TARGET_INSTRUMENT;
+    (void)patch_focus;
+    (void)all_patches_active;
+    return FM1LAB_PRESET_TARGET_INSTRUMENT;
 }
 
 /* PRESETS is active on Home, or on the main Sequencer page when a

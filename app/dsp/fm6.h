@@ -143,6 +143,7 @@ uint8_t fm6_arpeggiator_mode(void);
 void fm6_arpeggiator_set_latch(uint8_t enabled);
 #ifdef FM6_TEST
 uint8_t fm6_test_arpeggiator_amp_level(void);
+uint8_t fm6_test_fx_mix_effective(uint8_t effect);
 void fm6_test_set_cpu2_mode(uint8_t mode); /* 0 serial, 1 split, 2 simulated partial-job fallback */
 #endif
 int fm6_performance_state_valid(const fm6_performance_state_t *state);
