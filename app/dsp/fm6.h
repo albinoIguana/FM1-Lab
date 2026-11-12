@@ -167,6 +167,14 @@ uint8_t fm6_fx_get_send(uint8_t patch, uint8_t effect);
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12);
 uint32_t fm6_cpu2_last_job_us(void);
 uint32_t fm6_cpu2_last_wait_us(void);
+/* Per-callback sums and counts; maxima are exposed separately above. */
+uint32_t fm6_cpu0_voice_us(void);
+uint32_t fm6_cpu2_job_sum_us(void);
+uint32_t fm6_cpu2_wait_sum_us(void);
+uint32_t fm6_cpu2_quantum_count(void);
+uint32_t fm6_cpu2_dispatch_count(void);
+uint32_t fm6_cpu2_fallback_count(void);
+uint32_t fm6_callback_voice_peak_count(void);
 #ifdef FM6_TEST
 /* Test-only pre-clip Q24 probes; never used by the device UI/audio path. */
 uint64_t fm6_test_patch_peak(uint32_t patch);
