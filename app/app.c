@@ -1212,7 +1212,10 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
 }
 
 #ifdef PLAT_HOST
-static uint32_t app_host_input_failures;
+static uint32_t app_host_input_failures, app_host_render_callbacks;
+static uint8_t app_host_event_test_active, app_host_event_trace_count;
+static uint8_t app_host_event_trace[3];
+static uint32_t app_host_event_callback[3], app_host_event_start_callback;
 #endif
 static int app_input_patch_preset_step(void *opaque, uint8_t patch, int delta)
 {
@@ -1311,6 +1314,13 @@ static void ui_events_drain(void)
         uint8_t b = ui_events[tail].b, c = ui_events[tail].c;
         uint8_t heavy=(uint8_t)(type==EV_INSTRUMENT_LOAD ||
             type==EV_PERFORMANCE_APPLY || type==EV_PATCH_VOICE);
+#ifdef PLAT_HOST
+        if(app_host_event_test_active && app_host_event_trace_count<3u) {
+            uint8_t at=app_host_event_trace_count++;
+            app_host_event_trace[at]=type;
+            app_host_event_callback[at]=app_host_render_callbacks-app_host_event_start_callback;
+        }
+#endif
         /* Preserve FIFO order: process notes/light events ahead of the next
          * expensive update, but leave a second expensive update queued for the
          * next audio callback. Never pop an event we are deferring. */
@@ -1810,6 +1820,9 @@ uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count();
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
+#ifdef PLAT_HOST
+    app_host_render_callbacks++;
+#endif
     uint32_t render_t0 = plat_ticks24();
 #if defined(PLAT_WEB)
     uint32_t cpu2_t0 = fm6_cpu2_total_job_ticks();
@@ -4392,6 +4405,15 @@ int app_expect(const char *what, int *got)
         *got = seq_ui_instrument[(uint32_t)atoi(what + 9) & 1u];
     else if (!fm1lab_strcmp(what, "pending"))
         *got = instrument_apply_pending;
+#ifdef PLAT_HOST
+    else if (!fm1lab_strcmp(what, "eventbudget"))
+        *got = app_host_event_test_active && app_host_event_trace_count==3u &&
+            app_host_event_trace[0]==EV_NOTE_ON &&
+            app_host_event_trace[1]==EV_INSTRUMENT_LOAD &&
+            app_host_event_trace[2]==EV_PERFORMANCE_APPLY &&
+            app_host_event_callback[0]==1u && app_host_event_callback[1]==1u &&
+            app_host_event_callback[2]<=3u && app_host_event_callback[2]>app_host_event_callback[1];
+#endif
     else if (!fm1lab_strcmp(what, "page"))
         *got = page;
     else if (!fm1lab_strcmp(what, "cpu"))
@@ -4440,7 +4462,36 @@ int app_expect(const char *what, int *got)
 
 int app_host_fails(void)
 {
-    return (int)app_host_input_failures;
+    int failures=(int)app_host_input_failures;
+    if(app_host_event_test_active &&
+       !(app_host_event_trace_count==3u &&
+         app_host_event_trace[0]==EV_NOTE_ON &&
+         app_host_event_trace[1]==EV_INSTRUMENT_LOAD &&
+         app_host_event_trace[2]==EV_PERFORMANCE_APPLY &&
+         app_host_event_callback[0]==1u && app_host_event_callback[1]==1u &&
+         app_host_event_callback[2]<=3u && app_host_event_callback[2]>app_host_event_callback[1]))
+        failures++;
+    return failures;
+}
+
+int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
+{
+    (void)a;(void)b;(void)c;(void)d;
+    if(fm1lab_strcmp(cmd,"fm1lab_event_budget"))return 0;
+    if(ui_event_head!=ui_event_tail || instrument_apply_pending || performance_update_pending)
+        return 1;
+    app_host_event_trace_count=0u;
+    app_host_event_start_callback=app_host_render_callbacks;
+    app_host_event_test_active=1u;
+    instrument_apply_snapshot=current_instrument;
+    inserts_apply_snapshot=current_inserts;
+    performance_update_snapshot=set.performance;
+    instrument_apply_pending=1u;
+    performance_update_pending=1u;
+    note_on(60,100u);
+    ui_event_push(EV_INSTRUMENT_LOAD,seq_ui_lane,0u,0u);
+    ui_event_push(EV_PERFORMANCE_APPLY,0u,0u,0u);
+    return 1;
 }
 #endif
 

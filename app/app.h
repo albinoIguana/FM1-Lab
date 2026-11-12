@@ -50,6 +50,8 @@ void app_say(const char *a, const char *b);   /* a short message on the screen a
 #define APP_HOST_EXPECT
 #ifdef PLAT_HOST
 #define APP_HOST_FAILS
+#define APP_HOST_CMD
 int app_host_fails(void);
+int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d);
 #endif
 int app_expect(const char *what, int *got);

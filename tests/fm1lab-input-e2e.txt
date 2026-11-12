@@ -88,3 +88,9 @@ spin SELECT -1
 wait 40
 expect lane 0
 expect patch 1
+
+# Force note-on, Instrument-load, and performance-apply events into the same
+# queue. The app's host-only assertion checks FIFO order and callback spacing.
+fm1lab_event_budget
+wait 30
+expect eventbudget 1
