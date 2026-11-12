@@ -4323,6 +4323,7 @@ int app_expect(const char *what, int *got)
     else if (!fm1lab_strcmp(what, "cpu2dispatch")) *got=(int)render_cpu2_dispatches;
     else if (!fm1lab_strcmp(what, "cpu2fallback")) *got=(int)render_cpu2_fallbacks;
     else if (!fm1lab_strcmp(what, "shedvoices")) *got=(int)fm6_overload_last_voice_count();
+    else if (!fm1lab_strncmp(what, "shedvoice", 9)) *got=(int)fm6_overload_shed_voice_at((uint32_t)atoi(what+9));
     else if (!fm1lab_strcmp(what, "cpu2bad"))
         *got = (int)plat_cpu2_bad();
     else if (!fm1lab_strcmp(what, "cpu2selftest"))
