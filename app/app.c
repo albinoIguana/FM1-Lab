@@ -7,6 +7,7 @@
  * Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
+#include "fm1lab_cpu2_startup.h"
 #include "fm1lab_settings_record.h"
 #include "fm1lab_sequencer_record.h"
 #include "fm1lab_instrument.h"
@@ -1891,18 +1892,21 @@ void app_init(void)
     (void)plat_cpu2_set(1);
     /* Prove a real job can execute from flash and return shared data before
      * the first audio interrupt. A failed self-test leaves the safe CPU0 path. */
-    if (plat_cpu2_on()) {
+    {
         const uint32_t seed = 20261010u;
-        cpu2_selftest_out = 0u;
-        if (!plat_cpu2_run(cpu2_selftest_job, seed) ||
-            plat_cpu2_wait() != 0 ||
-            cpu2_selftest_out != cpu2_selftest_lcg(seed)) {
-            cpu2_selftest_failed = 1u;
-            if (plat_cpu2_on())
-                (void)plat_cpu2_set(0);
+        uint8_t started=(uint8_t)(plat_cpu2_on()!=0);
+        uint8_t dispatched=0u;
+        int wait_result=-1;
+        cpu2_selftest_out=0u;
+        if(started) {
+            dispatched=(uint8_t)(plat_cpu2_run(cpu2_selftest_job,seed)!=0);
+            if(dispatched)wait_result=plat_cpu2_wait();
         }
-    } else {
-        cpu2_selftest_failed = 1u;
+        if(!fm1lab_cpu2_selftest_success(started,dispatched,wait_result,
+                                          cpu2_selftest_out,cpu2_selftest_lcg(seed))) {
+            cpu2_selftest_failed=1u;
+            if(plat_cpu2_on())(void)plat_cpu2_set(0);
+        }
     }
 #endif
     fm6_init();
