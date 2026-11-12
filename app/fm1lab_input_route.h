@@ -2,6 +2,7 @@
 #define FM1LAB_INPUT_ROUTE_H
 
 #include <stdint.h>
+#include "../firmware/fm1lab_physical_controls.h"
 
 /* These values are kept in lockstep with app.c's PAGE_* enum. */
 enum {
@@ -27,9 +28,9 @@ static inline uint32_t fm1lab_input_route_claims(uint8_t page,
 {
     uint32_t claims = 0u;
     if (page == FM1LAB_INPUT_PAGE_HOME) {
-        if (encoder == 0u)
+        if (encoder == FM1LAB_ENCODER_SELECT)
             claims |= (uint32_t)1u << FM1LAB_INPUT_PATCH_FOCUS_STEP;
-        if (encoder == 2u)
+        if (encoder == FM1LAB_ENCODER_PRESETS)
             claims |= (uint32_t)1u << (patch_focus
                 ? FM1LAB_INPUT_PATCH_PRESET_STEP
                 : FM1LAB_INPUT_INSTRUMENT_STEP);
