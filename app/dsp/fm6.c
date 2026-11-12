@@ -1233,7 +1233,8 @@ static void fm6_cpu2_voice_job(uint32_t unused)
 #ifndef FM6_TEST
     {
         uint32_t elapsed = plat_ticks24() - t0;
-        fm6_cpu2_job_us = elapsed / PLAT_TICKS_PER_US;
+        uint32_t elapsed_us=elapsed / PLAT_TICKS_PER_US;
+        if(elapsed_us>fm6_cpu2_job_us)fm6_cpu2_job_us=elapsed_us;
 #if defined(PLAT_WEB)
         fm6_cpu2_total_job_ticks_accum += elapsed;
 #endif
@@ -1254,6 +1255,8 @@ uint32_t fm6_cpu2_total_job_ticks(void)
 
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 {
+    fm6_cpu2_job_us=0u;
+    fm6_cpu2_wait_us=0u;
 #ifdef FM6_TEST
     fm6_zero_bytes(fm6_test_patch_peak_q24, sizeof fm6_test_patch_peak_q24);
     fm6_test_dry_peak_q24 = 0u;
@@ -1327,7 +1330,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                                            fm6_patch_mix[0], fm6_voice_bus[0]);
                     uint32_t wait_t0 = plat_ticks24();
                     int wait_rc = plat_cpu2_wait();
-                    fm6_cpu2_wait_us = (plat_ticks24() - wait_t0) / PLAT_TICKS_PER_US;
+                    uint32_t wait_us=(plat_ticks24() - wait_t0) / PLAT_TICKS_PER_US;
+                    if(wait_us>fm6_cpu2_wait_us)fm6_cpu2_wait_us=wait_us;
                     if (wait_rc == 0) {
                         for (p = 0; p < PATCHES; ++p)
                             for (i = 0; i < FM6_N; ++i)
