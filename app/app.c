@@ -77,6 +77,7 @@ enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE
 static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
+static uint8_t patch_preset_cursor[FM1LAB_PATCH_COUNT];
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
@@ -726,6 +727,25 @@ static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH
         out[group*4u+2u]=(uint8_t)(value>>8);
         out[group*4u+3u]=(uint8_t)value;
     }
+    return 0;
+}
+
+/* PRESETS in patch-focus mode replaces only the selected patch's DX7 voice.
+ * Mixer level, enable state, tuning, pan, and macros belong to the patch slot. */
+static int fm1lab_patch_preset_step(int delta)
+{
+    uint8_t voice[FM1LAB_PATCH_BYTES];
+    uint8_t next;
+    if (!delta || set.patch >= FM1LAB_PATCH_COUNT) return -1;
+    next=fm1lab_preset_cursor_advance(patch_preset_cursor[set.patch],delta,
+                                      FM1LAB_DX7_VOICE_COUNT);
+    if (fm1lab_dx7_decode_voice(next,voice) != 0 ||
+        fm1lab_patch_replace_voice(&current_instrument,set.patch,voice) != 0)
+        return -1;
+    patch_preset_cursor[set.patch]=next;
+    instrument_dirty=1u;
+    set_dirty=1u;
+    voice_dirty=1u;
     return 0;
 }
 
@@ -2431,9 +2451,10 @@ static void input(void)
         } else if (k == EN_SELECT && page == PAGE_SEQ_PIANO) {
             sequencer_select_event(e);
             app_say("NOTE","SELECTED");
-        } else if (k == EN_SELECT && (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS)) {
-            /* Track focus is UI-only; a queued voice-bank apply belongs to
-             * the previous lane and must not swallow SELECT detents here. */
+        } else if (k == EN_SELECT && fm1lab_sequencer_select_is_track_input(
+                       page, PAGE_SEQ, PAGE_SEQ_OPTIONS)) {
+            /* This is the physical SELECT path used by the two-track UI.
+             * Save the current Instrument before switching the active bank. */
             if(instrument_dirty && instrument_save()!=0){app_say("SAVE FAILED","TRACK NOT CHANGED");continue;}
             seq_ui_lane = (uint8_t)fm1lab_sequencer_lane_advance(seq_ui_lane, e);
             set.patch = seq_ui_patch[seq_ui_lane];
@@ -2479,11 +2500,17 @@ static void input(void)
         } else if (k == EN_PRESET && page == PAGE_OPERATOR_MAP) {
             app_say("PATCH PITCH", "K1 OCTAVE / K2 FINE");
         } else if (k == EN_PRESET) {
-            /* PRESETS always selects the complete four-patch Instrument.
-             * SELECT owns patch focus; that focus never repurposes PRESETS. */
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
+            } else if(page==PAGE_HOME &&
+                      fm1lab_preset_target(patch_focus,0u)==FM1LAB_PRESET_TARGET_PATCH) {
+                if(fm1lab_patch_preset_step(e)==0)
+                    app_say("PATCH PRESET",patch_display_name(set.patch));
+                else
+                    app_say("PATCH PRESET","LOAD FAILED");
             } else {
+                /* No patch card focused: PRESETS changes the complete
+                 * four-patch Instrument. The Sequencer always uses this mode. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
