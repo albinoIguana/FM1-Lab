@@ -289,7 +289,62 @@ static void render_hardware_callback_stress(uint8_t mode, int32_t *destination)
     }
 }
 
+
+static void install_test_instrument_bank(unsigned lane, uint8_t attack)
+{
+    uint8_t voice[156];
+    assert(lane < 2u);
+    assert(FM6_ENGINE_PATCH_COUNT >= 8u);
+    memcpy(voice, fm6_patch_data(0u), 155u);
+    for (unsigned patch = 0u; patch < 4u; ++patch) {
+        unsigned engine_patch = lane * 4u + patch;
+        voice[0] = (uint8_t)(attack + patch);
+        voice[145] = (uint8_t)('A' + lane);
+        voice[146] = (uint8_t)('0' + patch);
+        assert(fm6_patch_set_voice(engine_patch, voice) == 0);
+        fm6_patch_set_enabled(engine_patch, 1u);
+        fm6_patch_set_level(engine_patch, 31u);
+    }
+}
+
+static void render_track_one_after_track_two_change(uint8_t change_track_two,
+                                                     int32_t *destination)
+{
+    static int32_t warmup[256u * 2u];
+    fm6_init();
+    install_test_instrument_bank(0u, 20u);
+    install_test_instrument_bank(1u, 35u);
+    if (change_track_two)
+        install_test_instrument_bank(1u, 80u);
+    /* T1 owns engine patches 0..3. A T2 bank replacement is not in this mask. */
+    fm6_note_on_mask(60u, 105u, 0x0fu);
+    fm6_render(warmup, 256u, 4096u);
+    fm6_render(destination, TEST_FRAMES, 4096u);
+}
+
+static void test_two_resident_instrument_banks(void)
+{
+    int32_t reference[TEST_WORDS], after_t2_change[TEST_WORDS];
+    uint8_t before[4][155];
+    fm6_init();
+    assert(FM6_ENGINE_PATCH_COUNT >= 8u);
+    install_test_instrument_bank(0u, 20u);
+    install_test_instrument_bank(1u, 35u);
+    for (unsigned patch = 0u; patch < 4u; ++patch)
+        memcpy(before[patch], fm6_patch_data(patch), sizeof before[patch]);
+
+    /* Replace only T2's four slots, exactly the bank addressed by lane*4. */
+    install_test_instrument_bank(1u, 80u);
+    for (unsigned patch = 0u; patch < 4u; ++patch)
+        assert(memcmp(before[patch], fm6_patch_data(patch), sizeof before[patch]) == 0);
+
+    render_track_one_after_track_two_change(0u, reference);
+    render_track_one_after_track_two_change(1u, after_t2_change);
+    assert(memcmp(reference, after_t2_change, sizeof reference) == 0);
+}
+
 int main(void) {
+    test_two_resident_instrument_banks();
     /* A single patch's active voices split across the cores, not by fixed
      * patch index. A partial worker failure must restore state before fallback. */
     /* One isolated patch: eight notes split four/four. */
