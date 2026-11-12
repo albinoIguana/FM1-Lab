@@ -42,7 +42,7 @@ static volatile uint32_t render_last_us, render_budget_us, render_deadline_misse
 static volatile uint32_t render_dma_guard_us, render_shed_threshold_us;
 static volatile uint32_t render_core0_active_us, render_cpu2_job_us, render_cpu2_wait_us;
 static volatile uint32_t render_cpu0_voice_us, render_cpu2_job_sum_us, render_cpu2_wait_sum_us;
-static volatile uint32_t render_cpu2_backup_us, render_cpu2_backup_voices;
+static volatile uint32_t render_cpu2_backup_ns, render_cpu2_backup_voices;
 static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
 static volatile uint32_t render_peak_all_us, render_peak_window_us;
 static volatile uint32_t render_voice_peak, render_quanta, render_cpu2_quanta, render_cpu2_dispatches, render_cpu2_fallbacks;
@@ -1770,7 +1770,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         render_cpu0_voice_us=fm6_cpu0_voice_us();
         render_cpu2_job_sum_us=fm6_cpu2_job_sum_us();
         render_cpu2_wait_sum_us=wait_sum_us;
-        render_cpu2_backup_us=fm6_cpu2_backup_sum_us();
+        render_cpu2_backup_ns=fm6_cpu2_backup_sum_ns();
         render_cpu2_backup_voices=fm6_cpu2_backup_voice_count();
         render_ui_us=ui_us; render_midi_us=midi_us; render_gain_us=gain_us;
         render_voice_peak=fm6_callback_voice_peak_count();
@@ -3513,7 +3513,7 @@ static void draw_audio_diag_panel(void)
             int_text((int32_t)render_cpu2_job_us,detail);text_cat(detail," / ");
             int_text((int32_t)render_cpu2_wait_us,value);text_cat(detail,value);text_cat(detail," max");
             cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
-            uint32_t backup_ns=fm6_cpu2_backup_sum_ns();
+            uint32_t backup_ns=render_cpu2_backup_ns;
             int_text((int32_t)backup_ns,detail);text_cat(detail," ns BK / ");
             int_text((int32_t)render_cpu2_backup_voices,value);text_cat(detail,value);text_cat(detail," V");
             if(render_cpu2_backup_voices) {
