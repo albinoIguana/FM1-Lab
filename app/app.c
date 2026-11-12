@@ -38,6 +38,7 @@ static uint32_t web_device_xruns;
 /* Per-callback diagnostics. CPU0 busy is callback wall time minus the sum
  * of CPU0's blocking waits; voice time and UI/MIDI sub-costs are also separate. */
 static volatile uint32_t render_last_us, render_budget_us, render_deadline_misses;
+static volatile uint32_t render_dma_guard_us, render_shed_threshold_us;
 static volatile uint32_t render_core0_active_us, render_cpu2_job_us, render_cpu2_wait_us;
 static volatile uint32_t render_cpu0_voice_us, render_cpu2_job_sum_us, render_cpu2_wait_sum_us;
 static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
@@ -1752,6 +1753,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         if(wait_sum_us>elapsed_us)wait_sum_us=elapsed_us;
         render_last_us=elapsed_us;
         render_budget_us=budget_us;
+        render_dma_guard_us=budget_us-(budget_us>>3);
+        render_shed_threshold_us=(budget_us*85u)/100u;
         render_core0_active_us=elapsed_us-wait_sum_us;
         render_cpu2_job_us=fm6_cpu2_last_job_us();
         render_cpu2_wait_us=fm6_cpu2_last_wait_us();
@@ -4299,6 +4302,8 @@ int app_expect(const char *what, int *got)
         *got = (int)render_last_us;
     else if (!fm1lab_strcmp(what, "renderbudget"))
         *got = (int)render_budget_us;
+    else if (!fm1lab_strcmp(what, "renderdma")) *got=(int)render_dma_guard_us;
+    else if (!fm1lab_strcmp(what, "rendershedat")) *got=(int)render_shed_threshold_us;
     else if (!fm1lab_strcmp(what, "renderlate"))
         *got = (int)render_deadline_misses;
     else if (!fm1lab_strcmp(what, "core0us"))
