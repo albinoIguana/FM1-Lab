@@ -24,6 +24,13 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" "$ROOT/tests/fm1lab_physica
 "$CONTROLS_BIN"
 echo "FM1-Lab physical control mapping tests passed."
 
+# Exercise the shared route + action dispatcher used by app.c, including the
+# HOME focused-patch/whole-Instrument split and SEQ SELECT/PRESETS separation.
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
+  "$ROOT/tests/fm1lab_input_route.test.c" -o "$CONTROLS_BIN"
+"$CONTROLS_BIN"
+echo "FM1-Lab app input routing and action-dispatch regression tests passed."
+
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" \
   "$ROOT/tests/fm1lab_preset_control.test.c" -o "$PRESET_BIN"
 "$PRESET_BIN"
