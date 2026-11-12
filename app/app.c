@@ -1279,7 +1279,7 @@ static void save_name_step(int delta)
 
 static void ui_events_drain(void)
 {
-    uint8_t tail;
+    uint8_t tail, heavy_done=0u;
     if (ui_event_overflow) {
         ui_event_tail = ui_event_head;
         ui_event_overflow = 0;
@@ -1303,6 +1303,12 @@ static void ui_events_drain(void)
     while ((tail = ui_event_tail) != ui_event_head) {
         uint8_t type = ui_events[tail].type, a = ui_events[tail].a;
         uint8_t b = ui_events[tail].b, c = ui_events[tail].c;
+        uint8_t heavy=(uint8_t)(type==EV_INSTRUMENT_LOAD ||
+            type==EV_PERFORMANCE_APPLY || type==EV_PATCH_VOICE);
+        /* Preserve FIFO order: process notes/light events ahead of the next
+         * expensive update, but leave a second expensive update queued for the
+         * next audio callback. Never pop an event we are deferring. */
+        if(heavy && heavy_done) break;
         ui_event_tail = (uint8_t)((tail + 1u) & 63u);
         if (type == EV_NOTE_ON)
             fm6_note_on_mask(a, b, c);
@@ -1341,6 +1347,7 @@ static void ui_events_drain(void)
                 current_instrument.patches[patch].fine_cents);
             voice_update_pending = 0u;
         }
+        if(heavy) heavy_done=1u;
     }
 }
 
