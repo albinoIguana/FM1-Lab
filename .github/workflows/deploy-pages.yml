@@ -105,7 +105,9 @@ jobs:
           cp app/build/emu/app.wasm _site/native-emulator/app.wasm
           build_sha="${{ github.event.workflow_run.head_sha }}"
           printf 'Build identity: %s\\n' "${build_sha:0:8}"
-          sed -i "s/__FM1_BUILD_SHA__/${build_sha:0:8}/g" _site/native-emulator/index.html
+          build_number="${{ github.event.workflow_run.run_number }}"
+          sed -i "s/__FM1_BUILD_NUMBER__/${build_number}/g; s/__FM1_BUILD_SHA__/${build_sha:0:8}/g" _site/native-emulator/index.html
+          ! grep -q "__FM1_BUILD_" _site/native-emulator/index.html
           ! grep -q "__FM1_BUILD_SHA__" _site/native-emulator/index.html
           cp native-emulator/startup-lab.html _site/native-emulator/startup-lab.html
       - name: Verify published native emulator payload
