@@ -7,6 +7,8 @@
 enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
 static int32_t output[TEST_WORDS];
 static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
+static int32_t stress_reference[96u * 256u * 2u];
+static int32_t stress_candidate[96u * 256u * 2u];
 
 static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voices,
                              int32_t *destination)
@@ -304,6 +306,15 @@ int main(void) {
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     render_cpu2_mode(2u, 0x0fu, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+
+    /* A single 128-frame equality check is too short to catch state drift
+     * across DMA boundaries. Compare 96 consecutive 256-frame callbacks
+     * under repeated 32-voice note-on/off activity in all worker modes. */
+    render_hardware_callback_stress(0u,stress_reference);
+    render_hardware_callback_stress(1u,stress_candidate);
+    assert(memcmp(stress_reference,stress_candidate,sizeof stress_reference)==0);
+    render_hardware_callback_stress(2u,stress_candidate);
+    assert(memcmp(stress_reference,stress_candidate,sizeof stress_reference)==0);
 
     /* MAELSTROM amount zero is a truly transparent bypass, independent of
      * the parked modulation controls. Engaged settings must alter the mix. */
