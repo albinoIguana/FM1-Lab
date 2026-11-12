@@ -1400,8 +1400,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                                            fm6_patch_mix[0], fm6_voice_bus[0]);
                     uint32_t wait_t0 = plat_ticks24();
                     int wait_rc = plat_cpu2_wait();
-                    uint32_t wait_us=(plat_ticks24() - wait_t0) / PLAT_TICKS_PER_US;
                     uint32_t wait_ticks=plat_ticks24()-wait_t0;
+                    uint32_t wait_us=wait_ticks/PLAT_TICKS_PER_US;
                     fm6_cpu2_wait_ticks_sum += wait_ticks;
                     if(wait_us>fm6_cpu2_wait_us)fm6_cpu2_wait_us=wait_us;
                     if (wait_rc == 0) {
