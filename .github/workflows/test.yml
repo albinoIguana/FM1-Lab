@@ -71,6 +71,8 @@ jobs:
       - name: Test Instrument and macro behavior
         run: npm test
       - name: Run native C adapter and audio-engine tests
+        env:
+          FM6_TSAN: "1"
         run: bash tests/test-native-instrument.sh
       - name: Build official M-VAVE browser simulator
         run: bash scripts/build-m-vave-simulator.sh
