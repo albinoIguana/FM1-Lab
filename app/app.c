@@ -2618,15 +2618,10 @@ static void input(void)
         } else if (k == EN_PRESET) {
             if(instrument_apply_pending) {
                 app_say("INSTRUMENT","LOADING");
-            } else if(page==PAGE_HOME &&
-                      fm1lab_preset_target(patch_focus,0u)==FM1LAB_PRESET_TARGET_PATCH) {
-                if(fm1lab_patch_preset_step(e)==0)
-                    app_say("PATCH PRESET",patch_display_name(set.patch));
-                else
-                    app_say("PATCH PRESET","LOAD FAILED");
             } else {
-                /* No patch card focused: PRESETS changes the complete
-                 * four-patch Instrument. The Sequencer always uses this mode. */
+                /* PRESETS always selects the complete four-patch Instrument,
+                 * including while a Home patch card is focused for editing.
+                 * Patch focus must never steal the Instrument selector. */
                 if(instrument_dirty && instrument_save()!=0) {
                     app_say("SAVE FAILED","PRESET NOT CHANGED");
                     continue;
@@ -3944,9 +3939,14 @@ static uint16_t arp_step_gradient_color(uint8_t accent, uint32_t band, uint32_t 
 {
     /* Accent is visual-only: it controls a bottom-up color ramp. */
     uint32_t progress=bands>1u?band*100u/(bands-1u):100u;
-    uint32_t level=18u+((uint32_t)accent*progress*82u)/10000u;
-    uint32_t r=20u+(207u*level)/100u, g=12u+(63u*level)/100u, b=34u+(176u*level)/100u;
-    if(playing){r+=r/2u;g+=g/2u;b+=b/2u;}
+    uint32_t emphasis=(uint32_t)accent;
+    /* A steep accent ramp reaches near-white magenta at high accent values. */
+    uint32_t level=12u+(emphasis*emphasis*88u)/10000u;
+    uint32_t lift=(progress*level)/100u;
+    uint32_t r=28u+(227u*lift)/100u;
+    uint32_t g=8u+(88u*lift)/100u;
+    uint32_t b=38u+(217u*lift)/100u;
+    if(playing){r+=r/3u;g+=g/3u;b+=b/3u;}
     if (r > 255u) r = 255u;
     if (g > 255u) g = 255u;
     if (b > 255u) b = 255u;
@@ -3978,7 +3978,7 @@ static void draw_arp_steps_panel(void)
         int32_t bar_h=(int32_t)gain*(height-10)/127;
         uint8_t is_playing=(uint8_t)(active && i==(uint32_t)(playing%arp_ui_length));
         uint8_t is_selected=(uint8_t)(i==arp_ui_step);
-        uint32_t bands=7u;
+        uint32_t bands=9u;
         int_text((int32_t)i+1,t);
         cv_text(x+(width-text_w(&FONT_XS,t))/2,21,&FONT_XS,t,is_selected?C_WHITE:C_PEWTER);
         cv_rect(x,top,width,height,is_selected?C_WHITE:RGB(43,59,72));
@@ -3989,10 +3989,23 @@ static void draw_arp_steps_panel(void)
             int32_t fill_x=x+2, fill_y=bottom-4-bar_h;
             int32_t bar_w=width-4;
             int32_t band_h=(bar_h+(int32_t)bands-1)/(int32_t)bands;
+            /* Bright edge + inset hot core simulate a luminous accent bar
+             * on the non-alpha 240x240 TFT. Keep the halo inside each step. */
+            if(emphasis) {
+                uint16_t halo=emphasis>=60u?RGB(255,74,245):RGB(146,42,150);
+                cv_rect(fill_x-1,fill_y-1,bar_w+2,1,halo);
+                cv_rect(fill_x-1,bottom-4,bar_w+2,1,halo);
+                cv_rect(fill_x-1,fill_y-1,1,(bottom-4)-fill_y+1,halo);
+                cv_rect(fill_x+bar_w,bottom-4-(bar_h-1),1,bar_h,halo);
+            }
             for(uint32_t band=0;band<bands;band++) {
                 int32_t yy=fill_y+(int32_t)band*band_h, hh=band_h;
                 if(yy+hh>bottom-4)hh=bottom-4-yy;
                 if(hh>0)cv_rect(fill_x,yy,bar_w,hh,arp_step_gradient_color(emphasis,band,bands,is_playing));
+            }
+            if(emphasis>=70u && bar_h>=5) {
+                int32_t core_y=fill_y+bar_h/3;
+                cv_rect(fill_x+1,core_y,bar_w-2,1,RGB(255,190,255));
             }
         }
         if(tied && i+1u<arp_ui_length) {
