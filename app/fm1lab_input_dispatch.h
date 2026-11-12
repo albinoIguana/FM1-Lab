@@ -49,8 +49,9 @@ static inline enum fm1lab_input_result fm1lab_input_apply(
 
     switch (action) {
     case FM1LAB_INPUT_PATCH_FOCUS_STEP: {
-        int value = ((int)state->patch + delta) % (int)patch_count;
+        int value;
         if (!patch_count) return FM1LAB_INPUT_RESULT_NONE;
+        value = ((int)state->patch + delta) % (int)patch_count;
         if (value < 0) value += patch_count;
         state->patch = (uint8_t)value;
         state->patch_focus = 1u;
