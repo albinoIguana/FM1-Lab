@@ -30,6 +30,10 @@ jobs:
           python3 tools/apply-fm1-base-audio-deadline.py
           cc -std=c11 -Wall -Wextra -Werror -I base/device tests/fm1lab_audio_commit.test.c -o /tmp/fm1-audio-commit-test
           /tmp/fm1-audio-commit-test
+      - name: Test CPU2 startup self-test failure decisions
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/fm1lab_cpu2_startup.test.c -o /tmp/fm1-cpu2-startup-test
+          /tmp/fm1-cpu2-startup-test
       - name: Patch and test both FM1 flash variants
         run: |
           python3 tools/apply-fm1-flash-compat.py
