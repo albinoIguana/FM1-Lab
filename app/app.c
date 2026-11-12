@@ -4167,8 +4167,15 @@ static void draw(void)
     }
     if (arp_ui_mode) cv_text(216, 1, &FONT_XS, "ARP", RGB(75,235,135));
 
-    /* Page identity replaces the generic FACTORY instrument label. */
-    cv_text_fit(8,15,&FONT_B,page==PAGE_HOME?instrument_display_name():page_title(page),accent,140);
+    /* Short-lived input refusals and confirmations must be visible. Keep
+     * the existing algorithm-preview message prefix intact for its overlay. */
+    if(ui.msg_until && (int32_t)(ui.msg_until-plat_ms())>0) {
+        cv_text_fit(8,13,&FONT_B,ui.msg[0],accent,166);
+        cv_text_fit(8,24,&FONT_XS,ui.msg[1],C_PEWTER,166);
+    } else {
+        /* Page identity replaces the generic FACTORY instrument label. */
+        cv_text_fit(8,15,&FONT_B,page==PAGE_HOME?instrument_display_name():page_title(page),accent,140);
+    }
     cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_PEWTER);
     if(seq_record_armed)cv_text(205,16,&FONT_XS,"REC",RGB(255,80,90));
     if (page == PAGE_HOME) {
