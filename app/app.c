@@ -3489,8 +3489,10 @@ static void draw_audio_diag_panel(void)
             cv_text(x+8,y+6,&FONT_XS,"VOICES / SHEDDING",C_PEWTER);
             int_text((int32_t)render_voice_peak,value);text_cat(value," voices");
             cv_text(x+8,y+21,&FONT_B,value,colors[i]);
-            int_text((int32_t)render_quanta,detail);text_cat(detail," Q  C2 ");
-            int_text((int32_t)render_cpu2_quanta,value);text_cat(detail,value);
+            int_text((int32_t)render_quanta,detail);text_cat(detail," Q C2:");
+            int_text((int32_t)render_cpu2_quanta,value);text_cat(detail,value);text_cat(detail," D:");
+            int_text((int32_t)render_cpu2_dispatches,value);text_cat(detail,value);text_cat(detail," F:");
+            int_text((int32_t)render_cpu2_fallbacks,value);text_cat(detail,value);
             cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
             int_text((int32_t)fm6_overload_shed_count(),detail);text_cat(detail," SHED  @ ");
             int_text((int32_t)fm6_overload_last_voice_count(),value);text_cat(detail,value);text_cat(detail," V");
