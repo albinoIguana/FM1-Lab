@@ -105,7 +105,6 @@ spin SELECT 1
 wait 30
 expect lane 0
 expect pending 1
-said LOAD BUSY
-said TRACK NOT CHANGED
+said LOAD BUSY TRACK NOT CHANGED
 fm1lab_pending_clear
 expect pending 0

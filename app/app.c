@@ -4252,7 +4252,7 @@ static void draw(void)
      * their main panels, so avoid duplicating them in a second bar. */
     cv_begin(240, 19, screen_bg());
     if (page == PAGE_HOME) {
-        t[0]='\\0';
+        t[0]='\0';
         if(patch_focus) {
             text_cat(t,"PRE: P");
             int_text((int32_t)set.patch+1,t+fm1lab_strlen(t));
@@ -4503,14 +4503,14 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         corrupt=seed0;
         if(fm1lab_voice_name_get(corrupt.patches[0].voice,patch_name)!=0)return 1;
         for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\0';
             corrupt.name[n]=c?c:' ';
         }
         if(fm1lab_store_library_save_full(0u,&corrupt,&inserts0)!=0)return 1;
         edited=seed1;
         if(fm1lab_voice_name_get(edited.patches[0].voice,patch_name)!=0)return 1;
         for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\0';
             edited.name[n]=c?c:' ';
         }
         edited.patches[0].voice[0]^=1u; /* a single user edit must block migration */
