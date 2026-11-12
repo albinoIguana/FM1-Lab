@@ -7,6 +7,10 @@
  * pools, and per-patch note allocation.
  */
 #include <stdint.h>
+#ifdef FM6_TEST
+#include <pthread.h>
+#include <stdlib.h>
+#endif
 #include "fm6.h"
 #include "felucca_tables.h"
 #include "felucca_fm6.h"
@@ -1242,6 +1246,18 @@ static void fm6_cpu2_voice_job(uint32_t unused)
 #endif
 }
 
+#ifdef FM6_TEST
+/* Host regression mode 1 uses a real POSIX worker thread, not a serial
+ * imitation. This exercises the same disjoint voice/output ownership that
+ * the FM1's second core uses. */
+static void *fm6_cpu2_test_thread(void *unused)
+{
+    (void)unused;
+    fm6_cpu2_voice_job(0u);
+    return 0;
+}
+#endif
+
 uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
 uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
 uint32_t fm6_cpu2_total_job_ticks(void)
@@ -1300,8 +1316,14 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
                 if (fm6_test_cpu2_mode == 1u) {
-                    fm6_cpu2_voice_job(0u);
+                    pthread_t worker;
+                    if (pthread_create(&worker, 0, fm6_cpu2_test_thread, 0) != 0)
+                        abort();
+                    /* CPU0 renders its half while CPU2's host twin renders
+                     * the other half, matching the hardware overlap. */
                     fm6_render_voice_range(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
+                    if (pthread_join(worker, 0) != 0)
+                        abort();
                     for (p = 0; p < PATCHES; ++p)
                         for (i = 0; i < FM6_N; ++i)
                             fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
