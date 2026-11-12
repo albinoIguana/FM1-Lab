@@ -18,6 +18,7 @@
 #include "../firmware/fm1lab_physical_controls.h"
 #include "fm1lab_preset_control.h"
 #include "fm1lab_input_route.h"
+#include "fm1lab_input_dispatch.h"
 #include <stddef.h>
 
 #define C_PEWTER RGB(175,185,195)
@@ -1185,6 +1186,57 @@ static int instrument_save_to(uint32_t index)
     return 0;
 }
 static int instrument_save(void) { return instrument_save_to(instrument_index); }
+
+typedef struct { fm1lab_input_state_t *state; } app_input_context_t;
+
+static int app_input_save_current(void *opaque)
+{
+    app_input_context_t *context = (app_input_context_t *)opaque;
+    int result = instrument_save();
+    if (context && context->state) {
+        context->state->instrument_dirty = instrument_dirty;
+        context->state->track_instrument[seq_ui_lane & 1u] = seq_ui_instrument[seq_ui_lane & 1u];
+    }
+    return result;
+}
+
+static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, int mode)
+{
+    app_input_context_t *context = (app_input_context_t *)opaque;
+    uint8_t previous_lane = seq_ui_lane;
+    int result;
+    seq_ui_lane = (uint8_t)(lane & 1u);
+    result = instrument_load(index, mode);
+    if (result != FM1LAB_LOAD_OK)
+        seq_ui_lane = previous_lane;
+    if (context && context->state && result == FM1LAB_LOAD_OK) {
+        context->state->instrument = instrument_index;
+        context->state->track_instrument[seq_ui_lane] = seq_ui_instrument[seq_ui_lane];
+        context->state->instrument_apply_pending = instrument_apply_pending;
+        context->state->instrument_dirty = instrument_dirty;
+    }
+    return result == FM1LAB_LOAD_OK ? 0 : result == FM1LAB_LOAD_BUSY ? 1 : -1;
+}
+
+static int app_input_patch_preset_step(void *opaque, uint8_t patch, int delta)
+{
+    (void)opaque;
+    set.patch = patch;
+    return fm1lab_patch_preset_step(delta);
+}
+
+static void app_input_publish(void *opaque)
+{
+    (void)opaque;
+    performance_publish();
+}
+
+static const fm1lab_input_ops_t app_input_ops = {
+    app_input_save_current,
+    app_input_load_instrument,
+    app_input_patch_preset_step,
+    app_input_publish
+};
 
 static void save_screen_open(void)
 {
@@ -2471,95 +2523,63 @@ static void input(void)
          * and unrelated page controls continue through their existing handlers. */
         enum fm1lab_input_action action = fm1lab_input_route(page, (uint8_t)k, patch_focus);
         if (action != FM1LAB_INPUT_NONE) {
-            switch (action) {
-            case FM1LAB_INPUT_PATCH_FOCUS_STEP: {
-                int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
-                if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;
-                set.patch = (uint8_t)next;
-                patch_focus = 1u;
-                seq_ui_patch[seq_ui_lane] = set.patch;
-                performance_publish();
+            fm1lab_input_state_t state = {
+                patch_focus, set.patch, seq_ui_lane, instrument_index,
+                {seq_ui_instrument[0], seq_ui_instrument[1]},
+                {seq_ui_patch[0], seq_ui_patch[1]},
+                instrument_apply_pending, instrument_dirty
+            };
+            app_input_context_t context = { &state };
+            enum fm1lab_input_result result = fm1lab_input_apply(
+                &state, action, e, (uint8_t)USER_INSTRUMENT_COUNT,
+                (uint8_t)FM1LAB_PATCH_COUNT, &app_input_ops, &context);
+
+            /* Commit the state changed by the same dispatcher exercised in
+             * host tests. Instrument/audio side effects remain in callbacks. */
+            patch_focus = state.patch_focus;
+            set.patch = state.patch;
+            seq_ui_lane = state.lane;
+            seq_ui_instrument[0] = state.track_instrument[0];
+            seq_ui_instrument[1] = state.track_instrument[1];
+            seq_ui_patch[0] = state.track_patch[0];
+            seq_ui_patch[1] = state.track_patch[1];
+
+            if (result == FM1LAB_INPUT_RESULT_APPLIED ||
+                result == FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED)
                 set_dirty = 1u;
-                app_say("PATCH", patch_display_name(set.patch));
+            switch (result) {
+            case FM1LAB_INPUT_RESULT_LOAD_BUSY:
+                app_say("LOAD BUSY", action == FM1LAB_INPUT_TRACK_TOGGLE
+                    ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
                 break;
-            }
-            case FM1LAB_INPUT_PATCH_PRESET_STEP:
-                if (instrument_apply_pending) {
-                    app_say("LOAD BUSY", "PATCH NOT CHANGED");
-                } else if (fm1lab_patch_preset_step(e) == 0) {
+            case FM1LAB_INPUT_RESULT_LOAD_FAILED:
+                app_say("LOAD FAILED", action == FM1LAB_INPUT_TRACK_TOGGLE
+                    ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
+                break;
+            case FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED:
+                app_say("SAVE FAILED", "TRACK NOT CHANGED");
+                break;
+            case FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED:
+                app_say("SAVE FAILED", "PRESET CHANGED");
+                break;
+            case FM1LAB_INPUT_RESULT_PATCH_FAILED:
+                app_say("PATCH PRESET", "LOAD FAILED");
+                break;
+            case FM1LAB_INPUT_RESULT_APPLIED:
+                if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP)
+                    app_say("PATCH", patch_display_name(set.patch));
+                else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP)
                     app_say("PATCH PRESET", patch_display_name(set.patch));
-                } else {
-                    app_say("PATCH PRESET", "LOAD FAILED");
+                else if (action == FM1LAB_INPUT_TRACK_TOGGLE)
+                    app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
+                else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP)
+                    app_say("TRACK INSTRUMENT", "LOADING");
+                else {
+                    int_text(instrument_index + 1, t);
+                    app_say("INSTRUMENT", t);
                 }
                 break;
-            case FM1LAB_INPUT_INSTRUMENT_STEP:
-            case FM1LAB_INPUT_TRACK_INSTRUMENT_STEP: {
-                int save_failed;
-                int32_t next;
-                int load_status;
-                if (instrument_apply_pending) {
-                    app_say("LOAD BUSY", "PRESET NOT CHANGED");
-                    break;
-                }
-                /* A failed save is reported but does not swallow the user's
-                 * PRESETS turn: the requested preset change still proceeds. */
-                save_failed = instrument_dirty && instrument_save() != 0;
-                next = ((int32_t)seq_ui_instrument[seq_ui_lane] + e) %
-                    (int32_t)USER_INSTRUMENT_COUNT;
-                if (next < 0) next += (int32_t)USER_INSTRUMENT_COUNT;
-                if ((uint32_t)next == instrument_index) {
-                    if (save_failed) app_say("SAVE FAILED", "PRESET UNCHANGED");
-                    else app_say("INSTRUMENT", "ALREADY SELECTED");
-                    break;
-                }
-                patch_focus = 0u;
-                load_status = instrument_load((uint32_t)next, 1);
-                if (load_status == FM1LAB_LOAD_BUSY) {
-                    app_say("LOAD BUSY", "PRESET NOT CHANGED");
-                } else if (load_status != FM1LAB_LOAD_OK) {
-                    app_say("LOAD FAILED", "PRESET NOT CHANGED");
-                } else {
-                    performance_publish();
-                    set_dirty = 1u;
-                    if (save_failed) app_say("SAVE FAILED", "PRESET CHANGED");
-                    else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP)
-                        app_say("TRACK INSTRUMENT", "LOADING");
-                    else {
-                        int_text(next + 1, t);
-                        app_say("INSTRUMENT", t);
-                    }
-                }
-                break;
-            }
-            case FM1LAB_INPUT_TRACK_TOGGLE: {
-                uint8_t previous_lane = seq_ui_lane;
-                uint8_t next_lane = fm1lab_input_track_next(seq_ui_lane, e);
-                int load_status;
-                if (instrument_apply_pending) {
-                    app_say("LOAD BUSY", "TRACK NOT CHANGED");
-                    break;
-                }
-                if (instrument_dirty && instrument_save() != 0) {
-                    app_say("SAVE FAILED", "TRACK NOT CHANGED");
-                    break;
-                }
-                if (next_lane == previous_lane)
-                    break;
-                seq_ui_lane = next_lane;
-                load_status = instrument_load(seq_ui_instrument[seq_ui_lane], 2);
-                if (load_status != FM1LAB_LOAD_OK) {
-                    seq_ui_lane = previous_lane;
-                    app_say(load_status == FM1LAB_LOAD_BUSY ? "LOAD BUSY" : "LOAD FAILED",
-                            "TRACK NOT CHANGED");
-                    break;
-                }
-                set.patch = seq_ui_patch[seq_ui_lane];
-                performance_publish();
-                set_dirty = 1u;
-                app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
-                break;
-            }
-            case FM1LAB_INPUT_NONE:
+            case FM1LAB_INPUT_RESULT_NONE:
             default:
                 break;
             }
