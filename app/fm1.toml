@@ -15,7 +15,8 @@ cpu2_stack = 4096
 # intended free half. This follows fm1-base's audio_commit path.
 audio_aside = true
 # Enable the FM1 SoC's second core for the FM6 voice-render worker.
-# Keep platform fallback enabled so a failed/late worker does not corrupt audio.
+# Platform fallback replays a dropped worker on CPU0; audio_aside protects
+# the DMA buffer, while the app records render-deadline misses separately.
 web_cflags = ["-DFM1B_CPU2=1"]
 web_link = ["web/emu/web_exports.c"]
 ble = true
