@@ -174,6 +174,7 @@ uint32_t fm6_cpu0_voice_us(void);
 uint32_t fm6_cpu2_job_sum_us(void);
 uint32_t fm6_cpu2_wait_sum_us(void);
 uint32_t fm6_cpu2_backup_sum_us(void);
+uint32_t fm6_cpu2_backup_sum_ns(void);
 uint32_t fm6_cpu2_backup_voice_count(void);
 void fm6_cpu2_disable(void);
 uint8_t fm6_cpu2_split_is_disabled(void);
