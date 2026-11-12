@@ -98,7 +98,9 @@ static void page_change(uint8_t next_page)
         page, next_page, patch_focus);
     page = next_page;
 }
-static uint8_t patch_preset_cursor[FM1LAB_PATCH_COUNT];
+static uint8_t patch_preset_cursor[2][FM1LAB_PATCH_COUNT] = {
+    {255u,255u,255u,255u}, {255u,255u,255u,255u}
+};
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
@@ -756,14 +758,18 @@ static int fm1lab_dx7_decode_voice(uint32_t voice_index,uint8_t out[FM1LAB_PATCH
 static int fm1lab_patch_preset_step(int delta)
 {
     uint8_t voice[FM1LAB_PATCH_BYTES];
-    uint8_t next;
+    uint8_t next, lane=(uint8_t)(seq_ui_lane&1u);
+    uint8_t cursor;
     if (!delta || set.patch >= FM1LAB_PATCH_COUNT) return -1;
-    next=fm1lab_preset_cursor_advance(patch_preset_cursor[set.patch],delta,
-                                      FM1LAB_DX7_VOICE_COUNT);
+    cursor=patch_preset_cursor[lane][set.patch];
+    if(cursor==255u)
+        next=(uint8_t)(delta>0?0u:FM1LAB_DX7_VOICE_COUNT-1u);
+    else
+        next=fm1lab_preset_cursor_advance(cursor,delta,FM1LAB_DX7_VOICE_COUNT);
     if (fm1lab_dx7_decode_voice(next,voice) != 0 ||
         fm1lab_patch_replace_voice(&current_instrument,set.patch,voice) != 0)
         return -1;
-    patch_preset_cursor[set.patch]=next;
+    patch_preset_cursor[lane][set.patch]=next;
     instrument_dirty=1u;
     set_dirty=1u;
     voice_dirty=1u;
@@ -1136,6 +1142,7 @@ static int instrument_load(uint32_t index, int from_audio)
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
     uint8_t repaired_patches = 0u;
+    uint8_t previous_instrument=seq_ui_instrument[seq_ui_lane&1u];
     int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
     if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
         current_instrument = candidate;
@@ -1145,6 +1152,9 @@ static int instrument_load(uint32_t index, int from_audio)
     }
     repaired_patches=instrument_repair_missing_voices(&current_instrument);
     instrument_index = (uint8_t)index;
+    if(previous_instrument!=instrument_index)
+        for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++)
+            patch_preset_cursor[seq_ui_lane&1u][p]=255u;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
