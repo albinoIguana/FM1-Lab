@@ -26,12 +26,12 @@ static inline unsigned fm1lab_sequencer_select_is_track_input(unsigned page,
     return (unsigned)(page == sequencer_page || page == options_page);
 }
 
-/* Clockwise selects T2; counter-clockwise selects T1. */
+/* The sequencer has two tracks, so rotation in either direction moves
+ * to the other track. Treat any nonzero encoder report as one detent action:
+ * FM1 hardware can report multiple quadrature counts for a single detent. */
 static inline unsigned fm1lab_sequencer_lane_advance(unsigned lane, int delta)
 {
-    if (delta > 0) return 1u;
-    if (delta < 0) return 0u;
-    return lane & 1u;
+    return delta ? ((lane ^ 1u) & 1u) : (lane & 1u);
 }
 
 static inline unsigned fm1lab_master_trim_advance(unsigned current, int delta)
