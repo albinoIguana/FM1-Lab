@@ -57,6 +57,13 @@ replace_once(main,
     "static void render_block(int32_t *o)                /* ALNK0: one half, measured */",
     "static uint32_t render_block(int32_t *o)             /* ALNK0: one half, measured */")
 replace_once(main,
+    """#ifdef APP_OVERLOAD
+    if (us > budget * 9u / 10u)
+        app_overload();""",
+    """#ifdef APP_OVERLOAD
+    if (us > budget * 85u / 100u)
+        app_overload();""")
+replace_once(main,
     """    fm1b_dbg.last_us = us;
     if (us > fm1b_dbg.max_us)
         fm1b_dbg.max_us = us;
