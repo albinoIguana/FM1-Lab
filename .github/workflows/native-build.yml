@@ -40,6 +40,8 @@ jobs:
         set -euo pipefail
         git submodule update --init --recursive base upstream/felucca
         python3 tools/apply-fm1-base-audio-deadline.py
+        cc -std=c11 -Wall -Wextra -Werror -I base/device tests/fm1lab_audio_commit.test.c -o /tmp/fm1-audio-commit-test
+        /tmp/fm1-audio-commit-test
         # Backport only the audited NOR wait/recovery changes; do not float BSP revisions.
         python3 tools/apply-fm1-flash-compat.py
         bash tests/test-flash-compat.sh
