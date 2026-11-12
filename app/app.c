@@ -3513,11 +3513,12 @@ static void draw_audio_diag_panel(void)
             int_text((int32_t)render_cpu2_job_us,detail);text_cat(detail," / ");
             int_text((int32_t)render_cpu2_wait_us,value);text_cat(detail,value);text_cat(detail," max");
             cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
-            int_text((int32_t)render_cpu2_backup_us,detail);text_cat(detail," us BK / ");
+            uint32_t backup_ns=fm6_cpu2_backup_sum_ns();
+            int_text((int32_t)backup_ns,detail);text_cat(detail," ns BK / ");
             int_text((int32_t)render_cpu2_backup_voices,value);text_cat(detail,value);text_cat(detail," V");
             if(render_cpu2_backup_voices) {
                 text_cat(detail," / ");
-                int_text((int32_t)(render_cpu2_backup_us*1000u/render_cpu2_backup_voices),value);
+                int_text((int32_t)(backup_ns/render_cpu2_backup_voices),value);
                 text_cat(detail,value);text_cat(detail," ns/V");
             }
             cv_text_fit(x+8,y+74,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
