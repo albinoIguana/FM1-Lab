@@ -4506,7 +4506,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         corrupt=seed0;
         if(fm1lab_voice_name_get(corrupt.patches[0].voice,patch_name)!=0)return 1;
         for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\0';
             corrupt.name[n]=c?c:' ';
         }
         if(fm1lab_store_library_save_full(0u,&corrupt,&inserts0)!=0)return 1;
@@ -4536,7 +4536,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         edited=seed1;
         if(fm1lab_voice_name_get(edited.patches[0].voice,patch_name)!=0)return 1;
         for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            char c=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\0';
             edited.name[n]=c?c:' ';
         }
         edited.patches[0].voice[0]^=1u;
