@@ -4087,12 +4087,10 @@ static void draw(void)
     }
     {
         char diag[48], number[12];
-        uint32_t render_pct=render_budget_us?
-            (render_last_us*100u)/render_budget_us:0u;
-        int_text((int32_t)render_pct, diag);
-        /* Show measured callback deadline load, DMA misses, shed voices, and
-         * both sides of the CPU2 hand-off rather than only a generic CPU gauge. */
-        text_cat(diag, "% R XR ");
+        int_text((int32_t)app_audio_cpu_pct(), diag);
+        /* Show fm1-base's measured whole-callback load, DMA misses, shed voices,
+         * and both sides of the CPU2 hand-off. */
+        text_cat(diag, "% CPU XR ");
         int_text((int32_t)app_audio_xruns(), number);
         text_cat(diag, number);
         text_cat(diag, " SH ");
