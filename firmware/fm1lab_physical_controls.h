@@ -6,22 +6,27 @@
 /* Physical FM1 panel labels are the public names. Values are the verified
  * upstream fm1_controls.encoders[] scan indices, not physical numbering. */
 enum fm1lab_encoder {
-    FM1LAB_ENCODER_SELECT = 0,    /* panel: SELECT */
-    FM1LAB_ENCODER_ALGORITHM = 1, /* panel: ALGORITHM */
-    FM1LAB_ENCODER_PRESETS = 2,   /* panel: PRESETS */
-    FM1LAB_ENCODER_KNOB_1 = 3,    /* panel: KNOB 1 */
-    FM1LAB_ENCODER_KNOB_2 = 4,    /* panel: KNOB 2 */
-    FM1LAB_ENCODER_KNOB_3 = 5,    /* panel: KNOB 3 */
-    FM1LAB_ENCODER_KNOB_4 = 6,    /* panel: KNOB 4 */
+    FM1LAB_ENCODER_SELECT = 0,
+    FM1LAB_ENCODER_ALGORITHM = 1,
+    FM1LAB_ENCODER_PRESETS = 2,
+    FM1LAB_ENCODER_KNOB_1 = 3,
+    FM1LAB_ENCODER_KNOB_2 = 4,
+    FM1LAB_ENCODER_KNOB_3 = 5,
+    FM1LAB_ENCODER_KNOB_4 = 6,
     FM1LAB_ENCODER_COUNT = 7
 };
 
-/* MASTER is an ADC input, not one of the seven rotary encoders. */
 enum { FM1LAB_ADC_MASTER = 4u };
 
-/* SELECT is a directional two-track selector: clockwise selects T2,
- * counter-clockwise selects T1. Use direction, not raw quadrature count:
- * the device encoder can report multiple counts for one physical detent. */
+/* SELECT is a directional two-track selector on the main Sequencer and
+ * Sequencer Options pages. This gate is shared by the app dispatcher/tests. */
+static inline unsigned fm1lab_sequencer_select_is_track_input(unsigned page,
+        unsigned sequencer_page, unsigned options_page)
+{
+    return (unsigned)(page == sequencer_page || page == options_page);
+}
+
+/* Clockwise selects T2; counter-clockwise selects T1. */
 static inline unsigned fm1lab_sequencer_lane_advance(unsigned lane, int delta)
 {
     if (delta > 0) return 1u;
@@ -29,9 +34,6 @@ static inline unsigned fm1lab_sequencer_lane_advance(unsigned lane, int delta)
     return lane & 1u;
 }
 
-/* Global-page controls. The hardware MASTER pot remains the primary volume
- * control; K1 provides a software trim. BLE and Maelstrom use direction-based
- * selectors so multi-count encoder reports still produce one clear action. */
 static inline unsigned fm1lab_master_trim_advance(unsigned current, int delta)
 {
     int next=(int)current+delta;
