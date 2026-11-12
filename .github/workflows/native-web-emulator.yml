@@ -11,6 +11,8 @@ on:
       - "upstream/felucca"
       - ".gitmodules"
       - ".github/workflows/native-web-emulator.yml"
+      - ".github/workflows/native-build.yml"
+      - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
 permissions:
