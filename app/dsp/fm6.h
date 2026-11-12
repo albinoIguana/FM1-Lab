@@ -178,6 +178,8 @@ uint32_t fm6_cpu2_quantum_count(void);
 uint32_t fm6_cpu2_dispatch_count(void);
 uint32_t fm6_cpu2_fallback_count(void);
 uint32_t fm6_callback_voice_peak_count(void);
+uint32_t fm6_pre_limiter_peak_q23(void);
+uint32_t fm6_limiter_reduction_q15(void);
 #ifdef FM6_TEST
 /* Test-only pre-clip Q24 probes; never used by the device UI/audio path. */
 uint64_t fm6_test_patch_peak(uint32_t patch);
