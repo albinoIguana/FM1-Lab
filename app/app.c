@@ -4526,7 +4526,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         }
         app_host_name_migration_stage=3u;
         for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
-            char expected=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\\0';
+            char expected=n<FM1LAB_PATCH_NAME_BYTES?patch_name[n]:'\0';
             if(!expected) expected=' ';
             if(loaded.name[n]!=expected) {
                 app_host_name_migration_stage=24u; return 1;
