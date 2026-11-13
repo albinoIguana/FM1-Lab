@@ -28,7 +28,10 @@ enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_INSTRUMENTS0, OBJ_INSTRUMENTS1, OBJ
 #define APP_STORE_POOL
 #define APP_STORE_POOL_BASE 0xF0000u
 #define APP_STORE_POOL_N 12u
-#define APP_STORE_POOL_OLD 0u
+/* fm1-base initializes its pool scan length from APP_STORE_POOL_OLD. The
+ * FM1 unity build does not call the legacy-pool migration helper, so set this
+ * to the active pool size or pooled objects are never discoverable after save. */
+#define APP_STORE_POOL_OLD APP_STORE_POOL_N
 #define APP_STORE_POOL_OBJ0 OBJ_INSTRUMENTS0
 #define APP_STORE_POOL_OBJN 5u
 
