@@ -141,10 +141,12 @@ static void patch_decode(const uint8_t *record,fm1lab_patch_t *patch)
     uint8_t raw[128],voice[FM1LAB_PATCH_BYTES];
     unpack7(raw,record);
     raw_to_voice(voice,raw);
-    fm1lab_instrument_t temporary;
-    fm1lab_instrument_init(&temporary,"");
-    (void)fm1lab_patch_set_voice(&temporary,0u,voice);
-    *patch=temporary.patches[0];
+    bytes_copy(patch->voice,voice,FM1LAB_PATCH_BYTES);
+    for(unsigned k=0;k<FM1LAB_MACRO_COUNT;k++)patch->macros[k]=50u;
+    patch->enabled=1u;
+    patch->level=31u;
+    patch->octave=0;
+    patch->fine_cents=0;
     const uint8_t *m=record+VOICE_BYTES;
     uint8_t pan=(uint8_t)((raw[111]>>4)&7u);
     for(unsigned k=0;k<FM1LAB_MACRO_COUNT;k++){
