@@ -14,7 +14,11 @@ try {
     window.emuTestHomeRefusalResult = null;
     node.port.postMessage({ type: "test-home-refusal" });
   });
-  await page.waitForFunction(() => window.emuTestHomeRefusalResult === true, null, { timeout: 5000 });
+  await page.waitForFunction(() => window.emuTestHomeRefusalResult?.ok === true, null, { timeout: 5000 });
+  const framebuffer = await page.evaluate(() => window.emuTestHomeRefusalResult);
+  if (framebuffer.framebufferLit < 500) {
+    throw new Error(`HOME refusal draw produced a blank framebuffer (blits=${framebuffer.blits}, lit=${framebuffer.framebufferLit})`);
+  }
   // Do not accept a successful browser run with a blank LCD. Wait for a
   // real framebuffer update and verify that the visible display has ink.
   await page.waitForFunction(() => {
