@@ -35,7 +35,7 @@ class Fm1 extends AudioWorkletProcessor {
       // C's plat_ticks24()/clock_gettime are performance counters in the
       // host simulator, not the virtual audio timeline. Use monotonic wall
       // time so render and CPU2 spans can be measured inside this worklet.
-      const now = () => BigInt(Math.round(performance.now() * 1e6));
+      const now = () => BigInt(Math.round(clock() * 1e6));
       const wasi = {
         clock_time_get: (id, prec, out) => {
           new DataView(this.mem.buffer).setBigUint64(out, now(), true);
