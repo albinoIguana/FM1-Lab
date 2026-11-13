@@ -88,8 +88,7 @@ static void test_complete_route_matrix(void)
                     if (encoder == 2u) expected = focus
                         ? FM1LAB_INPUT_PATCH_PRESET_STEP
                         : FM1LAB_INPUT_INSTRUMENT_STEP;
-                } else if (page == FM1LAB_INPUT_PAGE_SEQ ||
-                           page == FM1LAB_INPUT_PAGE_SEQ_OPTIONS) {
+                } else if (page == FM1LAB_INPUT_PAGE_SEQ) {
                     if (encoder == 0u) expected = FM1LAB_INPUT_TRACK_TOGGLE;
                     if (encoder == 2u) expected = FM1LAB_INPUT_TRACK_INSTRUMENT_STEP;
                 }
@@ -165,13 +164,11 @@ static void test_track_round_trip_and_isolation(void)
     assert(fake.save_calls == 0u && fake.load_calls == 0u);
     assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
 
-    /* PRESETS on SEQ OPTIONS changes only T2's Instrument/bank. */
-    assert(fm1lab_input_apply(&state,
-        fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ_OPTIONS, 2u, 0u), 1,
-        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
-        == FM1LAB_INPUT_RESULT_APPLIED);
-    assert(state.track_instrument[1] == 8u && state.instrument == 8u);
-    assert(fake.bank_instrument[1] == 8u);
+    /* PRESETS is completely inactive on SEQ OPTIONS. */
+    assert(fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ_OPTIONS, 2u, 0u)
+        == FM1LAB_INPUT_NONE);
+    assert(state.track_instrument[1] == 7u && state.instrument == 7u);
+    assert(fake.bank_instrument[1] == 7u);
     assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
     state.instrument_apply_pending = 0u; /* model completion of the queued bank apply */
     unsigned saves_before_toggle = fake.save_calls;
