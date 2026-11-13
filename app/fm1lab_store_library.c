@@ -276,11 +276,14 @@ int fm1lab_store_library_load_full(unsigned index,fm1lab_instrument_t *out,
     if(index>=FM1LAB_STORE_INSTRUMENT_COUNT || !out || !inserts)return -1;
     fm1lab_instrument_init(out,"");
     if(meta_load_instrument(index,out,inserts)!=0)return -1;
-    unsigned bank=index/FM1LAB_STORE_INSTRUMENTS_PER_BANK;
+    /* Resolve the four stored one-byte IDs to their physical patch records. */
+    unsigned bank=(unsigned)out->patch_ids[0]/FM1LAB_STORE_PATCHES_PER_BANK;
+    for(unsigned p=1;p<FM1LAB_PATCH_COUNT;p++)
+        if((unsigned)out->patch_ids[p]/FM1LAB_STORE_PATCHES_PER_BANK!=bank)return -1;
     if(patch_bank_load(bank)!=0)return -1;
-    unsigned first_slot=(index%FM1LAB_STORE_INSTRUMENTS_PER_BANK)*FM1LAB_PATCH_COUNT;
     for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
-        patch_decode(patch_record_at(bank_work,first_slot+p),&out->patches[p]);
+        unsigned patch_slot=(unsigned)out->patch_ids[p]%FM1LAB_STORE_PATCHES_PER_BANK;
+        patch_decode(patch_record_at(bank_work,patch_slot),&out->patches[p]);
         out->patches[p].octave=inserts->patch_octave[p];
         out->patches[p].fine_cents=inserts->patch_fine_cents[p];
     }
