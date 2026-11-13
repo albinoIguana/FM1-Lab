@@ -44,9 +44,11 @@ The latest ELF section totals show `.text` at 303,768 bytes. That section includ
 
 The app reserves a 12-sector, 4 KiB-per-sector pool at `0xF0000..0xFBFFF` (49,152 bytes) for five pooled objects:
 
-- Four Instrument bank objects: 3,840 bytes each, eight Instruments per bank; 15,360 bytes of bank payload total.
-- One versioned settings/insert sidecar: 1,704 bytes in the current V5 format.
-- Each object is CRC-protected and the pool maintains current/previous copies with rotating sectors for power-fail safety and wear distribution. The 12 sectors are a shared A/B pool, not five fixed one-sector allocations; do not calculate spare capacity by simply subtracting payload bytes from 49,152.
+- Four independent patch-bank objects: 3,752 bytes each. Each contains 32 records (patch IDs 0–31, 32–63, 64–95, or 96–127); each record stores a 112-byte packed DX7 voice plus four macros and level/on metadata. Total patch payload: 15,008 bytes.
+- One Instrument directory: 3,472 bytes. It stores 32 Instrument names, four one-byte patch IDs per Instrument, and the per-Instrument insert/tuning state, with two CRC-sealed directory snapshots.
+- Total current user-library payload: 18,480 bytes. The four patch banks and directory remain five pooled objects; the platform pool maintains current/previous copies with rotating sectors for power-fail safety and wear distribution. The 12 sectors are a shared pool, not five fixed one-sector allocations; do not calculate spare capacity by simply subtracting payload bytes from 49,152.
+
+Each Instrument owns four stable patch IDs: `instrument_id * 4 + patch_slot`. Loading another Instrument resolves its four IDs to independent patch records. Editing and saving overwrites only those patch records; leaving and returning to an Instrument reloads its saved data. Factory-preset selection copies the selected voice into the Instrument's owned patch slot rather than creating a shared reference. The previous inline-Instrument storage format is intentionally replaced rather than migrated; reflashing/reseeding restores the factory library.
 
 The three small app objects (settings, panel calibration and BLE state) use their own A/B sectors at `0xEA000`, `0xEC000`, and `0xEE000`, respectively. Together those occupy the separate `0xEA000..0xEFFFF` app-object window. The app map preserves Felucca projects, samples, user preset banks, autosave, voice bank, global sectors and OTA staging as documented in [REBUILD_AUDIT.md](REBUILD_AUDIT.md).
 
@@ -74,7 +76,7 @@ The CI build expands the platform's 240 × 144 graphics canvas to 240 × 180 bef
 
 - **32 Instruments / 128 current factory voices:** retained; no reduction is indicated by the current flash measurement.
 - **Firmware flash:** the latest successful build has **271,184 bytes of XIP headroom** after embedding the current factory library and the legacy migration datasets.
-- **User storage:** four 3,840-byte banks plus the 1,704-byte sidecar are in the dedicated 12-sector pool, separate from the application image.
+- **User storage:** four 3,752-byte patch banks plus the 3,472-byte Instrument directory are in the dedicated 12-sector pool, separate from the application image.
 - **No flash-map changes are warranted** based on this audit. Do not repurpose OTA staging, Felucca data regions, or device-reserved sectors.
 - The remaining useful precision improvement is a linker map / symbol-size report that attributes the 303,768-byte `.text` section among executable code, the current DX7 data, and legacy migration data. The current build proves total fit, but does not yet provide that per-symbol breakdown.
 
