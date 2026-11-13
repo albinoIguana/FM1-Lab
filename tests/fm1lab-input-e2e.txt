@@ -1,0 +1,131 @@
+# Exercise the real app.c input() path through fm1-base's native host simulator.
+# "spin" injects exact plat_enc detents; app_frame/app_render consume them as on-device.
+wait 5000
+expect lane 0
+expect focus 0
+expect trackinst0 0
+expect trackinst1 0
+
+# SEQ SELECT is a toggle: direction is irrelevant and a multi-detent report
+# still switches exactly once.
+tap SEQ
+wait 40
+spin SELECT 3
+wait 40
+expect lane 1
+spin SELECT -1
+wait 40
+expect lane 0
+spin SELECT -1
+wait 40
+expect lane 1
+
+# SEQ PRESETS changes only the selected lane's Instrument.
+spin PRESET 1
+wait 100
+expect trackinst1 1
+expect trackinst0 0
+expect instrument 1
+expect pending 0
+
+# HOME SELECT focuses patch 2; PRESETS then changes that patch voice only.
+tap HOME
+wait 40
+expect focus 0
+spin SELECT 1
+wait 40
+expect focus 1
+expect patch 1
+spin PRESET 1
+wait 40
+expect instrument 1
+expect presetcursor 0
+expect trackinst1 1
+
+# HOME with no patch focus changes the complete Instrument.
+tap HOME
+wait 40
+expect focus 0
+spin PRESET 1
+wait 100
+expect instrument 2
+expect trackinst1 2
+expect pending 0
+
+# Preserve each lane's Instrument and selected patch across T1 -> T2 -> T1.
+tap SEQ
+wait 40
+spin SELECT -1
+wait 40
+expect lane 0
+expect instrument 0
+spin PRESET 2
+wait 100
+expect trackinst0 2
+expect trackinst1 2
+expect pending 0
+spin SELECT 1
+wait 40
+expect lane 1
+expect instrument 2
+spin SELECT -1
+wait 40
+expect lane 0
+expect instrument 2
+
+# T1's patch selection is independent of T2's and survives the round trip.
+tap HOME
+wait 40
+spin SELECT 1
+wait 40
+expect focus 1
+expect patch 1
+spin PRESET 1
+wait 40
+expect presetcursor 0
+tap SEQ
+wait 40
+spin SELECT 1
+wait 40
+expect lane 1
+spin SELECT -1
+wait 40
+expect lane 0
+expect patch 1
+expect presetcursor 0
+
+# Force note-on, Instrument-load, and performance-apply events into the same
+# queue. The app's host-only assertion checks FIFO order and callback spacing.
+fm1lab_event_budget
+wait 30
+expect eventbudget 1
+fm1lab_name_migration_test
+expect name_migration 1
+expect namemigstage 10
+
+# Return HOME so the refusal and PRE: INST cue are checked in the same screen.
+tap HOME
+wait 40
+
+# Simulate an outstanding audio apply. SELECT must refuse the lane switch
+# and publish both refusal lines while the pending flag remains set.
+fm1lab_pending_test
+listen
+spin PRESET 1
+wait 30
+expect lane 0
+expect pending 1
+said LOAD BUSY PRESET NOT CHANGED
+expect home_refusal_layout 1
+fm1lab_pending_clear
+expect pending 0
+
+# Panic after a queued Instrument apply must resync both resident lanes.
+fm1lab_resync_panic_test
+expect pending 0
+expect resync 1
+
+# Queue overflow must take the same two-lane recovery path.
+fm1lab_resync_overflow_test
+expect pending 0
+expect resync 1

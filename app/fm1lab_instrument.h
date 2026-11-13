@@ -61,6 +61,9 @@ int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
 /* Validate the complete serialized value before loading or saving it. */
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument);
 
+/* True only for the legacy empty INSTR nn slots created by bank_init. */
+int fm1lab_instrument_is_blank_library_slot(const fm1lab_instrument_t *instrument);
+
 /* Carrier mask bits are OP1..OP6 in bits 0..5, from M-VAVE's DX7 algorithm routing. */
 uint8_t fm1lab_carrier_mask(unsigned algorithm);
 

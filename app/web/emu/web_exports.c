@@ -11,6 +11,7 @@ uint32_t app_audio_cpu_pct(void);
 uint32_t app_audio_xruns(void);
 uint32_t app_audio_core0_pct(void);
 uint32_t app_audio_core2_pct(void);
+void app_web_test_home_refusal(void);
 
 #define WEB_EXPORT __attribute__((used, visibility("default")))
 
@@ -18,3 +19,6 @@ WEB_EXPORT uint32_t web_app_audio_cpu_pct(void) { return app_audio_cpu_pct(); }
 WEB_EXPORT uint32_t web_app_audio_xruns(void) { return app_audio_xruns(); }
 WEB_EXPORT uint32_t web_app_audio_core0_pct(void) { return app_audio_core0_pct(); }
 WEB_EXPORT uint32_t web_app_audio_core2_pct(void) { return app_audio_core2_pct(); }
+/* Deterministic, emulator-only layout probe for the HOME refusal overlay.
+ * The real pending/refusal behavior is exercised by the native host E2E test. */
+WEB_EXPORT void web_test_home_refusal(void) { app_web_test_home_refusal(); }
