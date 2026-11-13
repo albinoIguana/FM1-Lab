@@ -28,7 +28,10 @@ class Fm1 extends AudioWorkletProcessor {
   }
 
   async onMessage(m) {
-    if (m.type === "load") {
+    if (m.type === "ping") {
+      this.port.postMessage({ type: "pong" });
+      return;
+    } else if (m.type === "load") {
       // C's plat_ticks24()/clock_gettime are performance counters in the
       // host simulator, not the virtual audio timeline. Use monotonic wall
       // time so render and CPU2 spans can be measured inside this worklet.
@@ -134,25 +137,32 @@ class Fm1 extends AudioWorkletProcessor {
 
   process(inputs, outputs) {
     if (!this.ex) return true;
-    const out = outputs[0];
-    const n = out[0].length;
-    const t0 = clock();
-    if (this.app.process) this.app.process(this);
-    this.ex.web_render(n);
-    // app_render computes the FM1 deadline model in C from the monotonic
-    // clock and the separately timed CPU2 worker. Read its smoothed per-core
-    // figures after advancing the simulated device clock.
-    if (this.ex.web_app_audio_cpu_pct) this.deviceLoad = this.ex.web_app_audio_cpu_pct();
-    if (this.ex.web_app_audio_core0_pct) this.deviceCore0 = this.ex.web_app_audio_core0_pct();
-    if (this.ex.web_app_audio_core2_pct) this.deviceCore2 = this.ex.web_app_audio_core2_pct();
-    if (this.ex.web_app_audio_xruns) this.deviceXruns = this.ex.web_app_audio_xruns();
-    this.busy += clock() - t0;
-    this.frames += n;
-    out[0].set(new Float32Array(this.mem.buffer, this.ex.web_out_l(), n));
-    if (out[1]) out[1].set(new Float32Array(this.mem.buffer, this.ex.web_out_r(), n));
-    if (currentTime - this.lastFrame >= 1 / 30) {
-      this.lastFrame = currentTime;
-      this.publish();
+    try {
+      const out = outputs[0];
+      const n = out[0].length;
+      const t0 = clock();
+      if (this.app.process) this.app.process(this);
+      this.ex.web_render(n);
+      // app_render computes the FM1 deadline model in C from the monotonic
+      // clock and the separately timed CPU2 worker. Read its smoothed per-core
+      // figures after advancing the simulated device clock.
+      if (this.ex.web_app_audio_cpu_pct) this.deviceLoad = this.ex.web_app_audio_cpu_pct();
+      if (this.ex.web_app_audio_core0_pct) this.deviceCore0 = this.ex.web_app_audio_core0_pct();
+      if (this.ex.web_app_audio_core2_pct) this.deviceCore2 = this.ex.web_app_audio_core2_pct();
+      if (this.ex.web_app_audio_xruns) this.deviceXruns = this.ex.web_app_audio_xruns();
+      this.busy += clock() - t0;
+      this.frames += n;
+      out[0].set(new Float32Array(this.mem.buffer, this.ex.web_out_l(), n));
+      if (out[1]) out[1].set(new Float32Array(this.mem.buffer, this.ex.web_out_r(), n));
+      if (currentTime - this.lastFrame >= 1 / 30) {
+        this.lastFrame = currentTime;
+        this.publish();
+      }
+    } catch (err) {
+      const message = String(err && (err.stack || err.message) || err);
+      this.port.postMessage({ type: "runtime-error", message });
+      this.ex = null;
+      this.mem = null;
     }
     return true;
   }

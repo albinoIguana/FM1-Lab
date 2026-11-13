@@ -12,11 +12,30 @@ try {
   await page.evaluate(() => {
     if (typeof node === "undefined" || !node) throw new Error("FM1 AudioWorklet is not ready");
     window.emuTestHomeRefusalResult = null;
-    node.port.postMessage({ type: "test-home-refusal" });
+    window.emuWorkletPong = false;
+    window.emuRuntimeError = null;
+    window.emuProcessorError = null;
+    node.port.postMessage({ type: "ping" });
   });
+  await page.waitForFunction(() => window.emuWorkletPong === true ||
+    window.emuRuntimeError || window.emuProcessorError, null, { timeout: 5000 });
+  const bridge = await page.evaluate(() => ({
+    pong: window.emuWorkletPong,
+    runtimeError: window.emuRuntimeError,
+    processorError: window.emuProcessorError
+  }));
+  if (bridge.runtimeError || bridge.processorError || !bridge.pong) {
+    throw new Error(`FM1 AudioWorklet bridge failed: ${bridge.runtimeError || bridge.processorError || "no pong"}`);
+  }
+  await page.evaluate(() => node.port.postMessage({ type: "test-home-refusal" }));
   await page.waitForFunction(() => window.emuTestHomeRefusalResult !== null &&
-    window.emuTestHomeRefusalResult !== undefined, null, { timeout: 5000 });
-  const framebuffer = await page.evaluate(() => window.emuTestHomeRefusalResult);
+    window.emuTestHomeRefusalResult !== undefined || window.emuRuntimeError || window.emuProcessorError,
+    null, { timeout: 5000 });
+  const framebuffer = await page.evaluate(() => {
+    if (window.emuRuntimeError || window.emuProcessorError)
+      throw new Error(window.emuRuntimeError || window.emuProcessorError);
+    return window.emuTestHomeRefusalResult;
+  });
   if (!framebuffer.ok) {
     throw new Error(`HOME refusal fixture failed in AudioWorklet: ${framebuffer.error || "unknown error"}`);
   }
