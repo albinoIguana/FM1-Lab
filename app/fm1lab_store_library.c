@@ -228,6 +228,7 @@ static int meta_snapshot_commit(void)
     uint8_t *fallback=active+META_SNAPSHOT_BYTES;
     bytes_copy(fallback,meta_snapshot_work,META_SNAPSHOT_BYTES);
     bytes_copy(active,meta_snapshot_work,META_SNAPSHOT_BYTES);
+    meta_snapshot_seal(fallback);
     meta_snapshot_seal(active);
     meta_header_seal(meta_work);
     return plat_store_save(OBJ_INSERTS,meta_work,META_TOTAL_BYTES);
