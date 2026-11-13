@@ -7,11 +7,14 @@
 #define FM1LAB_STORE_BANK_COUNT 4u
 #define FM1LAB_STORE_INSTRUMENTS_PER_BANK 8u
 #define FM1LAB_STORE_INSTRUMENT_COUNT 32u
-#define FM1LAB_STORE_NAME_BYTES 11u
+#define FM1LAB_STORE_PATCHES_PER_BANK 32u
+#define FM1LAB_STORE_NAME_BYTES FM1LAB_INSTRUMENT_NAME_BYTES
+#define FM1LAB_STORE_PATCH_BANK_BYTES 3752u
+#define FM1LAB_STORE_METADATA_BYTES 3472u
 
-/* Uses four 3,840-byte bank objects plus one versioned sidecar in the existing
- * pooled flash area. Control task only; the sidecar stores one global stereo
- * Amp/Drive + parametric-EQ state per Instrument, not per-patch inserts. */
+/* Four 32-patch banks (IDs 0..127) and one Instrument directory. Each Instrument
+ * owns four stable patch IDs: instrument_index*4 + slot. Factory-preset selection
+ * copies into those IDs; switching Instruments never resets their saved patch data. */
 int fm1lab_store_library_load(unsigned index, fm1lab_instrument_t *out);
 int fm1lab_store_library_save(unsigned index, const fm1lab_instrument_t *instrument);
 int fm1lab_store_library_load_full(unsigned index, fm1lab_instrument_t *instrument, fm1lab_insert_state_t *inserts);
