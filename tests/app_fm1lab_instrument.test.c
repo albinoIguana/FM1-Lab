@@ -50,6 +50,7 @@ static void test_blank_library_slot_detection(void)
 
 int main(void)
 {
+    test_track_activation_preserves_shared_master_chain();
     test_blank_library_slot_detection();
     fm1lab_instrument_t instrument;
     uint8_t voice[FM1LAB_PATCH_BYTES];
