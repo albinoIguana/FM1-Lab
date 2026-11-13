@@ -1,4 +1,5 @@
 #include "../app/fm1lab_instrument.h"
+#include "../app/dsp/fm1lab_insert_state.h"
 
 #include <assert.h>
 #include <stdint.h>
