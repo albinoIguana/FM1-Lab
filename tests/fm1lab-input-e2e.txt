@@ -114,3 +114,13 @@ expect pending 1
 said LOAD BUSY TRACK NOT CHANGED
 fm1lab_pending_clear
 expect pending 0
+
+# Panic after a queued Instrument apply must resync both resident lanes.
+fm1lab_resync_panic_test
+expect pending 0
+expect resync 1
+
+# Queue overflow must take the same two-lane recovery path.
+fm1lab_resync_overflow_test
+expect pending 0
+expect resync 1

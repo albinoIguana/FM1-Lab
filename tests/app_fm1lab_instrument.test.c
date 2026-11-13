@@ -1,5 +1,6 @@
 #include "../app/fm1lab_instrument.h"
 #include "../app/dsp/fm1lab_insert_state.h"
+#include "../app/fm1lab_pending_watch.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -31,6 +32,19 @@ static void test_track_activation_preserves_shared_master_chain(void)
     assert(active.patch_octave[2]==-2 && active.patch_fine_cents[2]==35);
 }
 
+static void test_pending_watch_requires_stalled_audio_heartbeat(void)
+{
+    fm1lab_pending_watch_t watch={0};
+    assert(!fm1lab_pending_watch_update(&watch,1u,100u,10u));
+    assert(!fm1lab_pending_watch_update(&watch,1u,599u,10u));
+    assert(fm1lab_pending_watch_update(&watch,1u,600u,10u));
+    assert(!fm1lab_pending_watch_update(&watch,1u,650u,11u));
+    assert(!fm1lab_pending_watch_update(&watch,1u,1149u,11u));
+    assert(fm1lab_pending_watch_update(&watch,1u,1150u,11u));
+    assert(!fm1lab_pending_watch_update(&watch,0u,1200u,11u));
+    assert(!fm1lab_pending_watch_update(&watch,1u,1800u,11u));
+}
+
 static void test_blank_library_slot_detection(void)
 {
     fm1lab_instrument_t blank;
@@ -51,6 +65,7 @@ static void test_blank_library_slot_detection(void)
 int main(void)
 {
     test_track_activation_preserves_shared_master_chain();
+    test_pending_watch_requires_stalled_audio_heartbeat();
     test_blank_library_slot_detection();
     fm1lab_instrument_t instrument;
     uint8_t voice[FM1LAB_PATCH_BYTES];

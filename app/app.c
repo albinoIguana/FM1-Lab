@@ -19,6 +19,7 @@
 #include "fm1lab_preset_control.h"
 #include "fm1lab_input_route.h"
 #include "fm1lab_input_dispatch.h"
+#include "fm1lab_pending_watch.h"
 #include <stddef.h>
 
 #define C_PEWTER RGB(175,185,195)
@@ -41,6 +42,9 @@ static uint32_t web_device_xruns;
  * sample-derived deadline; CPU2 job and wait are the longest quantum values. */
 static volatile uint32_t render_last_us, render_budget_us, render_deadline_misses;
 static volatile uint32_t render_core0_active_us, render_cpu2_job_us, render_cpu2_wait_us;
+static volatile uint32_t render_heartbeat;
+static volatile uint8_t app_resync_requested;
+static fm1lab_pending_watch_t pending_watch;
 #if defined(PLAT_WEB)
 
 #define FM1LAB_WEB_EXPORT __attribute__((used, visibility("default")))
@@ -90,6 +94,7 @@ typedef struct {
 static app_track_state_t track_state[2];
 #ifdef PLAT_HOST
 static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
+static uint8_t app_host_resync_pass;
 static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
 #endif
 static fm1lab_instrument_t factory_instrument;
@@ -1379,27 +1384,51 @@ static void save_name_step(int delta)
     if(save_name_target){voice_dirty=1u;}
 }
 
+static void app_resync(void)
+{
+    uint8_t active=(uint8_t)(seq_ui_lane&1u);
+    fm6_panic();
+    fm6_sequencer_set_running(0u);
+    /* Rebuild both resident four-patch banks. The active lane uses the live
+     * UI snapshot; the other lane uses its RAM cache. Neither path touches flash. */
+    for(uint8_t lane=0u;lane<2u;lane++) {
+        const fm1lab_instrument_t *instrument;
+        const fm1lab_insert_state_t *inserts;
+        if(lane==active) {
+            instrument=&current_instrument;
+            inserts=&current_inserts;
+        } else if(track_state[lane].loaded) {
+            instrument=&track_state[lane].instrument;
+            inserts=&track_state[lane].inserts;
+        } else {
+            instrument=&factory_instrument;
+            inserts=&current_inserts;
+        }
+        instrument_apply_engine_bank(lane,instrument,inserts,0u);
+    }
+    /* Amp/Drive + EQ and the compressor are shared post-mix state. */
+    fm6_master_insert_reset_state();
+    for(uint32_t field=0u;field<FM6_INSERT_FIELD_COUNT;field++)
+        fm6_master_insert_set(field,fm1lab_insert_state_get(&current_inserts,field));
+    (void)fm6_performance_state_set(&set.performance);
+    fm6_sequencer_set_lane(active,(uint8_t)(active*FM1LAB_PATCH_COUNT));
+    ui_event_tail=ui_event_head;
+    ui_event_overflow=0u;
+    instrument_apply_pending=0u;
+    voice_update_pending=0u;
+    voice_dirty=0u;
+    performance_update_pending=0u;
+    performance_update_dirty=0u;
+    app_resync_requested=0u;
+}
+
 static void ui_events_drain(void)
 {
     uint8_t tail, heavy_done=0u;
-    if (ui_event_overflow) {
-        ui_event_tail = ui_event_head;
-        ui_event_overflow = 0;
-        fm6_panic();
-        fm6_sequencer_set_running(0u);
-        if (instrument_loaded) instrument_apply_engine();
-        else for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-            fm6_patch_set_enabled(p, 1u);
-            fm6_patch_set_level(p, set.levels[p]);
-            for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
-                fm6_macro_set(p, m, set.macros[p][m]);
-        }
-        instrument_apply_pending = 0u;
-        voice_update_pending = 0u;
-        voice_dirty = 0u;
-        performance_update_pending = 0u;
-        performance_update_dirty = 0u;
-        (void)fm6_performance_state_set(&set.performance);
+    if (ui_event_overflow || app_resync_requested) {
+        ui_event_tail=ui_event_head;
+        ui_event_overflow=0u;
+        app_resync();
         return;
     }
     while ((tail = ui_event_tail) != ui_event_head) {
@@ -1913,6 +1942,7 @@ uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count();
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
+    ++render_heartbeat;
 #ifdef PLAT_HOST
     app_host_render_callbacks++;
 #endif
@@ -1969,9 +1999,11 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 void app_panic(void)
 {
     voice_note = -1;
-    fm6_panic();
-    ui_event_tail = ui_event_head;
-    ui_event_overflow = 0;
+    /* Keep pending flags intact until the audio callback rebuilds both lanes. */
+    ui_event_tail=ui_event_head;
+    ui_event_overflow=0u;
+    if(instrument_loaded)app_track_stash((uint8_t)(seq_ui_lane&1u));
+    app_resync_requested=1u;
 }
 
 /* --------------------------------------------------------------- settings --- */
@@ -4431,6 +4463,10 @@ void app_frame(void)
             return; /* keep the power-on ident clean; don't consume control input */
     }
     input();
+    if(fm1lab_pending_watch_update(&pending_watch,instrument_apply_pending,now,render_heartbeat)) {
+        app_say("AUDIO STALLED","LOAD HELD");
+        ui.redraw=1u;
+    }
     if(seq_record_redraw){ui.redraw=1u;seq_record_redraw=0u;}
     if (performance_update_dirty && !performance_update_pending) performance_publish();
     speak();
@@ -4506,6 +4542,8 @@ int app_expect(const char *what, int *got)
         *got = seq_ui_instrument[(uint32_t)atoi(what + 9) & 1u];
     else if (!fm1lab_strcmp(what, "pending"))
         *got = instrument_apply_pending;
+    else if (!fm1lab_strcmp(what, "resync"))
+        *got = app_host_resync_pass;
 #ifdef PLAT_HOST
     else if (!fm1lab_strcmp(what, "eventbudget"))
         *got = app_host_event_test_active && app_host_event_trace_count==3u &&
@@ -4584,6 +4622,34 @@ int app_host_fails(void)
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
+    if(!fm1lab_strcmp(cmd,"fm1lab_resync_panic_test") ||
+       !fm1lab_strcmp(cmd,"fm1lab_resync_overflow_test")) {
+        uint8_t active=(uint8_t)(seq_ui_lane&1u),other=(uint8_t)(active^1u);
+        int32_t audio[64]={0};
+        current_instrument.patches[0].macros[0]=20u;
+        current_inserts.instrument_macros[0]=60u;
+        fm1lab_insert_state_set(&current_inserts,FM6_INSERT_DRIVE,77u);
+        if(!track_state[other].loaded) return 1;
+        track_state[other].instrument.patches[0].macros[0]=80u;
+        track_state[other].inserts.instrument_macros[0]=40u;
+        app_track_stash(active);
+        instrument_apply_snapshot=current_instrument;
+        inserts_apply_snapshot=current_inserts;
+        instrument_apply_pending=1u;
+        ui_event_push(EV_INSTRUMENT_LOAD,active,0u,1u);
+        if(!fm1lab_strcmp(cmd,"fm1lab_resync_panic_test")) {
+            app_panic();
+        } else {
+            for(uint32_t n=0u;n<64u;n++)ui_event_push(EV_NOTE_ON,60u,100u,0u);
+        }
+        app_render(audio,32u,4096u);
+        app_render(audio,32u,4096u);
+        app_host_resync_pass=(uint8_t)(!instrument_apply_pending &&
+            fm6_macro_get((uint32_t)active*FM1LAB_PATCH_COUNT,0u)==30u &&
+            fm6_macro_get((uint32_t)other*FM1LAB_PATCH_COUNT,0u)==70u &&
+            fm6_master_insert_get(FM6_INSERT_DRIVE)==77u);
+        return 1;
+    }
     if(!fm1lab_strcmp(cmd,"fm1lab_pending_test")) {
         instrument_apply_pending=1u;
         return 1;
