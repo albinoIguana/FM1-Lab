@@ -36,9 +36,9 @@ The active app includes three generated voice-data headers:
 
 These are Z85-encoded strings in `app/fm1lab_dx7_data.h`, `app/fm1lab_dx7_legacy_data.h`, and `app/fm1lab_digitone_data.h`. All three headers are included by `app/app.c`; the current DX7 set seeds the 32-Instrument factory library, while the older datasets are referenced by startup migration checks so edited user Instruments can be preserved while untouched older factory slots are upgraded.
 
-The 74,100-byte figure is the encoded source-string payload, not a separately measured linker-symbol total. The current CI memory report aggregates code and read-only constants into `.text`; it does not yet print per-symbol sizes. The full image measurement already includes these embedded strings. The curated 128-voice factory library is therefore **inside the 310,380-byte application image**, not an additional 128-patch allocation on top of it.
+The 74,100-byte figure is the encoded source-string payload, not a separately measured linker-symbol total. The current CI memory report aggregates code and read-only constants into `.text`; it does not yet print per-symbol sizes. The full image measurement already includes these embedded strings. The curated 128-voice factory library is therefore **inside the 311,000-byte application image**, not an additional 128-patch allocation on top of it.
 
-The latest ELF section totals show `.text` at 303,768 bytes. That section includes executable code and read-only data; the build does not currently split those categories in its printed report.
+The latest ELF section totals show `.text` at 303,960 bytes. That section includes executable code and read-only data; the build does not currently split those categories in its printed report.
 
 ## 3. User-editable Instrument storage is separate from XIP
 
@@ -56,26 +56,26 @@ The three small app objects (settings, panel calibration and BLE state) use thei
 
 ## 4. Latest linker section report
 
-The same successful CI run reported:
+The successful Instrument-storage build reported:
 
 | ELF section / check | Used | Capacity | Remaining |
 |---|---:|---:|---:|
-| `.text` | 303,768 B | Included in XIP slot | — |
-| `.ram_text` | 3,556 B | 32,768 B | 29,212 B |
-| `.data + .bss` | 68,472 B | 98,304 B | 29,832 B |
-| `.pool` | 296,744 B | 344,064 B | 47,320 B |
-| `.pool` after mandatory 8 KiB reserve | — | — | 39,128 B |
-| `.noinit` | 1,836 B | 15,696 B | 13,860 B |
-| `app.bin` | **310,380 B** | **581,564 B** | **271,184 B** |
+| `.text` | 303,960 B | Included in XIP slot | — |
+| `.ram_text` | 3,968 B | 32,768 B | 28,800 B |
+| `.data + .bss` | 81,132 B | 98,304 B | 17,172 B |
+| `.pool` | 304,960 B | 344,064 B | 39,104 B |
+| `.pool` after mandatory 8 KiB reserve | — | — | 30,912 B |
+| `.noinit` | 1,848 B | 15,696 B | 13,848 B |
+| `app.bin` | **311,000 B** | **581,564 B** | **270,564 B** |
 
-The application image is exactly `.text + .ram_text + .data` (303,768 + 3,556 + 3,056 = 310,380 bytes). The builder separately checks the 96 KiB `.data + .bss` region, the 32 KiB RAM-text region, and the 336 KiB pool while preserving at least 8,192 bytes of pool headroom.
+The application image is exactly `.text + .ram_text + .data` (303,960 + 3,968 + 3,072 = 311,000 bytes). The builder separately checks the 96 KiB `.data + .bss` region, the 32 KiB RAM-text region, and the 336 KiB pool while preserving at least 8,192 bytes of pool headroom.
 
-The CI build expands the platform's 240 × 144 graphics canvas to 240 × 180 before compiling. The resulting 86,400-byte 16-bit canvas and 196,608 bytes of shared stereo FX feedback storage account for 283,008 bytes of the 296,744-byte pool total. The remaining 13,736 bytes cover other pool allocations, including migration and runtime buffers.
+The CI build expands the platform's 240 × 144 graphics canvas to 240 × 180 before compiling. The resulting 86,400-byte 16-bit canvas and 196,608 bytes of shared stereo FX feedback storage account for 283,008 bytes of the 304,960-byte pool total. The remaining 21,952 bytes cover other pool allocations, including the patch-library buffers and runtime allocations.
 
 ## 5. Conclusion and remaining measurement
 
 - **32 Instruments / 128 current factory voices:** retained; no reduction is indicated by the current flash measurement.
-- **Firmware flash:** the latest successful build has **271,184 bytes of XIP headroom** after embedding the current factory library and the legacy migration datasets.
+- **Firmware flash:** the latest successful build has **270,564 bytes of XIP headroom** after embedding the current factory library and the legacy migration datasets.
 - **User storage:** four 3,752-byte patch banks plus the 1,742-byte Instrument directory are in the dedicated 12-sector pool, separate from the application image.
 - **No flash-map changes are warranted** based on this audit. Do not repurpose OTA staging, Felucca data regions, or device-reserved sectors.
 - The remaining useful precision improvement is a linker map / symbol-size report that attributes the 303,768-byte `.text` section among executable code, the current DX7 data, and legacy migration data. The current build proves total fit, but does not yet provide that per-symbol breakdown.
