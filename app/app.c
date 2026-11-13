@@ -97,6 +97,8 @@ static app_track_state_t track_state[2];
 static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
 static uint8_t app_host_resync_pass;
 static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
+static uint32_t app_host_store_load_calls, app_host_store_save_calls;
+static uint8_t app_host_track_cache_pass;
 #endif
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
@@ -1216,6 +1218,9 @@ static int instrument_load(uint32_t index, int from_audio)
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
     uint8_t previous_instrument=seq_ui_instrument[seq_ui_lane&1u];
+#ifdef PLAT_HOST
+    ++app_host_store_load_calls;
+#endif
     int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
     if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
         current_instrument = candidate;
@@ -1259,6 +1264,9 @@ static int instrument_save_to(uint32_t index)
         !fm1lab_instrument_valid(&current_instrument))
         return -1;
     app_say("SAVING", seq_ui_lane ? "TRACK 2" : "TRACK 1");
+#ifdef PLAT_HOST
+    ++app_host_store_save_calls;
+#endif
     if (fm1lab_store_library_save_full(index, &current_instrument, &current_inserts))
         return -1;
     instrument_index=(uint8_t)index;
@@ -4570,6 +4578,8 @@ int app_expect(const char *what, int *got)
         *got = instrument_apply_pending;
     else if (!fm1lab_strcmp(what, "resync"))
         *got = app_host_resync_pass;
+    else if (!fm1lab_strcmp(what, "track_cache"))
+        *got = app_host_track_cache_pass;
     else if (!fm1lab_strcmp(what, "home_refusal_layout"))
         *got = app_host_home_refusal_layout;
 #ifdef PLAT_HOST
@@ -4650,6 +4660,67 @@ int app_host_fails(void)
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
+    if(!fm1lab_strcmp(cmd,"fm1lab_track_cache_test")) {
+        static app_track_state_t saved_tracks[2];
+        static fm1lab_instrument_t saved_current;
+        static fm1lab_insert_state_t saved_inserts;
+        static uint8_t saved_seq_instrument[2];
+        static char saved_seq_names[2][FM1LAB_INSTRUMENT_NAME_BYTES+1u];
+        uint8_t active=(uint8_t)(seq_ui_lane&1u),other=(uint8_t)(active^1u);
+        uint8_t saved_index=instrument_index,saved_dirty=instrument_dirty,saved_loaded=instrument_loaded;
+        uint32_t reads=app_host_store_load_calls,writes=app_host_store_save_calls;
+        uint8_t saved_lane=seq_ui_lane;
+        app_host_track_cache_pass=0u;
+        if(!instrument_loaded || !track_state[other].loaded) return 1;
+        saved_tracks[0]=track_state[0]; saved_tracks[1]=track_state[1];
+        saved_current=current_instrument; saved_inserts=current_inserts;
+        saved_seq_instrument[0]=seq_ui_instrument[0]; saved_seq_instrument[1]=seq_ui_instrument[1];
+        memcpy(saved_seq_names,seq_ui_instrument_name,sizeof saved_seq_names);
+        current_instrument.patches[0].macros[0]=17u;
+        current_inserts.instrument_macros[0]=63u;
+        fm1lab_insert_state_set(&current_inserts,FM6_INSERT_DRIVE,77u);
+        instrument_dirty=1u;
+        app_track_stash(active);
+        track_state[other].instrument.patches[0].macros[0]=82u;
+        track_state[other].inserts.instrument_macros[0]=42u;
+        track_state[other].dirty=1u;
+        track_state[other].flash_index=9u;
+        fm6_master_insert_set(FM6_INSERT_DRIVE,77u);
+        if(app_input_switch_track(0,active,other)!=0 ||
+           current_instrument.patches[0].macros[0]!=82u ||
+           current_inserts.instrument_macros[0]!=42u ||
+           !instrument_dirty || instrument_index!=9u ||
+           fm6_master_insert_get(FM6_INSERT_DRIVE)!=77u) goto track_cache_restore;
+        current_instrument.patches[0].macros[0]=25u;
+        current_inserts.instrument_macros[0]=31u;
+        instrument_dirty=1u;
+        app_track_stash(other);
+        if(app_input_switch_track(0,other,active)!=0 ||
+           current_instrument.patches[0].macros[0]!=17u ||
+           current_inserts.instrument_macros[0]!=63u ||
+           !instrument_dirty || instrument_index!=saved_index ||
+           fm6_master_insert_get(FM6_INSERT_DRIVE)!=77u ||
+           track_state[other].instrument.patches[0].macros[0]!=25u ||
+           track_state[other].inserts.instrument_macros[0]!=31u ||
+           !track_state[other].dirty || track_state[other].flash_index!=9u ||
+           app_host_store_load_calls!=reads || app_host_store_save_calls!=writes)
+            goto track_cache_restore;
+        app_host_track_cache_pass=1u;
+track_cache_restore:
+        track_state[0]=saved_tracks[0]; track_state[1]=saved_tracks[1];
+        current_instrument=saved_current; current_inserts=saved_inserts;
+        instrument_index=saved_index; instrument_dirty=saved_dirty; instrument_loaded=saved_loaded;
+        seq_ui_instrument[0]=saved_seq_instrument[0]; seq_ui_instrument[1]=saved_seq_instrument[1];
+        memcpy(seq_ui_instrument_name,saved_seq_names,sizeof saved_seq_names);
+        seq_ui_lane=saved_lane;
+        fm6_sequencer_set_lane(saved_lane,(uint8_t)(saved_lane*FM1LAB_PATCH_COUNT));
+        fm1lab_insert_state_set(&current_inserts,FM6_INSERT_DRIVE,
+                                fm1lab_insert_state_get(&saved_inserts,FM6_INSERT_DRIVE));
+        fm6_master_insert_set(FM6_INSERT_DRIVE,
+                              fm1lab_insert_state_get(&saved_inserts,FM6_INSERT_DRIVE));
+        instrument_sync_settings();
+        return 1;
+    }
     if(!fm1lab_strcmp(cmd,"fm1lab_resync_panic_test") ||
        !fm1lab_strcmp(cmd,"fm1lab_resync_overflow_test")) {
         uint8_t active=(uint8_t)(seq_ui_lane&1u),other=(uint8_t)(active^1u);
