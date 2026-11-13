@@ -34,8 +34,7 @@ static inline uint32_t fm1lab_input_route_claims(uint8_t page,
             claims |= (uint32_t)1u << (patch_focus
                 ? FM1LAB_INPUT_PATCH_PRESET_STEP
                 : FM1LAB_INPUT_INSTRUMENT_STEP);
-    } else if (page == FM1LAB_INPUT_PAGE_SEQ ||
-               page == FM1LAB_INPUT_PAGE_SEQ_OPTIONS) {
+    } else if (page == FM1LAB_INPUT_PAGE_SEQ) {
         if (encoder == 0u)
             claims |= (uint32_t)1u << FM1LAB_INPUT_TRACK_TOGGLE;
         if (encoder == 2u)
