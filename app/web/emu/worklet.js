@@ -71,13 +71,23 @@ class Fm1 extends AudioWorkletProcessor {
     } else if (m.type === "master") {
       this.ex.web_master(m.value | 0);
     } else if (m.type === "test-home-refusal") {
-      const available = typeof this.ex.web_test_home_refusal === "function";
-      if (available) this.ex.web_test_home_refusal();
-      const fb = new Uint16Array(this.mem.buffer, this.ex.web_fb(), 240 * 240);
-      let lit = 0;
-      for (let i = 0; i < fb.length; i++) if (fb[i] !== 0) lit++;
-      this.port.postMessage({ type: "test-home-refusal-result", ok: available,
-                              blits: this.ex.web_blits(), framebufferLit: lit });
+      const result = { type: "test-home-refusal-result", ok: false };
+      try {
+        if (typeof this.ex.web_test_home_refusal !== "function") {
+          result.error = "web_test_home_refusal export is missing";
+        } else {
+          this.ex.web_test_home_refusal();
+          const fb = new Uint16Array(this.mem.buffer, this.ex.web_fb(), 240 * 240);
+          let lit = 0;
+          for (let i = 0; i < fb.length; i++) if (fb[i] !== 0) lit++;
+          result.ok = true;
+          result.blits = this.ex.web_blits();
+          result.framebufferLit = lit;
+        }
+      } catch (err) {
+        result.error = String(err && (err.stack || err.message) || err);
+      }
+      this.port.postMessage(result);
     } else if (m.type === "sysex") {                  // a screen reader's frame: the bytes between F0 and F7
       const b = Uint8Array.from(m.bytes).subarray(0, 64);
       new Uint8Array(this.mem.buffer, this.ex.web_sysex_buf(), b.length).set(b);

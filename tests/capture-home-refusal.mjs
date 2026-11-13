@@ -14,8 +14,12 @@ try {
     window.emuTestHomeRefusalResult = null;
     node.port.postMessage({ type: "test-home-refusal" });
   });
-  await page.waitForFunction(() => window.emuTestHomeRefusalResult?.ok === true, null, { timeout: 5000 });
+  await page.waitForFunction(() => window.emuTestHomeRefusalResult !== null &&
+    window.emuTestHomeRefusalResult !== undefined, null, { timeout: 5000 });
   const framebuffer = await page.evaluate(() => window.emuTestHomeRefusalResult);
+  if (!framebuffer.ok) {
+    throw new Error(`HOME refusal fixture failed in AudioWorklet: ${framebuffer.error || "unknown error"}`);
+  }
   if (framebuffer.framebufferLit < 500) {
     throw new Error(`HOME refusal draw produced a blank framebuffer (blits=${framebuffer.blits}, lit=${framebuffer.framebufferLit})`);
   }
