@@ -296,6 +296,11 @@ int fm1lab_store_library_save_full(unsigned index,const fm1lab_instrument_t *in,
 {
     if(index>=FM1LAB_STORE_INSTRUMENT_COUNT || !fm1lab_instrument_valid(in) ||
        !fm1lab_insert_state_valid(inserts))return -1;
+    fm1lab_insert_state_t saved_inserts=*inserts;
+    for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
+        saved_inserts.patch_octave[p]=in->patches[p].octave;
+        saved_inserts.patch_fine_cents[p]=in->patches[p].fine_cents;
+    }
     if(meta_snapshot_load()!=0)return -1;
     unsigned bank=index/FM1LAB_STORE_INSTRUMENTS_PER_BANK;
     if(patch_bank_load(bank)!=0)return -1;
@@ -304,7 +309,7 @@ int fm1lab_store_library_save_full(unsigned index,const fm1lab_instrument_t *in,
         patch_encode(patch_record_at(bank_work,first_slot+p),&in->patches[p]);
     /* One pooled-object commit writes all four patch records for this Instrument. */
     if(patch_bank_save(bank)!=0)return -1;
-    return meta_save_instrument(index,in,inserts);
+    return meta_save_instrument(index,in,&saved_inserts);
 }
 int fm1lab_store_library_save(unsigned index,const fm1lab_instrument_t *in)
 {
