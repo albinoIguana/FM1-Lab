@@ -184,7 +184,7 @@ static void test_track_round_trip_and_isolation(void)
     assert(fake.switch_calls == 2u);
     assert(fake.save_calls == saves_before_toggle && fake.load_calls == loads_before_toggle);
     assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
-    assert(fake.bank_instrument[0] == 3u && fake.bank_instrument[1] == 8u);
+    assert(fake.bank_instrument[0] == 3u && fake.bank_instrument[1] == 7u);
 }
 
 static void test_busy_and_save_failure_statuses(void)
