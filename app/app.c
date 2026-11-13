@@ -858,7 +858,7 @@ static int fm1lab_same_library_instrument(const fm1lab_instrument_t *a,
                                            const fm1lab_instrument_t *b)
 {
     return memcmp(a->patches,b->patches,sizeof a->patches)==0 &&
-           fm1lab_strncmp(a->name,b->name,FM1LAB_INSTRUMENT_NAME_BYTES)==0;
+           fm1lab_strncmp(a->name,b->name,FM1LAB_STORE_NAME_BYTES)==0;
 }
 static int fm1lab_is_previous_digitone_instrument(uint32_t index,
                                                    const fm1lab_instrument_t *existing)
@@ -1303,7 +1303,7 @@ static void save_name_step(int delta)
         length=FM1LAB_PATCH_NAME_BYTES;
     } else {
         name=current_instrument.name;
-        length=FM1LAB_INSTRUMENT_NAME_BYTES;
+        length=FM1LAB_STORE_NAME_BYTES;
     }
     if(save_name_cursor>=length)save_name_cursor=(uint8_t)(length-1u);
     char c=name[save_name_cursor];
@@ -2665,7 +2665,7 @@ static void input(void)
                 save_patch=(uint8_t)next;set.patch=save_patch;seq_ui_patch[seq_ui_lane]=save_patch;
                 save_name_cursor=0u;app_say("PATCH",patch_display_name(save_patch));
             } else if(k==EN_K1) {
-                uint32_t length=save_name_target?FM1LAB_PATCH_NAME_BYTES:FM1LAB_INSTRUMENT_NAME_BYTES;
+                uint32_t length=save_name_target?FM1LAB_PATCH_NAME_BYTES:FM1LAB_STORE_NAME_BYTES;
                 save_name_cursor=(uint8_t)(((int32_t)save_name_cursor+e+(int32_t)length)%(int32_t)length);
                 app_say("NAME CURSOR","MOVED");
             } else if(k==EN_K2) {
@@ -3915,13 +3915,13 @@ static void draw_save_panel(void)
     cv_text(14,55,&FONT_XS,"PATCH  /  SELECT KNOB",C_PEWTER);
     int_text((int32_t)save_patch+1,t);text_cat(t," / 4");
     cv_text(14,73,&FONT_B,t,patch_color(save_patch));
-    cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  24 CHARS",C_PEWTER);
+    cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  11 CHARS",C_PEWTER);
     if(save_name_target) {
         for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)t[i]=(char)current_instrument.patches[save_patch].voice[145u+i];
         t[FM1LAB_PATCH_NAME_BYTES]='\0';
     } else {
-        for(uint32_t i=0;i<FM1LAB_INSTRUMENT_NAME_BYTES;i++)t[i]=current_instrument.name[i];
-        t[FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
+        for(uint32_t i=0;i<FM1LAB_STORE_NAME_BYTES;i++)t[i]=current_instrument.name[i];
+        t[FM1LAB_STORE_NAME_BYTES]='\0';
     }
     cv_text_fit(14,117,&FONT_B,t,accent,210);
     int32_t cursor_x=14+(int32_t)save_name_cursor*(save_name_target?8:7);
