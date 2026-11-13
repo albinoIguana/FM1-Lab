@@ -18,9 +18,9 @@ enum fm1lab_encoder {
 
 enum { FM1LAB_ADC_MASTER = 4u };
 
-/* The sequencer has two tracks, so rotation in either direction moves
- * to the other track. Treat any nonzero encoder report as one detent action:
- * FM1 hardware can report multiple quadrature counts for a single detent. */
+/* The SEQUENCER's SELECT encoder selects its two tracks. Treat any nonzero
+ * report as one detent: FM1 hardware can report multiple quadrature counts
+ * for a single physical detent. */
 static inline unsigned fm1lab_sequencer_lane_advance(unsigned lane, int delta)
 {
     return delta ? ((lane ^ 1u) & 1u) : (lane & 1u);

@@ -11,8 +11,8 @@ int main(void)
     assert(FM1LAB_ENCODER_KNOB_3 == 5);
     assert(FM1LAB_ENCODER_KNOB_4 == 6);
 
-    /* Exercise the same encoder/page/delta dispatch used by input() after
-     * it polls plat_enc(k). Both directions switch the two-track selector. */
+    /* The physical SEQUENCER track selector is SELECT (scan index 0).
+     * Both directions switch tracks; PRESETS (scan index 2) must not. */
     unsigned next_lane=99u;
     assert(fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
         FM1LAB_ENCODER_SELECT,1,0u,&next_lane) && next_lane==1u);
@@ -25,9 +25,9 @@ int main(void)
     assert(!fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
         FM1LAB_ENCODER_PRESETS,1,0u,&next_lane));
     assert(!fm1lab_sequencer_track_select_dispatch(0u,7u,8u,
-        FM1LAB_ENCODER_SELECT,1,0u,&next_lane));
+        FM1LAB_ENCODER_PRESETS,1,0u,&next_lane));
     assert(!fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
-        FM1LAB_ENCODER_SELECT,0,0u,&next_lane));
+        FM1LAB_ENCODER_PRESETS,0,0u,&next_lane));
     assert(!fm1lab_sequencer_track_select_dispatch(7u,7u,8u,
         FM1LAB_ENCODER_SELECT,1,0u,0));
 
