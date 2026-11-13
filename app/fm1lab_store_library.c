@@ -14,7 +14,7 @@
 #define META_RECORD_BYTES (FM1LAB_INSTRUMENT_NAME_BYTES + FM1LAB_PATCH_COUNT + sizeof(fm1lab_insert_state_t))
 #define META_SNAPSHOT_DATA_BYTES (FM1LAB_STORE_INSTRUMENT_COUNT * META_RECORD_BYTES)
 #define META_SNAPSHOT_BYTES (META_SNAPSHOT_DATA_BYTES + 2u)
-#define META_TOTAL_BYTES (META_HEADER_BYTES + 2u * META_SNAPSHOT_BYTES)
+#define META_TOTAL_BYTES (META_HEADER_BYTES + META_SNAPSHOT_BYTES)
 
 _Static_assert(sizeof(fm1lab_insert_state_t)==26u, "Instrument insert state layout changed");
 _Static_assert(PATCH_BANK_HEADER + PATCH_RECORDS_BYTES == PATCH_BANK_BYTES, "Patch bank size mismatch");
@@ -215,22 +215,18 @@ static int meta_snapshot_load(void)
     if(plat_store_size(OBJ_INSERTS)!=(int)META_TOTAL_BYTES)return -1;
     int n=plat_store_load(OBJ_INSERTS,meta_work,sizeof meta_work);
     if(n!=(int)META_TOTAL_BYTES || !meta_header_valid(meta_work))return -1;
-    const uint8_t *active=meta_work+META_HEADER_BYTES;
-    const uint8_t *fallback=active+META_SNAPSHOT_BYTES;
-    if(meta_snapshot_valid(active))bytes_copy(meta_snapshot_work,active,META_SNAPSHOT_BYTES);
-    else if(meta_snapshot_valid(fallback))bytes_copy(meta_snapshot_work,fallback,META_SNAPSHOT_BYTES);
-    else return -1;
+    const uint8_t *snapshot=meta_work+META_HEADER_BYTES;
+    if(!meta_snapshot_valid(snapshot))return -1;
+    bytes_copy(meta_snapshot_work,snapshot,META_SNAPSHOT_BYTES);
     return 0;
 }
 static int meta_snapshot_commit(void)
 {
-    uint8_t *active=meta_work+META_HEADER_BYTES;
-    uint8_t *fallback=active+META_SNAPSHOT_BYTES;
-    bytes_copy(fallback,meta_snapshot_work,META_SNAPSHOT_BYTES);
-    bytes_copy(active,meta_snapshot_work,META_SNAPSHOT_BYTES);
-    meta_snapshot_seal(fallback);
-    meta_snapshot_seal(active);
+    uint8_t *snapshot=meta_work+META_HEADER_BYTES;
+    bytes_copy(snapshot,meta_snapshot_work,META_SNAPSHOT_BYTES);
+    meta_snapshot_seal(snapshot);
     meta_header_seal(meta_work);
+    /* plat_store_save already commits through the pool's CRC-protected A/B copies. */
     return plat_store_save(OBJ_INSERTS,meta_work,META_TOTAL_BYTES);
 }
 static void meta_snapshot_format(void)
@@ -238,7 +234,6 @@ static void meta_snapshot_format(void)
     bytes_zero(meta_work,META_TOTAL_BYTES);
     meta_snapshot_init(meta_snapshot_work);
     bytes_copy(meta_work+META_HEADER_BYTES,meta_snapshot_work,META_SNAPSHOT_BYTES);
-    bytes_copy(meta_work+META_HEADER_BYTES+META_SNAPSHOT_BYTES,meta_snapshot_work,META_SNAPSHOT_BYTES);
     meta_header_seal(meta_work);
 }
 static int meta_save_instrument(unsigned index,const fm1lab_instrument_t *in,
