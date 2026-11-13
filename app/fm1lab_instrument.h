@@ -6,6 +6,7 @@
 #define FM1LAB_INSTRUMENT_MAGIC 0x31494c46u
 #define FM1LAB_INSTRUMENT_VERSION 1u
 #define FM1LAB_PATCH_COUNT 4u
+#define FM1LAB_PATCH_ID_COUNT 128u
 #define FM1LAB_PATCH_BYTES 156u
 #define FM1LAB_PATCH_NAME_BYTES 10u
 #define FM1LAB_INSTRUMENT_NAME_BYTES 24u
@@ -31,6 +32,7 @@ typedef struct {
 typedef struct {
     uint32_t magic;
     uint8_t version;
+    uint8_t patch_ids[FM1LAB_PATCH_COUNT]; /* persistent 0..127 patch-record addresses */
     char name[FM1LAB_INSTRUMENT_NAME_BYTES];
     fm1lab_patch_t patches[FM1LAB_PATCH_COUNT];
 } fm1lab_instrument_t;
