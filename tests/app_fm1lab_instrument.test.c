@@ -4,6 +4,32 @@
 #include <stdint.h>
 #include <string.h>
 
+static void test_track_activation_preserves_shared_master_chain(void)
+{
+    fm1lab_insert_state_t active, lane;
+    fm1lab_insert_state_init(&active);
+    fm1lab_insert_state_init(&lane);
+    fm1lab_insert_state_set(&active, FM6_INSERT_AMP_ENABLED, 1u);
+    fm1lab_insert_state_set(&active, FM6_INSERT_DRIVE, 73u);
+    fm1lab_insert_state_set(&active, FM6_INSERT_EQ_MID_GAIN, 19u);
+    fm1lab_insert_state_set(&lane, FM6_INSERT_AMP_ENABLED, 0u);
+    fm1lab_insert_state_set(&lane, FM6_INSERT_DRIVE, 12u);
+    fm1lab_insert_state_set(&lane, FM6_INSERT_EQ_MID_GAIN, 4u);
+    lane.instrument_macros[0]=17u;
+    lane.instrument_macros[1]=28u;
+    lane.patch_octave[2]=-2;
+    lane.patch_fine_cents[2]=35;
+
+    fm1lab_insert_state_activate_instrument(&active,&lane);
+    /* Shared live chain stays exactly as heard before the track handoff. */
+    assert(fm1lab_insert_state_get(&active,FM6_INSERT_AMP_ENABLED)==1u);
+    assert(fm1lab_insert_state_get(&active,FM6_INSERT_DRIVE)==73u);
+    assert(fm1lab_insert_state_get(&active,FM6_INSERT_EQ_MID_GAIN)==19u);
+    /* Instrument-owned controls follow the newly focused lane. */
+    assert(active.instrument_macros[0]==17u && active.instrument_macros[1]==28u);
+    assert(active.patch_octave[2]==-2 && active.patch_fine_cents[2]==35);
+}
+
 static void test_blank_library_slot_detection(void)
 {
     fm1lab_instrument_t blank;

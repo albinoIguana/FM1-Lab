@@ -1162,7 +1162,10 @@ static int app_track_activate(uint8_t lane)
         return -1;
     track = &track_state[lane];
     current_instrument = track->instrument;
-    current_inserts = track->inserts;
+    /* Amp/Drive + EQ are one shared stereo master chain. A lane handoff
+     * restores only that Instrument's macro/tuning sidecar fields; it must
+     * not replace the live master chain or make the UI disagree with audio. */
+    fm1lab_insert_state_activate_instrument(&current_inserts, &track->inserts);
     instrument_index = track->flash_index;
     instrument_dirty = track->dirty;
     instrument_loaded = 1u;
