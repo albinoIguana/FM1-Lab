@@ -1238,12 +1238,14 @@ static int instrument_load(uint32_t index, int from_audio)
     ++app_host_store_load_calls;
 #endif
     int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
-    if (!loaded && fm1lab_instrument_valid(&candidate) && fm1lab_insert_state_valid(&candidate_inserts)) {
-        current_instrument = candidate;
-        current_inserts = candidate_inserts;
-    } else {
-        instrument_factory_defaults();
-    }
+    /* Never turn a failed library read into a successful FACTORY selection.
+     * Keep the currently sounding Instrument intact and let the caller report
+     * the failed selection instead of silently substituting another record. */
+    if (loaded != 0 || !fm1lab_instrument_valid(&candidate) ||
+        !fm1lab_insert_state_valid(&candidate_inserts))
+        return FM1LAB_LOAD_INVALID;
+    current_instrument = candidate;
+    current_inserts = candidate_inserts;
     /* Missing-carrier recovery is an in-memory safety fallback only.
      * It must not mark a loaded Instrument dirty or silently rewrite storage. */
     (void)instrument_repair_missing_voices(&current_instrument);
@@ -2783,7 +2785,8 @@ static void input(void)
                 else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP) app_say("PATCH PRESET", patch_display_name(set.patch));
                 else if (action == FM1LAB_INPUT_TRACK_TOGGLE) app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
                 else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP) app_say("TRACK INSTRUMENT", "LOADING");
-                else { int_text(instrument_index + 1, t); app_say("INSTRUMENT", t); }
+                /* HOME Instrument selection is shown by the persistent
+                 * Instrument name in the header; no temporary numeric overlay. */
                 break;
             case FM1LAB_INPUT_RESULT_NONE: default: break;
             }
