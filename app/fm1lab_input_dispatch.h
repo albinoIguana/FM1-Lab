@@ -31,6 +31,7 @@ typedef struct {
 typedef struct {
     int (*save_current)(void *context);
     int (*load_instrument)(void *context, uint8_t lane, uint8_t instrument, int mode);
+    int (*switch_track)(void *context, uint8_t old_lane, uint8_t new_lane);
     int (*patch_preset_step)(void *context, uint8_t patch, int delta);
     void (*publish)(void *context);
 } fm1lab_input_ops_t;
@@ -102,20 +103,14 @@ static inline enum fm1lab_input_result fm1lab_input_apply(
     case FM1LAB_INPUT_TRACK_TOGGLE:
         if (state->instrument_apply_pending)
             return FM1LAB_INPUT_RESULT_LOAD_BUSY;
-        if (!ops->load_instrument)
+        if (!ops->switch_track)
             return FM1LAB_INPUT_RESULT_LOAD_FAILED;
-        if (state->instrument_dirty && ops->save_current) {
-            if (ops->save_current(context) != 0)
-                return FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED;
-            state->instrument_dirty = 0u;
-        }
         next = fm1lab_input_track_next(state->lane, delta);
         if (next == state->lane)
             return FM1LAB_INPUT_RESULT_NONE;
-        load_result = ops->load_instrument(context, next,
-            state->track_instrument[next], FM1LAB_INPUT_LOAD_UI_ONLY);
-        if (load_result == 1) return FM1LAB_INPUT_RESULT_LOAD_BUSY;
-        if (load_result != 0) return FM1LAB_INPUT_RESULT_LOAD_FAILED;
+        /* Track focus is a RAM-only handoff; explicit SAVE owns flash writes. */
+        if (ops->switch_track(context, state->lane, next) != 0)
+            return FM1LAB_INPUT_RESULT_LOAD_FAILED;
         state->lane = next;
         state->instrument = state->track_instrument[next];
         state->patch = state->track_patch[next];

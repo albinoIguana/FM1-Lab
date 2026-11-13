@@ -76,6 +76,18 @@ static settings_t set;
 static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
 static fm1lab_insert_state_t current_inserts;
+static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
+
+/* Both sequencer lanes stay resident in RAM. Track focus never performs
+ * storage I/O; each lane is persisted only by its own explicit SAVE. */
+typedef struct {
+    fm1lab_instrument_t instrument;
+    fm1lab_insert_state_t inserts;
+    uint8_t dirty;
+    uint8_t flash_index;
+    uint8_t loaded;
+} app_track_state_t;
+static app_track_state_t track_state[2];
 #ifdef PLAT_HOST
 static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
 static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
@@ -1130,6 +1142,37 @@ static void instrument_sync_settings(void)
     }
 }
 
+static void app_track_stash(uint8_t lane)
+{
+    app_track_state_t *track;
+    if (lane > 1u || !instrument_loaded)
+        return;
+    track = &track_state[lane];
+    track->instrument = current_instrument;
+    track->inserts = current_inserts;
+    track->dirty = instrument_dirty;
+    track->flash_index = instrument_index;
+    track->loaded = 1u;
+}
+
+static int app_track_activate(uint8_t lane)
+{
+    app_track_state_t *track;
+    if (lane > 1u || !track_state[lane].loaded)
+        return -1;
+    track = &track_state[lane];
+    current_instrument = track->instrument;
+    current_inserts = track->inserts;
+    instrument_index = track->flash_index;
+    instrument_dirty = track->dirty;
+    instrument_loaded = 1u;
+    seq_ui_instrument[lane] = instrument_index;
+    fm6_sequencer_set_lane(lane, (uint8_t)(lane * FM1LAB_PATCH_COUNT));
+    sequencer_cache_instrument_name(lane, current_instrument.name);
+    instrument_sync_settings();
+    return 0;
+}
+
 static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
 
 static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
@@ -1192,6 +1235,7 @@ static int instrument_load(uint32_t index, int from_audio)
     } else {
         instrument_apply_engine();
     }
+    app_track_stash(seq_ui_lane & 1u);
     return FM1LAB_LOAD_OK;
 }
 
@@ -1200,12 +1244,14 @@ static int instrument_save_to(uint32_t index)
     if (!instrument_loaded || index >= USER_INSTRUMENT_COUNT ||
         !fm1lab_instrument_valid(&current_instrument))
         return -1;
+    app_say("SAVING", seq_ui_lane ? "TRACK 2" : "TRACK 1");
     if (fm1lab_store_library_save_full(index, &current_instrument, &current_inserts))
         return -1;
     instrument_index=(uint8_t)index;
     instrument_dirty=0u;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
+    app_track_stash(seq_ui_lane & 1u);
     return 0;
 }
 static int instrument_save(void) { return instrument_save_to(instrument_index); }
@@ -1221,6 +1267,18 @@ static int app_input_save_current(void *opaque)
         context->state->track_instrument[seq_ui_lane & 1u] = seq_ui_instrument[seq_ui_lane & 1u];
     }
     return result;
+}
+
+static int app_input_switch_track(void *opaque, uint8_t old_lane, uint8_t new_lane)
+{
+    (void)opaque;
+    if (old_lane > 1u || new_lane > 1u || old_lane == new_lane)
+        return -1;
+    app_track_stash(old_lane);
+    if (app_track_activate(new_lane) != 0)
+        return -1;
+    seq_ui_lane = new_lane;
+    return 0;
 }
 
 static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, int mode)
@@ -1280,6 +1338,7 @@ static void app_input_publish(void *opaque)
 static const fm1lab_input_ops_t app_input_ops = {
     app_input_save_current,
     app_input_load_instrument,
+    app_input_switch_track,
     app_input_patch_preset_step,
     app_input_publish
 };
@@ -2197,6 +2256,7 @@ void app_init(void)
     set.patch = seq_ui_patch[seq_ui_lane];
     patch_focus = 0u;
     instrument_load(seq_ui_instrument[seq_ui_lane], 0);
+    app_track_stash(seq_ui_lane & 1u);
     {
         uint8_t other_lane=(uint8_t)(seq_ui_lane^1u);
         uint32_t other_index=seq_ui_instrument[other_lane];
@@ -2206,6 +2266,11 @@ void app_init(void)
             fm1lab_insert_state_init(&startup_insert_scratch);
         }
         (void)instrument_repair_missing_voices(&startup_instrument_scratch);
+        track_state[other_lane].instrument = startup_instrument_scratch;
+        track_state[other_lane].inserts = startup_insert_scratch;
+        track_state[other_lane].dirty = 0u;
+        track_state[other_lane].flash_index = (uint8_t)other_index;
+        track_state[other_lane].loaded = 1u;
         sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
         fm6_sequencer_set_lane(other_lane,FM1LAB_PATCH_COUNT);
         instrument_apply_engine_bank(other_lane,&startup_instrument_scratch,&startup_insert_scratch,0u);
@@ -3782,7 +3847,7 @@ static void draw_sequencer_panel(void)
     int32_t row_gap=2;
     int32_t row_height=(46-(int32_t)(rows-1u)*row_gap)/(int32_t)rows;
     cv_rect(2,13,236,1,seq_ui_lane==0u?C_PEWTER:C_LINE);
-    cv_text(6,0,&FONT_XS,"TRACK 1",seq_ui_lane==0u?C_WHITE:patch_color(seq_ui_patch[0]));
+    cv_text(6,0,&FONT_XS, (seq_ui_lane==0u ? instrument_dirty : track_state[0].dirty) ? "TRACK 1*" : "TRACK 1", seq_ui_lane==0u?C_WHITE:patch_color(seq_ui_patch[0]));
     cv_text(48,0,&FONT_XS,seq_ui_lane==0u?"ACTIVE":"",C_PEWTER);
     cv_text(78,0,&FONT_XS,seq_ui_instrument_name[0],C_WHITE);
     for(uint32_t row=0;row<rows;row++) {
@@ -3797,7 +3862,7 @@ static void draw_sequencer_panel(void)
     }
 
     cv_rect(2,79,236,1,seq_ui_lane==1u?C_PEWTER:C_LINE);
-    cv_text(6,66,&FONT_XS,"TRACK 2",seq_ui_lane==1u?C_WHITE:patch_color(seq_ui_patch[1]));
+    cv_text(6,66,&FONT_XS, (seq_ui_lane==1u ? instrument_dirty : track_state[1].dirty) ? "TRACK 2*" : "TRACK 2", seq_ui_lane==1u?C_WHITE:patch_color(seq_ui_patch[1]));
     cv_text(48,66,&FONT_XS,seq_ui_lane==1u?"ACTIVE":"",C_PEWTER);
     cv_text(78,66,&FONT_XS,seq_ui_instrument_name[1],C_WHITE);
     for(uint32_t row=0;row<rows;row++) {

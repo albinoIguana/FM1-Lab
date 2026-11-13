@@ -17,6 +17,7 @@ typedef struct {
     unsigned load_calls;
     unsigned patch_calls;
     unsigned publish_calls;
+    unsigned switch_calls;
 } fake_engine_t;
 
 static unsigned bit_count(uint32_t value)
@@ -62,8 +63,18 @@ static void fake_publish(void *opaque)
     ((fake_engine_t *)opaque)->publish_calls++;
 }
 
+static int fake_switch_track(void *opaque, uint8_t old_lane, uint8_t new_lane)
+{
+    fake_engine_t *fake = (fake_engine_t *)opaque;
+    (void)old_lane;
+    fake->switch_calls++;
+    fake->active_lane = new_lane;
+    fake->engine_target = (uint8_t)(new_lane * FM1LAB_PATCH_COUNT);
+    return 0;
+}
+
 static const fm1lab_input_ops_t fake_ops = {
-    fake_save, fake_load, fake_patch_preset, fake_publish
+    fake_save, fake_load, fake_switch_track, fake_patch_preset, fake_publish
 };
 
 static void test_complete_route_matrix(void)
@@ -150,6 +161,8 @@ static void test_track_round_trip_and_isolation(void)
         == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.lane == 1u && state.instrument == 7u && state.patch == 2u);
     assert(fake.engine_target == FM1LAB_PATCH_COUNT);
+    assert(fake.switch_calls == 1u);
+    assert(fake.save_calls == 0u && fake.load_calls == 0u);
     assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
 
     /* PRESETS on SEQ OPTIONS changes only T2's Instrument/bank. */
@@ -161,6 +174,8 @@ static void test_track_round_trip_and_isolation(void)
     assert(fake.bank_instrument[1] == 8u);
     assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
     state.instrument_apply_pending = 0u; /* model completion of the queued bank apply */
+    unsigned saves_before_toggle = fake.save_calls;
+    unsigned loads_before_toggle = fake.load_calls;
 
     /* T2 -> T1 restores T1's own Instrument and patch selection. */
     assert(fm1lab_input_apply(&state,
@@ -169,6 +184,8 @@ static void test_track_round_trip_and_isolation(void)
         == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.lane == 0u && state.instrument == 3u && state.patch == 1u);
     assert(fake.engine_target == 0u);
+    assert(fake.switch_calls == 2u);
+    assert(fake.save_calls == saves_before_toggle && fake.load_calls == loads_before_toggle);
     assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
     assert(fake.bank_instrument[0] == 3u && fake.bank_instrument[1] == 8u);
 }
@@ -197,10 +214,15 @@ static void test_busy_and_save_failure_statuses(void)
     state.track_instrument[0] = 4u;
     state.instrument_dirty = 1u;
     fake.fail_save = 1u;
-    assert(fm1lab_input_apply(&state, FM1LAB_INPUT_TRACK_TOGGLE, 1,
-        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
-        == FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED);
-    assert(state.lane == 0u);
+    {
+        unsigned saves_before = fake.save_calls;
+        unsigned loads_before = fake.load_calls;
+        assert(fm1lab_input_apply(&state, FM1LAB_INPUT_TRACK_TOGGLE, 1,
+            TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
+            == FM1LAB_INPUT_RESULT_APPLIED);
+        assert(state.lane == 1u);
+        assert(fake.save_calls == saves_before && fake.load_calls == loads_before);
+    }
 }
 
 int main(void)
