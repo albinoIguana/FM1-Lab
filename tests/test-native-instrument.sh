@@ -12,7 +12,9 @@ PRESET_BIN="$(mktemp)"
 APP_INSTRUMENT_BIN="$(mktemp)"
 EVENT_ORDER_BIN="$(mktemp)"
 PENDING_WATCH_BIN="$(mktemp)"
-trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN" "$PRESET_BIN" "$APP_INSTRUMENT_BIN" "$EVENT_ORDER_BIN" "$PENDING_WATCH_BIN"' EXIT
+AUDIO_PEAK_BIN="$(mktemp)"
+CPU2_STARTUP_BIN="$(mktemp)"
+trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN" "$PRESET_BIN" "$APP_INSTRUMENT_BIN" "$EVENT_ORDER_BIN" "$PENDING_WATCH_BIN" "$AUDIO_PEAK_BIN" "$CPU2_STARTUP_BIN"' EXIT
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/tests/fm1lab_instrument.test.c" -o "$INSTRUMENT_BIN"
@@ -51,6 +53,14 @@ echo "FM1-Lab event FIFO/heavy-budget property tests passed."
 cc -std=c11 -Wall -Wextra -Werror "$ROOT/tests/fm1lab_pending_watch.test.c" -o "$PENDING_WATCH_BIN"
 "$PENDING_WATCH_BIN"
 echo "FM1-Lab pending-load stall watchdog tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror "$ROOT/tests/fm1lab_audio_peak_window.test.c" -o "$AUDIO_PEAK_BIN"
+"$AUDIO_PEAK_BIN"
+echo "FM1-Lab audio peak-window tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror "$ROOT/tests/fm1lab_cpu2_startup.test.c" -o "$CPU2_STARTUP_BIN"
+"$CPU2_STARTUP_BIN"
+echo "FM1-Lab CPU2 startup self-test tests passed."
 
 cc -std=c11 -Wall -Wextra -Werror \
   -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
