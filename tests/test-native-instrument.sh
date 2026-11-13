@@ -11,7 +11,8 @@ SETTINGS_BIN="$(mktemp)"
 PRESET_BIN="$(mktemp)"
 APP_INSTRUMENT_BIN="$(mktemp)"
 EVENT_ORDER_BIN="$(mktemp)"
-trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN" "$PRESET_BIN" "$APP_INSTRUMENT_BIN" "$EVENT_ORDER_BIN"' EXIT
+PENDING_WATCH_BIN="$(mktemp)"
+trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN" "$PRESET_BIN" "$APP_INSTRUMENT_BIN" "$EVENT_ORDER_BIN" "$PENDING_WATCH_BIN"' EXIT
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/tests/fm1lab_instrument.test.c" -o "$INSTRUMENT_BIN"
@@ -46,6 +47,10 @@ echo "FM1-Lab app-side patch replacement isolation tests passed."
 cc -std=c11 -Wall -Wextra -Werror "$ROOT/tests/fm1lab_event_order.test.c" -o "$EVENT_ORDER_BIN"
 "$EVENT_ORDER_BIN"
 echo "FM1-Lab event FIFO/heavy-budget property tests passed."
+
+cc -std=c11 -Wall -Wextra -Werror "$ROOT/tests/fm1lab_pending_watch.test.c" -o "$PENDING_WATCH_BIN"
+"$PENDING_WATCH_BIN"
+echo "FM1-Lab pending-load stall watchdog tests passed."
 
 cc -std=c11 -Wall -Wextra -Werror \
   -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
