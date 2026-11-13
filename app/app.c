@@ -7,6 +7,8 @@
  * Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
+#include "fm1lab_cpu2_startup.h"
+#include "fm1lab_audio_peak_window.h"
 #include "fm1lab_settings_record.h"
 #include "fm1lab_sequencer_record.h"
 #include "fm1lab_instrument.h"
@@ -39,13 +41,27 @@ static uint32_t web_device_core0_q12, web_device_core2_q12;
 static uint32_t web_device_core0_pct, web_device_core2_pct;
 static uint32_t web_device_xruns;
 #endif
-/* Per-callback timing on the physical device: wall time is compared with the
- * sample-derived deadline; CPU2 job and wait are the longest quantum values. */
+/* Per-callback diagnostics. CPU0 busy is callback wall time minus the sum
+ * of CPU0's blocking waits; voice time and UI/MIDI sub-costs are also separate. */
 static volatile uint32_t render_last_us, render_budget_us, render_deadline_misses;
+static volatile uint32_t render_dma_guard_us, render_shed_threshold_us;
 static volatile uint32_t render_core0_active_us, render_cpu2_job_us, render_cpu2_wait_us;
 static volatile uint32_t render_heartbeat;
 static volatile uint8_t app_resync_requested;
 static fm1lab_pending_watch_t pending_watch;
+static volatile uint32_t render_cpu0_voice_us, render_cpu2_job_sum_us, render_cpu2_wait_sum_us;
+static volatile uint32_t render_cpu2_backup_ns, render_cpu2_backup_voices;
+static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
+static volatile uint32_t render_peak_all_us, render_peak_window_us;
+static volatile uint32_t render_voice_peak, render_quanta, render_cpu2_quanta, render_cpu2_dispatches, render_cpu2_fallbacks;
+static volatile uint32_t render_pre_limiter_peak_q23, render_limiter_reduction_q15;
+static volatile uint32_t render_pre_limiter_peak_window_q23, render_limiter_reduction_window_q15;
+static void app_audio_timing_reset_window(void)
+{
+    render_peak_window_us=0u;
+    fm1lab_audio_peak_window_reset(&render_pre_limiter_peak_window_q23,
+                                   &render_limiter_reduction_window_q15);
+}
 #if defined(PLAT_WEB)
 
 #define FM1LAB_WEB_EXPORT __attribute__((used, visibility("default")))
@@ -107,6 +123,7 @@ static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
 enum { USER_INSTRUMENT_COUNT = FM1LAB_STORE_INSTRUMENT_COUNT };
 enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_COUNT };
+enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE_LFO, PAGE_LFO_MOD, PAGE_SEQ, PAGE_SEQ_OPTIONS, PAGE_SEQ_PIANO, PAGE_ARP, PAGE_ARP_STEPS, PAGE_ARP_LATCH, PAGE_FX_AMP, PAGE_FX_CHORUS, PAGE_FX_DELAY, PAGE_FX_REVERB, PAGE_FX_PHASER, PAGE_FX_COMPRESSOR, PAGE_FX_EQ, PAGE_INSTRUMENT_MACRO, PAGE_CHAOS, PAGE_SAVE, PAGE_DIAG, PAGE_COUNT };
 _Static_assert((unsigned)PAGE_HOME == (unsigned)FM1LAB_INPUT_PAGE_HOME &&
                (unsigned)PAGE_SEQ == (unsigned)FM1LAB_INPUT_PAGE_SEQ &&
                (unsigned)PAGE_SEQ_OPTIONS == (unsigned)FM1LAB_INPUT_PAGE_SEQ_OPTIONS &&
@@ -116,7 +133,6 @@ _Static_assert((unsigned)EN_SELECT == (unsigned)FM1LAB_ENCODER_SELECT,
                "SELECT encoder ID must match the physical-control map");
 _Static_assert((unsigned)EN_PRESET == (unsigned)FM1LAB_ENCODER_PRESETS,
                "PRESETS encoder ID must match the physical-control map");
-static uint8_t page = PAGE_HOME;
 /* HOME starts in whole-instrument mode; selecting a layer enters patch focus. */
 static uint8_t patch_focus;
 /* Patch focus belongs only to HOME. Leaving HOME always clears it. */
@@ -1961,24 +1977,50 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     app_host_render_callbacks++;
 #endif
     uint32_t render_t0 = plat_ticks24();
+    uint32_t phase_t0=render_t0;
 #if defined(PLAT_WEB)
     uint32_t cpu2_t0 = fm6_cpu2_total_job_ticks();
 #endif
     ui_events_drain();
+    uint32_t ui_us=(plat_ticks24()-phase_t0)/PLAT_TICKS_PER_US;
+    phase_t0=plat_ticks24();
     midi_in();
+    uint32_t midi_us=(plat_ticks24()-phase_t0)/PLAT_TICKS_PER_US;
+    phase_t0=plat_ticks24();
     master_q12=fm1lab_master_gain_scale(master_q12,master_trim_pct);
+    uint32_t gain_us=(plat_ticks24()-phase_t0)/PLAT_TICKS_PER_US;
     fm6_render(lr, n, master_q12);
     {
         uint32_t elapsed_ticks=plat_ticks24()-render_t0;
         uint32_t elapsed_us=elapsed_ticks/PLAT_TICKS_PER_US;
         uint32_t budget_us=(n*1000000u)/FM6_SAMPLE_RATE_HZ;
-        uint32_t wait_us=fm6_cpu2_last_wait_us();
-        if(wait_us>elapsed_us)wait_us=elapsed_us;
+        uint32_t wait_sum_us=fm6_cpu2_wait_sum_us();
+        if(wait_sum_us>elapsed_us)wait_sum_us=elapsed_us;
         render_last_us=elapsed_us;
         render_budget_us=budget_us;
-        render_core0_active_us=elapsed_us-wait_us;
+        render_dma_guard_us=budget_us-(budget_us>>3);
+        render_shed_threshold_us=(budget_us*85u)/100u;
+        render_core0_active_us=elapsed_us-wait_sum_us;
         render_cpu2_job_us=fm6_cpu2_last_job_us();
-        render_cpu2_wait_us=wait_us;
+        render_cpu2_wait_us=fm6_cpu2_last_wait_us();
+        render_cpu0_voice_us=fm6_cpu0_voice_us();
+        render_cpu2_job_sum_us=fm6_cpu2_job_sum_us();
+        render_cpu2_wait_sum_us=wait_sum_us;
+        render_cpu2_backup_ns=fm6_cpu2_backup_sum_ns();
+        render_cpu2_backup_voices=fm6_cpu2_backup_voice_count();
+        render_ui_us=ui_us; render_midi_us=midi_us; render_gain_us=gain_us;
+        render_voice_peak=fm6_callback_voice_peak_count();
+        render_pre_limiter_peak_q23=fm6_pre_limiter_peak_q23();
+        render_limiter_reduction_q15=fm6_limiter_reduction_q15();
+        fm1lab_audio_peak_window_update(&render_pre_limiter_peak_window_q23,
+            &render_limiter_reduction_window_q15,
+            render_pre_limiter_peak_q23,render_limiter_reduction_q15);
+        render_quanta=fm6_render_quantum_count();
+        render_cpu2_quanta=fm6_cpu2_quantum_count();
+        render_cpu2_dispatches=fm6_cpu2_dispatch_count();
+        render_cpu2_fallbacks=fm6_cpu2_fallback_count();
+        if(elapsed_us>render_peak_all_us)render_peak_all_us=elapsed_us;
+        if(elapsed_us>render_peak_window_us)render_peak_window_us=elapsed_us;
         if(budget_us && elapsed_us>budget_us)++render_deadline_misses;
     }
 #if defined(PLAT_WEB)
@@ -2087,19 +2129,28 @@ void app_init(void)
     (void)plat_cpu2_set(1);
     /* Prove a real job can execute from flash and return shared data before
      * the first audio interrupt. A failed self-test leaves the safe CPU0 path. */
-    if (plat_cpu2_on()) {
+    {
         const uint32_t seed = 20261010u;
-        cpu2_selftest_out = 0u;
-        if (!plat_cpu2_run(cpu2_selftest_job, seed) ||
-            plat_cpu2_wait() != 0 ||
-            cpu2_selftest_out != cpu2_selftest_lcg(seed)) {
-            cpu2_selftest_failed = 1u;
-            if (plat_cpu2_on())
-                (void)plat_cpu2_set(0);
+        uint8_t started=(uint8_t)(plat_cpu2_on()!=0);
+        uint8_t dispatched=0u;
+        int wait_result=-1;
+        cpu2_selftest_out=0u;
+        if(started) {
+            dispatched=(uint8_t)(plat_cpu2_run(cpu2_selftest_job,seed)!=0);
+            if(dispatched)wait_result=plat_cpu2_wait();
+        }
+        if(!fm1lab_cpu2_selftest_success(started,dispatched,wait_result,
+                                          cpu2_selftest_out,cpu2_selftest_lcg(seed))) {
+            cpu2_selftest_failed=1u;
+            if(plat_cpu2_on())(void)plat_cpu2_set(0);
         }
     }
 #endif
     fm6_init();
+#if defined(FM1B_CPU2) && FM1B_CPU2 && !defined(PLAT_WEB)
+    if (cpu2_selftest_failed)
+        fm6_cpu2_disable(); /* self-test/start failure: CPU0-only for this session */
+#endif
 #if defined(FM1B_CPU2) && FM1B_CPU2 && defined(PLAT_WEB)
     /* The browser simulator's CPU2 model expects the engine initialized first. */
     (void)plat_cpu2_set(1);
@@ -2520,6 +2571,9 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
+        if (k != B_HOME && k != B_GLO && k != B_ENV && k != B_LFO &&
+            k != B_EDIT && k != B_SEL && k != B_SEQ && k != B_ARP && k != B_FX && k != B_SAVE)
+            app_audio_timing_reset_window();
         if (k == B_OCTDN)
             octave_step(-1);
         else if (k == B_OCTUP)
@@ -2532,7 +2586,9 @@ static void input(void)
             patch_focus = 0u;
             app_say("INSTRUMENT", seq_ui_lane ? "TRACK 2 PATCH" : "TRACK 1 PATCH");
         } else if (k == B_GLO) {
-            page_change(page == PAGE_GLOBAL ? PAGE_HOME : PAGE_GLOBAL);
+            page_change(page==PAGE_GLOBAL?PAGE_DIAG:page==PAGE_DIAG?PAGE_HOME:PAGE_GLOBAL);
+            app_say(page==PAGE_GLOBAL?"GLOBAL":page==PAGE_DIAG?"AUDIO DIAGNOSTICS":"HOME",
+                    page==PAGE_DIAG?"TIMING / LOAD":"SETTINGS");
             app_say(page==PAGE_GLOBAL?"GLOBAL":"HOME","SETTINGS");
         } else if (k == B_ENV) {
             page_change(PAGE_ENV);
@@ -2693,6 +2749,7 @@ static void input(void)
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
         ui.redraw = 1;
+        if(page==PAGE_DIAG) continue; /* diagnostic page is read-only */
         /* One exclusive route owns HOME and both Sequencer pages. K1-K4
          * and unrelated page controls continue through their existing handlers. */
         enum fm1lab_input_action action = fm1lab_input_route(page, (uint8_t)k, patch_focus);
@@ -2707,9 +2764,6 @@ static void input(void)
             enum fm1lab_input_result result = fm1lab_input_apply(
                 &state, action, e, (uint8_t)USER_INSTRUMENT_COUNT,
                 (uint8_t)FM1LAB_PATCH_COUNT, &app_input_ops, &context);
-
-            /* Commit the state changed by the same dispatcher exercised in
-             * host tests. Instrument/audio side effects remain in callbacks. */
             patch_focus = state.patch_focus;
             set.patch = state.patch;
             seq_ui_lane = state.lane;
@@ -2717,56 +2771,34 @@ static void input(void)
             seq_ui_instrument[1] = state.track_instrument[1];
             seq_ui_patch[0] = state.track_patch[0];
             seq_ui_patch[1] = state.track_patch[1];
-
             if (result == FM1LAB_INPUT_RESULT_APPLIED ||
                 result == FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED)
                 set_dirty = 1u;
             switch (result) {
             case FM1LAB_INPUT_RESULT_LOAD_BUSY:
-                app_say("LOAD BUSY", action == FM1LAB_INPUT_TRACK_TOGGLE
-                    ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
+                app_say("LOAD BUSY", action == FM1LAB_INPUT_TRACK_TOGGLE ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
                 break;
             case FM1LAB_INPUT_RESULT_LOAD_FAILED:
-                app_say("LOAD FAILED", action == FM1LAB_INPUT_TRACK_TOGGLE
-                    ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
+                app_say("LOAD FAILED", action == FM1LAB_INPUT_TRACK_TOGGLE ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
                 break;
-            case FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED:
-                app_say("SAVE FAILED", "TRACK NOT CHANGED");
-                break;
-            case FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED:
-                app_say("SAVE FAILED", "PRESET CHANGED");
-                break;
-            case FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED:
-                app_say("SAVE FAILED", "PRESET UNCHANGED");
-                break;
-            case FM1LAB_INPUT_RESULT_PATCH_FAILED:
-                app_say("PATCH PRESET", "LOAD FAILED");
-                break;
+            case FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED: app_say("SAVE FAILED", "TRACK NOT CHANGED"); break;
+            case FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED: app_say("SAVE FAILED", "PRESET CHANGED"); break;
+            case FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED: app_say("SAVE FAILED", "PRESET UNCHANGED"); break;
+            case FM1LAB_INPUT_RESULT_PATCH_FAILED: app_say("PATCH PRESET", "LOAD FAILED"); break;
             case FM1LAB_INPUT_RESULT_APPLIED:
-                if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP)
-                    app_say("PATCH", patch_display_name(set.patch));
-                else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP)
-                    app_say("PATCH PRESET", patch_display_name(set.patch));
-                else if (action == FM1LAB_INPUT_TRACK_TOGGLE)
-                    app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
-                else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP)
-                    app_say("TRACK INSTRUMENT", "LOADING");
-                else {
-                    int_text(instrument_index + 1, t);
-                    app_say("INSTRUMENT", t);
-                }
+                if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP) app_say("PATCH", patch_display_name(set.patch));
+                else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP) app_say("PATCH PRESET", patch_display_name(set.patch));
+                else if (action == FM1LAB_INPUT_TRACK_TOGGLE) app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
+                else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP) app_say("TRACK INSTRUMENT", "LOADING");
+                else { int_text(instrument_index + 1, t); app_say("INSTRUMENT", t); }
                 break;
-            case FM1LAB_INPUT_RESULT_NONE:
-            default:
-                break;
+            case FM1LAB_INPUT_RESULT_NONE: default: break;
             }
-            continue; /* exactly one routed action handled this encoder report */
+            continue;
         }
-        /* PRESETS outside HOME/SEQ/SEQ OPTIONS remain inert, as before. */
-        if (k == EN_PRESET && page != PAGE_HOME &&
-            page != PAGE_SEQ && page != PAGE_SEQ_OPTIONS &&
-            page != PAGE_SAVE && page != PAGE_ARP_STEPS &&
-            page != PAGE_OPERATOR_MAP)
+        if (k == EN_PRESET && page != PAGE_HOME && page != PAGE_SEQ &&
+            page != PAGE_SEQ_OPTIONS && page != PAGE_SAVE && page != PAGE_ARP_STEPS &&
+            page != PAGE_OPERATOR_MAP) continue;
             continue;
         if(page==PAGE_SAVE) {
             if(k==EN_PRESET) {
@@ -3694,6 +3726,71 @@ static void draw_global_panel(uint32_t pct)
     }
 }
 
+static void draw_audio_diag_panel(void)
+{
+    char value[24], detail[32];
+    const uint16_t colors[4]={RGB(255,170,75),RGB(36,215,232),RGB(75,220,150),RGB(227,75,210)};
+    for(uint32_t i=0u;i<4u;i++) {
+        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
+        instrument_card(x,y,UI_GRID_CARD_W,UI_GRID_CARD_H,panel_fill(),colors[i],colors[i]);
+        if(i==0u) {
+            cv_text(x+8,y+6,&FONT_XS,"RENDER / PEAK",C_PEWTER);
+            int_text((int32_t)render_last_us,value);text_cat(value," us");
+            cv_text(x+8,y+21,&FONT_B,value,colors[i]);
+            int_text((int32_t)render_peak_window_us,detail);text_cat(detail," / ");
+            int_text((int32_t)render_peak_all_us,value);text_cat(detail,value);
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)render_shed_threshold_us,detail);text_cat(detail," shed  ");
+            int_text((int32_t)render_dma_guard_us,value);text_cat(detail,value);
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        } else if(i==1u) {
+            cv_text(x+8,y+6,&FONT_XS,"CPU0 BUSY / VOICE",C_PEWTER);
+            int_text((int32_t)render_core0_active_us,value);text_cat(value," us");
+            cv_text(x+8,y+21,&FONT_B,value,colors[i]);
+            int_text((int32_t)render_cpu0_voice_us,detail);text_cat(detail," voice");
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)render_ui_us,detail);text_cat(detail," UI  ");
+            int_text((int32_t)render_midi_us,value);text_cat(detail,value);text_cat(detail," MIDI");
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        } else if(i==2u) {
+            cv_text(x+8,y+6,&FONT_XS,"CPU2 JOB / WAIT",C_PEWTER);
+            int_text((int32_t)render_cpu2_job_sum_us,value);text_cat(value," us job");
+            cv_text_fit(x+8,y+21,&FONT_B,value,colors[i],UI_GRID_CARD_W-16);
+            int_text((int32_t)render_cpu2_wait_sum_us,detail);text_cat(detail," us wait");
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)render_cpu2_job_us,detail);text_cat(detail," / ");
+            int_text((int32_t)render_cpu2_wait_us,value);text_cat(detail,value);text_cat(detail," max");
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            uint32_t backup_ns=render_cpu2_backup_ns;
+            int_text((int32_t)backup_ns,detail);text_cat(detail," ns BK / ");
+            int_text((int32_t)render_cpu2_backup_voices,value);text_cat(detail,value);text_cat(detail," V");
+            if(render_cpu2_backup_voices) {
+                text_cat(detail," / ");
+                int_text((int32_t)(backup_ns/render_cpu2_backup_voices),value);
+                text_cat(detail,value);text_cat(detail," ns/V");
+            }
+            cv_text_fit(x+8,y+74,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        } else {
+            cv_text(x+8,y+6,&FONT_XS,"VOICES / SHEDDING",C_PEWTER);
+            int_text((int32_t)render_voice_peak,value);text_cat(value," voices");
+            cv_text(x+8,y+21,&FONT_B,value,colors[i]);
+            int_text((int32_t)render_quanta,detail);text_cat(detail," Q C2:");
+            int_text((int32_t)render_cpu2_quanta,value);text_cat(detail,value);text_cat(detail," D:");
+            int_text((int32_t)render_cpu2_dispatches,value);text_cat(detail,value);text_cat(detail," F:");
+            int_text((int32_t)render_cpu2_fallbacks,value);text_cat(detail,value);
+            cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            int_text((int32_t)fm6_overload_shed_count(),detail);text_cat(detail," SHED  @ ");
+            int_text((int32_t)fm6_overload_last_voice_count(),value);text_cat(detail,value);text_cat(detail," V");
+            cv_text_fit(x+8,y+62,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+            uint32_t pre_pct=(uint32_t)(((uint64_t)render_pre_limiter_peak_window_q23*100u)/8388607u);
+            uint32_t gr_pct=(uint32_t)(((uint64_t)render_limiter_reduction_window_q15*100u)/32768u);
+            int_text((int32_t)pre_pct,detail);text_cat(detail,"% PRE  ");
+            int_text((int32_t)gr_pct,value);text_cat(detail,value);text_cat(detail,"% GR");
+            cv_text_fit(x+8,y+74,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
+        }
+    }
+}
+
 static const char *env_rate_word(uint8_t value)
 {
     if (value >= 85u) return "FAST";
@@ -4095,9 +4192,14 @@ static uint16_t arp_step_gradient_color(uint8_t accent, uint32_t band, uint32_t 
 {
     /* Accent is visual-only: it controls a bottom-up color ramp. */
     uint32_t progress=bands>1u?band*100u/(bands-1u):100u;
-    uint32_t level=18u+((uint32_t)accent*progress*82u)/10000u;
-    uint32_t r=20u+(207u*level)/100u, g=12u+(63u*level)/100u, b=34u+(176u*level)/100u;
-    if(playing){r+=r/2u;g+=g/2u;b+=b/2u;}
+    uint32_t emphasis=(uint32_t)accent;
+    /* A steep accent ramp reaches near-white magenta at high accent values. */
+    uint32_t level=12u+(emphasis*emphasis*88u)/10000u;
+    uint32_t lift=(progress*level)/100u;
+    uint32_t r=28u+(227u*lift)/100u;
+    uint32_t g=8u+(88u*lift)/100u;
+    uint32_t b=38u+(217u*lift)/100u;
+    if(playing){r+=r/3u;g+=g/3u;b+=b/3u;}
     if (r > 255u) r = 255u;
     if (g > 255u) g = 255u;
     if (b > 255u) b = 255u;
@@ -4129,7 +4231,7 @@ static void draw_arp_steps_panel(void)
         int32_t bar_h=(int32_t)gain*(height-10)/127;
         uint8_t is_playing=(uint8_t)(active && i==(uint32_t)(playing%arp_ui_length));
         uint8_t is_selected=(uint8_t)(i==arp_ui_step);
-        uint32_t bands=7u;
+        uint32_t bands=9u;
         int_text((int32_t)i+1,t);
         cv_text(x+(width-text_w(&FONT_XS,t))/2,21,&FONT_XS,t,is_selected?C_WHITE:C_PEWTER);
         cv_rect(x,top,width,height,is_selected?C_WHITE:RGB(43,59,72));
@@ -4140,10 +4242,23 @@ static void draw_arp_steps_panel(void)
             int32_t fill_x=x+2, fill_y=bottom-4-bar_h;
             int32_t bar_w=width-4;
             int32_t band_h=(bar_h+(int32_t)bands-1)/(int32_t)bands;
+            /* Bright edge + inset hot core simulate a luminous accent bar
+             * on the non-alpha 240x240 TFT. Keep the halo inside each step. */
+            if(emphasis) {
+                uint16_t halo=emphasis>=60u?RGB(255,74,245):RGB(146,42,150);
+                cv_rect(fill_x-1,fill_y-1,bar_w+2,1,halo);
+                cv_rect(fill_x-1,bottom-4,bar_w+2,1,halo);
+                cv_rect(fill_x-1,fill_y-1,1,(bottom-4)-fill_y+1,halo);
+                cv_rect(fill_x+bar_w,bottom-4-(bar_h-1),1,bar_h,halo);
+            }
             for(uint32_t band=0;band<bands;band++) {
                 int32_t yy=fill_y+(int32_t)band*band_h, hh=band_h;
                 if(yy+hh>bottom-4)hh=bottom-4-yy;
                 if(hh>0)cv_rect(fill_x,yy,bar_w,hh,arp_step_gradient_color(emphasis,band,bands,is_playing));
+            }
+            if(emphasis>=70u && bar_h>=5) {
+                int32_t core_y=fill_y+bar_h/3;
+                cv_rect(fill_x+1,core_y,bar_w-2,1,RGB(255,190,255));
             }
         }
         if(tied && i+1u<arp_ui_length) {
@@ -4243,6 +4358,7 @@ static const char *page_title(uint8_t current)
     case PAGE_HOME: return "HOME";
     case PAGE_MACRO: return patch_focus ? "PATCH MACROS" : "MACROS";
     case PAGE_GLOBAL: return "GLOBAL";
+    case PAGE_DIAG: return "AUDIO DIAG";
     case PAGE_OPERATOR_MAP: return "PATCH PITCH";
     case PAGE_ENV: return "PATCH ADSR";
     case PAGE_LFO: return lfo_view==0u?"OPERATOR":lfo_view==1u?"OP EG RATES":"OP EG TARGETS";
@@ -4275,6 +4391,7 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_INSTRUMENT_MACRO: return RGB(150,120,255);
     case PAGE_CHAOS: return RGB(255,85,65);
     case PAGE_GLOBAL: return RGB(85,190,255);
+    case PAGE_DIAG: return RGB(255,170,75);
     case PAGE_OPERATOR_MAP: return RGB(36,215,232);
     case PAGE_ENV: return RGB(255,170,75);
     case PAGE_LFO: return RGB(75,220,150);
@@ -4387,6 +4504,7 @@ static void draw(void)
     else if (page == PAGE_FX_DELAY) draw_fx_panel(1u);
     else if (page == PAGE_FX_REVERB) draw_fx_panel(2u);
     else if (page == PAGE_FX_PHASER) draw_fx_panel(3u);
+    else if (page == PAGE_DIAG) draw_audio_diag_panel();
     else draw_global_panel(pct);
     if(ui.delete_until && (int32_t)(ui.delete_until-plat_ms())>0)draw_delete_overlay();
     if(page==PAGE_SEQ && seq_clear_prompt)draw_seq_clear_prompt();
@@ -4482,7 +4600,7 @@ void app_ui_init(void)
 
 void app_frame(void)
 {
-    static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw, last_startup_draw;
+    static uint32_t last_pct, lit_until, last_ble, last_midi, last_arp_redraw, last_startup_draw, last_diag_redraw;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     if (startup_active) {
         uint32_t elapsed = now - startup_started_at;
@@ -4499,6 +4617,10 @@ void app_frame(void)
     input();
     if(fm1lab_pending_watch_update(&pending_watch,instrument_apply_pending,now,render_heartbeat)) {
         app_say("AUDIO STALLED","LOAD HELD");
+        ui.redraw=1u;
+    }
+    if(page==PAGE_DIAG && (uint32_t)(now-last_diag_redraw)>=100u) {
+        last_diag_redraw=now;
         ui.redraw=1u;
     }
     if(seq_record_redraw){ui.redraw=1u;seq_record_redraw=0u;}
@@ -4617,10 +4739,27 @@ int app_expect(const char *what, int *got)
         *got = (int)render_last_us;
     else if (!fm1lab_strcmp(what, "renderbudget"))
         *got = (int)render_budget_us;
+    else if (!fm1lab_strcmp(what, "renderdma")) *got=(int)render_dma_guard_us;
+    else if (!fm1lab_strcmp(what, "rendershedat")) *got=(int)render_shed_threshold_us;
     else if (!fm1lab_strcmp(what, "renderlate"))
         *got = (int)render_deadline_misses;
     else if (!fm1lab_strcmp(what, "core0us"))
         *got = (int)render_core0_active_us;
+    else if (!fm1lab_strcmp(what, "cpu0voice")) *got=(int)render_cpu0_voice_us;
+    else if (!fm1lab_strcmp(what, "cpu2jobsum")) *got=(int)render_cpu2_job_sum_us;
+    else if (!fm1lab_strcmp(what, "cpu2waitsum")) *got=(int)render_cpu2_wait_sum_us;
+    else if (!fm1lab_strcmp(what, "uius")) *got=(int)render_ui_us;
+    else if (!fm1lab_strcmp(what, "midius")) *got=(int)render_midi_us;
+    else if (!fm1lab_strcmp(what, "gainus")) *got=(int)render_gain_us;
+    else if (!fm1lab_strcmp(what, "renderpeak")) *got=(int)render_peak_window_us;
+    else if (!fm1lab_strcmp(what, "renderpeakall")) *got=(int)render_peak_all_us;
+    else if (!fm1lab_strcmp(what, "voicepeak")) *got=(int)render_voice_peak;
+    else if (!fm1lab_strcmp(what, "renderquanta")) *got=(int)render_quanta;
+    else if (!fm1lab_strcmp(what, "cpu2quanta")) *got=(int)render_cpu2_quanta;
+    else if (!fm1lab_strcmp(what, "cpu2dispatch")) *got=(int)render_cpu2_dispatches;
+    else if (!fm1lab_strcmp(what, "cpu2fallback")) *got=(int)render_cpu2_fallbacks;
+    else if (!fm1lab_strcmp(what, "shedvoices")) *got=(int)fm6_overload_last_voice_count();
+    else if (!fm1lab_strncmp(what, "shedvoice", 9)) *got=(int)fm6_overload_shed_voice_at((uint32_t)atoi(what+9));
     else if (!fm1lab_strcmp(what, "cpu2bad"))
         *got = (int)plat_cpu2_bad();
     else if (!fm1lab_strcmp(what, "cpu2selftest"))
