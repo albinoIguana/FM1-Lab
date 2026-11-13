@@ -56,7 +56,7 @@ The three small app objects (settings, panel calibration and BLE state) use thei
 
 ## 4. Latest linker section report
 
-The successful Instrument-storage build reported:
+The successful Instrument-storage build #1237 (commit `ef262cc4`) reported:
 
 | ELF section / check | Used | Capacity | Remaining |
 |---|---:|---:|---:|
@@ -78,6 +78,6 @@ The CI build expands the platform's 240 × 144 graphics canvas to 240 × 180 bef
 - **Firmware flash:** the latest successful build has **270,564 bytes of XIP headroom** after embedding the current factory library and the legacy migration datasets.
 - **User storage:** four 3,752-byte patch banks plus the 1,742-byte Instrument directory are in the dedicated 12-sector pool, separate from the application image.
 - **No flash-map changes are warranted** based on this audit. Do not repurpose OTA staging, Felucca data regions, or device-reserved sectors.
-- The remaining useful precision improvement is a linker map / symbol-size report that attributes the 303,768-byte `.text` section among executable code, the current DX7 data, and legacy migration data. The current build proves total fit, but does not yet provide that per-symbol breakdown.
+- The remaining useful precision improvement is a linker map / symbol-size report that attributes the 303,960-byte `.text` section among executable code, the current DX7 data, and legacy migration data. The current build proves total fit, but does not yet provide that per-symbol breakdown.
 
 This audit verifies the successful CI device-target link and configured flash layout. It does not claim physical-device flashing, OTA/recovery qualification, or runtime audio qualification.
