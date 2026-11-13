@@ -4649,6 +4649,30 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             char c=n<FM1LAB_STORE_NAME_BYTES?seed0.name[n]:'\0';
             if(current_instrument.name[n]!=(c?c:' ')) return 1;
         }
+        {
+            fm1lab_instrument_t long_seed=seed0, stored_seed=seed0;
+            fm1lab_instrument_t different_name, different_patch;
+            static const char long_name[]="ABCDEFGHIJK-TAIL-IGNORED";
+            for(uint32_t n=0u;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++) {
+                long_seed.name[n]=n<sizeof(long_name)-1u?long_name[n]:' ';
+                stored_seed.name[n]=n<FM1LAB_STORE_NAME_BYTES?long_seed.name[n]:' ';
+            }
+            /* Same patches and first 11 name bytes must match after storage truncation. */
+            if(!fm1lab_same_library_instrument(&long_seed,&stored_seed))
+                return 1;
+
+            /* A different name within the stored 11-byte field must not match. */
+            different_name=stored_seed;
+            different_name.name[0]=different_name.name[0]=='A'?'B':'A';
+            if(fm1lab_same_library_instrument(&long_seed,&different_name))
+                return 1;
+
+            /* Identical stored name is insufficient when any patch differs. */
+            different_patch=stored_seed;
+            different_patch.patches[0].voice[0]^=1u;
+            if(fm1lab_same_library_instrument(&long_seed,&different_patch))
+                return 1;
+        }
         app_host_name_migration_stage=10u;
         app_host_name_migration_pass=1u;
         return 1;
