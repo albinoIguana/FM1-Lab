@@ -103,6 +103,10 @@ fm1lab_name_migration_test
 expect name_migration 1
 expect namemigstage 10
 
+# Return HOME so the refusal and PRE: INST cue are checked in the same screen.
+tap HOME
+wait 40
+
 # Simulate an outstanding audio apply. SELECT must refuse the lane switch
 # and publish both refusal lines while the pending flag remains set.
 fm1lab_pending_test
