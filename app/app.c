@@ -4445,6 +4445,18 @@ static void draw(void)
     cv_blit(0, 221);
 }
 
+#if defined(PLAT_WEB)
+/* Deterministic visual fixture used only by the browser-emulator screenshot test.
+ * Force HOME whole-Instrument mode, show the same refusal copy as the real
+ * pending-load path, and render immediately so the screenshot is deterministic. */
+__attribute__((used, visibility("default"))) void app_web_test_home_refusal(void)
+{
+    page_change(PAGE_HOME);
+    app_say("LOAD BUSY","PRESET NOT CHANGED");
+    draw();
+}
+#endif
+
 void app_splash(void)
 {
     /* Suppress fm1-base's generic app-name splash; keep the panel on Shipwreck black. */
