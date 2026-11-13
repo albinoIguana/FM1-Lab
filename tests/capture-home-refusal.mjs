@@ -15,9 +15,21 @@ try {
     node.port.postMessage({ type: "test-home-refusal" });
   });
   await page.waitForFunction(() => window.emuTestHomeRefusalResult === true, null, { timeout: 5000 });
-  await page.waitForTimeout(250);
+  // Do not accept a successful browser run with a blank LCD. Wait for a
+  // real framebuffer update and verify that the visible display has ink.
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector("#screen");
+    if (!canvas) return false;
+    const ctx = canvas.getContext("2d");
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let lit = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 12 || data[i + 1] > 12 || data[i + 2] > 12) lit++;
+    }
+    return lit > 500;
+  }, null, { timeout: 5000 });
   await page.locator("#device").screenshot({ path: "app/build/emu/home-refusal.png" });
-  console.log("Captured HOME refusal overlay with PRE: INST cue.");
+  console.log("Captured non-blank HOME refusal overlay with PRE: INST cue.");
 } finally {
   await browser.close();
 }
