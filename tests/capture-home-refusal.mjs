@@ -5,6 +5,12 @@ try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 }, deviceScaleFactor: 1 });
   page.on("pageerror", error => { throw error; });
   await page.goto("http://127.0.0.1:4173/", { waitUntil: "networkidle" });
+  await page.evaluate(() => {
+    window.emuTestHomeRefusalResult = null;
+    window.emuWorkletPong = false;
+    window.emuRuntimeError = null;
+    window.emuProcessorError = null;
+  });
   await page.locator("#go").click();
   await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("On"), null, { timeout: 15000 });
   // Let the power-on ident finish so the HOME page and PRE: INST cue are visible.
@@ -13,8 +19,8 @@ try {
     if (typeof node === "undefined" || !node) throw new Error("FM1 AudioWorklet is not ready");
     window.emuTestHomeRefusalResult = null;
     window.emuWorkletPong = false;
-    window.emuRuntimeError = null;
-    window.emuProcessorError = null;
+    // Do not reset runtime/processor errors here: a worklet may have failed
+    // during boot, before this post-ident diagnostic runs.
     node.port.postMessage({ type: "ping" });
   });
   await page.waitForFunction(() => window.emuWorkletPong === true ||
