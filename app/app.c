@@ -20,6 +20,7 @@
 #include "fm1lab_input_route.h"
 #include "fm1lab_input_dispatch.h"
 #include "fm1lab_pending_watch.h"
+#include "fm1lab_event_order.h"
 #include <stddef.h>
 
 #define C_PEWTER RGB(175,185,195)
@@ -170,7 +171,12 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* display-only: last pressed MIDI/key note */
 static uint8_t touch_note[NKEYS];              /* pitch captured at key-down; octave shifts must not orphan note-off */
-enum { EV_NOTE_ON = 1, EV_NOTE_OFF, EV_PANIC, EV_MACRO_SET, EV_PATCH_LEVEL, EV_INSTRUMENT_LOAD, EV_PATCH_VOICE, EV_MASTER_INSERT, EV_MASTER_COMP, EV_PERFORMANCE_APPLY, EV_SEQ_RUN, EV_PATCH_PITCH };
+enum { EV_NOTE_ON = FM1LAB_EVENT_NOTE_ON, EV_NOTE_OFF = FM1LAB_EVENT_NOTE_OFF,
+       EV_PANIC = FM1LAB_EVENT_PANIC, EV_MACRO_SET = FM1LAB_EVENT_MACRO_SET,
+       EV_PATCH_LEVEL = FM1LAB_EVENT_PATCH_LEVEL, EV_INSTRUMENT_LOAD = FM1LAB_EVENT_INSTRUMENT_LOAD,
+       EV_PATCH_VOICE = FM1LAB_EVENT_PATCH_VOICE, EV_MASTER_INSERT = FM1LAB_EVENT_MASTER_INSERT,
+       EV_MASTER_COMP = FM1LAB_EVENT_MASTER_COMP, EV_PERFORMANCE_APPLY = FM1LAB_EVENT_PERFORMANCE_APPLY,
+       EV_SEQ_RUN = FM1LAB_EVENT_SEQ_RUN, EV_PATCH_PITCH = FM1LAB_EVENT_PATCH_PITCH };
 static fm6_performance_state_t performance_update_snapshot;
 static volatile uint8_t performance_update_pending, performance_update_dirty;
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
@@ -1434,12 +1440,11 @@ static void ui_events_drain(void)
     while ((tail = ui_event_tail) != ui_event_head) {
         uint8_t type = ui_events[tail].type, a = ui_events[tail].a;
         uint8_t b = ui_events[tail].b, c = ui_events[tail].c;
-        uint8_t heavy=(uint8_t)(type==EV_INSTRUMENT_LOAD ||
-            type==EV_PERFORMANCE_APPLY || type==EV_PATCH_VOICE);
+        uint8_t heavy=fm1lab_event_is_heavy(type);
         /* Preserve FIFO order: process notes/light events ahead of the next
          * expensive update, but leave a second expensive update queued for the
          * next audio callback. Never pop or account for an event we defer. */
-        if(heavy && heavy_done) break;
+        if(fm1lab_event_should_defer(type,heavy_done)) break;
 #ifdef PLAT_HOST
         if(app_host_event_test_active && app_host_event_trace_count<3u) {
             uint8_t at=app_host_event_trace_count++;
