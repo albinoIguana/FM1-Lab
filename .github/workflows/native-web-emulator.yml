@@ -2,7 +2,7 @@ name: Native FM1 browser emulator
 
 on:
   push:
-    branches: [main, fix/shipwreck-patch-presets-track-audio, fix/shipwreck-track-cache]
+    branches: [main, fix/shipwreck-patch-presets-track-audio, fix/shipwreck-track-cache, integration/shipwreck-unified]
     paths:
       - "app/**"
       - "tests/fm6_engine.test.c"
