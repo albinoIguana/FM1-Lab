@@ -72,6 +72,15 @@ jobs:
           echo "Native FM1 emulator bundle:"
           du -h app/build/emu/*
 
+      - name: Capture HOME refusal overlay screenshot
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory app/build/emu >/tmp/fm1-emu-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node tests/capture-home-refusal.mjs
+
       - name: Upload emulator bundle
         uses: actions/upload-artifact@v4
         with:

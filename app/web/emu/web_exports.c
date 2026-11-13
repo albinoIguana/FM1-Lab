@@ -21,4 +21,4 @@ WEB_EXPORT uint32_t web_app_audio_core0_pct(void) { return app_audio_core0_pct()
 WEB_EXPORT uint32_t web_app_audio_core2_pct(void) { return app_audio_core2_pct(); }
 /* Deterministic, emulator-only layout probe for the HOME refusal overlay.
  * The real pending/refusal behavior is exercised by the native host E2E test. */
-WEB_EXPORT void web_test_home_refusal(void) { app_say("LOAD BUSY","TRACK NOT CHANGED"); }
+WEB_EXPORT void web_test_home_refusal(void) { app_say("LOAD BUSY","PRESET NOT CHANGED"); }
