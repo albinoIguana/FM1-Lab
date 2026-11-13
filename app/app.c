@@ -979,6 +979,10 @@ static uint8_t fm1lab_restore_factory_instrument_name(
     return 1u;
 }
 
+/* Banks formatted during this boot contain placeholders, not user data.
+ * Seed those slots unconditionally; migration heuristics are only for banks
+ * that were already present and may contain user edits. */
+static uint8_t fm1lab_seed_fresh_bank_mask;
 static void fm1lab_seed_factory_library(void)
 {
     /* Curated CC0 six-operator DX7 library: 8 bass, 8 choir, one FM rhythm,
@@ -1015,7 +1019,10 @@ static void fm1lab_seed_factory_library(void)
             }
         }
         if(fm1lab_same_library_instrument(&existing,&seed)) continue;
-        if(!fm1lab_is_untouched_factory(&existing) &&
+        uint8_t freshly_formatted=(uint8_t)((fm1lab_seed_fresh_bank_mask &
+            (uint8_t)(1u << (index/FM1LAB_STORE_INSTRUMENTS_PER_BANK))) != 0u);
+        if(!freshly_formatted &&
+           !fm1lab_is_untouched_factory(&existing) &&
            !fm1lab_instrument_is_blank_library_slot(&existing) &&
            !fm1lab_is_previous_factory_instrument(index,&existing) &&
            !fm1lab_is_previous_digitone_instrument(index,&existing) &&
@@ -2118,6 +2125,7 @@ void app_init(void)
 {
     int performance_loaded = 0;
     int loaded;
+    uint8_t fresh_bank_mask=0u;
     master_trim_pct=100u;
 #if defined(PLAT_WEB)
     web_device_cpu_q12 = web_device_cpu_pct = 0u;
@@ -2336,6 +2344,8 @@ void app_init(void)
             size == (int)sizeof(fm1lab_instrument_t)) {
             if (fm1lab_store_library_format_bank(bank, &factory_instrument) != 0)
                 app_say("PATCH BANK", "FORMAT FAILED");
+            else
+                fresh_bank_mask |= (uint8_t)(1u << bank);
             continue;
         }
         if (size == (int)FM1LAB_STORE_PATCH_BANK_BYTES) {
@@ -2346,8 +2356,12 @@ void app_init(void)
         }
         app_say("PATCH BANK", "UNKNOWN FORMAT");
     }
-    /* Replace only untouched factory placeholders; edited Instruments survive. */
+    /* Freshly formatted banks are known placeholders and must be populated
+     * with their actual curated Instruments. Existing banks still use the
+     * conservative migration checks so user edits are preserved. */
+    fm1lab_seed_fresh_bank_mask=fresh_bank_mask;
     fm1lab_seed_factory_library();
+    fm1lab_seed_fresh_bank_mask=0u;
     set.patch = seq_ui_patch[seq_ui_lane];
     patch_focus = 0u;
     instrument_load(seq_ui_instrument[seq_ui_lane], 0);
