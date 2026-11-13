@@ -71,7 +71,9 @@ class Fm1 extends AudioWorkletProcessor {
     } else if (m.type === "master") {
       this.ex.web_master(m.value | 0);
     } else if (m.type === "test-home-refusal") {
-      if (this.ex.web_test_home_refusal) this.ex.web_test_home_refusal();
+      const available = typeof this.ex.web_test_home_refusal === "function";
+      if (available) this.ex.web_test_home_refusal();
+      this.port.postMessage({ type: "test-home-refusal-result", ok: available });
     } else if (m.type === "sysex") {                  // a screen reader's frame: the bytes between F0 and F7
       const b = Uint8Array.from(m.bytes).subarray(0, 64);
       new Uint8Array(this.mem.buffer, this.ex.web_sysex_buf(), b.length).set(b);
