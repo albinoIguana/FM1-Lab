@@ -10,7 +10,7 @@
 #define FM1LAB_STORE_PATCHES_PER_BANK 32u
 #define FM1LAB_STORE_NAME_BYTES FM1LAB_INSTRUMENT_NAME_BYTES
 #define FM1LAB_STORE_PATCH_BANK_BYTES 3752u
-#define FM1LAB_STORE_METADATA_BYTES 3472u
+#define FM1LAB_STORE_METADATA_BYTES 1742u
 
 /* Four 32-patch banks (IDs 0..127) and one Instrument directory. Each Instrument
  * owns four stable patch IDs: instrument_index*4 + slot. Factory-preset selection
