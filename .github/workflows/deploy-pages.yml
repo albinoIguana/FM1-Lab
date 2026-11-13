@@ -5,7 +5,7 @@ on:
     workflows: ["Native FM1 build"]
     types: [completed]
     # Candidate is intentionally published only after its own verified Native FM1 build.
-    branches: ["main", "integration/shipwreck-unified", "test/shipwreck-single-core-startup-candidate", "fix/shipwreck-timing-instrumentation", "fix/shipwreck-patch-presets-track-audio"]
+    branches: ["main", "integration/shipwreck-unified", "test/shipwreck-single-core-startup-candidate", "fix/shipwreck-timing-instrumentation", "fix/shipwreck-patch-presets-track-audio", "Shipwreck-instrument-repair"]
 
 permissions:
   contents: read
