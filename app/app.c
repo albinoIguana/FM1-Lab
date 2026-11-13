@@ -2322,12 +2322,16 @@ void app_init(void)
         seq_event_store_ready=1u;
         performance_publish();
     }
+    /* A missing/old directory means the new address map has not been committed
+     * yet (including a power cut during first format); rebuild all four banks. */
+    uint8_t reset_patch_library =
+        (uint8_t)(plat_store_size(OBJ_INSERTS) != (int)FM1LAB_STORE_METADATA_BYTES);
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
         int size = plat_store_size(OBJ_INSTRUMENTS0 + bank);
         /* The previous 3,840-byte inline-Instrument format is intentionally
-         * replaced, not migrated. New-format records are independently addressed
-         * patches; malformed records that claim this format remain untouched. */
-        if (size < 0 || size == 3840 || size == (int)sizeof(fm1lab_instrument_t)) {
+         * replaced, not migrated. A malformed current-format bank is preserved. */
+        if (reset_patch_library || size < 0 || size == 3840 ||
+            size == (int)sizeof(fm1lab_instrument_t)) {
             if (fm1lab_store_library_format_bank(bank, &factory_instrument) != 0)
                 app_say("PATCH BANK", "FORMAT FAILED");
             continue;
