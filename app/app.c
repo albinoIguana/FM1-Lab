@@ -2799,7 +2799,6 @@ static void input(void)
         if (k == EN_PRESET && page != PAGE_HOME && page != PAGE_SEQ &&
             page != PAGE_SEQ_OPTIONS && page != PAGE_SAVE && page != PAGE_ARP_STEPS &&
             page != PAGE_OPERATOR_MAP) continue;
-            continue;
         if(page==PAGE_SAVE) {
             if(k==EN_PRESET) {
                 int32_t next=((int32_t)save_slot+e)%(int32_t)USER_INSTRUMENT_COUNT;
