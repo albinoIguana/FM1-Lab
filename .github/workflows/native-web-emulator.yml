@@ -6,6 +6,7 @@ on:
     paths:
       - "app/**"
       - "tests/fm6_engine.test.c"
+      - "tests/capture-home-refusal.mjs"
       - "firmware/**"
       - "base"
       - "upstream/felucca"
