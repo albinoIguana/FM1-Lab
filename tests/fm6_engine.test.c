@@ -25,6 +25,20 @@ static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voice
                          (uint8_t)(92u - note * 4u), mask);
     assert(fm6_active_voices() == expected_voices);
     fm6_render(destination, TEST_FRAMES, 4096u);
+    /* 128 frames are four 32-frame quanta. The timing counters are callback
+     * sums/maxima, not values carried over from earlier render calls. */
+    assert(fm6_callback_voice_peak_count()==expected_voices);
+    assert(fm6_render_quantum_count()==4u);
+    assert(fm6_cpu2_quantum_count()==4u);
+    if(mode==1u) {
+        assert(fm6_cpu2_dispatch_count()==4u);
+        assert(fm6_cpu2_fallback_count()==0u);
+        assert(fm6_cpu2_job_sum_us()>=fm6_cpu2_last_job_us());
+        assert(fm6_cpu2_backup_voice_count()==(expected_voices/2u)*4u);
+    } else {
+        assert(fm6_cpu2_dispatch_count()==0u);
+        assert(fm6_cpu2_fallback_count()==4u);
+    }
 }
 static int32_t peak(const int32_t *samples, unsigned count) {
     int32_t result = 0;
@@ -353,6 +367,22 @@ int main(void) {
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     render_cpu2_mode(2u, 0x01u, 8u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    fm6_init();
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++) {
+        uint8_t enabled=(uint8_t)(patch==0u);
+        fm6_patch_set_enabled(patch,enabled);
+        fm6_patch_set_level(patch,enabled?31u:0u);
+    }
+    fm6_test_set_cpu2_mode(1u);
+    fm6_cpu2_disable(); /* same DSP state reached after startup self-test failure */
+    for(unsigned note=0u;note<8u;note++)
+        fm6_note_on_mask((uint8_t)(48u+note*3u),(uint8_t)(92u-note*4u),0x01u);
+    fm6_render(chunk_b,TEST_FRAMES,4096u);
+    assert(fm6_cpu2_split_is_disabled());
+    assert(fm6_cpu2_dispatch_count()==0u);
+    assert(fm6_cpu2_quantum_count()==0u);
+    assert(fm6_cpu2_fallback_count()==4u);
+    assert(memcmp(chunk_a,chunk_b,TEST_WORDS*sizeof(int32_t))==0);
 
     /* One four-layer Instrument (not two sequencer Instruments or a sampler):
      * eight notes fan out to 32 active FM voices, split 16/16. */
@@ -863,6 +893,8 @@ int main(void) {
     assert(stress_peak > 0u);
     assert(fm6_test_output_peak() <= 7470000u);
     assert(fm6_test_limiter_events() > 0u);
+    assert(fm6_pre_limiter_peak_q23() >= fm6_test_output_peak());
+    assert(fm6_limiter_reduction_q15() > 0u);
     assert(stereo_frames > 0u); /* chorus is actually contributing stereo output */
     assert(fm6_sequencer_step() > 0u);
     fm6_panic();
