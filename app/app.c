@@ -1316,6 +1316,7 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
 #ifdef PLAT_HOST
 static uint32_t app_host_input_failures, app_host_render_callbacks;
 static uint8_t app_host_event_test_active, app_host_event_trace_count;
+static uint8_t app_host_home_refusal_layout;
 static uint8_t app_host_name_migration_pass, app_host_name_migration_stage;
 static uint8_t app_host_event_trace[3];
 static uint32_t app_host_event_callback[3], app_host_event_start_callback;
@@ -4395,6 +4396,14 @@ static void draw(void)
             text_cat(t,"PRE: INST");
         }
         cv_text_fit(6,4,&FONT_XS,t,C_PEWTER,52);
+#ifdef PLAT_HOST
+        /* The HOME refusal test requires both independent UI regions in one draw:
+         * LOAD BUSY / TRACK NOT CHANGED in the header, PRE: INST in this strip. */
+        if(ui.msg_until && (int32_t)(ui.msg_until-plat_ms())>0 &&
+           !fm1lab_strcmp(ui.msg[0],"LOAD BUSY") &&
+           !fm1lab_strcmp(ui.msg[1],"TRACK NOT CHANGED"))
+            app_host_home_refusal_layout=1u;
+#endif
     }
     {
         char diag[48], number[12];
@@ -4549,6 +4558,8 @@ int app_expect(const char *what, int *got)
         *got = instrument_apply_pending;
     else if (!fm1lab_strcmp(what, "resync"))
         *got = app_host_resync_pass;
+    else if (!fm1lab_strcmp(what, "home_refusal_layout"))
+        *got = app_host_home_refusal_layout;
 #ifdef PLAT_HOST
     else if (!fm1lab_strcmp(what, "eventbudget"))
         *got = app_host_event_test_active && app_host_event_trace_count==3u &&
@@ -4656,6 +4667,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         return 1;
     }
     if(!fm1lab_strcmp(cmd,"fm1lab_pending_test")) {
+        app_host_home_refusal_layout=0u;
         instrument_apply_pending=1u;
         return 1;
     }
