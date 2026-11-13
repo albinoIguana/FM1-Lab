@@ -2324,32 +2324,21 @@ void app_init(void)
     }
     for (uint32_t bank = 0; bank < FM1LAB_STORE_BANK_COUNT; ++bank) {
         int size = plat_store_size(OBJ_INSTRUMENTS0 + bank);
-        /* Only a genuinely absent object may be initialized automatically.
-         * A present but malformed bank is user data: leave it untouched so a
-         * CRC/read failure cannot silently factory-reset eight Instruments. */
-        if (size < 0) {
-            (void)fm1lab_store_library_format_bank(bank, &factory_instrument);
+        /* The previous 3,840-byte inline-Instrument format is intentionally
+         * replaced, not migrated. New-format records are independently addressed
+         * patches; malformed records that claim this format remain untouched. */
+        if (size < 0 || size == 3840 || size == (int)sizeof(fm1lab_instrument_t)) {
+            if (fm1lab_store_library_format_bank(bank, &factory_instrument) != 0)
+                app_say("PATCH BANK", "FORMAT FAILED");
             continue;
         }
-        if (size == 3840) {
-            if (fm1lab_store_library_load(bank * 8u, &startup_instrument_scratch) != 0)
-                app_say("BANK ERROR", "DATA PRESERVED");
+        if (size == (int)FM1LAB_STORE_PATCH_BANK_BYTES) {
+            if (fm1lab_store_library_load(bank * FM1LAB_STORE_INSTRUMENTS_PER_BANK,
+                                          &startup_instrument_scratch) != 0)
+                app_say("PATCH BANK", "DATA INVALID");
             continue;
         }
-        if (bank < 3u && size == (int)sizeof(fm1lab_instrument_t)) {
-            if (plat_store_load(OBJ_INSTRUMENTS0 + bank, &startup_instrument_scratch, sizeof startup_instrument_scratch) ==
-                    (int)sizeof startup_instrument_scratch && fm1lab_instrument_valid(&startup_instrument_scratch)) {
-                /* V1's final voice byte was only a 63 sentinel, not pan. */
-                for (uint32_t p=0; p<FM1LAB_PATCH_COUNT; ++p)
-                    fm1lab_patch_set_pan(&startup_instrument_scratch,p,64u);
-                if (!fm1lab_store_library_format_bank(bank, &factory_instrument))
-                    (void)fm1lab_store_library_save(bank, &startup_instrument_scratch);
-                continue;
-            }
-        }
-        /* Unexpected non-empty object sizes are not blank storage. Preserve
-         * them for recovery rather than replacing them with factory data. */
-        app_say("BANK ERROR", "DATA PRESERVED");
+        app_say("PATCH BANK", "UNKNOWN FORMAT");
     }
     /* Replace only untouched factory placeholders; edited Instruments survive. */
     fm1lab_seed_factory_library();
