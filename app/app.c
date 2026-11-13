@@ -4401,7 +4401,7 @@ static void draw(void)
          * LOAD BUSY / TRACK NOT CHANGED in the header, PRE: INST in this strip. */
         if(ui.msg_until && (int32_t)(ui.msg_until-plat_ms())>0 &&
            !fm1lab_strcmp(ui.msg[0],"LOAD BUSY") &&
-           !fm1lab_strcmp(ui.msg[1],"TRACK NOT CHANGED"))
+           !fm1lab_strcmp(ui.msg[1],"PRESET NOT CHANGED"))
             app_host_home_refusal_layout=1u;
 #endif
     }

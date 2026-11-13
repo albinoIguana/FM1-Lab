@@ -111,11 +111,11 @@ wait 40
 # and publish both refusal lines while the pending flag remains set.
 fm1lab_pending_test
 listen
-spin SELECT 1
+spin PRESET 1
 wait 30
 expect lane 0
 expect pending 1
-said LOAD BUSY TRACK NOT CHANGED
+said LOAD BUSY PRESET NOT CHANGED
 expect home_refusal_layout 1
 fm1lab_pending_clear
 expect pending 0
