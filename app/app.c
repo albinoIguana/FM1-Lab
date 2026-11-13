@@ -127,7 +127,7 @@ enum { PAGE_HOME = 0, PAGE_MACRO, PAGE_GLOBAL, PAGE_OPERATOR_MAP, PAGE_ENV, PAGE
 _Static_assert((unsigned)PAGE_HOME == (unsigned)FM1LAB_INPUT_PAGE_HOME &&
                (unsigned)PAGE_SEQ == (unsigned)FM1LAB_INPUT_PAGE_SEQ &&
                (unsigned)PAGE_SEQ_OPTIONS == (unsigned)FM1LAB_INPUT_PAGE_SEQ_OPTIONS &&
-               (unsigned)PAGE_COUNT == (unsigned)FM1LAB_INPUT_PAGE_COUNT,
+               (unsigned)PAGE_DIAG == (unsigned)FM1LAB_INPUT_PAGE_COUNT,
                "input router page values must match app pages");
 _Static_assert((unsigned)EN_SELECT == (unsigned)FM1LAB_ENCODER_SELECT,
                "SELECT encoder ID must match the physical-control map");
