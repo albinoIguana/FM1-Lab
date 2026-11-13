@@ -78,6 +78,7 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
     instrument->version = FM1LAB_INSTRUMENT_VERSION;
     copy_name(instrument->name, sizeof instrument->name, name);
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        instrument->patch_ids[p] = (uint8_t)p;
         for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             instrument->patches[p].macros[m] = 50;
         instrument->patches[p].enabled = 1;
@@ -142,6 +143,7 @@ int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
     }
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const fm1lab_patch_t *patch = &instrument->patches[p];
+        if (instrument->patch_ids[p] >= FM1LAB_PATCH_ID_COUNT) return 0;
         if (patch->enabled > 1 || patch->level > 127 ||
             patch->octave < -4 || patch->octave > 4 ||
             patch->fine_cents < -100 || patch->fine_cents > 100 ||
