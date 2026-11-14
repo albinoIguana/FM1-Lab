@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "fm1lab_synth_engines.h"
+#include "fm1lab_fm4.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
@@ -56,6 +57,31 @@ int main(void)
         double ns_per_sample = (double)elapsed[TRIALS / 2u] / samples;
         printf("engine=%u voices=%u frames=%u blocks/trial=%u trials=%u median_ns/sample=%.2f Msamples/s=%.2f checksum=%llu\n",
                engine, VOICES, FRAMES, BLOCKS, TRIALS, ns_per_sample,
+               1000.0 / ns_per_sample, (unsigned long long)checksum_sink);
+    }
+    {
+        fm1lab_fm4_voice_t fm4_voices[VOICES];
+        int16_t fm4_output[VOICES][FRAMES];
+        uint64_t elapsed[TRIALS];
+        for (uint32_t trial = 0; trial < TRIALS; ++trial) {
+            for (uint32_t voice = 0; voice < VOICES; ++voice) {
+                fm1lab_fm4_init(&fm4_voices[voice]);
+                fm1lab_fm4_note_on(&fm4_voices[voice], (uint8_t)(48u + voice * 3u), 100u, 0u);
+            }
+            uint64_t start = monotonic_ns();
+            for (uint32_t block = 0; block < BLOCKS; ++block) {
+                for (uint32_t voice = 0; voice < VOICES; ++voice) {
+                    (void)fm1lab_fm4_render(&fm4_voices[voice], fm4_output[voice], FRAMES);
+                    checksum_sink += (uint16_t)fm4_output[voice][block % FRAMES];
+                }
+            }
+            elapsed[trial] = monotonic_ns() - start;
+        }
+        sort_u64(elapsed, TRIALS);
+        double samples = (double)BLOCKS * VOICES * FRAMES;
+        double ns_per_sample = (double)elapsed[TRIALS / 2u] / samples;
+        printf("engine=FM4 voices=%u frames=%u blocks/trial=%u trials=%u median_ns/sample=%.2f Msamples/s=%.2f checksum=%llu\\n",
+               VOICES, FRAMES, BLOCKS, TRIALS, ns_per_sample,
                1000.0 / ns_per_sample, (unsigned long long)checksum_sink);
     }
     return 0;
