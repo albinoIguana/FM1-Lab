@@ -20,6 +20,7 @@
 #include "fm1lab_dx7_legacy_data.h"
 #include "../firmware/fm1lab_physical_controls.h"
 #include "fm1lab_preset_control.h"
+#include "fm1lab_dx7_preset.c"
 #include "fm1lab_input_route.h"
 #include "fm1lab_input_dispatch.h"
 #include "fm1lab_pending_watch.h"
