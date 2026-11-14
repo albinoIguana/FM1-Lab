@@ -384,12 +384,18 @@ int main(void) {
     assert(fm6_cpu2_fallback_count()==4u);
     assert(memcmp(chunk_a,chunk_b,TEST_WORDS*sizeof(int32_t))==0);
 
-    /* One four-layer Instrument (not two sequencer Instruments or a sampler):
-     * eight notes fan out to 32 active FM voices, split 16/16. */
+    /* One four-slot Instrument: eight notes fan out to 32 mixed-engine voices,
+     * split 16/16. Every engine state must survive CPU2 backup/rollback. */
     render_cpu2_mode(0u, 0x0fu, 32u, chunk_a);
     render_cpu2_mode(1u, 0x0fu, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     render_cpu2_mode(2u, 0x0fu, 32u, chunk_b);
+    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    /* The second sequencer bank has the same fixed engine order. */
+    render_cpu2_mode(0u, 0xf0u, 32u, chunk_a);
+    render_cpu2_mode(1u, 0xf0u, 32u, chunk_b);
+    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    render_cpu2_mode(2u, 0xf0u, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
 
     /* A single 128-frame equality check is too short to catch state drift
@@ -534,20 +540,35 @@ int main(void) {
     uint64_t four_patch_peak = render_stack_patch_peak(0x0Fu, &four_dry_peak);
     assert(single_patch_peak > 0u);
     assert(four_patch_peak == single_patch_peak);
-    /* Four identical patch buses add linearly before the output clipper.
-     * This avoids mistaking the old final soft clip for mixer headroom. */
-    assert(four_dry_peak == single_dry_peak * 4u);
-    printf("FM6 gain reference: one-patch=%llu four-patch=%llu\n",
-           (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak);
-    assert(four_dry_peak > (uint64_t)(1u << 24) * 98u / 100u);
-    assert(four_dry_peak < (uint64_t)(1u << 24) * 102u / 100u);
-    printf("FM6 calibrated reference: one-patch=%llu four-patch=%llu output=%llu\n",
-           (unsigned long long)single_dry_peak, (unsigned long long)four_dry_peak,
-           (unsigned long long)fm6_test_output_peak());
-    /* The master trim is now unity. Four factory layers at their safe 24.4%
-     * patch level should approach the final limiter ceiling, not sit 12 dB low. */
+    /* Patch 1 remains the existing six-operator FM6 reference. Its dry
+     * calibration is unchanged even though slots 2–4 now use other engines. */
+    assert(single_patch_peak > 0u);
+    assert(single_dry_peak > (uint64_t)(1u << 22) * 98u / 100u);
+    assert(single_dry_peak < (uint64_t)(1u << 22) * 102u / 100u);
+    printf("FM6 patch-1 calibration: dry=%llu\n",
+           (unsigned long long)single_dry_peak);
+
+    /* The limiter still sees the same FM6 signal path at full patch level.
+     * One full-level FM6 patch is approximately the old four x 24.4% stack. */
+    fm6_init();
+    for (unsigned patch = 1u; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
+        fm6_patch_set_enabled((uint8_t)patch, 0u);
+    fm6_patch_set_level(0u, 127u);
+    fm6_note_on_mask(60u, 110u, 0x01u);
+    fm6_render(output, TEST_FRAMES, 4096u);
     assert(fm6_test_output_peak() > 8388607u * 86u / 100u);
     assert(fm6_test_output_peak() <= 7470000u);
+
+    /* Every physical slot, in both sequencer banks, must render through its
+     * assigned engine and contribute a nonzero signal to the shared bus. */
+    for (unsigned patch = 0u; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
+        fm6_init();
+        for (unsigned other = 0u; other < FM6_ENGINE_PATCH_COUNT; ++other)
+            if (other != patch) fm6_patch_set_enabled((uint8_t)other, 0u);
+        fm6_note_on_mask(60u, 110u, (uint8_t)(1u << patch));
+        fm6_render(output, TEST_FRAMES, 4096u);
+        assert(fm6_test_patch_peak(patch) > 0u);
+    }
 
     /* At the reference level, all four parallel FX buses must retain their
      * headroom over sustained feedback without any internal Q23 saturation. */
