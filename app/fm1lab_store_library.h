@@ -45,7 +45,9 @@ enum fm1lab_store_format_stage {
 enum fm1lab_store_format_stage fm1lab_store_library_last_format_stage(void);
 
 /* Four 32-patch banks (IDs 0..127) and one Instrument directory. Each Instrument
- * owns four stable patch IDs: instrument_index*4 + slot. Factory-preset selection
+ * owns four stable patch IDs: instrument_index*4 + slot, with fixed slot roles
+ * FM6 / wavetable / PSG / subtractive. The role is derived, not serialized.
+ * Factory-preset selection
  * copies into those IDs; switching Instruments never resets their saved patch data. */
 int fm1lab_store_library_load(unsigned index, fm1lab_instrument_t *out);
 int fm1lab_store_library_save(unsigned index, const fm1lab_instrument_t *instrument);

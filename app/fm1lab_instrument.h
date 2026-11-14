@@ -12,6 +12,10 @@
 #define FM1LAB_INSTRUMENT_NAME_BYTES 24u
 #define FM1LAB_MACRO_COUNT 4u
 
+/* The known-good Instrument remains four independent patch records. Engine
+ * identity is fixed by slot (FM6 / wavetable / PSG / subtractive), not stored
+ * per preset, so the v1 flash and save formats remain compatible. */
+
 enum fm1lab_macro {
     FM1LAB_BRIGHTNESS,
     FM1LAB_BODY,

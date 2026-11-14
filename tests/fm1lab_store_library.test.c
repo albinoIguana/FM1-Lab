@@ -75,6 +75,8 @@ static void make_instrument(fm1lab_instrument_t *in,const char *name,unsigned se
             q[16]=(uint8_t)(70u+seed);q[17]=1;q[18]=14;q[19]=77;q[20]=4;
         }
         for(unsigned i=126;i<156;i++)v[i]=(uint8_t)(i%90u);
+        v[145]=(uint8_t)('A'+p);
+        for(unsigned n=1u;n<FM1LAB_PATCH_NAME_BYTES;n++)v[145u+n]=' ';
         v[134]=(uint8_t)(p+2u);v[135]=(uint8_t)(p+1u);
         v[136]=1;v[141]=1;v[142]=4;v[143]=6;v[155]=(uint8_t)(20u+p*30u);
         in->patches[p].voice[155]=(uint8_t)(20u+p*30u);
@@ -98,6 +100,9 @@ int main(void)
         for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++)
             assert(loaded.patch_ids[p]==(uint8_t)(i*4u+p));
     }
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+    for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++)
+        assert(loaded.patches[p].voice[145u]==(uint8_t)('A'+p));
 
     /* Exercise the same route + dispatcher used by app.c, ending in the
      * production store loader rather than a mocked successful callback. */

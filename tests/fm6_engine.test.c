@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "fm6.h"
+#include "../app/dsp/fm1lab_instrument_engine_map.h"
 #include "../app/fm1lab_sequencer_record.h"
 enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
 static int32_t output[TEST_WORDS];
@@ -358,6 +359,16 @@ static void test_two_resident_instrument_banks(void)
 }
 
 int main(void) {
+    assert(fm1lab_patch_engine_for_context(0u)==FM1LAB_PATCH_ENGINE_FM6);
+    assert(fm1lab_patch_engine_for_context(1u)==FM1LAB_PATCH_ENGINE_WAVETABLE);
+    assert(fm1lab_patch_engine_for_context(2u)==FM1LAB_PATCH_ENGINE_PSG);
+    assert(fm1lab_patch_engine_for_context(3u)==FM1LAB_PATCH_ENGINE_SUBTRACTIVE);
+    assert(fm1lab_patch_engine_for_context(4u)==FM1LAB_PATCH_ENGINE_FM6);
+    assert(fm1lab_patch_engine_for_context(5u)==FM1LAB_PATCH_ENGINE_WAVETABLE);
+    assert(fm1lab_patch_engine_for_context(6u)==FM1LAB_PATCH_ENGINE_PSG);
+    assert(fm1lab_patch_engine_for_context(7u)==FM1LAB_PATCH_ENGINE_SUBTRACTIVE);
+    assert(fm1lab_patch_engine_for_context(8u)==FM1LAB_PATCH_ENGINE_INVALID);
+
     test_two_resident_instrument_banks();
     /* A single patch's active voices split across the cores, not by fixed
      * patch index. A partial worker failure must restore state before fallback. */

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Fixed-point candidate engines for FM1-Lab mixed-synthesis evaluation.
- * Standalone prototype: not yet wired into the live FM6 voice allocator.
+ * Fixed-slot lightweight engines used by the live FM6 voice allocator.
  */
 #include "fm1lab_synth_engines.h"
 

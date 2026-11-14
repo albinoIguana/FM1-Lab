@@ -137,3 +137,12 @@ The fixed map is now active in the FM6 wrapper. Each voice pool is homogeneous b
 The voice state is a copy-safe union of the existing 244-byte FM6 note and the lightweight voice state, plus a separate DC-blocker accumulator for lightweight engines. The CPU2 backup/rollback copies the complete voice object, so engine state and DC history roll back together. The active-voice list remains dynamically packed before CPU0/CPU2 splitting. The lightweight render path converts Q15 samples into the existing FM6 Q24 patch-mix domain and retains the shared patch gain, fade, pan/send, FX, and master path.
 
 The wavetable/PSG/subtractive engines accept Q8-semitone pitch updates; pitch bend, per-voice tuning, patch transpose, octave, and fine cents update phase increments without resetting oscillator phases. No persistent engine selector or preset-format field was added. The native FM6 test harness exercises the mixed slots through the existing all-patch and CPU2 split/fallback paths; passing CI is still required before treating this integration as validated.
+
+
+## Known-good Instrument structure retained
+
+The mixed-engine branch keeps the existing FM1-Lab Instrument/library model unchanged: four banks of eight Instruments (32 total), four stable patch IDs per Instrument, and two independently resident sequencer-track Instruments. Each Instrument still carries four independent patch records with its existing name, macro values, enabled/level, pan and tuning state. PRESETS retains its existing mode behavior: without a focused HOME card it selects the complete Instrument; with a focused card it selects that patch only.
+
+The physical engine role is derived from the four patch-slot positions and is not a serialized selector: slot 1 is six-operator FM6, slot 2 fixed-point wavetable, slot 3 PSG pulse/noise, and slot 4 two-oscillator subtractive. This intentionally preserves the known-good v1 Instrument structure, 32-slot library, stable patch IDs, pooled flash layout, and CRC-protected persistence. DX7 voice preset replacement and the six-operator operator/EG editor are restricted to slot 1; the other three slots cannot accidentally have their engine-specific identity replaced by a DX7 voice. Legacy DX7 payload bytes in those slots remain intact for compatibility, but are not treated as their synthesis engine.
+
+Native regression coverage asserts the fixed engine map in both sequencer banks and round-trips independent names in all four stored patch records. No flash schema migration is introduced.
