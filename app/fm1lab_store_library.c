@@ -21,6 +21,10 @@ _Static_assert(PATCH_BANK_HEADER + PATCH_RECORDS_BYTES == PATCH_BANK_BYTES, "Pat
 _Static_assert(META_TOTAL_BYTES == FM1LAB_STORE_METADATA_BYTES, "Instrument directory size mismatch");
 _Static_assert(META_TOTAL_BYTES <= 3840u, "Instrument directory exceeds pooled object capacity");
 
+static enum fm1lab_store_load_stage last_load_stage;
+enum fm1lab_store_load_stage fm1lab_store_library_last_load_stage(void)
+{ return last_load_stage; }
+
 static PLAT_POOL uint8_t bank_work[PATCH_BANK_BYTES];
 static PLAT_POOL uint8_t meta_work[META_TOTAL_BYTES];
 static PLAT_POOL uint8_t meta_snapshot_work[META_SNAPSHOT_BYTES];
@@ -122,11 +126,13 @@ static int patch_bank_valid(const uint8_t *bank,unsigned bank_index)
 }
 static int patch_bank_load(unsigned bank)
 {
-    if(bank>=FM1LAB_STORE_BANK_COUNT)return -1;
+    if(bank>=FM1LAB_STORE_BANK_COUNT){last_load_stage=FM1LAB_STORE_LOAD_PATCH_IDS;return -1;}
     uint32_t object=OBJ_INSTRUMENTS0+bank;
-    if(plat_store_size(object)!=(int)PATCH_BANK_BYTES)return -1;
+    if(plat_store_size(object)!=(int)PATCH_BANK_BYTES){last_load_stage=FM1LAB_STORE_LOAD_BANK_SIZE;return -1;}
     int n=plat_store_load(object,bank_work,sizeof bank_work);
-    return n==(int)PATCH_BANK_BYTES && patch_bank_valid(bank_work,bank)?0:-1;
+    if(n!=(int)PATCH_BANK_BYTES){last_load_stage=FM1LAB_STORE_LOAD_BANK_READ;return -1;}
+    if(!patch_bank_valid(bank_work,bank)){last_load_stage=FM1LAB_STORE_LOAD_BANK_DATA;return -1;}
+    return 0;
 }
 static int patch_bank_save(unsigned bank)
 {
@@ -212,11 +218,12 @@ static void meta_snapshot_init(uint8_t *snapshot)
 }
 static int meta_snapshot_load(void)
 {
-    if(plat_store_size(OBJ_INSERTS)!=(int)META_TOTAL_BYTES)return -1;
+    if(plat_store_size(OBJ_INSERTS)!=(int)META_TOTAL_BYTES){last_load_stage=FM1LAB_STORE_LOAD_META_SIZE;return -1;}
     int n=plat_store_load(OBJ_INSERTS,meta_work,sizeof meta_work);
-    if(n!=(int)META_TOTAL_BYTES || !meta_header_valid(meta_work))return -1;
+    if(n!=(int)META_TOTAL_BYTES){last_load_stage=FM1LAB_STORE_LOAD_META_READ;return -1;}
+    if(!meta_header_valid(meta_work)){last_load_stage=FM1LAB_STORE_LOAD_META_HEADER;return -1;}
     const uint8_t *snapshot=meta_work+META_HEADER_BYTES;
-    if(!meta_snapshot_valid(snapshot))return -1;
+    if(!meta_snapshot_valid(snapshot)){last_load_stage=FM1LAB_STORE_LOAD_META_CRC;return -1;}
     bytes_copy(meta_snapshot_work,snapshot,META_SNAPSHOT_BYTES);
     return 0;
 }
@@ -258,23 +265,25 @@ static int meta_load_instrument(unsigned index,fm1lab_instrument_t *out,
     for(unsigned n=0;n<FM1LAB_INSTRUMENT_NAME_BYTES;n++)out->name[n]=(char)r[n];
     for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
         uint8_t id=r[FM1LAB_INSTRUMENT_NAME_BYTES+p];
-        if(id>=FM1LAB_PATCH_ID_COUNT || id!=(uint8_t)(index*4u+p))return -1;
+        if(id>=FM1LAB_PATCH_ID_COUNT || id!=(uint8_t)(index*4u+p)){last_load_stage=FM1LAB_STORE_LOAD_PATCH_IDS;return -1;}
         out->patch_ids[p]=id;
     }
     bytes_copy(inserts,r+FM1LAB_INSTRUMENT_NAME_BYTES+FM1LAB_PATCH_COUNT,sizeof *inserts);
-    return fm1lab_insert_state_valid(inserts)?0:-1;
+    if(!fm1lab_insert_state_valid(inserts)){last_load_stage=FM1LAB_STORE_LOAD_INSERTS;return -1;}
+    return 0;
 }
 
 int fm1lab_store_library_load_full(unsigned index,fm1lab_instrument_t *out,
                                    fm1lab_insert_state_t *inserts)
 {
-    if(index>=FM1LAB_STORE_INSTRUMENT_COUNT || !out || !inserts)return -1;
+    last_load_stage=FM1LAB_STORE_LOAD_OK;
+    if(index>=FM1LAB_STORE_INSTRUMENT_COUNT || !out || !inserts){last_load_stage=FM1LAB_STORE_LOAD_BAD_ARGUMENT;return -1;}
     fm1lab_instrument_init(out,"");
     if(meta_load_instrument(index,out,inserts)!=0)return -1;
     /* Resolve the four stored one-byte IDs to their physical patch records. */
     unsigned bank=(unsigned)out->patch_ids[0]/FM1LAB_STORE_PATCHES_PER_BANK;
     for(unsigned p=1;p<FM1LAB_PATCH_COUNT;p++)
-        if((unsigned)out->patch_ids[p]/FM1LAB_STORE_PATCHES_PER_BANK!=bank)return -1;
+        if((unsigned)out->patch_ids[p]/FM1LAB_STORE_PATCHES_PER_BANK!=bank){last_load_stage=FM1LAB_STORE_LOAD_PATCH_IDS;return -1;}
     if(patch_bank_load(bank)!=0)return -1;
     for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
         unsigned patch_slot=(unsigned)out->patch_ids[p]%FM1LAB_STORE_PATCHES_PER_BANK;
@@ -282,7 +291,9 @@ int fm1lab_store_library_load_full(unsigned index,fm1lab_instrument_t *out,
         out->patches[p].octave=inserts->patch_octave[p];
         out->patches[p].fine_cents=inserts->patch_fine_cents[p];
     }
-    return fm1lab_instrument_valid(out)?0:-1;
+    if(!fm1lab_instrument_valid(out)){last_load_stage=FM1LAB_STORE_LOAD_INSTRUMENT;return -1;}
+    last_load_stage=FM1LAB_STORE_LOAD_OK;
+    return 0;
 }
 int fm1lab_store_library_load(unsigned index,fm1lab_instrument_t *out)
 {
