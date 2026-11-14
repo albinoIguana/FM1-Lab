@@ -2,17 +2,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include "../base/include/plat.h"
+#include "../app/app.h"
+#include "../app/fm1lab_store_library.h"
 
 static uint8_t nor_flash[0x100000];
 static int fail_after = -1;
 static unsigned operations;
 
-enum {
-    OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_INSTRUMENTS0,
-    OBJ_INSTRUMENTS1, OBJ_INSTRUMENTS2, OBJ_INSTRUMENTS3,
-    OBJ_INSERTS, OBJ_NOBJ
-};
 #define APP_STORE_MAP {0xEA000u,0xEC000u,0xEE000u,0xF0000u,0xF0000u,0xF0000u,0xF0000u,0xF0000u}
 #define APP_STORE_POOL
 #define APP_STORE_POOL_BASE 0xF0000u
@@ -51,6 +47,10 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
     for (uint32_t i = 0; i < n; ++i) nor_flash[off + i] &= p[i];
     return 0;
 }
+
+int plat_store_size(uint32_t obj) { return st_size(obj); }
+int plat_store_load(uint32_t obj, void *dst, uint32_t max) { return st_load(obj, dst, max); }
+int plat_store_save(uint32_t obj, const void *src, uint32_t len) { return st_save(obj, src, len); }
 static void fill(uint8_t *p, uint32_t n, uint8_t seed)
 {
     for (uint32_t i = 0; i < n; ++i) p[i] = (uint8_t)(seed + i * 13u);
@@ -117,5 +117,36 @@ int main(void)
 
     assert(st_pool_room() >= 0);
     puts("FM1-Lab actual 12-sector flash-pool tests passed.");
+
+    /* Full startup-format/reload integration: use the real production
+     * storage pool and the real Instrument library together, not a fake
+     * plat_store implementation. This is the first-boot path used by app_init. */
+    memset(nor_flash, 0xFF, sizeof nor_flash);
+    fm1lab_instrument_t factory, loaded;
+    fm1lab_insert_state_t inserts;
+    fm1lab_instrument_init(&factory, "FACTORY");
+    assert(fm1lab_instrument_valid(&factory));
+    for (uint32_t bank_index = 0u; bank_index < FM1LAB_STORE_BANK_COUNT; ++bank_index)
+        assert(fm1lab_store_library_format_bank(bank_index, &factory) == 0);
+    assert(st_size(OBJ_INSERTS) == (int)FM1LAB_STORE_METADATA_BYTES);
+    for (uint32_t index = 0u; index < FM1LAB_STORE_INSTRUMENT_COUNT; ++index) {
+        assert(fm1lab_store_library_load_full(index, &loaded, &inserts) == 0);
+        assert(fm1lab_instrument_valid(&loaded));
+        assert(fm1lab_store_library_last_load_stage() == FM1LAB_STORE_LOAD_OK);
+    }
+
+    /* Factory seeding rewrites many Instruments across the shared five-object
+     * pool. Metadata must remain discoverable after pool sector recycling. */
+    for (uint32_t index = 0u; index < FM1LAB_STORE_INSTRUMENT_COUNT; ++index) {
+        assert(fm1lab_store_library_load_full(index, &loaded, &inserts) == 0);
+        loaded.patches[0].macros[0] = (uint8_t)(index % 101u);
+        assert(fm1lab_store_library_save_full(index, &loaded, &inserts) == 0);
+    }
+    assert(st_pool_boot() == 0);
+    for (uint32_t index = 0u; index < FM1LAB_STORE_INSTRUMENT_COUNT; ++index) {
+        assert(fm1lab_store_library_load_full(index, &loaded, &inserts) == 0);
+        assert(loaded.patches[0].macros[0] == (uint8_t)(index % 101u));
+    }
+    puts("FM1-Lab production Instrument library + real flash-pool startup/reload tests passed.");
     return 0;
 }
