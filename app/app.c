@@ -4385,18 +4385,18 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
 {
     (void)a;(void)b;(void)c;(void)d;
     if(!fm1lab_strcmp(cmd,"fm1lab_rom_fallback_test")) {
-        fm1lab_instrument_t rom_instrument;
+        fm1lab_instrument_t rom_instrument,expected_instrument;
         fm1lab_insert_state_t rom_inserts;
         uint8_t rom_fallback=0u;
-        char patch_name[FM1LAB_PATCH_NAME_BYTES+1u];
         app_host_rom_fallback_pass=0u;
         app_host_force_meta_lookup_failure=1u;
         int result=instrument_load_record(0u,&rom_instrument,&rom_inserts,&rom_fallback);
         app_host_force_meta_lookup_failure=0u;
-        app_host_rom_fallback_pass=(uint8_t)(result==0 && rom_fallback &&
-            fm1lab_strcmp(rom_instrument.name,fm1lab_dx7_instrument_names[0])==0 &&
-            fm1lab_voice_name_get(rom_instrument.patches[0].voice,patch_name)==0 &&
-            fm1lab_strcmp(patch_name,"JH.SUSBS 1")==0);
+        int expected=fm1lab_seed_dx7_instrument(0u,&expected_instrument);
+        app_host_rom_fallback_pass=(uint8_t)(result==0 && expected==0 && rom_fallback &&
+            memcmp(rom_instrument.name,expected_instrument.name,sizeof rom_instrument.name)==0 &&
+            memcmp(rom_instrument.patches[0].voice,expected_instrument.patches[0].voice,
+                   FM1LAB_PATCH_BYTES)==0);
         return 1;
     }
     if(!fm1lab_strcmp(cmd,"fm1lab_track_cache_test")) {
