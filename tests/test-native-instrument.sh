@@ -111,3 +111,8 @@ bash "$ROOT/tests/test-store-library.sh"
 # Run fm1-base's native test against the exact pinned production storage.c pool implementation.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function "$ROOT/base/tests/storage_pool_test.c" -o "$CONTROLS_BIN"
 "$CONTROLS_BIN"
+
+# Exercise the pinned storage.c pool with FM1-Lab's exact object IDs and 12-sector layout.
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -I"$ROOT/base/include" \
+  "$ROOT/tests/fm1lab_flash_pool.test.c" -o "$CONTROLS_BIN"
+"$CONTROLS_BIN"
