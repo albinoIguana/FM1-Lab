@@ -12,6 +12,27 @@ static int fail_obj=-1;
 static int fail_size_obj=-1;
 static int fail_load_obj=-1;
 
+static uint16_t test_crc16(const uint8_t *p, unsigned n)
+{
+    uint16_t crc=0xffffu;
+    while(n--) {
+        crc ^= (uint16_t)((uint16_t)*p++ << 8);
+        for(unsigned b=0;b<8;b++) {
+            uint16_t shifted=(uint16_t)(crc << 1);
+            if(crc & 0x8000u) shifted ^= 0x1021u;
+            crc=shifted;
+        }
+    }
+    return crc;
+}
+static void reseal_metadata_snapshot(void)
+{
+    unsigned data_bytes=FM1LAB_STORE_METADATA_BYTES-12u-2u;
+    uint16_t crc=test_crc16(objects[4]+12u,data_bytes);
+    objects[4][FM1LAB_STORE_METADATA_BYTES-2u]=(uint8_t)crc;
+    objects[4][FM1LAB_STORE_METADATA_BYTES-1u]=(uint8_t)(crc>>8);
+}
+
 int plat_store_size(uint32_t obj) {
     if((int)obj==fail_size_obj)return -1;
     if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || !present[obj-OBJ_INSTRUMENTS0]) return -1;
@@ -151,6 +172,33 @@ int main(void)
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
     assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_READ);
     fail_load_obj=-1;
+
+    /* Header, snapshot CRC, patch references and insert sidecar validation
+     * each fail at their own boundary rather than collapsing into LOAD FAILED. */
+    uint8_t saved_meta[FM1LAB_STORE_METADATA_BYTES];
+    memcpy(saved_meta,objects[4],sizeof saved_meta);
+    objects[4][0]^=1u;
+    assert(fm1lab_store_library_load(0u,&loaded)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_HEADER);
+    memcpy(objects[4],saved_meta,sizeof saved_meta);
+    objects[4][100]^=1u;
+    assert(fm1lab_store_library_load(0u,&loaded)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_CRC);
+    memcpy(objects[4],saved_meta,sizeof saved_meta);
+    objects[4][12u+FM1LAB_INSTRUMENT_NAME_BYTES]=127u;
+    reseal_metadata_snapshot();
+    assert(fm1lab_store_library_load(0u,&loaded)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_PATCH_IDS);
+    memcpy(objects[4],saved_meta,sizeof saved_meta);
+    objects[4][12u+FM1LAB_INSTRUMENT_NAME_BYTES+FM1LAB_PATCH_COUNT]=2u;
+    reseal_metadata_snapshot();
+    assert(fm1lab_store_library_load(0u,&loaded)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_INSERTS);
+    memcpy(objects[4],saved_meta,sizeof saved_meta);
+    assert(fm1lab_store_library_load_full(FM1LAB_STORE_INSTRUMENT_COUNT,&loaded,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BAD_ARGUMENT);
+    assert(fm1lab_store_library_load_full(0u,0,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BAD_ARGUMENT);
 
     /* CRC damage is reported; it is not silently replaced by factory data. */
     objects[0][100]^=1u;
