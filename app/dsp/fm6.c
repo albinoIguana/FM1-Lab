@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #endif
 #include "fm6.h"
+#include "fm1lab_instrument_engine_map.h"
+#include "fm1lab_synth_engines.h"
 #include "felucca_tables.h"
 #include "felucca_fm6.h"
 
@@ -105,8 +107,14 @@ typedef struct {
     uint8_t ready;
 } fm1lab_patch_t;
 
+typedef union {
+    fm6_note_t fm6;
+    fm1lab_synth_voice_t synth;
+} fm1lab_voice_state_t;
+
 typedef struct {
-    fm6_note_t state;
+    fm1lab_voice_state_t state;
+    int32_t synth_dc;
     uint32_t age;
     uint8_t patch;
     uint8_t note;
@@ -1102,7 +1110,26 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
         v->fade_in = 32;
         v->fade_out = 0u;
         v->tune16 = tune16;
-        fm6_note_init(&v->state, p->effective, (int32_t)note + p->effective[FP_TRNSP] - 24, velocity, 1);
+        {
+            fm1lab_patch_engine_t engine = fm1lab_patch_engine_for_context((uint8_t)i);
+            int32_t pitch16 = ((int32_t)note + p->effective[FP_TRNSP] - 24) * 16 + tune16;
+            pitch16 += (int32_t)p->octave * 192;
+            pitch16 += (int32_t)p->fine_cents * 16 / 100;
+            if (engine == FM1LAB_PATCH_ENGINE_FM6) {
+                fm6_note_init(&v->state.fm6, p->effective,
+                              (int32_t)note + p->effective[FP_TRNSP] - 24, velocity, 1);
+            } else {
+                fm1lab_synth_engine_t synth_engine =
+                    engine == FM1LAB_PATCH_ENGINE_WAVETABLE ? FM1LAB_SYNTH_WAVETABLE :
+                    engine == FM1LAB_PATCH_ENGINE_PSG ? FM1LAB_SYNTH_PSG :
+                    FM1LAB_SYNTH_SUBTRACTIVE;
+                fm1lab_synth_init(&v->state.synth, synth_engine);
+                fm1lab_synth_note_on(&v->state.synth, note, velocity);
+                (void)fm1lab_synth_set_pitch(&v->state.synth,
+                    (int16_t)(pitch16 < 0 ? 0 : pitch16 > 127 * 16 ? 127 * 16 : pitch16));
+                v->synth_dc = 0;
+            }
+        }
         fm6_lfo_key(&patch_lfo[i]);
     }
 }
@@ -1159,7 +1186,10 @@ static void fm6_note_off_source(uint8_t note,uint8_t patch_mask,uint16_t source)
         fm1lab_voice_t *v=&voices[i];
         if(v->used && v->note==note && v->source==source && (patch_mask&(1u<<v->patch))) {
             fm1lab_patch_t *p=&instrument[v->patch];
-            fm6_note_key(&v->state,p->effective,0);
+            if (fm1lab_patch_engine_for_context(v->patch) == FM1LAB_PATCH_ENGINE_FM6)
+                fm6_note_key(&v->state.fm6,p->effective,0);
+            else
+                fm1lab_synth_note_off(&v->state.synth);
         }
     }
 }
@@ -1181,7 +1211,10 @@ void fm6_note_off_mask(uint8_t note,uint8_t patch_mask)
         fm1lab_voice_t *v=&voices[i];
         if(v->used && v->note==note && v->source==0u && (patch_mask&(1u<<v->patch))) {
             fm1lab_patch_t *p=&instrument[v->patch];
-            fm6_note_key(&v->state,p->effective,0);
+            if (fm1lab_patch_engine_for_context(v->patch) == FM1LAB_PATCH_ENGINE_FM6)
+                fm6_note_key(&v->state.fm6,p->effective,0);
+            else
+                fm1lab_synth_note_off(&v->state.synth);
         }
     }
 }
@@ -1217,26 +1250,65 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
                                    int64_t patch_mix[PATCHES][FM6_N],
                                    int32_t bus[FM6_N])
 {
+    int16_t synth_out[FM6_N];
     for (uint32_t k = first; k < end; ++k) {
         uint32_t i;
         fm1lab_voice_t *voice = &voices[fm6_voice_work[k]];
         fm1lab_patch_t *patch = &instrument[voice->patch];
-        int32_t pitch, fb;
+        fm1lab_patch_engine_t engine;
         if (!voice->used)
             continue;
-        pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16 + voice->tune16 + pitch_bend_16, 0);
-        /* Q24 log2-frequency offset: octave is exact; cents retain 1-cent resolution. */
-        pitch += (int32_t)patch->octave * (1 << 24);
-        pitch += (int32_t)(((int64_t)patch->fine_cents * (1LL << 24)) / 1200LL);
-        fb = patch->feedback;
-        if (fm6_note_compute(&voice->state, patch->effective, bus,
-                             patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
-                             pitch, patch->effective[FP_ALG], fb, patch->detune, patch->mod_level)) {
-            int32_t dc = voice->state.dc;
+        engine = fm1lab_patch_engine_for_context(voice->patch);
+        if (engine == FM1LAB_PATCH_ENGINE_FM6) {
+            int32_t pitch, fb;
+            pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16 + voice->tune16 + pitch_bend_16, 0);
+            /* Q24 log2-frequency offset: octave is exact; cents retain 1-cent resolution. */
+            pitch += (int32_t)patch->octave * (1 << 24);
+            pitch += (int32_t)(((int64_t)patch->fine_cents * (1LL << 24)) / 1200LL);
+            fb = patch->feedback;
+            if (fm6_note_compute(&voice->state.fm6, patch->effective, bus,
+                                 patch_lfo_value[voice->patch], patch_lfo_delay[voice->patch],
+                                 pitch, patch->effective[FP_ALG], fb, patch->detune, patch->mod_level)) {
+                int32_t dc = voice->state.fm6.dc;
+                uint8_t shedding = voice->fade_out != 0u;
+                for (i = 0; i < FM6_N; i++) {
+                    int32_t x = bus[i] - dc;
+                    dc += x >> 10;
+                    if (voice->fade_in) {
+                        uint32_t gain = 32u - voice->fade_in;
+                        x = (int32_t)(((int64_t)x * gain) >> 5);
+                        voice->fade_in--;
+                    }
+                    if (voice->fade_out) {
+                        x = (int32_t)(((int64_t)x * voice->fade_out) >> 5);
+                        --voice->fade_out;
+                    }
+                    patch_mix[voice->patch][i] += (((int64_t)x * fm6_patch_gain_q15[voice->patch]) >> 15) * FM6_PATCH_CALIBRATION_Q15 >> 15;
+                }
+                voice->state.fm6.dc = dc;
+                if (shedding && !voice->fade_out) {
+                    voice->state.fm6.live = 0;
+                    voice->used = 0;
+                }
+            }
+            if (voice->used && fm6_note_done(&voice->state.fm6, patch->effective, patch->effective[FP_ALG])) {
+                voice->state.fm6.live = 0;
+                voice->used = 0;
+            }
+        } else {
+            int32_t pitch16 = ((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16;
+            int32_t dc = voice->synth_dc;
             uint8_t shedding = voice->fade_out != 0u;
+            pitch16 += voice->tune16 + pitch_bend_16;
+            pitch16 += (int32_t)patch->octave * 192;
+            pitch16 += (int32_t)patch->fine_cents * 16 / 100;
+            if (pitch16 < 0) pitch16 = 0;
+            if (pitch16 > 127 * 16) pitch16 = 127 * 16;
+            (void)fm1lab_synth_set_pitch(&voice->state.synth, (int16_t)pitch16);
+            (void)fm1lab_synth_render(&voice->state.synth, synth_out, FM6_N);
             for (i = 0; i < FM6_N; i++) {
-                int32_t x = bus[i] - dc;
-                dc += x >> 10; /* ~7 Hz high-pass; FM sidebands can otherwise leave DC. */
+                int32_t x = ((int32_t)synth_out[i] << 9) - dc; /* Q15 prototype -> FM6 Q24 mix domain */
+                dc += x >> 10;
                 if (voice->fade_in) {
                     uint32_t gain = 32u - voice->fade_in;
                     x = (int32_t)(((int64_t)x * gain) >> 5);
@@ -1248,19 +1320,16 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
                 }
                 patch_mix[voice->patch][i] += (((int64_t)x * fm6_patch_gain_q15[voice->patch]) >> 15) * FM6_PATCH_CALIBRATION_Q15 >> 15;
             }
-            voice->state.dc = dc;
+            voice->synth_dc = dc;
             if (shedding && !voice->fade_out) {
-                voice->state.live = 0;
-                voice->used = 0;
+                voice->state.synth.active = 0u;
+                voice->used = 0u;
+            } else if (!voice->state.synth.active) {
+                voice->used = 0u;
             }
-        }
-        if (voice->used && fm6_note_done(&voice->state, patch->effective, patch->effective[FP_ALG])) {
-            voice->state.live = 0;
-            voice->used = 0;
         }
     }
 }
-
 /* CPU0-only wrapper: measures every CPU0 voice-range pass, including a
  * CPU2 fallback rerender, and accumulates the whole callback cost. */
 static void fm6_render_voice_range_cpu0(uint32_t first, uint32_t end,

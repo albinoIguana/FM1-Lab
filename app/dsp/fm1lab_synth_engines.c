@@ -35,13 +35,18 @@ static int32_t clamp_q15(int64_t x)
     return (int32_t)x;
 }
 
-static uint32_t phase_for_note(uint8_t note)
+static uint32_t phase_for_pitch16(int16_t pitch16)
 {
-    int32_t offset = (int32_t)(note > 127u ? 127u : note) - 60;
-    int32_t octave = offset / 12;
-    int32_t semitone = offset % 12;
-    if (semitone < 0) { semitone += 12; --octave; }
-    uint64_t increment = ((uint64_t)c4_phase_inc * semitone_ratio_q24[semitone]) >> 24;
+    int32_t offset = (int32_t)pitch16 - 60 * 16;
+    int32_t octave = offset / 192;
+    int32_t within_octave = offset % 192;
+    if (within_octave < 0) { within_octave += 192; --octave; }
+    uint32_t semitone = (uint32_t)within_octave / 16u;
+    uint32_t fraction = (uint32_t)within_octave & 15u;
+    uint32_t next_ratio = semitone == 11u ? (2u << 24) : semitone_ratio_q24[semitone + 1u];
+    uint64_t ratio = semitone_ratio_q24[semitone] +
+        (((uint64_t)(next_ratio - semitone_ratio_q24[semitone]) * fraction) >> 4);
+    uint64_t increment = ((uint64_t)c4_phase_inc * ratio) >> 24;
     if (octave > 0) increment <<= (uint32_t)octave;
     else if (octave < 0) increment >>= (uint32_t)(-octave);
     return increment > UINT32_MAX ? UINT32_MAX : (uint32_t)increment;
@@ -65,11 +70,13 @@ void fm1lab_synth_init(fm1lab_synth_voice_t *v, fm1lab_synth_engine_t engine)
     v->filter_alpha_q15 = 8192u;
 }
 
-int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *v, uint8_t note)
+int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *v, int16_t pitch16)
 {
     if (!v || v->engine >= FM1LAB_SYNTH_ENGINE_COUNT) return -1;
-    v->note = note > 127u ? 127u : note;
-    v->phase_inc = phase_for_note(v->note);
+    if (pitch16 < 0) pitch16 = 0;
+    if (pitch16 > 127 * 16) pitch16 = 127 * 16;
+    v->note = (uint8_t)((uint16_t)pitch16 >> 4);
+    v->phase_inc = phase_for_pitch16(pitch16);
     v->phase_inc_b = (uint32_t)(((uint64_t)v->phase_inc * 1003u) / 1000u);
     return 0;
 }
@@ -78,7 +85,7 @@ void fm1lab_synth_note_on(fm1lab_synth_voice_t *v, uint8_t note, uint8_t velocit
 {
     if (!v || v->engine >= FM1LAB_SYNTH_ENGINE_COUNT || !velocity) return;
     v->velocity = velocity;
-    (void)fm1lab_synth_set_pitch(v, note);
+    (void)fm1lab_synth_set_pitch(v, (int16_t)((note > 127u ? 127u : note) * 16u));
     v->phase = 0u; v->phase_b = 0u;
     v->envelope_q15 = 0u;
     v->gate = 1u; v->active = 1u;

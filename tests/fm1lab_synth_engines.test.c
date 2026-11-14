@@ -74,10 +74,13 @@ int main(void)
         assert(fm1lab_synth_render(&pitch, buffers[engine], 37u) == 0);
         uint32_t phase_a = pitch.phase, phase_b = pitch.phase_b;
         uint32_t old_inc = pitch.phase_inc;
-        assert(fm1lab_synth_set_pitch(&pitch, 72u) == 0);
+        assert(fm1lab_synth_set_pitch(&pitch, 72 * 16) == 0);
         assert(pitch.phase == phase_a && pitch.phase_b == phase_b);
         assert(pitch.phase_inc >= old_inc * 2u - 2u && pitch.phase_inc <= old_inc * 2u + 2u);
         assert(pitch.phase_inc_b >= pitch.phase_inc);
+        uint32_t bent_inc = pitch.phase_inc;
+        assert(fm1lab_synth_set_pitch(&pitch, 72 * 16 + 8) == 0);
+        assert(pitch.phase_inc > bent_inc);
     }
 
     fm1lab_synth_init(&pitch, FM1LAB_SYNTH_PSG);
