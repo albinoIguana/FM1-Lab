@@ -128,7 +128,9 @@ static int patch_bank_load(unsigned bank)
 {
     if(bank>=FM1LAB_STORE_BANK_COUNT){last_load_stage=FM1LAB_STORE_LOAD_PATCH_IDS;return -1;}
     uint32_t object=OBJ_INSTRUMENTS0+bank;
-    if(plat_store_size(object)!=(int)PATCH_BANK_BYTES){last_load_stage=FM1LAB_STORE_LOAD_BANK_SIZE;return -1;}
+    int size=plat_store_size(object);
+    if(size<0){last_load_stage=FM1LAB_STORE_LOAD_BANK_LOOKUP;return -1;}
+    if(size!=(int)PATCH_BANK_BYTES){last_load_stage=FM1LAB_STORE_LOAD_BANK_SIZE;return -1;}
     int n=plat_store_load(object,bank_work,sizeof bank_work);
     if(n!=(int)PATCH_BANK_BYTES){last_load_stage=FM1LAB_STORE_LOAD_BANK_READ;return -1;}
     if(!patch_bank_valid(bank_work,bank)){last_load_stage=FM1LAB_STORE_LOAD_BANK_DATA;return -1;}
@@ -218,7 +220,9 @@ static void meta_snapshot_init(uint8_t *snapshot)
 }
 static int meta_snapshot_load(void)
 {
-    if(plat_store_size(OBJ_INSERTS)!=(int)META_TOTAL_BYTES){last_load_stage=FM1LAB_STORE_LOAD_META_SIZE;return -1;}
+    int size=plat_store_size(OBJ_INSERTS);
+    if(size<0){last_load_stage=FM1LAB_STORE_LOAD_META_LOOKUP;return -1;}
+    if(size!=(int)META_TOTAL_BYTES){last_load_stage=FM1LAB_STORE_LOAD_META_SIZE;return -1;}
     int n=plat_store_load(OBJ_INSERTS,meta_work,sizeof meta_work);
     if(n!=(int)META_TOTAL_BYTES){last_load_stage=FM1LAB_STORE_LOAD_META_READ;return -1;}
     if(!meta_header_valid(meta_work)){last_load_stage=FM1LAB_STORE_LOAD_META_HEADER;return -1;}
