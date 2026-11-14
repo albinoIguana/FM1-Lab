@@ -1,6 +1,13 @@
 #include "fm1lab_store_library.h"
 #include "app.h"
 
+/* Host-native tests run on Mach-O; the device-only .pool section is
+ * supplied by the firmware linker script and is not meaningful on the host. */
+#if defined(FM1_HOST_TEST)
+#undef PLAT_POOL
+#define PLAT_POOL
+#endif
+
 #define PATCH_BANK_HEADER 8u
 #define PATCH_RECORD_BYTES 117u
 #define VOICE_BYTES 112u
