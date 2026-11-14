@@ -1,5 +1,6 @@
 #include "fm1lab_store_library.h"
 #include "app.h"
+#include "fm1lab_input_dispatch.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -8,12 +9,16 @@ static uint8_t objects[5][3840];
 static uint16_t object_len[5];
 static int present[5];
 static int fail_obj=-1;
+static int fail_size_obj=-1;
+static int fail_load_obj=-1;
 
 int plat_store_size(uint32_t obj) {
+    if((int)obj==fail_size_obj)return -1;
     if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || !present[obj-OBJ_INSTRUMENTS0]) return -1;
     return object_len[obj-OBJ_INSTRUMENTS0];
 }
 int plat_store_load(uint32_t obj, void *dst, uint32_t max) {
+    if((int)obj==fail_load_obj)return -1;
     if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || !present[obj-OBJ_INSTRUMENTS0] ||
        max<object_len[obj-OBJ_INSTRUMENTS0]) return -1;
     memcpy(dst,objects[obj-OBJ_INSTRUMENTS0],object_len[obj-OBJ_INSTRUMENTS0]);
@@ -28,6 +33,13 @@ int plat_store_save(uint32_t obj, const void *src, uint32_t len) {
     return 0;
 }
 
+static fm1lab_instrument_t dispatch_loaded;
+static fm1lab_insert_state_t dispatch_inserts;
+static int dispatch_load(void *ctx,uint8_t lane,uint8_t id,int mode)
+{
+    (void)ctx;(void)lane;(void)mode;
+    return fm1lab_store_library_load_full(id,&dispatch_loaded,&dispatch_inserts);
+}
 static void make_instrument(fm1lab_instrument_t *in,const char *name,unsigned seed)
 {
     fm1lab_instrument_init(in,name);
@@ -62,6 +74,23 @@ int main(void)
         assert(fm1lab_store_library_load_full(i,&loaded,&restored)==0);
         for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++)
             assert(loaded.patch_ids[p]==(uint8_t)(i*4u+p));
+    }
+
+    /* Exercise the same route + dispatcher used by app.c, ending in the
+     * production store loader rather than a mocked successful callback. */
+    {
+        fm1lab_input_state_t state={0};
+        fm1lab_input_ops_t ops={0};
+        state.instrument=0u; state.track_instrument[0]=0u;
+        ops.load_instrument=dispatch_load;
+        enum fm1lab_input_action action=fm1lab_input_route(
+            FM1LAB_INPUT_PAGE_HOME,FM1LAB_ENCODER_PRESETS,0u);
+        assert(action==FM1LAB_INPUT_INSTRUMENT_STEP);
+        assert(fm1lab_input_apply(&state,action,1,FM1LAB_STORE_INSTRUMENT_COUNT,
+            FM1LAB_PATCH_COUNT,&ops,0)==FM1LAB_INPUT_RESULT_APPLIED);
+        assert(state.instrument==1u);
+        assert(memcmp(dispatch_loaded.name,"FACTORY QUAD",12u)==0);
+        assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_OK);
     }
 
     /* IDs are stable save addresses: editing Instrument 0 never mutates
@@ -105,8 +134,27 @@ int main(void)
     assert(fm1lab_store_library_load_full(0u,&one,&inserts)==0);
     assert(one.patches[1].voice[0]==saved);
 
+    /* Fault injection identifies lookup/read/validation failures precisely. */
+    fail_size_obj=OBJ_INSERTS;
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_SIZE);
+    fail_size_obj=-1;
+    fail_load_obj=OBJ_INSERTS;
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_READ);
+    fail_load_obj=-1;
+    fail_size_obj=OBJ_INSTRUMENTS0;
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_SIZE);
+    fail_size_obj=-1;
+    fail_load_obj=OBJ_INSTRUMENTS0;
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_READ);
+    fail_load_obj=-1;
+
     /* CRC damage is reported; it is not silently replaced by factory data. */
     objects[0][100]^=1u;
     assert(fm1lab_store_library_load(0u,&loaded)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_DATA);
     return 0;
 }
