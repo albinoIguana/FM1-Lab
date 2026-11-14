@@ -1,4 +1,5 @@
 #include "fm1lab_synth_engines.h"
+#include "fm1lab_instrument_engine_map.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -16,6 +17,17 @@ static uint32_t checksum(const int16_t *p, uint32_t n)
 
 int main(void)
 {
+    static const fm1lab_patch_engine_t expected[FM1LAB_INSTRUMENT_SLOT_COUNT] = {
+        FM1LAB_PATCH_ENGINE_FM6,
+        FM1LAB_PATCH_ENGINE_WAVETABLE,
+        FM1LAB_PATCH_ENGINE_PSG,
+        FM1LAB_PATCH_ENGINE_SUBTRACTIVE
+    };
+    for (uint8_t slot = 0; slot < FM1LAB_INSTRUMENT_SLOT_COUNT; ++slot) {
+        assert(fm1lab_patch_engine_for_context(slot) == expected[slot]);
+        assert(fm1lab_patch_engine_for_context((uint8_t)(slot + 4u)) == expected[slot]);
+    }
+    assert(fm1lab_patch_engine_for_context(8u) == FM1LAB_PATCH_ENGINE_INVALID);
     uint32_t hashes[FM1LAB_SYNTH_ENGINE_COUNT];
     for (uint32_t engine = 0; engine < FM1LAB_SYNTH_ENGINE_COUNT; ++engine) {
         fm1lab_synth_voice_t voice, twin;
