@@ -19,6 +19,13 @@ cc -std=c11 -O2 -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable -pth
   -I"$ROOT/app/dsp" -I"$TMP" \
   "$ROOT/app/dsp/fm6.c" "$ROOT/tests/fm6_engine.test.c" -o "$BIN"
 
+# Standalone fixed-point mixed-synthesis engine prototypes.
+MIXED_BIN="$TMP/mixed-synth-prototypes-test"
+cc -std=c11 -O2 -Wall -Wextra -Werror \
+  -I"$ROOT/app/dsp" \
+  "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/tests/fm1lab_synth_engines.test.c" -o "$MIXED_BIN"
+"$MIXED_BIN"
+
 DX7_BIN="$TMP/fm6-dx7-audit"
 cc -std=c11 -O2 -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable \
   -I"$ROOT/app" -I"$ROOT/app/dsp" -I"$TMP" \
