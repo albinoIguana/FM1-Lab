@@ -791,12 +791,14 @@ static const char *fm1lab_store_load_failure_label(void)
 {
     switch(fm1lab_store_library_last_load_stage()) {
     case FM1LAB_STORE_LOAD_BAD_ARGUMENT: return "BAD ARGUMENT";
+    case FM1LAB_STORE_LOAD_META_LOOKUP: return "META LOOKUP";
     case FM1LAB_STORE_LOAD_META_SIZE: return "META SIZE";
     case FM1LAB_STORE_LOAD_META_READ: return "META READ";
     case FM1LAB_STORE_LOAD_META_HEADER: return "META HEADER";
     case FM1LAB_STORE_LOAD_META_CRC: return "META CRC";
     case FM1LAB_STORE_LOAD_PATCH_IDS: return "PATCH IDS";
     case FM1LAB_STORE_LOAD_INSERTS: return "INSERT STATE";
+    case FM1LAB_STORE_LOAD_BANK_LOOKUP: return "BANK LOOKUP";
     case FM1LAB_STORE_LOAD_BANK_SIZE: return "BANK SIZE";
     case FM1LAB_STORE_LOAD_BANK_READ: return "BANK READ";
     case FM1LAB_STORE_LOAD_BANK_DATA: return "BANK CRC / DATA";
