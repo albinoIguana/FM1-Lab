@@ -12,6 +12,24 @@
 #define FM1LAB_STORE_PATCH_BANK_BYTES 3752u
 #define FM1LAB_STORE_METADATA_BYTES 1742u
 
+/* Last load failure, exposed for native diagnostics and the compact device
+ * status overlay. Zero means no failure / success. */
+enum fm1lab_store_load_stage {
+    FM1LAB_STORE_LOAD_OK = 0,
+    FM1LAB_STORE_LOAD_BAD_ARGUMENT,
+    FM1LAB_STORE_LOAD_META_SIZE,
+    FM1LAB_STORE_LOAD_META_READ,
+    FM1LAB_STORE_LOAD_META_HEADER,
+    FM1LAB_STORE_LOAD_META_CRC,
+    FM1LAB_STORE_LOAD_PATCH_IDS,
+    FM1LAB_STORE_LOAD_INSERTS,
+    FM1LAB_STORE_LOAD_BANK_SIZE,
+    FM1LAB_STORE_LOAD_BANK_READ,
+    FM1LAB_STORE_LOAD_BANK_DATA,
+    FM1LAB_STORE_LOAD_INSTRUMENT
+};
+enum fm1lab_store_load_stage fm1lab_store_library_last_load_stage(void);
+
 /* Four 32-patch banks (IDs 0..127) and one Instrument directory. Each Instrument
  * owns four stable patch IDs: instrument_index*4 + slot. Factory-preset selection
  * copies into those IDs; switching Instruments never resets their saved patch data. */
