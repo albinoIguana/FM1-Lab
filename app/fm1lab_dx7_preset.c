@@ -17,9 +17,9 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_decode_z85(
 {
     if (!source || !out || !voice_count)
         return FM1LAB_DX7_PRESET_BAD_ARGUMENT;
-    if (voice_index >= voice_count ||
-        source_bytes < (size_t)voice_count * FM1LAB_DX7_Z85_BYTES)
-        return FM1LAB_DX7_PRESET_INDEX_INVALID;
+    if (voice_index >= voice_count) return FM1LAB_DX7_PRESET_INDEX_INVALID;
+    if (source_bytes < (size_t)voice_count * FM1LAB_DX7_Z85_BYTES)
+        return FM1LAB_DX7_PRESET_DATA_MISSING;
 
     const char *voice = source + (size_t)voice_index * FM1LAB_DX7_Z85_BYTES;
     for (uint32_t group = 0; group < 39u; ++group) {
@@ -46,12 +46,25 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_decode_voice(
         FM1LAB_DX7_VOICE_COUNT, out);
 }
 
-static int voice_valid(const uint8_t voice[FM1LAB_PATCH_BYTES])
+int fm1lab_dx7_voice_valid(const uint8_t voice[FM1LAB_PATCH_BYTES])
 {
     if (!voice) return 0;
     for (unsigned i = 0; i < FM1LAB_PATCH_BYTES - 1u; ++i)
         if (voice[i] > 127u) return 0;
     return voice[134] <= 31u && voice[135] <= 7u;
+}
+
+enum fm1lab_dx7_preset_result fm1lab_dx7_replace_voice(
+    fm1lab_instrument_t *instrument, uint8_t patch,
+    const uint8_t voice[FM1LAB_PATCH_BYTES])
+{
+    if (patch >= FM1LAB_PATCH_COUNT)
+        return FM1LAB_DX7_PRESET_INDEX_INVALID;
+    if (!fm1lab_dx7_voice_valid(voice))
+        return FM1LAB_DX7_PRESET_VOICE_INVALID;
+    if (fm1lab_patch_replace_voice(instrument, patch, voice) != 0)
+        return FM1LAB_DX7_PRESET_PATCH_REPLACE_FAILED;
+    return FM1LAB_DX7_PRESET_OK;
 }
 
 enum fm1lab_dx7_preset_result fm1lab_dx7_patch_preset_step(
@@ -70,9 +83,8 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_patch_preset_step(
     next = fm1lab_preset_cursor_step(cursor, delta, FM1LAB_DX7_VOICE_COUNT);
     result = fm1lab_dx7_decode_voice(next, voice);
     if (result != FM1LAB_DX7_PRESET_OK) return result;
-    if (!voice_valid(voice)) return FM1LAB_DX7_PRESET_VOICE_INVALID;
-    if (fm1lab_patch_replace_voice(instrument, patch, voice) != 0)
-        return FM1LAB_DX7_PRESET_PATCH_REPLACE_FAILED;
+    result = fm1lab_dx7_replace_voice(instrument, patch, voice);
+    if (result != FM1LAB_DX7_PRESET_OK) return result;
 
     *next_cursor = next;
     return FM1LAB_DX7_PRESET_OK;
