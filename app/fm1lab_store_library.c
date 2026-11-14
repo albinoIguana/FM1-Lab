@@ -236,7 +236,6 @@ static int meta_snapshot_load(void)
 }
 static int meta_snapshot_commit(void)
 {
-    uint8_t verify[META_TOTAL_BYTES];
     uint8_t *snapshot=meta_work+META_HEADER_BYTES;
     int rc;
     bytes_copy(snapshot,meta_snapshot_work,META_SNAPSHOT_BYTES);
@@ -250,9 +249,9 @@ static int meta_snapshot_commit(void)
         return rc;
     }
     if(plat_store_size(OBJ_INSERTS)!=(int)META_TOTAL_BYTES ||
-       plat_store_load(OBJ_INSERTS,verify,sizeof verify)!=(int)META_TOTAL_BYTES ||
-       !meta_header_valid(verify) ||
-       !meta_snapshot_valid(verify+META_HEADER_BYTES)) {
+       plat_store_load(OBJ_INSERTS,meta_work,sizeof meta_work)!=(int)META_TOTAL_BYTES ||
+       !meta_header_valid(meta_work) ||
+       !meta_snapshot_valid(meta_work+META_HEADER_BYTES)) {
         last_format_stage=FM1LAB_STORE_FORMAT_META_VERIFY;
         return -1;
     }
