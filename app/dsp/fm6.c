@@ -81,7 +81,11 @@ static void fm6_zero_bytes(void *dst, uint32_t n)
 #define FM6_FX_HEADROOM_SCALE (1u << FM6_FX_HEADROOM_SHIFT)
 #define FM6_LIMITER_CEILING_Q23 7470000
 #ifndef PLAT_POOL
+#if defined(FM6_TEST)
+#define PLAT_POOL
+#else
 #define PLAT_POOL __attribute__((section(".pool")))
+#endif
 #endif
 
 typedef struct {
