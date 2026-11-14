@@ -8,7 +8,7 @@ trap 'rm -f "$BIN"' EXIT
 
 # GCC supports -Wno-array-parameter; Apple Clang may reject it as unknown.
 ARRAY_PARAMETER_FLAG=""
-if printf '%s\\n' 'int main(void) { return 0; }' | cc -std=c11 -Werror -Wno-array-parameter -x c -fsyntax-only - >/dev/null 2>&1; then
+if printf '%s\n' 'int main(void) { return 0; }' | cc -std=c11 -Werror -Wno-array-parameter -x c -fsyntax-only - >/dev/null 2>&1; then
   ARRAY_PARAMETER_FLAG="-Wno-array-parameter"
 fi
 
