@@ -20,6 +20,9 @@ int main(void)
         sizeof fm1lab_dx7_voice_z85 - 1u, FM1LAB_DX7_VOICE_COUNT,
         FM1LAB_DX7_VOICE_COUNT, voice) == FM1LAB_DX7_PRESET_INDEX_INVALID);
 
+    uint8_t expected[FM1LAB_PATCH_BYTES];
+    assert(fm1lab_dx7_decode_voice(0u, expected) == FM1LAB_DX7_PRESET_OK);
+
     fm1lab_instrument_t instrument;
     fm1lab_instrument_init(&instrument, "PRESET TEST");
     fm1lab_patch_t before = instrument.patches[2];
@@ -27,7 +30,7 @@ int main(void)
     assert(fm1lab_dx7_patch_preset_step(&instrument, 2u, 255u, 1, &next)
         == FM1LAB_DX7_PRESET_OK);
     assert(next == 0u);
-    assert(memcmp(instrument.patches[2].voice, voice, 0u) == 0);
+    assert(memcmp(instrument.patches[2].voice, expected, FM1LAB_PATCH_BYTES - 1u) == 0);
     assert(instrument.patches[2].level == before.level);
     assert(instrument.patches[2].enabled == before.enabled);
     assert(instrument.patches[2].octave == before.octave);
