@@ -282,6 +282,10 @@ static volatile uint8_t fx_send[PATCHES][4];
 static uint16_t fx_send_gain_q15[PATCHES][4] PLAT_POOL;
 static volatile uint8_t fx_mix_effective[4];
 static uint32_t fx_lfo_phase, fx_phaser_phase;
+/* Percent controls are converted once per 32-frame quantum. The sample loop
+ * must not execute integer divides for feedback, wet mix, or reverb decay. */
+static int32_t fx_feedback_q15[4], fx_mix_q15[4];
+static int32_t fx_reverb_decay_q15[3];
 
 /* Parallel wet returns share a 50% budget, leaving 6 dB for the dry path.
  * Four independently-maxed effects therefore cannot swamp the instrument. */
@@ -295,6 +299,20 @@ static void fm6_fx_mix_budget_update(void)
         else if(total<=50u)fx_mix_effective[fx]=fx_mix[fx];
         else fx_mix_effective[fx]=(uint8_t)((uint32_t)fx_mix[fx]*50u/total);
     }
+}
+static void fm6_fx_coefficients_update(void)
+{
+    for (uint32_t fx=0u; fx<4u; ++fx) {
+        fx_feedback_q15[fx]=(int32_t)((uint32_t)fx_feedback[fx]*32768u/100u);
+        fx_mix_q15[fx]=(int32_t)((uint32_t)fx_mix_effective[fx]*32768u/100u);
+    }
+    uint32_t time=fx_time[2], feedback=fx_feedback[2];
+    uint32_t decay[3];
+    decay[0]=30u+time*20u/100u+feedback*8u/100u;
+    decay[1]=40u+time*25u/100u+feedback*15u/100u;
+    decay[2]=60u+time*25u/100u+feedback*10u/100u;
+    for(uint32_t type=0u;type<3u;++type)
+        fx_reverb_decay_q15[type]=(int32_t)(decay[type]*32768u/100u);
 }
 static void fm6_pan_gains(uint8_t pan, int32_t *left_q15, int32_t *right_q15)
 {
@@ -776,9 +794,9 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
         int32_t chorus_r_feedback=fx_chorus_r[chorus_r_index];
         if(fx_mix_effective[0]) { chorus=chorus_l_feedback; chorus_r=chorus_r_feedback; }
         fx_chorus[cp]=fm6_sat_q23((int64_t)sends[0][0]+
-            (int32_t)((int32_t)chorus_l_feedback*(int32_t)fx_feedback[0]/100));
+            (int32_t)(((int64_t)chorus_l_feedback*fx_feedback_q15[0])>>15));
         fx_chorus_r[cp]=fm6_sat_q23((int64_t)sends[0][1]+
-            (int32_t)((int32_t)chorus_r_feedback*(int32_t)fx_feedback[0]/100));
+            (int32_t)(((int64_t)chorus_r_feedback*fx_feedback_q15[0])>>15));
         fx_chorus_pos=(uint16_t)((cp+1u)&(FM6_CHORUS_SIZE-1u));
         fx_lfo_phase+=200u+(uint32_t)fx_time[0]*10u;
     }
@@ -788,9 +806,9 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
         delay_feedback_l=fx_delay[(dp-delay_length)&(FM6_DELAY_SIZE-1u)];
         delay_feedback_r=fx_delay_r[(dp-delay_length)&(FM6_DELAY_SIZE-1u)];
         fx_delay[dp]=fm6_sat_q23((int64_t)sends[1][0]+
-            (int32_t)((int32_t)delay_feedback_l*(int32_t)fx_feedback[1]/100));
+            (int32_t)(((int64_t)delay_feedback_l*fx_feedback_q15[1])>>15));
         fx_delay_r[dp]=fm6_sat_q23((int64_t)sends[1][1]+
-            (int32_t)((int32_t)delay_feedback_r*(int32_t)fx_feedback[1]/100));
+            (int32_t)(((int64_t)delay_feedback_r*fx_feedback_q15[1])>>15));
         fx_delay_pos=(uint16_t)((dp+1u)&(FM6_DELAY_SIZE-1u));
     }
     if(fx_enabled[2]) {
@@ -802,17 +820,16 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
             else if(reverb_type==0u) { reverb=(a_l*3+b_l+c_l)/5; reverb_r=(a_r*3+b_r+c_r)/5; }
             else { reverb=(a_l+b_l+c_l)/3; reverb_r=(a_r+b_r+c_r)/3; }
         }
-        uint32_t decay=reverb_type==0u
-            ? 30u+(uint32_t)fx_time[2]*20u/100u+(uint32_t)fx_feedback[2]*8u/100u
-            : reverb_type==2u
-                ? 60u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*10u/100u
-                : 40u+(uint32_t)fx_time[2]*25u/100u+(uint32_t)fx_feedback[2]*15u/100u;
-        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(a_l*(int32_t)decay/100));
-        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(b_l*(int32_t)(decay+3u)/100));
-        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(c_l*(int32_t)(decay+6u)/100));
-        fx_comb_a_r[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(a_r*(int32_t)decay/100));
-        fx_comb_b_r[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(b_r*(int32_t)(decay+3u)/100));
-        fx_comb_c_r[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(c_r*(int32_t)(decay+6u)/100));
+        uint32_t decay_index=reverb_type==0u?0u:(reverb_type==2u?2u:1u);
+        int32_t decay_a=fx_reverb_decay_q15[decay_index];
+        int32_t decay_b=decay_a+983;  /* +3 percentage points */
+        int32_t decay_c=decay_a+1966; /* +6 percentage points */
+        fx_comb_a[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(((int64_t)a_l*decay_a)>>15));
+        fx_comb_b[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(((int64_t)b_l*decay_b)>>15));
+        fx_comb_c[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][0]+(int32_t)(((int64_t)c_l*decay_c)>>15));
+        fx_comb_a_r[fx_comb_pos_a]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(((int64_t)a_r*decay_a)>>15));
+        fx_comb_b_r[fx_comb_pos_b]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(((int64_t)b_r*decay_b)>>15));
+        fx_comb_c_r[fx_comb_pos_c]=fm6_sat_q23((int64_t)sends[2][1]+(int32_t)(((int64_t)c_r*decay_c)>>15));
         fx_comb_pos_a=(uint16_t)((fx_comb_pos_a+1u)&2047u);
         fx_comb_pos_b=(uint16_t)((fx_comb_pos_b+1u)&4095u);
         fx_comb_pos_c=(uint16_t)((fx_comb_pos_c+1u)&8191u);
@@ -820,9 +837,9 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
     if(fx_enabled[3] && (sends[3][0] || sends[3][1] ||
        fx_phaser_feedback_l || fx_phaser_feedback_r)) {
         int32_t in_l=fm6_sat_q23((int64_t)sends[3][0]+
-            (int32_t)((int32_t)fx_phaser_feedback_l*(int32_t)fx_feedback[3]/100));
+            (int32_t)(((int64_t)fx_phaser_feedback_l*fx_feedback_q15[3])>>15));
         int32_t in_r=fm6_sat_q23((int64_t)sends[3][1]+
-            (int32_t)((int32_t)fx_phaser_feedback_r*(int32_t)fx_feedback[3]/100));
+            (int32_t)(((int64_t)fx_phaser_feedback_r*fx_feedback_q15[3])>>15));
         phaser_l=fm6_phaser_channel(in_l,fx_phaser_state_l,(fx_phaser_phase>>16)&0xFFFFu);
         phaser_r=fm6_phaser_channel(in_r,fx_phaser_state_r,((fx_phaser_phase+0x40000000u)>>16)&0xFFFFu);
         fx_phaser_feedback_l=phaser_l; fx_phaser_feedback_r=phaser_r;
@@ -831,10 +848,10 @@ static void fm6_fx_process(int64_t input_l,int64_t input_r,const int32_t sends[4
     int64_t wet_l=input_l,wet_r=input_r;
     /* FX state runs 32x below the Q24 dry bus. This preserves the int32
      * delay/comb memory footprint while reserving 30 dB for feedback growth. */
-    if(fx_enabled[0]) { wet_l+=(int64_t)((chorus*(int32_t)fx_mix_effective[0]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((chorus_r*(int32_t)fx_mix_effective[0]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
-    if(fx_enabled[1]) { wet_l+=(int64_t)((delay_feedback_l*(int32_t)fx_mix_effective[1]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((delay_feedback_r*(int32_t)fx_mix_effective[1]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
-    if(fx_enabled[2]) { wet_l+=(int64_t)((reverb*(int32_t)fx_mix_effective[2]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((reverb_r*(int32_t)fx_mix_effective[2]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
-    if(fx_enabled[3]) { wet_l+=(int64_t)((phaser_l*(int32_t)fx_mix_effective[3]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); wet_r+=(int64_t)((phaser_r*(int32_t)fx_mix_effective[3]/100)*(int32_t)FM6_FX_HEADROOM_SCALE); }
+    if(fx_enabled[0]) { wet_l+=(((int64_t)chorus*fx_mix_q15[0])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; wet_r+=(((int64_t)chorus_r*fx_mix_q15[0])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; }
+    if(fx_enabled[1]) { wet_l+=(((int64_t)delay_feedback_l*fx_mix_q15[1])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; wet_r+=(((int64_t)delay_feedback_r*fx_mix_q15[1])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; }
+    if(fx_enabled[2]) { wet_l+=(((int64_t)reverb*fx_mix_q15[2])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; wet_r+=(((int64_t)reverb_r*fx_mix_q15[2])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; }
+    if(fx_enabled[3]) { wet_l+=(((int64_t)phaser_l*fx_mix_q15[3])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; wet_r+=(((int64_t)phaser_r*fx_mix_q15[3])>>15)*(int32_t)FM6_FX_HEADROOM_SCALE; }
     *left=wet_l; *right=wet_r;
 }
 
@@ -1450,7 +1467,42 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
         if(active_voice_count>fm6_callback_voice_peak)fm6_callback_voice_peak=active_voice_count;
         if (active_voice_count > 1u && !fm6_cpu2_split_disabled) {
             ++fm6_cpu2_quanta;
-            uint32_t split = (active_voice_count + 1u) / 2u;
+            /* FM6 voices cost substantially more than the lightweight engines.
+             * Stable-sort by estimated cost, then leave roughly 40% of synthesis
+             * work on CPU0 and 60% on CPU2. CPU0 also owns transport, mixing and FX. */
+            uint32_t total_cost=0u;
+            for(uint32_t k=0u;k<active_voice_count;k++) {
+                fm1lab_patch_engine_t e=fm1lab_patch_engine_for_context(
+                    voices[fm6_voice_work[k]].patch);
+                uint8_t cost=e==FM1LAB_PATCH_ENGINE_FM6?6u:
+                    (e==FM1LAB_PATCH_ENGINE_SUBTRACTIVE?3u:
+                    (e==FM1LAB_PATCH_ENGINE_PSG?2u:1u));
+                total_cost+=cost;
+                uint32_t j=k;
+                while(j>0u) {
+                    fm1lab_patch_engine_t prev=fm1lab_patch_engine_for_context(
+                        voices[fm6_voice_work[j-1u]].patch);
+                    uint8_t prev_cost=prev==FM1LAB_PATCH_ENGINE_FM6?6u:
+                        (prev==FM1LAB_PATCH_ENGINE_SUBTRACTIVE?3u:
+                        (prev==FM1LAB_PATCH_ENGINE_PSG?2u:1u));
+                    if(prev_cost<=cost)break;
+                    uint8_t swap=fm6_voice_work[j-1u];
+                    fm6_voice_work[j-1u]=fm6_voice_work[j];
+                    fm6_voice_work[j]=swap;
+                    --j;
+                }
+            }
+            uint32_t target_cost=(total_cost*40u+99u)/100u;
+            uint32_t cpu0_cost=0u, split=1u;
+            for(uint32_t k=0u;k+1u<active_voice_count;k++) {
+                fm1lab_patch_engine_t e=fm1lab_patch_engine_for_context(
+                    voices[fm6_voice_work[k]].patch);
+                cpu0_cost+=e==FM1LAB_PATCH_ENGINE_FM6?6u:
+                    (e==FM1LAB_PATCH_ENGINE_SUBTRACTIVE?3u:
+                    (e==FM1LAB_PATCH_ENGINE_PSG?2u:1u));
+                split=k+1u;
+                if(cpu0_cost>=target_cost)break;
+            }
             fm6_cpu2_job_start = split;
             fm6_cpu2_job_count = active_voice_count - split;
 #ifdef FM6_TEST
@@ -1560,6 +1612,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             for(uint32_t fx=0u;fx<4u;fx++)
                 fx_send_gain_q15[patch][fx]=(uint16_t)(
                     (uint32_t)fx_send[patch][fx]*32768u/send_divisor);
+        fm6_fx_coefficients_update();
         for (i = 0; i < count; i++) {
             int32_t delta=(int32_t)master_gain_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
