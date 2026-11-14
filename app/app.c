@@ -157,7 +157,6 @@ static uint8_t patch_preset_cursor[2][FM1LAB_PATCH_COUNT] = {
     {255u,255u,255u,255u}, {255u,255u,255u,255u}
 };
 static enum fm1lab_dx7_preset_result patch_preset_last_result = FM1LAB_DX7_PRESET_OK;
-static uint8_t patch_preset_engine_locked;
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
@@ -395,7 +394,6 @@ static const char *fm1lab_store_load_failure_label(void)
 }
 static const char *fm1lab_patch_preset_failure_label(void)
 {
-    if (patch_preset_engine_locked) return "FIXED ENGINE SLOT";
     switch(patch_preset_last_result) {
     case FM1LAB_DX7_PRESET_BAD_ARGUMENT: return "BAD ARGUMENT";
     case FM1LAB_DX7_PRESET_INDEX_INVALID: return "INDEX INVALID";
@@ -412,13 +410,8 @@ static int fm1lab_patch_preset_step(int delta)
     uint8_t lane=(uint8_t)(seq_ui_lane&1u);
     uint8_t next;
     enum fm1lab_dx7_preset_result result;
-    patch_preset_engine_locked=0u;
     if (!delta) { patch_preset_last_result=FM1LAB_DX7_PRESET_BAD_ARGUMENT; return -1; }
     if (set.patch >= FM1LAB_PATCH_COUNT) { patch_preset_last_result=FM1LAB_DX7_PRESET_INDEX_INVALID; return -1; }
-    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
-        patch_preset_engine_locked=1u;
-        return -1;
-    }
     result=fm1lab_dx7_patch_preset_step(&current_instrument,set.patch,
         patch_preset_cursor[lane][set.patch],delta,&next);
     patch_preset_last_result=result;
@@ -2453,9 +2446,7 @@ static void input(void)
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED: app_say("SAVE FAILED", "PRESET CHANGED"); break;
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED: app_say("SAVE FAILED", "PRESET UNCHANGED"); break;
             case FM1LAB_INPUT_RESULT_PATCH_FAILED:
-                app_say(patch_preset_engine_locked ? "ENGINE SLOT" : "PATCH PRESET",
-                        patch_preset_engine_locked ? fm1lab_patch_engine_name(set.patch) :
-                                                     fm1lab_patch_preset_failure_label());
+                app_say("PATCH PRESET",fm1lab_patch_preset_failure_label());
                 break;
             case FM1LAB_INPUT_RESULT_APPLIED:
                 if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP) app_say("PATCH", patch_display_name(set.patch));
@@ -3123,8 +3114,6 @@ static const char *patch_display_name(uint32_t patch)
     static char fallback[FM1LAB_PATCH_COUNT][12];
     if (patch >= FM1LAB_PATCH_COUNT) patch = 0u;
     /* Use the DX voice-name accessor, never the containing Instrument name. */
-    if (fm1lab_patch_engine_for_context((uint8_t)patch) != FM1LAB_PATCH_ENGINE_FM6)
-        return fm1lab_patch_engine_name((uint8_t)patch);
     if (fm1lab_voice_name_get(current_instrument.patches[patch].voice,
                               display[patch]) == 0) {
         uint32_t n = fm1lab_strlen(display[patch]);
@@ -3140,6 +3129,8 @@ static const char *patch_display_name(uint32_t patch)
         if (n && !patch_name_is_factory(display[patch]) && !placeholder)
             return display[patch];
     }
+    if (fm1lab_patch_engine_for_context((uint8_t)patch) != FM1LAB_PATCH_ENGINE_FM6)
+        return fm1lab_patch_engine_name((uint8_t)patch);
     fallback[patch][0]='V'; fallback[patch][1]='O'; fallback[patch][2]='I';
     fallback[patch][3]='C'; fallback[patch][4]='E'; fallback[patch][5]=' ';
     int_text((int32_t)patch+1,fallback[patch]+6);
