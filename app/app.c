@@ -266,11 +266,11 @@ static int fm1lab_default_slot_name_matches(const char *name,uint32_t index)
     memcpy(full,full_prefix,sizeof full_prefix-1u);
     full[11]=(char)('0'+number/10u);
     full[12]=(char)('0'+number%10u);
-    full[13]='\\0';
+    full[13]='\0';
     memcpy(short_name,short_prefix,sizeof short_prefix-1u);
     short_name[6]=(char)('0'+number/10u);
     short_name[7]=(char)('0'+number%10u);
-    short_name[8]='\\0';
+    short_name[8]='\0';
     return fm1lab_name_is_padded(name,full) ||
            fm1lab_name_is_padded(name,short_name);
 }
@@ -4481,7 +4481,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             memcpy(slot_name,"INSTRUMENT ",11u);
             slot_name[11]=(char)('0'+number/10u);
             slot_name[12]=(char)('0'+number%10u);
-            slot_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
+            slot_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
             fm1lab_instrument_init(&legacy,slot_name);
             for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
                 if(fm1lab_patch_set_voice(&legacy,patch,
@@ -4512,7 +4512,8 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
            memcmp(migrated.name,edited.name,sizeof migrated.name)!=0 ||
            memcmp(migrated.patches,edited.patches,sizeof migrated.patches)!=0)
             return 1;
-        if(fm1lab_store_library_save_full(0u,&expected,&inserts)!=0) return 1;
+        if(fm1lab_seed_dx7_instrument(0u,&expected)!=0 ||
+           fm1lab_store_library_save_full(0u,&expected,&inserts)!=0) return 1;
         app_host_legacy_factory_migration_pass=1u;
         return 1;
     }
