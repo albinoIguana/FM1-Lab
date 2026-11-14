@@ -146,6 +146,7 @@ static void page_change(uint8_t next_page)
 static uint8_t patch_preset_cursor[2][FM1LAB_PATCH_COUNT] = {
     {255u,255u,255u,255u}, {255u,255u,255u,255u}
 };
+static enum fm1lab_dx7_preset_result patch_preset_last_result = FM1LAB_DX7_PRESET_OK;
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
@@ -786,14 +787,45 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
 
 /* PRESETS in patch-focus mode replaces only the selected patch's DX7 voice.
  * Mixer level, enable state, tuning, pan, and macros belong to the patch slot. */
+static const char *fm1lab_store_load_failure_label(void)
+{
+    switch(fm1lab_store_library_last_load_stage()) {
+    case FM1LAB_STORE_LOAD_BAD_ARGUMENT: return "BAD ARGUMENT";
+    case FM1LAB_STORE_LOAD_META_SIZE: return "META SIZE";
+    case FM1LAB_STORE_LOAD_META_READ: return "META READ";
+    case FM1LAB_STORE_LOAD_META_HEADER: return "META HEADER";
+    case FM1LAB_STORE_LOAD_META_CRC: return "META CRC";
+    case FM1LAB_STORE_LOAD_PATCH_IDS: return "PATCH IDS";
+    case FM1LAB_STORE_LOAD_INSERTS: return "INSERT STATE";
+    case FM1LAB_STORE_LOAD_BANK_SIZE: return "BANK SIZE";
+    case FM1LAB_STORE_LOAD_BANK_READ: return "BANK READ";
+    case FM1LAB_STORE_LOAD_BANK_DATA: return "BANK CRC / DATA";
+    case FM1LAB_STORE_LOAD_INSTRUMENT: return "INSTRUMENT DATA";
+    case FM1LAB_STORE_LOAD_OK: default: return "APP VALIDATION";
+    }
+}
+static const char *fm1lab_patch_preset_failure_label(void)
+{
+    switch(patch_preset_last_result) {
+    case FM1LAB_DX7_PRESET_BAD_ARGUMENT: return "BAD ARGUMENT";
+    case FM1LAB_DX7_PRESET_INDEX_INVALID: return "INDEX INVALID";
+    case FM1LAB_DX7_PRESET_DECODE_FAILED: return "DECODE FAILED";
+    case FM1LAB_DX7_PRESET_VOICE_INVALID: return "VOICE INVALID";
+    case FM1LAB_DX7_PRESET_PATCH_REPLACE_FAILED: return "REPLACE FAILED";
+    case FM1LAB_DX7_PRESET_OK: default: return "UNKNOWN FAILURE";
+    }
+}
+
 static int fm1lab_patch_preset_step(int delta)
 {
     uint8_t lane=(uint8_t)(seq_ui_lane&1u);
     uint8_t next;
     enum fm1lab_dx7_preset_result result;
-    if (!delta || set.patch >= FM1LAB_PATCH_COUNT) return -1;
+    if (!delta) { patch_preset_last_result=FM1LAB_DX7_PRESET_BAD_ARGUMENT; return -1; }
+    if (set.patch >= FM1LAB_PATCH_COUNT) { patch_preset_last_result=FM1LAB_DX7_PRESET_INDEX_INVALID; return -1; }
     result=fm1lab_dx7_patch_preset_step(&current_instrument,set.patch,
         patch_preset_cursor[lane][set.patch],delta,&next);
+    patch_preset_last_result=result;
     if(result!=FM1LAB_DX7_PRESET_OK) return -1;
     patch_preset_cursor[lane][set.patch]=next;
     instrument_dirty=1u;
@@ -2768,12 +2800,12 @@ static void input(void)
                 app_say("LOAD BUSY", action == FM1LAB_INPUT_TRACK_TOGGLE ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
                 break;
             case FM1LAB_INPUT_RESULT_LOAD_FAILED:
-                app_say("LOAD FAILED", action == FM1LAB_INPUT_TRACK_TOGGLE ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
+                app_say("LOAD FAILED", fm1lab_store_load_failure_label());
                 break;
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED: app_say("SAVE FAILED", "TRACK NOT CHANGED"); break;
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED: app_say("SAVE FAILED", "PRESET CHANGED"); break;
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED: app_say("SAVE FAILED", "PRESET UNCHANGED"); break;
-            case FM1LAB_INPUT_RESULT_PATCH_FAILED: app_say("PATCH PRESET", "LOAD FAILED"); break;
+            case FM1LAB_INPUT_RESULT_PATCH_FAILED: app_say("PATCH PRESET", fm1lab_patch_preset_failure_label()); break;
             case FM1LAB_INPUT_RESULT_APPLIED:
                 if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP) app_say("PATCH", patch_display_name(set.patch));
                 else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP) app_say("PATCH PRESET", patch_display_name(set.patch));
