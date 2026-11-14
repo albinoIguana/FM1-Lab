@@ -99,33 +99,44 @@ static int32_t envelope_next(fm1lab_fm4_voice_t *v)
 
 static int32_t render_algorithm(fm1lab_fm4_voice_t *v)
 {
-    int32_t op[4];
-    uint32_t phase0 = v->phase[0] + ((uint32_t)(int32_t)v->feedback_sample << 14);
-    op[0] = sine_lookup(phase0);
-    op[1] = sine_lookup(v->phase[1]);
-    op[2] = sine_lookup(v->phase[2]);
-    op[3] = sine_lookup(v->phase[3]);
-    for (uint32_t i = 0; i < 4u; ++i) v->phase[i] += v->phase_inc[i];
-    v->feedback_sample = (int16_t)(op[0] >> 3);
+    int32_t op0, op1, op2, op3;
+    uint32_t p0 = v->phase[0] + ((uint32_t)(int32_t)v->feedback_sample << 14);
+    uint32_t p1 = v->phase[1], p2 = v->phase[2], p3 = v->phase[3];
+    int32_t output;
 
     switch (v->algorithm) {
     case 0u: /* Four-op serial: 1 -> 2 -> 3 -> 4. */
-        op[1] = sine_lookup(v->phase[1] - v->phase_inc[1] + ((uint32_t)op[0] << 15));
-        op[2] = sine_lookup(v->phase[2] - v->phase_inc[2] + ((uint32_t)op[1] << 15));
-        return sine_lookup(v->phase[3] - v->phase_inc[3] + ((uint32_t)op[2] << 15));
+        op0 = sine_lookup(p0);
+        op1 = sine_lookup(p1 + ((uint32_t)op0 << 15));
+        op2 = sine_lookup(p2 + ((uint32_t)op1 << 15));
+        output = sine_lookup(p3 + ((uint32_t)op2 << 15));
+        break;
     case 1u: /* Two independent modulator/carrier pairs. */
-        op[1] = sine_lookup(v->phase[1] - v->phase_inc[1] + ((uint32_t)op[0] << 15));
-        op[3] = sine_lookup(v->phase[3] - v->phase_inc[3] + ((uint32_t)op[2] << 15));
-        return (op[1] + op[3]) / 2;
+        op0 = sine_lookup(p0);
+        op1 = sine_lookup(p1 + ((uint32_t)op0 << 15));
+        op2 = sine_lookup(p2);
+        op3 = sine_lookup(p3 + ((uint32_t)op2 << 15));
+        output = (op1 + op3) / 2;
+        break;
     case 2u: /* Three-op stack plus one independent carrier. */
-        op[1] = sine_lookup(v->phase[1] - v->phase_inc[1] + ((uint32_t)op[0] << 15));
-        op[2] = sine_lookup(v->phase[2] - v->phase_inc[2] + ((uint32_t)op[1] << 15));
-        return (op[2] + op[3]) / 2;
+        op0 = sine_lookup(p0);
+        op1 = sine_lookup(p1 + ((uint32_t)op0 << 15));
+        op2 = sine_lookup(p2 + ((uint32_t)op1 << 15));
+        op3 = sine_lookup(p3);
+        output = (op2 + op3) / 2;
+        break;
     default: /* One independent carrier plus a three-op stack. */
-        op[2] = sine_lookup(v->phase[2] - v->phase_inc[2] + ((uint32_t)op[1] << 15));
-        op[3] = sine_lookup(v->phase[3] - v->phase_inc[3] + ((uint32_t)op[2] << 15));
-        return (op[0] + op[3]) / 2;
+        op0 = sine_lookup(p0);
+        op1 = sine_lookup(p1);
+        op2 = sine_lookup(p2 + ((uint32_t)op1 << 15));
+        op3 = sine_lookup(p3 + ((uint32_t)op2 << 15));
+        output = (op0 + op3) / 2;
+        break;
     }
+
+    v->feedback_sample = (int16_t)(op0 >> 3);
+    for (uint32_t i = 0; i < 4u; ++i) v->phase[i] += v->phase_inc[i];
+    return output;
 }
 
 int fm1lab_fm4_render(fm1lab_fm4_voice_t *v, int16_t *out, uint32_t frames)
