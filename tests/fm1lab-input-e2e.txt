@@ -103,6 +103,10 @@ fm1lab_name_migration_test
 expect name_migration 1
 expect namemigstage 10
 
+# Missing flash metadata must still load the exact curated ROM Instrument.
+fm1lab_rom_fallback_test
+expect rom_fallback 1
+
 # Return HOME so the refusal and PRE: INST cue are checked in the same screen.
 tap HOME
 wait 40
