@@ -1,6 +1,6 @@
 # Mixed synthesis implementation plan
 
-Status: implementation branch, design checkpoint. This document does not claim that any engine has been integrated or benchmarked on FM1 hardware.
+Status: implementation branch. Fixed-slot mixed-engine dispatch is integrated into the native FM6 voice allocator on this branch; device build, CPU2 regression, and physical FM1 qualification remain required. No hardware performance claim is made.
 
 ## Target architecture
 
@@ -108,7 +108,7 @@ Prototype limitations are deliberate and remain open:
 - The subtractive saws are not band-limited yet; aliasing and a musical filter control model must be addressed before integration.
 - PSG pulse/noise balance is fixed in this first pass.
 - The current envelopes are intentionally minimal, not the final FM1 envelope model.
-- The three lightweight modules are not yet connected to the live FM6 allocator or device build. Fixed-slot dispatch, FM6-state preservation, CPU0/CPU2 backup semantics, and target memory/performance qualification remain future work.
+- The three lightweight modules are now connected to the live FM6 allocator. Fixed-slot dispatch, FM6-state preservation, and CPU0/CPU2 backup semantics are implemented in the wrapper. Device build, static memory/stack audit, target callback measurements, and physical FM1 qualification remain required.
 - Plucked string is deferred until its per-voice delay memory and target cost are justified.
 
 No engine choice, Instrument schema change, preset migration, UI change, or hardware-performance claim is made by this checkpoint.
@@ -128,3 +128,12 @@ The instrument engine map is fixed and identical for both sequencer banks:
 The physical slot determines the engine. There is no engine selector, per-preset engine-type field, per-voice engine tag, or five-engine mode. Instrument changes replace engine parameters only; they do not change slot identity. The four-operator FM module remains a non-production experiment.
 
 Integration is deliberately staged. First, the three lightweight engines gain phase-continuous pitch updates so pitch bend and tuning can be dispatched without phase resets. The live allocator integration must then preserve FM6's existing note state, output scaling, voice-stealing/source-token behavior, render quantum, and CPU2 copy/fallback semantics. No persistent format, instrument selection, UI, or factory migration changes are part of this stage.
+
+
+## Live allocator integration checkpoint — 2026-11-14
+
+The fixed map is now active in the FM6 wrapper. Each voice pool is homogeneous by physical patch slot; the wrapper dispatches note-on, note-off, pitch updates, render, and completion by the fixed patch-context map. Patch 1 (contexts 0 and 4) continues through the existing FM6 note state and renderer. The other three slots use their own fixed-point synth voice state.
+
+The voice state is a copy-safe union of the existing 244-byte FM6 note and the lightweight voice state, plus a separate DC-blocker accumulator for lightweight engines. The CPU2 backup/rollback copies the complete voice object, so engine state and DC history roll back together. The active-voice list remains dynamically packed before CPU0/CPU2 splitting. The lightweight render path converts Q15 samples into the existing FM6 Q24 patch-mix domain and retains the shared patch gain, fade, pan/send, FX, and master path.
+
+The wavetable/PSG/subtractive engines accept Q4-semitone pitch updates; pitch bend, per-voice tuning, patch transpose, octave, and fine cents update phase increments without resetting oscillator phases. No persistent engine selector or preset-format field was added. The native FM6 test harness exercises the mixed slots through the existing all-patch and CPU2 split/fallback paths; passing CI is still required before treating this integration as validated.

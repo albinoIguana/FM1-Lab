@@ -17,7 +17,7 @@ python3 "$FELUCCA/tools/gen_fm6_patches.py" "$TMP/felucca_fm6.h"
 
 cc -std=c11 -O2 -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable -pthread \
   -I"$ROOT/app/dsp" -I"$TMP" \
-  "$ROOT/app/dsp/fm6.c" "$ROOT/tests/fm6_engine.test.c" -o "$BIN"
+  "$ROOT/app/dsp/fm6.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/tests/fm6_engine.test.c" -o "$BIN"
 
 # Standalone fixed-point mixed-synthesis engine prototypes.
 MIXED_BIN="$TMP/mixed-synth-prototypes-test"
@@ -36,7 +36,7 @@ cc -std=c11 -O2 -Wall -Wextra -Werror \
 DX7_BIN="$TMP/fm6-dx7-audit"
 cc -std=c11 -O2 -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable \
   -I"$ROOT/app" -I"$ROOT/app/dsp" -I"$TMP" \
-  "$ROOT/app/dsp/fm6.c" "$ROOT/tests/fm6_dx7_library_audit.test.c" -o "$DX7_BIN"
+  "$ROOT/app/dsp/fm6.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/tests/fm6_dx7_library_audit.test.c" -o "$DX7_BIN"
 "$DX7_BIN"
 "$BIN"
 
@@ -48,6 +48,6 @@ if [[ "${FM6_TSAN:-0}" == "1" ]]; then
   cc -std=c11 -O1 -g -DFM6_TEST -Wall -Wextra -Werror -Wno-unused-const-variable \
     -fsanitize=thread -fno-omit-frame-pointer -pthread \
     -I"$ROOT/app/dsp" -I"$TMP" \
-    "$ROOT/app/dsp/fm6.c" "$ROOT/tests/fm6_engine.test.c" -o "$TSAN_BIN"
+    "$ROOT/app/dsp/fm6.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/tests/fm6_engine.test.c" -o "$TSAN_BIN"
   TSAN_OPTIONS=halt_on_error=1 "$TSAN_BIN"
 fi
