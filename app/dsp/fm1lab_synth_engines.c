@@ -3,7 +3,6 @@
  * Standalone prototype: not yet wired into the live FM6 voice allocator.
  */
 #include "fm1lab_synth_engines.h"
-#include <string.h>
 
 #define ENV_SUSTAIN_Q15 24576u
 #define ENV_ATTACK_STEP 1024u
@@ -64,7 +63,10 @@ static int32_t sine_lookup(uint32_t phase)
 void fm1lab_synth_init(fm1lab_synth_voice_t *v, fm1lab_synth_engine_t engine)
 {
     if (!v) return;
-    memset(v, 0, sizeof(*v));
+    {
+        uint8_t *bytes = (uint8_t *)v;
+        for (uint32_t i = 0; i < sizeof(*v); ++i) bytes[i] = 0u;
+    }
     v->engine = (uint8_t)engine;
     v->noise = 0x2ce1u;
     v->filter_alpha_q15 = 8192u;
