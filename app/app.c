@@ -100,6 +100,7 @@ static uint8_t set_dirty;
 static fm1lab_instrument_t current_instrument;
 static fm1lab_insert_state_t current_inserts;
 static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
+static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out);
 
 /* Both sequencer lanes stay resident in RAM. Track focus never performs
  * storage I/O; each lane is persisted only by its own explicit SAVE. */
@@ -107,12 +108,14 @@ typedef struct {
     fm1lab_instrument_t instrument;
     fm1lab_insert_state_t inserts;
     uint8_t dirty;
+    uint8_t rom_fallback;
     uint8_t flash_index;
     uint8_t loaded;
 } app_track_state_t;
 static app_track_state_t track_state[2];
 #ifdef PLAT_HOST
 static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
+static uint8_t app_host_force_meta_lookup_failure, app_host_rom_fallback_pass;
 static uint8_t app_host_resync_pass;
 static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
 static uint32_t app_host_store_load_calls, app_host_store_save_calls;
@@ -120,6 +123,7 @@ static uint8_t app_host_track_cache_pass;
 #endif
 static fm1lab_instrument_t factory_instrument;
 static uint8_t instrument_index, instrument_dirty, instrument_loaded;
+static uint8_t instrument_rom_fallback;
 static volatile uint8_t instrument_apply_pending;
 static uint8_t voice_update_snapshot[FM1LAB_PATCH_BYTES];
 static volatile uint8_t voice_update_pending, voice_update_patch, voice_dirty;
@@ -207,497 +211,6 @@ static volatile uint8_t ui_event_head, ui_event_tail, ui_event_overflow;
 /* Main-loop controls never write FM voice state directly. They publish compact events;
  * the audio interrupt is the sole runtime writer of the synthesizer state. */
 
-/* M-VAVE's 16 compact factory DX7 recipes, expanded to the same 156-byte
- * voice layout used by FM1-Lab/Felucca. PRESET loads one recipe into one patch. */
-enum { FM1LAB_FACTORY_PRESET_COUNT = 16u };
-struct fm1lab_factory_pair {
-    uint8_t level, coarse : 2, detune : 4, mod, ratio, fine, decay, body;
-};
-struct fm1lab_factory_voice {
-    uint8_t attack, decay, settle, release, body, sustain, mod_attack, mod_release, feedback;
-    struct fm1lab_factory_pair pair[3];
-};
-static const char fm1lab_factory_names[FM1LAB_FACTORY_PRESET_COUNT][11] = {
-    "NEON KEYS ","ORBIT BELL","SOFT ORGAN","ROUND BASS","WARM AIR  ","WOOD REED ",
-    "SOFT EP   ","DRY CLAV  ","FM GUITAR ","MARIMBA   ","VIBES     ","SOFT BRASS",
-    "FM STRINGS","SUB BASS  ","METAL HIT ","SOFT LEAD "
-};
-static const struct fm1lab_factory_voice fm1lab_factory_voices[FM1LAB_FACTORY_PRESET_COUNT] = {
-    {96,52,30,62,84,0,99,66,0, {{98,1,7,54,1,0,65,38},{91,1,8,60,1,0,57,58},{79,1,6,48,7,0,80,0}}},
-    {99,50,28,53,70,0,99,62,0, {{96,1,7,58,3,50,59,0},{82,2,7,48,7,0,68,0},{69,3,7,35,11,0,80,0}}},
-    {95,65,45,78,99,99,95,78,0, {{90,1,7,0,1,0,65,0},{87,2,7,0,1,0,65,0},{74,3,7,0,1,0,65,0}}},
-    {97,72,46,82,91,84,99,86,0, {{99,1,7,42,1,0,76,32},{74,2,7,32,1,0,82,20},{0,1,7,0,1,0,80,0}}},
-    {53,47,36,52,96,92,49,55,0, {{90,1,5,42,1,0,55,82},{84,1,9,34,2,0,53,76},{73,2,7,27,1,0,52,78}}},
-    {84,61,46,72,94,89,78,77,1, {{95,1,7,61,2,0,63,86},{82,1,8,38,1,0,68,75},{70,3,7,29,1,0,72,60}}},
-    {94,49,28,60,86,0,96,64,0, {{98,1,7,44,1,0,60,35},{86,1,8,38,3,0,66,20},{72,2,6,31,1,0,72,0}}},
-    {99,75,47,80,42,0,99,83,1, {{96,1,7,67,1,0,82,18},{81,2,7,55,2,0,86,0},{0,1,7,0,1,0,80,0}}},
-    {97,57,32,66,69,0,99,74,0, {{97,1,7,55,1,0,72,18},{83,2,7,46,3,0,81,0},{66,3,7,38,5,0,85,0}}},
-    {99,67,37,72,34,0,99,81,0, {{98,1,7,60,3,0,85,0},{74,2,7,46,5,0,88,0},{58,3,7,32,7,0,91,0}}},
-    {98,52,25,55,78,0,99,65,0, {{94,1,7,56,4,0,76,0},{76,2,8,39,3,0,81,0},{66,3,6,28,2,0,84,0}}},
-    {81,62,42,72,96,90,67,75,1, {{95,1,7,67,1,0,62,90},{84,1,8,46,1,0,65,83},{70,2,6,40,2,0,68,75}}},
-    {61,48,39,54,96,94,57,58,0, {{89,1,5,54,1,0,55,89},{83,1,9,36,2,0,55,83},{72,2,7,30,4,0,58,76}}},
-    {95,72,44,84,96,94,99,86,0, {{99,1,7,0,1,0,80,0},{0,1,7,0,1,0,80,0},{0,1,7,0,1,0,80,0}}},
-    {99,65,40,72,48,0,99,76,0, {{89,1,7,65,7,31,67,0},{70,2,7,58,11,47,73,0},{56,3,7,48,13,79,78,0}}},
-    {88,60,40,71,96,90,82,75,1, {{96,1,7,45,1,0,65,83},{80,1,8,31,2,0,70,72},{71,2,6,24,1,0,74,66}}}
-};
-static void fm1lab_factory_voice_build(uint8_t out[FM1LAB_PATCH_BYTES], uint8_t preset)
-{
-    const struct fm1lab_factory_voice *sound = &fm1lab_factory_voices[preset % FM1LAB_FACTORY_PRESET_COUNT];
-    for (uint32_t i=0;i<FM1LAB_PATCH_BYTES;i++) out[i]=0u;
-    for (uint32_t i=0;i<10u;i++) out[145u+i]=(uint8_t)fm1lab_factory_names[preset % FM1LAB_FACTORY_PRESET_COUNT][i];
-    for (uint32_t op=0;op<6u;op++) {
-        uint8_t *v=out+21u*op;
-        const struct fm1lab_factory_pair *pair=&sound->pair[op/2u];
-        uint8_t carrier=(uint8_t)(op&1u);
-        v[0]=carrier?sound->attack:sound->mod_attack;
-        v[1]=carrier?sound->decay:pair->decay;
-        v[2]=sound->settle; v[3]=carrier?sound->release:sound->mod_release;
-        v[4]=99u; v[5]=carrier?sound->body:pair->body;
-        v[6]=carrier?sound->sustain:(sound->sustain?pair->body:0u);
-        v[8]=50u; v[10]=carrier?8u:18u; v[13]=1u;
-        v[15]=carrier?2u:4u; v[16]=carrier?pair->level:pair->mod;
-        v[18]=carrier?pair->coarse:pair->ratio;
-        v[19]=carrier?0u:pair->fine; v[20]=pair->detune;
-        if (preset==2u) {
-            static const uint8_t levels[6]={89,77,84,68,59,52};
-            static const uint8_t ratios[6]={1,2,3,4,6,8};
-            v[16]=levels[op]; v[18]=ratios[op]; v[19]=0u;
-            v[5]=v[6]=99u; v[15]=1u; v[20]=7u;
-        }
-    }
-    for(uint32_t i=126u;i<130u;i++)out[i]=99u;
-    for(uint32_t i=130u;i<134u;i++)out[i]=50u;
-    out[134]=(uint8_t)(preset==2u?31u:4u);
-    out[135]=sound->feedback; out[136]=1u;
-    out[137]=28u; out[138]=35u;
-    if(preset==4u||preset==5u||preset==12u){out[139]=2u;out[143]=2u;}
-    out[141]=1u; out[142]=4u; out[144]=24u; out[155]=63u;
-}
-
-
-/* Turn a factory recipe into a genuinely long-form layer. DX-style EG rates
- * are inverse-time controls: lower values create slower stages. Two contrasting
- * evolvers are used per Instrument; the remaining voices keep the attack clear. */
-static void fm1lab_make_evolving_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t texture)
-{
-    static const char *const names[2]={"SLOW AIR","EVOLVE FX"};
-    uint8_t carriers=fm1lab_carrier_mask(voice[134]&31u);
-    for(uint32_t op=0;op<6u;op++) {
-        uint8_t *v=voice+(5u-op)*21u;
-        uint8_t carrier=(uint8_t)((carriers>>op)&1u);
-        uint8_t spread=(uint8_t)(op*2u);
-        if(!texture) {
-            /* Broad, slow swell; modulator envelopes move at different rates
-             * so the harmonic color opens after the fundamental arrives. */
-            v[0]=(uint8_t)(carrier?13u+spread:20u+spread);
-            v[1]=(uint8_t)(carrier?24u+spread:31u+spread);
-            v[2]=(uint8_t)(carrier?35u+spread:43u+spread);
-            v[3]=(uint8_t)(carrier?19u+spread:27u+spread);
-            v[4]=99u;
-            v[5]=(uint8_t)(carrier?88u:76u);
-            v[6]=(uint8_t)(carrier?72u:48u);
-            v[7]=0u;
-        } else {
-            /* More spectral movement and a slower, uneven fade; deliberately
-             * contrasts with SLOW AIR instead of doubling its envelope. */
-            v[0]=(uint8_t)(carrier?19u+spread:11u+spread);
-            v[1]=(uint8_t)(carrier?34u+spread:24u+spread);
-            v[2]=(uint8_t)(carrier?46u+spread:37u+spread);
-            v[3]=(uint8_t)(carrier?23u+spread:16u+spread);
-            v[4]=99u;
-            v[5]=(uint8_t)(carrier?82u:68u);
-            v[6]=(uint8_t)(carrier?58u:36u);
-            v[7]=0u;
-            if(!carrier && v[18]<28u) v[18]=(uint8_t)(v[18]+(op%3u)+1u);
-        }
-    }
-    voice[137]=(uint8_t)(texture?29u:17u); /* slow LFO */
-    voice[138]=(uint8_t)(texture?24u:48u); /* let the note bloom before modulation */
-    voice[139]=(uint8_t)(texture?7u:3u);  /* restrained pitch movement */
-    voice[140]=(uint8_t)(texture?42u:26u); /* audible but gradual level movement */
-    voice[141]=0u;
-    voice[142]=0u; /* sine */
-    voice[143]=(uint8_t)(texture?4u:2u);
-    for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[texture])?names[texture][i]:' ');
-}
-
-/* PELAGIC: long-form, layered pad family derived from the supplied four-op
- * recipe. Algorithm 15 routes the active modulators into one stable carrier.
- * The fourth recipe role is placed on OP6 because the DX feedback loop is
- * global and belongs to the engine's feedback operator. */
-static void fm1lab_make_pelagic_voice(uint8_t voice[FM1LAB_PATCH_BYTES],uint8_t layer)
-{
-    static const char *const names[4]={"LOW TIDE","SLOW BLOOM","CHROME VEIL","HIGH MIST"};
-    static const uint8_t op_level[4][4]={
-        {99u,78u,84u,65u},{99u,86u,78u,58u},
-        {99u,70u,91u,74u},{99u,65u,68u,72u}
-    };
-    static const uint8_t op_coarse[4]={1u,1u,5u,11u};
-    static const uint8_t op_fine[4]={0u,41u,0u,0u};
-    static const uint8_t op_detune[4]={7u,8u,10u,3u};
-    static const uint8_t attack[4]={12u,15u,18u,21u};
-    static const uint8_t lfo_speed[4]={17u,14u,20u,12u};
-    static const uint8_t lfo_depth[4]={38u,31u,43u,48u};
-    /* OP1 is the carrier; OP2/3/4 are the recipe's harmonic modulators.
-     * OP6 carries the noisy upper partial and the DX feedback loop. */
-    const uint8_t mapped[4]={0u,1u,2u,5u};
-    for(uint32_t op=0;op<6u;op++) {
-        uint8_t *v=voice+(5u-op)*21u;
-        v[0]=(uint8_t)(attack[layer&3u]+op*2u);
-        v[1]=(uint8_t)(op==0u?22u:27u+op*2u);
-        v[2]=(uint8_t)(op==0u?35u:39u+op*2u);
-        v[3]=(uint8_t)(op==0u?17u:23u+op);
-        v[4]=99u;
-        v[5]=(uint8_t)(op==0u?91u:op==5u?66u:74u);
-        v[6]=(uint8_t)(op==0u?82u:op==5u?31u:op==2u?52u:61u);
-        v[7]=0u;
-        v[10]=(uint8_t)(op==0u?5u:op==5u?0u:3u);
-        v[15]=(uint8_t)(op==0u?1u:3u);
-        v[16]=0u;
-        v[18]=1u; v[19]=0u; v[20]=7u;
-    }
-    for(uint32_t role=0;role<4u;role++) {
-        uint8_t *v=voice+(5u-mapped[role])*21u;
-        v[16]=op_level[ layer&3u ][role];
-        v[18]=op_coarse[role];
-        v[19]=op_fine[role];
-        v[20]=op_detune[role];
-    }
-    /* One carrier, four parallel/stacked modulation paths, OP6 feedback. */
-    voice[134]=15u;
-    voice[135]=7u;
-    voice[136]=1u;
-    /* Slow, gently moving pitch and amplitude LFO: the note should breathe,
-     * not wobble like a conventional vibrato patch. */
-    voice[137]=lfo_speed[layer&3u];
-    voice[138]=(uint8_t)(layer==2u?34u:layer==3u?42u:45u);
-    voice[139]=(uint8_t)(layer==1u?5u:layer==2u?8u:3u);
-    voice[140]=lfo_depth[layer&3u];
-    voice[141]=0u;
-    voice[142]=0u;
-    voice[143]=(uint8_t)(layer==2u?4u:3u);
-    voice[144]=24u;
-    for(uint32_t i=0;i<10u;i++)
-        voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[layer&3u])?names[layer&3u][i]:' ');
-}
-static void fm1lab_seed_pelagic(fm1lab_instrument_t *out)
-{
-    static const uint8_t levels[4]={25u,20u,16u,12u};
-    fm1lab_instrument_init(out,"PELAGIC");
-    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        fm1lab_factory_voice_build(voice,12u);
-        fm1lab_make_pelagic_voice(voice,(uint8_t)p);
-        (void)fm1lab_patch_set_voice(out,p,voice);
-        out->patches[p].level=levels[p];
-        out->patches[p].enabled=1u;
-        out->patches[p].voice[155]=64u;
-    }
-}
-
-/* Four dark FM creatures. Each patch is a purpose-built six-operator voice:
- * low throat, grinding growl, sharp teeth, and a slow spectral howl. */
-static void fm1lab_make_beast_voice_v1(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t beast, uint8_t role)
-{
-    static const uint8_t algorithms[4][4] = {
-        {15u, 16u, 20u, 24u}, {17u, 15u, 21u, 23u},
-        {16u, 18u, 20u, 24u}, {15u, 17u, 22u, 24u}
-    };
-    static const uint8_t coarse[4][6] = {
-        {1u,2u,3u,5u,7u,1u}, {1u,3u,2u,6u,9u,1u},
-        {1u,2u,4u,7u,11u,1u}, {1u,3u,5u,8u,13u,1u}
-    };
-    static const uint8_t fine[4][6] = {
-        {0u,7u,19u,31u,11u,0u}, {0u,13u,27u,8u,37u,0u},
-        {0u,9u,23u,41u,16u,0u}, {0u,17u,33u,5u,29u,0u}
-    };
-    uint8_t algorithm=algorithms[beast&3u][role&3u];
-    uint8_t carriers=fm1lab_carrier_mask(algorithm);
-    voice[134]=algorithm;
-    voice[135]=(uint8_t)(role==0u?7u:role==1u?6u:role==2u?5u:4u);
-    for(uint32_t op=0;op<6u;op++) {
-        uint8_t *v=voice+(5u-op)*21u;
-        uint8_t carrier=(uint8_t)((carriers>>op)&1u);
-        uint8_t spread=(uint8_t)((op*3u+beast*2u)%13u);
-        /* A quick bite followed by an uneven, vocal-like decay. */
-        v[0]=(uint8_t)(carrier?82u+spread:91u-spread/2u);
-        v[1]=(uint8_t)(role==0u?48u+spread:role==1u?31u+spread:58u+spread);
-        v[2]=(uint8_t)(role==3u?22u+spread:45u+spread);
-        v[3]=(uint8_t)(role==2u?35u+spread:62u+spread);
-        v[4]=99u;
-        v[5]=(uint8_t)(carrier?94u:82u);
-        v[6]=(uint8_t)(carrier?(role==0u?84u:72u):(role==1u?65u:42u+spread));
-        v[7]=0u;
-        v[10]=(uint8_t)(carrier?8u:18u);
-        v[15]=(uint8_t)(carrier?1u:4u);
-        v[16]=(uint8_t)(carrier?94u:(role==0u?88u:role==1u?99u:78u+spread));
-        v[18]=coarse[beast&3u][op];
-        v[19]=fine[beast&3u][op];
-        v[20]=(uint8_t)(7u+(op%4u)*2u);
-    }
-    /* Slow, slightly unstable pitch/level movement keeps the held note alive. */
-    voice[137]=(uint8_t)(role==3u?31u:role==1u?47u:38u+beast*3u);
-    voice[138]=(uint8_t)(role==3u?12u:role==1u?5u:18u);
-    voice[139]=(uint8_t)(role==2u?12u:role==3u?24u:18u);
-    voice[140]=(uint8_t)(role==3u?34u:role==1u?12u:18u);
-    voice[141]=0u;
-    voice[142]=0u;
-    voice[143]=(uint8_t)(role==3u?5u:3u);
-    {
-        static const char *const names[4]={"THROAT","GROWL","TEETH","HOWL"};
-        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[role&3u])?names[role&3u][i]:' ');
-    }
-}
-/* V2 creature voices: push the DX-style engine itself into an inharmonic,
- * vocal range. Operator output levels are intentionally high on modulators;
- * fractional fine ratios, detune and the pitch EG supply the bite and larynx
- * movement. No master distortion is required to create the core character. */
-static void fm1lab_make_beast_voice(uint8_t voice[FM1LAB_PATCH_BYTES], uint8_t beast, uint8_t role)
-{
-    static const uint8_t algorithms[4][4] = {
-        {15u,16u,20u,24u}, {17u,15u,21u,23u},
-        {16u,18u,20u,24u}, {15u,17u,22u,24u}
-    };
-    static const uint8_t coarse[4][6] = {
-        {1u,2u,3u,5u,7u,1u}, {1u,3u,2u,6u,9u,1u},
-        {1u,2u,4u,7u,11u,1u}, {1u,3u,5u,8u,13u,1u}
-    };
-    static const uint8_t fine[4][6] = {
-        {0u,17u,31u,47u,63u,11u}, {0u,23u,41u,13u,57u,29u},
-        {0u,11u,37u,59u,19u,43u}, {0u,29u,53u,7u,67u,35u}
-    };
-    static const uint8_t pitch_start[4][4] = {
-        {82u,34u,50u,50u}, {96u,18u,50u,50u},
-        {99u,8u,50u,50u}, {74u,42u,50u,50u}
-    };
-    static const uint8_t pitch_rate[4][4] = {
-        {99u,94u,76u,62u}, {99u,99u,82u,68u},
-        {99u,99u,90u,72u}, {90u,78u,64u,52u}
-    };
-    const uint8_t alg=algorithms[beast&3u][role&3u];
-    const uint8_t carriers=fm1lab_carrier_mask(alg);
-    for(uint32_t op=0;op<6u;op++) {
-        uint8_t *v=voice+(5u-op)*21u;
-        const uint8_t carrier=(uint8_t)((carriers>>op)&1u);
-        const uint8_t spread=(uint8_t)((op*5u+beast*3u+role*2u)%17u);
-        /* Hard attack, then a deliberately uneven vocal-formant collapse. */
-        v[0]=(uint8_t)(carrier?94u+spread/3u:99u);
-        v[1]=(uint8_t)(role==0u?76u+spread:role==1u?94u:role==2u?99u:56u+spread);
-        v[2]=(uint8_t)(role==3u?44u+spread:role==2u?82u+spread:66u+spread);
-        v[3]=(uint8_t)(role==3u?70u:88u+spread/2u);
-        v[4]=99u;
-        v[5]=(uint8_t)(carrier?94u:role==3u?82u:72u);
-        v[6]=(uint8_t)(carrier?78u:role==0u?58u:role==1u?24u:role==2u?12u:44u);
-        v[7]=0u;
-        /* More output from modulators = much higher FM index. */
-        v[16]=(uint8_t)(carrier?88u+spread/2u:role==0u?91u+spread/2u:role==1u?99u:role==2u?97u:88u+spread/2u);
-        v[18]=coarse[beast&3u][op];
-        v[19]=fine[beast&3u][op];
-        v[20]=(uint8_t)(role==1u?10u+(op%5u):role==2u?12u-(op%3u):8u+(op%5u));
-        /* Keep carrier levels healthy while modulator envelopes bite quickly. */
-        v[10]=(uint8_t)(carrier?5u:role==1u?0u:role==2u?2u:8u);
-        v[15]=(uint8_t)(carrier?1u:role==2u?1u:3u);
-    }
-    voice[134]=alg;
-    voice[135]=(uint8_t)(role==3u?5u:role==0u?7u:7u);
-    voice[136]=1u;
-    /* DX pitch EG: a fast initial pitch excursion that falls into the note. */
-    for(uint32_t i=0;i<4u;i++) {
-        voice[126u+i]=pitch_rate[role&3u][i];
-        voice[130u+i]=pitch_start[role&3u][i];
-    }
-    /* Controlled instability, strongest on GROWL and TEETH. */
-    voice[137]=(uint8_t)(role==0u?42u:role==1u?68u:role==2u?58u:31u);
-    voice[138]=(uint8_t)(role==3u?14u:role==0u?2u:0u);
-    voice[139]=(uint8_t)(role==1u?24u:role==2u?31u:role==3u?18u:12u);
-    voice[140]=(uint8_t)(role==1u?22u:role==2u?18u:role==3u?30u:10u);
-    voice[141]=1u;
-    voice[142]=4u;
-    voice[143]=(uint8_t)(role==3u?5u:role==2u?4u:3u);
-    voice[144]=24u;
-    {
-        static const char *const names[4]={"THROAT","GROWL","TEETH","HOWL"};
-        for(uint32_t i=0;i<10u;i++) voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[role&3u])?names[role&3u][i]:' ');
-    }
-}
-typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_beast_instrument_t;
-static void fm1lab_seed_beast_v1(uint32_t index,fm1lab_instrument_t *out)
-{
-    const fm1lab_beast_instrument_t *beast;
-    /* Legacy comparison image lets the updater replace only untouched V1 beasts. */
-    static const fm1lab_beast_instrument_t legacy[4]={
-        {"HOUND",{3u,5u,14u,12u},{28u,24u,20u,16u}},
-        {"RAVAGE",{14u,11u,15u,5u},{27u,23u,18u,14u}},
-        {"ABYSS",{13u,12u,14u,4u},{28u,22u,17u,13u}},
-        {"WRAITH",{5u,12u,10u,14u},{25u,21u,16u,12u}}
-    };
-    beast=&legacy[(index-16u)&3u];
-    fm1lab_instrument_init(out,beast->name);
-    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        fm1lab_factory_voice_build(voice,beast->source[p]);
-        fm1lab_make_beast_voice_v1(voice,(uint8_t)((index-16u)&3u),(uint8_t)p);
-        (void)fm1lab_patch_set_voice(out,p,voice);
-        out->patches[p].level=beast->level[p];
-        out->patches[p].enabled=1u;
-        out->patches[p].voice[155]=(uint8_t)(p==0u?48u:p==1u?64u:p==2u?80u:72u);
-    }
-}
-
-static const fm1lab_beast_instrument_t fm1lab_beasts[4]={
-    {"HOUND",{3u,5u,14u,12u},{22u,16u,11u,9u}},
-    {"RAVAGE",{14u,11u,15u,5u},{20u,15u,10u,8u}},
-    {"ABYSS",{13u,12u,14u,4u},{21u,16u,10u,8u}},
-    {"WRAITH",{5u,12u,10u,14u},{20u,16u,11u,9u}}
-};
-static void fm1lab_seed_beast(uint32_t index,fm1lab_instrument_t *out)
-{
-    const fm1lab_beast_instrument_t *beast=&fm1lab_beasts[(index-16u)&3u];
-    fm1lab_instrument_init(out,beast->name);
-    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        fm1lab_factory_voice_build(voice,beast->source[p]);
-        fm1lab_make_beast_voice(voice,(uint8_t)((index-16u)&3u),(uint8_t)p);
-        (void)fm1lab_patch_set_voice(out,p,voice);
-        out->patches[p].level=beast->level[p];
-        out->patches[p].enabled=1u;
-        out->patches[p].voice[155]=(uint8_t)(p==0u?48u:p==1u?64u:p==2u?80u:72u);
-    }
-}
-
-/* Four industrial instruments in bank 2: hard transients, grinding FM,
- * metallic shards and unstable warning-tone drones. Each patch uses all six
- * operators; the selected algorithms provide multi-stage modulation paths. */
-typedef struct { const char *name; uint8_t source[4]; uint8_t level[4]; } fm1lab_industrial_t;
-static const fm1lab_industrial_t fm1lab_industrials[4]={
-    {"IRONWORK",{14u,3u,15u,12u},{22u,17u,12u,9u}},
-    {"PRESSURE",{3u,14u,5u,13u},{23u,18u,12u,9u}},
-    {"SHRAPNEL",{14u,9u,15u,10u},{21u,16u,12u,9u}},
-    {"SIREN",{12u,5u,14u,1u},{22u,17u,13u,10u}}
-};
-static void fm1lab_make_industrial_voice(uint8_t voice[FM1LAB_PATCH_BYTES],uint8_t family,uint8_t role)
-{
-    static const uint8_t algorithms[4][4]={
-        {15u,20u,17u,24u},{17u,15u,20u,23u},
-        {20u,17u,15u,24u},{24u,20u,17u,15u}
-    };
-    static const uint8_t coarse[4][6]={
-        {1u,2u,3u,5u,7u,11u},{1u,3u,4u,6u,9u,13u},
-        {1u,2u,5u,7u,11u,15u},{1u,2u,3u,4u,7u,9u}
-    };
-    static const uint8_t fine[4][6]={
-        {0u,17u,41u,63u,29u,77u},{0u,31u,59u,13u,47u,83u},
-        {0u,23u,53u,71u,37u,89u},{0u,11u,43u,67u,19u,57u}
-    };
-    static const char *const names[4]={"IMPACT","GRIND","SHARD","DRONE"};
-    uint8_t alg=algorithms[family&3u][role&3u];
-    uint8_t carriers=fm1lab_carrier_mask(alg);
-    for(uint32_t op=0;op<6u;op++) {
-        uint8_t *v=voice+(5u-op)*21u;
-        uint8_t carrier=(uint8_t)((carriers>>op)&1u);
-        uint8_t spread=(uint8_t)((op*7u+family*5u+role*3u)%19u);
-        /* Percussive envelopes on IMPACT/SHARD; GRIND and DRONE sustain. */
-        v[0]=(uint8_t)(role==3u?(carrier?28u:18u):99u);
-        v[1]=(uint8_t)(role==0u?92u:role==1u?84u:role==2u?99u:48u+spread);
-        v[2]=(uint8_t)(role==3u?64u+spread:role==1u?76u+spread:58u+spread);
-        v[3]=(uint8_t)(role==3u?72u:role==1u?86u:44u+spread);
-        v[4]=99u;
-        v[5]=(uint8_t)(carrier?94u:role==3u?78u:69u);
-        v[6]=(uint8_t)(role==3u?(carrier?84u:61u):role==1u?12u:0u);
-        v[7]=0u;
-        v[10]=(uint8_t)(carrier?5u:role==2u?0u:3u);
-        v[15]=(uint8_t)(carrier?1u:role==2u?1u:3u);
-        /* Loud modulators and fractional ratios produce clang, rasp and grit. */
-        v[16]=(uint8_t)(carrier?88u:role==1u?99u:role==2u?97u:92u);
-        v[18]=coarse[family&3u][op];
-        v[19]=fine[family&3u][op];
-        v[20]=(uint8_t)(8u+(op*3u+family+role)%9u);
-    }
-    voice[134]=alg;
-    voice[135]=(uint8_t)(role==1u?7u:role==2u?6u:role==0u?5u:4u);
-    voice[136]=1u;
-    /* Sharp initial pitch fall for the metallic hit and shard patches. */
-    {
-        static const uint8_t start[4][4]={
-            {99u,5u,50u,50u},{91u,22u,50u,50u},
-            {99u,0u,50u,50u},{67u,39u,50u,50u}
-        };
-        static const uint8_t rate[4][4]={
-            {99u,99u,88u,72u},{99u,94u,82u,68u},
-            {99u,99u,91u,76u},{82u,72u,61u,52u}
-        };
-        for(uint32_t i=0;i<4u;i++) {
-            voice[126u+i]=rate[role&3u][i];
-            voice[130u+i]=start[role&3u][i];
-        }
-    }
-    voice[137]=(uint8_t)(role==3u?24u:role==1u?61u:role==2u?55u:38u);
-    voice[138]=(uint8_t)(role==3u?18u:role==0u?0u:3u);
-    voice[139]=(uint8_t)(role==1u?22u:role==2u?29u:role==3u?16u:8u);
-    voice[140]=(uint8_t)(role==3u?28u:role==1u?19u:role==2u?16u:8u);
-    voice[141]=1u;
-    voice[142]=4u;
-    voice[143]=(uint8_t)(role==3u?5u:role==2u?4u:3u);
-    voice[144]=24u;
-    for(uint32_t i=0;i<10u;i++)
-        voice[145u+i]=(uint8_t)(i<fm1lab_strlen(names[role&3u])?names[role&3u][i]:' ');
-}
-static void fm1lab_seed_industrial(uint32_t index,fm1lab_instrument_t *out)
-{
-    const fm1lab_industrial_t *industrial=&fm1lab_industrials[(index-20u)&3u];
-    fm1lab_instrument_init(out,industrial->name);
-    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        fm1lab_factory_voice_build(voice,industrial->source[p]);
-        fm1lab_make_industrial_voice(voice,(uint8_t)((index-20u)&3u),(uint8_t)p);
-        (void)fm1lab_patch_set_voice(out,p,voice);
-        out->patches[p].level=industrial->level[p];
-        out->patches[p].enabled=1u;
-        out->patches[p].voice[155]=(uint8_t)(p==0u?48u:p==1u?64u:p==2u?80u:72u);
-    }
-}
-
-/* Starter library: a deliberate four-voice combination of M-VAVE recipes. */
-typedef struct { const char *name; uint8_t voice[4]; uint8_t level[4]; } fm1lab_seed_instrument_t;
-static const fm1lab_seed_instrument_t fm1lab_seed_instruments[16] = {
- {"GLASS",{1,4,10,0},{25,18,12,8}},
- {"PLUSH",{6,2,12,10},{24,18,14,10}},
- {"PULSE",{15,3,0,14},{23,20,12,8}},
- {"TIDE",{12,5,4,1},{22,18,14,10}},
- {"DUST",{7,8,13,14},{24,18,12,8}},
- {"HALO",{10,1,6,11},{22,18,14,10}},
- {"STATIC",{14,15,7,13},{24,18,12,8}},
- {"VELVET",{2,12,4,6},{23,18,14,10}},
- {"BASSLINE",{3,13,7,0},{25,20,12,8}},
- {"PRISM",{9,10,1,6},{22,18,14,10}},
- {"REED",{5,11,12,4},{22,18,14,10}},
- {"SPARK",{0,14,9,15},{24,18,12,8}},
- {"NIGHT",{13,12,1,2},{25,18,12,8}},
- {"CHIME",{1,9,10,6},{22,18,14,10}},
- {"MOTOR",{3,15,14,7},{24,18,12,8}},
- {"BLOOM",{4,11,12,10},{22,18,14,10}}
-};
-static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
-{
-    const fm1lab_seed_instrument_t *seed=&fm1lab_seed_instruments[index&15u];
-    char name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
-    uint32_t n=0u;
-    while(n<10u && seed->name[n]) { name[n]=seed->name[n]; ++n; }
-    if(index>=16u && n<10u) { name[n++]=' '; name[n++]='2'; }
-    name[n]='\0';
-    fm1lab_instrument_init(out,name);
-    for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        uint32_t source=(index>=16u)?((p+1u)&3u):p;
-        fm1lab_factory_voice_build(voice,seed->voice[source]);
-        if(p==1u) fm1lab_make_evolving_voice(voice,0u);
-        else if(p==3u) fm1lab_make_evolving_voice(voice,1u);
-        (void)fm1lab_patch_set_voice(out,p,voice);
-        out->patches[p].level=seed->level[source];
-        out->patches[p].enabled=1u;
-        out->patches[p].voice[155]=64u;
-    }
-}
 /* A factory placeholder is identified by its factory name and neutral
  * mixer/macro state, not by byte-for-byte voice equality. The last voice byte
  * changed meaning across firmware generations (legacy sentinel -> pan), and
@@ -705,7 +218,7 @@ static void fm1lab_seed_instrument(uint32_t index, fm1lab_instrument_t *out)
 static int fm1lab_is_untouched_factory(const fm1lab_instrument_t *in)
 {
     if(!in || !fm1lab_instrument_valid(in) ||
-       fm1lab_strncmp(in->name,"FACTORY",7u)!=0) return 0;
+       fm1lab_strncmp(in->name,factory_instrument.name,FM1LAB_STORE_NAME_BYTES)!=0) return 0;
     if(memcmp(in->patches,factory_instrument.patches,sizeof in->patches)!=0) return 0;
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;p++) {
         if(in->patches[p].level!=31u || !in->patches[p].enabled) return 0;
@@ -942,31 +455,6 @@ static int fm1lab_is_previous_dx7_instrument(uint32_t index,
            fm1lab_seed_dx7_legacy_instrument(index,&previous)==0 &&
            fm1lab_same_library_instrument(existing,&previous);
 }
-static int fm1lab_is_previous_factory_instrument(uint32_t index,
-                                                  const fm1lab_instrument_t *existing)
-{
-    fm1lab_instrument_t previous;
-    if(index==24u) {
-        fm1lab_seed_pelagic(&previous);
-        if(fm1lab_same_library_instrument(existing,&previous)) return 1;
-        fm1lab_seed_instrument(index,&previous);
-        return fm1lab_same_library_instrument(existing,&previous);
-    }
-    if(index>=16u && index<20u) {
-        fm1lab_seed_beast(index,&previous);
-        if(fm1lab_same_library_instrument(existing,&previous)) return 1;
-        fm1lab_seed_beast_v1(index,&previous);
-        return fm1lab_same_library_instrument(existing,&previous);
-    }
-    if(index>=20u && index<24u) {
-        fm1lab_seed_industrial(index,&previous);
-        if(fm1lab_same_library_instrument(existing,&previous)) return 1;
-        fm1lab_seed_instrument(index,&previous);
-        return fm1lab_same_library_instrument(existing,&previous);
-    }
-    fm1lab_seed_instrument(index,&previous);
-    return fm1lab_same_library_instrument(existing,&previous);
-}
 /* Restore only the historical voice-derived placeholder name, and only
  * when every patch is byte-identical to this slot's factory seed. */
 static uint8_t fm1lab_restore_factory_instrument_name(
@@ -1040,7 +528,6 @@ static void fm1lab_seed_factory_library(void)
         if(!freshly_formatted &&
            !fm1lab_is_untouched_factory(&existing) &&
            !fm1lab_instrument_is_blank_library_slot(&existing) &&
-           !fm1lab_is_previous_factory_instrument(index,&existing) &&
            !fm1lab_is_previous_digitone_instrument(index,&existing) &&
            !fm1lab_is_previous_dx7_instrument(index,&existing)) continue;
         if(fm1lab_store_library_save_full(index,&seed,&inserts)!=0) {
@@ -1164,15 +651,16 @@ static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro)
 
 static void instrument_factory_capture(void)
 {
-    /* Build all four factory voices explicitly. Never copy the engine's
-     * uninitialized PATCH 1..4 placeholders into the factory Instrument. */
-    fm1lab_instrument_init(&factory_instrument, "FACTORY");
-    for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        fm1lab_factory_voice_build(voice,(uint8_t)p);
-        (void)fm1lab_patch_set_voice(&factory_instrument,p,voice);
-        factory_instrument.patches[p].enabled = 1u;
-        factory_instrument.patches[p].level = 31u;
+    /* The curated firmware bank is the sole factory source. */
+    if(fm1lab_seed_dx7_instrument(0u,&factory_instrument)!=0) {
+        fm1lab_instrument_init(&factory_instrument,"SUB FOUNDATION");
+        for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++) {
+            uint8_t voice[FM1LAB_PATCH_BYTES];
+            if(fm1lab_dx7_decode_voice(p,voice)!=FM1LAB_DX7_PRESET_OK) continue;
+            (void)fm1lab_patch_set_voice(&factory_instrument,p,voice);
+            factory_instrument.patches[p].enabled=1u;
+            factory_instrument.patches[p].level=fm1lab_dx7_instrument_level[0];
+        }
     }
 }
 
@@ -1203,6 +691,7 @@ static void app_track_stash(uint8_t lane)
     track->instrument = current_instrument;
     track->inserts = current_inserts;
     track->dirty = instrument_dirty;
+    track->rom_fallback = instrument_rom_fallback;
     track->flash_index = instrument_index;
     track->loaded = 1u;
 }
@@ -1220,6 +709,7 @@ static int app_track_activate(uint8_t lane)
     fm1lab_insert_state_activate_instrument(&current_inserts, &track->inserts);
     instrument_index = track->flash_index;
     instrument_dirty = track->dirty;
+    instrument_rom_fallback = track->rom_fallback;
     instrument_loaded = 1u;
     seq_ui_instrument[lane] = instrument_index;
     fm6_sequencer_set_lane(lane, (uint8_t)(lane * FM1LAB_PATCH_COUNT));
@@ -1238,10 +728,10 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
         if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice)) {
             uint8_t playable[FM1LAB_PATCH_BYTES];
             uint8_t previous_level=instrument->patches[patch].level;
-            fm1lab_factory_voice_build(playable,patch);
+            if(fm1lab_dx7_decode_voice(patch,playable)!=FM1LAB_DX7_PRESET_OK) continue;
             if(fm1lab_patch_replace_voice(instrument,patch,playable)==0) {
                 instrument->patches[patch].enabled=1u;
-                instrument->patches[patch].level=previous_level?previous_level:31u;
+                instrument->patches[patch].level=previous_level?previous_level:fm1lab_dx7_instrument_level[0];
                 repaired=1u;
             }
         }
@@ -1250,6 +740,25 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
 }
 
 enum { FM1LAB_LOAD_OK = 0, FM1LAB_LOAD_BUSY = 1, FM1LAB_LOAD_INVALID = 2 };
+static int instrument_load_record(uint32_t index,fm1lab_instrument_t *candidate,
+        fm1lab_insert_state_t *inserts,uint8_t *rom_fallback)
+{
+    int loaded;
+#ifdef PLAT_HOST
+    if(app_host_force_meta_lookup_failure) loaded=-1;
+    else
+#endif
+        loaded=fm1lab_store_library_load_full(index,candidate,inserts);
+    if(rom_fallback) *rom_fallback=0u;
+    if(loaded!=0) {
+        /* Factory Instruments are compiled into the firmware. A failed flash
+         * read falls back to that exact numbered ROM slot, read-only. */
+        if(fm1lab_seed_dx7_instrument(index,candidate)!=0) return -1;
+        fm1lab_insert_state_init(inserts);
+        if(rom_fallback) *rom_fallback=1u;
+    }
+    return fm1lab_instrument_valid(candidate)&&fm1lab_insert_state_valid(inserts)?0:-1;
+}
 static int instrument_load(uint32_t index, int from_audio)
 {
     if (instrument_apply_pending) return FM1LAB_LOAD_BUSY;
@@ -1257,18 +766,15 @@ static int instrument_load(uint32_t index, int from_audio)
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
     uint8_t previous_instrument=seq_ui_instrument[seq_ui_lane&1u];
+    uint8_t rom_fallback=0u;
 #ifdef PLAT_HOST
     ++app_host_store_load_calls;
 #endif
-    int loaded = fm1lab_store_library_load_full(index, &candidate, &candidate_inserts);
-    /* Never turn a failed library read into a successful FACTORY selection.
-     * Keep the currently sounding Instrument intact and let the caller report
-     * the failed selection instead of silently substituting another record. */
-    if (loaded != 0 || !fm1lab_instrument_valid(&candidate) ||
-        !fm1lab_insert_state_valid(&candidate_inserts))
+    if(instrument_load_record(index,&candidate,&candidate_inserts,&rom_fallback)!=0)
         return FM1LAB_LOAD_INVALID;
     current_instrument = candidate;
     current_inserts = candidate_inserts;
+    instrument_rom_fallback=rom_fallback;
     /* Missing-carrier recovery is an in-memory safety fallback only.
      * It must not mark a loaded Instrument dirty or silently rewrite storage. */
     (void)instrument_repair_missing_voices(&current_instrument);
@@ -1312,6 +818,7 @@ static int instrument_save_to(uint32_t index)
         return -1;
     instrument_index=(uint8_t)index;
     instrument_dirty=0u;
+    instrument_rom_fallback=0u;
     seq_ui_instrument[seq_ui_lane]=instrument_index;
     sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
     app_track_stash(seq_ui_lane & 1u);
@@ -2389,7 +1896,14 @@ void app_init(void)
          * invalid current_instrument and made Track 1 impossible to reactivate
          * after switching to the already-fallback-loaded Track 2. Keep a
          * playable RAM-only factory Instrument until storage is repaired. */
-        instrument_factory_defaults();
+        if(fm1lab_seed_dx7_instrument(seq_ui_instrument[seq_ui_lane],
+                                      &current_instrument)==0) {
+            fm1lab_insert_state_init(&current_inserts);
+            instrument_rom_fallback=1u;
+        } else {
+            instrument_factory_defaults();
+            instrument_rom_fallback=1u;
+        }
         instrument_index = seq_ui_instrument[seq_ui_lane];
         instrument_loaded = 1u;
         instrument_dirty = 0u;
@@ -2404,21 +1918,24 @@ void app_init(void)
         else if(format_failure==FM1LAB_STORE_FORMAT_BANK_SAVE)
             app_say("FACTORY FALLBACK","BANK WRITE FAIL");
         else
-            app_say("FACTORY FALLBACK","META LOOKUP");
+            app_say("ROM FALLBACK",fm1lab_store_load_failure_label());
     }
     app_track_stash(seq_ui_lane & 1u);
     {
         uint8_t other_lane=(uint8_t)(seq_ui_lane^1u);
         uint32_t other_index=seq_ui_instrument[other_lane];
-        if(fm1lab_store_library_load_full(other_index,&startup_instrument_scratch,&startup_insert_scratch)!=0 ||
-           !fm1lab_instrument_valid(&startup_instrument_scratch) || !fm1lab_insert_state_valid(&startup_insert_scratch)){
+        uint8_t other_rom_fallback=0u;
+        if(instrument_load_record(other_index,&startup_instrument_scratch,
+                                  &startup_insert_scratch,&other_rom_fallback)!=0) {
             startup_instrument_scratch=factory_instrument;
             fm1lab_insert_state_init(&startup_insert_scratch);
+            other_rom_fallback=1u;
         }
         (void)instrument_repair_missing_voices(&startup_instrument_scratch);
         track_state[other_lane].instrument = startup_instrument_scratch;
         track_state[other_lane].inserts = startup_insert_scratch;
         track_state[other_lane].dirty = 0u;
+        track_state[other_lane].rom_fallback = other_rom_fallback;
         track_state[other_lane].flash_index = (uint8_t)other_index;
         track_state[other_lane].loaded = 1u;
         sequencer_cache_instrument_name(other_lane,startup_instrument_scratch.name);
@@ -2839,7 +2356,13 @@ static void input(void)
                 if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP) app_say("PATCH", patch_display_name(set.patch));
                 else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP) app_say("PATCH PRESET", patch_display_name(set.patch));
                 else if (action == FM1LAB_INPUT_TRACK_TOGGLE) app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
-                else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP) app_say("TRACK INSTRUMENT", "LOADING");
+                else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP ||
+                         action == FM1LAB_INPUT_INSTRUMENT_STEP) {
+                    if(instrument_rom_fallback)
+                        app_say("ROM INSTRUMENT",fm1lab_store_load_failure_label());
+                    else if(action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP)
+                        app_say("TRACK INSTRUMENT","LOADING");
+                }
                 /* HOME Instrument selection is shown by the persistent
                  * Instrument name in the header; no temporary numeric overlay. */
                 break;
@@ -4767,6 +4290,8 @@ int app_expect(const char *what, int *got)
         *got = app_host_name_migration_pass;
     else if (!fm1lab_strcmp(what, "namemigstage"))
         *got = app_host_name_migration_stage;
+    else if (!fm1lab_strcmp(what, "rom_fallback"))
+        *got = app_host_rom_fallback_pass;
 #endif
     else if (!fm1lab_strcmp(what, "page"))
         *got = page;
@@ -4849,6 +4374,31 @@ int app_host_fails(void)
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
+    if(!fm1lab_strcmp(cmd,"fm1lab_rom_fallback_test")) {
+        fm1lab_instrument_t saved_current=current_instrument;
+        fm1lab_insert_state_t saved_inserts=current_inserts;
+        uint8_t saved_index=instrument_index,saved_dirty=instrument_dirty;
+        uint8_t saved_loaded=instrument_loaded,saved_rom=instrument_rom_fallback;
+        uint8_t saved_lane=seq_ui_lane,index=instrument_index;
+        char patch_name[FM1LAB_PATCH_NAME_BYTES+1u];
+        app_host_rom_fallback_pass=0u;
+        app_host_force_meta_lookup_failure=1u;
+        int result=instrument_load(index,0);
+        app_host_force_meta_lookup_failure=0u;
+        app_host_rom_fallback_pass=(uint8_t)(result==FM1LAB_LOAD_OK &&
+            instrument_rom_fallback &&
+            fm1lab_strcmp(current_instrument.name,fm1lab_dx7_instrument_names[index])==0 &&
+            fm1lab_voice_name_get(current_instrument.patches[0].voice,patch_name)==0 &&
+            fm1lab_strcmp(patch_name,"NEON KEYS")!=0);
+        current_instrument=saved_current; current_inserts=saved_inserts;
+        instrument_index=saved_index; instrument_dirty=saved_dirty;
+        instrument_loaded=saved_loaded; instrument_rom_fallback=saved_rom;
+        seq_ui_lane=saved_lane;
+        instrument_sync_settings();
+        app_track_stash(saved_lane);
+        instrument_apply_engine();
+        return 1;
+    }
     if(!fm1lab_strcmp(cmd,"fm1lab_track_cache_test")) {
         static app_track_state_t saved_tracks[2];
         static fm1lab_instrument_t saved_current;
