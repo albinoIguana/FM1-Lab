@@ -78,7 +78,7 @@ cc -std=c11 -Wall -Wextra -Werror -DFM1_HOST_TEST -I"$ROOT/firmware" -I"$ROOT/ve
 "$RUNTIME_BIN"
 echo "FM1-Lab runtime control tests passed."
 
-cc -std=c11 -Wall -Wextra -Werror \
+cc -std=c11 -Wall -Wextra -Werror -DFM1_HOST_TEST \
   -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
   "$ROOT/firmware/fm1lab_sequencer.c" "$ROOT/tests/fm1lab_sequencer.test.c" -o "$SEQUENCER_BIN"
 "$SEQUENCER_BIN"
