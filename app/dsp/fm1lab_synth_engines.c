@@ -65,13 +65,20 @@ void fm1lab_synth_init(fm1lab_synth_voice_t *v, fm1lab_synth_engine_t engine)
     v->filter_alpha_q15 = 8192u;
 }
 
+int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *v, uint8_t note)
+{
+    if (!v || v->engine >= FM1LAB_SYNTH_ENGINE_COUNT) return -1;
+    v->note = note > 127u ? 127u : note;
+    v->phase_inc = phase_for_note(v->note);
+    v->phase_inc_b = (uint32_t)(((uint64_t)v->phase_inc * 1003u) / 1000u);
+    return 0;
+}
+
 void fm1lab_synth_note_on(fm1lab_synth_voice_t *v, uint8_t note, uint8_t velocity)
 {
     if (!v || v->engine >= FM1LAB_SYNTH_ENGINE_COUNT || !velocity) return;
-    v->note = note > 127u ? 127u : note;
     v->velocity = velocity;
-    v->phase_inc = phase_for_note(v->note);
-    v->phase_inc_b = (uint32_t)(((uint64_t)v->phase_inc * 1003u) / 1000u);
+    (void)fm1lab_synth_set_pitch(v, note);
     v->phase = 0u; v->phase_b = 0u;
     v->envelope_q15 = 0u;
     v->gate = 1u; v->active = 1u;

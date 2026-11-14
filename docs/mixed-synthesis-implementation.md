@@ -6,20 +6,20 @@ Status: implementation branch, design checkpoint. This document does not claim t
 
 An Instrument remains exactly four sound slots. The two sequencer instrument banks remain independent and retain their current 0..3 / 4..7 internal patch contexts. The candidate mixed Instrument is:
 
-1. One four-operator FM engine.
-2. One wavetable engine.
-3. One subtractive engine.
-4. One PSG engine (pulse/noise).
+1. **Patch 1 — existing six-operator FM6.** Keep the current production FM6 core and its established voice behavior.
+2. **Patch 2 — fixed-point wavetable.**
+3. **Patch 3 — PSG pulse + noise.**
+4. **Patch 4 — two-oscillator subtractive.**
 
 This is an alternative to four four-operator FM slots, not an additional fifth slot. Engine selection must not change Instrument library indices, preset selection, sequencer lane mapping, or existing save/load migration semantics.
 
 ## DSP integration boundary
 
-Keep note allocation, note source tokens, note-off routing, pitch bend, per-slot level/pan, shared sends, master effects, limiter, and callback diagnostics in the existing FM6 wrapper. Add a tagged engine state to each voice and dispatch note init, note-off, render, and voice-done operations by engine type.
+Keep note allocation, note source tokens, note-off routing, pitch bend, per-slot level/pan, shared sends, master effects, limiter, and callback diagnostics in the existing FM6 wrapper. The engine is a fixed property of the physical patch slot: patch-context indices 0 and 4 use FM6; 1 and 5 use wavetable; 2 and 6 use PSG; 3 and 7 use subtractive. Dispatch by `patch_context % 4`, not by a user-selectable engine field or a per-voice engine tag. Each slot owns a homogeneous voice pool and its engine-specific state.
 
 The renderer must continue to pack active voices dynamically before CPU0/CPU2 splitting. Engine state must be self-contained or use explicitly partitioned scratch so CPU2 backup/rollback remains correct. Do not add locks, allocation, floating point, or unbounded work to the audio callback.
 
-The current FM6 core remains available for the one FM slot until a measured four-operator core is selected. Muting two operators in a six-operator render is not an acceptable CPU optimization if the core still computes all six operators.
+The existing six-operator FM6 core remains the permanent Patch 1 engine for this implementation. The four-operator prototype is not in the active instrument architecture; it remains an isolated performance experiment only. Revisit four-operator FM only if physical-device measurements show a compelling need.
 
 ## Candidate engines
 
@@ -80,12 +80,12 @@ The earlier normalized cost figures (wavetable 0.15–0.30, subtractive 0.35–0
 
 The four-slot Option B now has standalone fixed-point prototypes for all four engine roles:
 
-1. **Four-operator FM:** four phase accumulators, four operator sine evaluations per sample, four simple routing topologies, and fixed feedback.
+1. **FM6:** existing six-operator production engine; no FM4 substitution.
 2. **Wavetable:** 64-sample sine table, Q32 phase accumulator, linear interpolation.
 3. **PSG:** pulse oscillator plus deterministic 15-bit LFSR noise.
 4. **Subtractive:** two slightly detuned saw oscillators into a one-pole fixed-point low-pass.
 
-The three lightweight candidate engines share the API in `app/dsp/fm1lab_synth_engines.[ch]`; the FM proof-of-path is in `app/dsp/fm1lab_fm4.[ch]`. Each uses a compact attack/sustain/release envelope. The FM4 voice state is 44 bytes; each lightweight voice state is 36 bytes. At eight voices per Instrument slot, the four-slot Option B requires 352 bytes for the FM4 pool plus 864 bytes for the three lightweight pools: **1,216 bytes of voice state total**, excluding the small read-only lookup tables. There is no per-voice table copy, heap allocation, floating-point DSP, or per-voice effect state.
+The three non-FM engines share the API in `app/dsp/fm1lab_synth_engines.[ch]`. The separate four-operator FM proof-of-path in `app/dsp/fm1lab_fm4.[ch]` is retained only for research and is not used by any of the four instrument slots. Each uses a compact attack/sustain/release envelope. The FM4 experimental voice state is 44 bytes; each lightweight voice state is 36 bytes. The active design instead has one existing FM6 pool and three lightweight pools; its final memory cost must be calculated from the actual `fm6_note_t` and integrated layout, not from the FM4 prototype estimate. There is no per-voice table copy, heap allocation, floating-point DSP, or per-voice effect state.
 
 The standalone native tests are included in `tests/test-fm6-engine.sh`. They check silence before note-on, deterministic output for identical voices, distinct outputs/topologies, bounded samples, octave phase-increment behavior, note-off/release completion, invalid engine rejection, and voice-state sizes.
 
@@ -98,9 +98,9 @@ A reproducible host microbenchmark is available as `tests/bench-mixed-synth.sh`.
 | PSG | 4.24–4.47 ns / voice-sample |
 | Subtractive | 3.71–3.94 ns / voice-sample |
 
-These are host measurements only. They show the simple FM4 proof-of-path at roughly 3.5× the per-voice sample cost of these minimal lightweight prototypes on this host, but they do not compare against the existing six-operator FM6 core and must not be converted into FM1 callback budgets. The FM1's CPU0/CPU2 callback diagnostics remain the deciding measurement.
+These are host measurements only. They show the simple FM4 proof-of-path at roughly 3.5× the per-voice sample cost of these minimal lightweight prototypes on this host. They do not compare against the existing six-operator FM6 core and are not evidence for the active architecture's CPU cost. The FM1's CPU0/CPU2 callback diagnostics remain the deciding measurement.
 
-For equal eight-voice pools in all four slots, summing those per-voice host costs gives a rough comparison of about 435–459 ns per output frame for four FM4 slots versus 203–213 ns per output frame for one FM4 plus the three lightweight engines: approximately 51–56% less prototype synthesis work on this host. This arithmetic excludes the shared FM6 wrapper, mixing, effects, and dual-core scheduling; it is a directional comparison, not a device estimate.
+The earlier four-FM4 versus FM4-plus-three-lightweight arithmetic is superseded by the fixed FM6 + wavetable + PSG + subtractive architecture and must not be used to estimate its performance.
 
 Prototype limitations are deliberate and remain open:
 - The FM4 module is a cost/topology proof, not a production DX7-compatible engine: it has four simple routing topologies, fixed operator ratios/feedback, one shared envelope, and a sine-only operator waveform. It does not replace the current FM6 core.
@@ -108,7 +108,23 @@ Prototype limitations are deliberate and remain open:
 - The subtractive saws are not band-limited yet; aliasing and a musical filter control model must be addressed before integration.
 - PSG pulse/noise balance is fixed in this first pass.
 - The current envelopes are intentionally minimal, not the final FM1 envelope model.
-- None of these modules is connected to the live FM6 allocator or device build. Engine-state dispatch, CPU0/CPU2 backup semantics, and a genuine four-op/FM6 performance comparison remain future work.
+- The three lightweight modules are not yet connected to the live FM6 allocator or device build. Fixed-slot dispatch, FM6-state preservation, CPU0/CPU2 backup semantics, and target memory/performance qualification remain future work.
 - Plucked string is deferred until its per-voice delay memory and target cost are justified.
 
 No engine choice, Instrument schema change, preset migration, UI change, or hardware-performance claim is made by this checkpoint.
+
+
+## Fixed-slot architecture decision — 2026-11-14
+
+The instrument engine map is fixed and identical for both sequencer banks:
+
+| Physical slot | Engine | Internal patch contexts |
+|---|---|---|
+| Patch 1 | Existing six-operator FM6 | 0, 4 |
+| Patch 2 | Fixed-point wavetable | 1, 5 |
+| Patch 3 | PSG pulse + noise | 2, 6 |
+| Patch 4 | Two-oscillator subtractive | 3, 7 |
+
+The physical slot determines the engine. There is no engine selector, per-preset engine-type field, per-voice engine tag, or five-engine mode. Instrument changes replace engine parameters only; they do not change slot identity. The four-operator FM module remains a non-production experiment.
+
+Integration is deliberately staged. First, the three lightweight engines gain phase-continuous pitch updates so pitch bend and tuning can be dispatched without phase resets. The live allocator integration must then preserve FM6's existing note state, output scaling, voice-stealing/source-token behavior, render quantum, and CPU2 copy/fallback semantics. No persistent format, instrument selection, UI, or factory migration changes are part of this stage.

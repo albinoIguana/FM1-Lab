@@ -32,6 +32,8 @@ typedef struct {
  * fixed-point, and deterministic at the 44.1 kHz device sample rate. */
 void fm1lab_synth_init(fm1lab_synth_voice_t *voice, fm1lab_synth_engine_t engine);
 void fm1lab_synth_note_on(fm1lab_synth_voice_t *voice, uint8_t note, uint8_t velocity);
+/* Update pitch without resetting oscillator phase; suitable for bend/tuning. */
+int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *voice, uint8_t note);
 void fm1lab_synth_note_off(fm1lab_synth_voice_t *voice);
 int fm1lab_synth_render(fm1lab_synth_voice_t *voice, int16_t *output, uint32_t frames);
 size_t fm1lab_synth_voice_bytes(void);
