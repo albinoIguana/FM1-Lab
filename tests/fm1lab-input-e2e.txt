@@ -103,6 +103,11 @@ fm1lab_name_migration_test
 expect name_migration 1
 expect namemigstage 10
 
+# The exact retired M-VAVE FACTORY/NEON KEYS placeholder must migrate to
+# the curated Instrument bank, while a one-byte edited record is preserved.
+fm1lab_legacy_factory_migration_test
+expect legacy_factory_migration 1
+
 # Missing flash metadata must still load the exact curated ROM Instrument.
 fm1lab_rom_fallback_test
 expect rom_fallback 1
