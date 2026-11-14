@@ -9,6 +9,7 @@ enum fm1lab_dx7_preset_result {
     FM1LAB_DX7_PRESET_OK = 0,
     FM1LAB_DX7_PRESET_BAD_ARGUMENT,
     FM1LAB_DX7_PRESET_INDEX_INVALID,
+    FM1LAB_DX7_PRESET_DATA_MISSING,
     FM1LAB_DX7_PRESET_DECODE_FAILED,
     FM1LAB_DX7_PRESET_VOICE_INVALID,
     FM1LAB_DX7_PRESET_PATCH_REPLACE_FAILED
@@ -21,6 +22,10 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_decode_z85(
     uint32_t voice_count, uint8_t out[FM1LAB_PATCH_BYTES]);
 enum fm1lab_dx7_preset_result fm1lab_dx7_decode_voice(
     uint32_t voice_index, uint8_t out[FM1LAB_PATCH_BYTES]);
+int fm1lab_dx7_voice_valid(const uint8_t voice[FM1LAB_PATCH_BYTES]);
+enum fm1lab_dx7_preset_result fm1lab_dx7_replace_voice(
+    fm1lab_instrument_t *instrument, uint8_t patch,
+    const uint8_t voice[FM1LAB_PATCH_BYTES]);
 
 /* Apply one PRESETS detent to a focused patch. Slot-owned performance values
  * are preserved by fm1lab_patch_replace_voice(). next_cursor changes on success only. */
