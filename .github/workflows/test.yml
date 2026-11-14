@@ -2,7 +2,7 @@ name: FM1-Lab native engine checks
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "fix/shipwreck-patch-presets-track-audio", "fix/shipwreck-track-cache", "integration/shipwreck-unified"]
   pull_request:
     branches: ["main"]
 
@@ -25,12 +25,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Apply and test FM1 DMA deadline guard
+        run: |
+          python3 tools/apply-fm1-base-audio-deadline.py
+          cc -std=c11 -Wall -Wextra -Werror -I base/device tests/fm1lab_audio_commit.test.c -o /tmp/fm1-audio-commit-test
+          /tmp/fm1-audio-commit-test
+      - name: Patch and test both FM1 flash variants
+        run: |
+          python3 tools/apply-fm1-flash-compat.py
+          bash tests/test-flash-compat.sh
       - name: Verify generated curated DX7 firmware bank
         run: |
           python3 tools/generate_dx7_library.py
           git diff --exit-code -- app/fm1lab_dx7_data.h
       - name: Test Digitone conversion primitives
         run: python3 -m unittest discover -s tests -p 'test_digitone_converter.py'
+      - name: Test intercept-based polyphony fit
+        run: python3 -m unittest discover -s tests -p 'test_fit_polyphony.py'
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -67,7 +78,15 @@ jobs:
       - name: Test Instrument and macro behavior
         run: npm test
       - name: Run native C adapter and audio-engine tests
+        env:
+          FM6_TSAN: "1"
         run: bash tests/test-native-instrument.sh
+      - name: Install native app build dependencies
+        run: python -m pip install --upgrade Pillow
+      - name: Build and exercise the real FM1 app input path
+        run: |
+          python3 base/tools/build.py app --host
+          app/build/host/fm1lab_host tests/fm1lab-input-e2e.txt app/build/host
       - name: Build official M-VAVE browser simulator
         run: bash scripts/build-m-vave-simulator.sh
       - name: Verify required native engine API

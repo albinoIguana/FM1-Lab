@@ -36,6 +36,18 @@ static inline void fm1lab_insert_state_init(fm1lab_insert_state_t *v) {
     for (unsigned m=0;m<4u;m++)v->instrument_macros[m]=50u;
     for (unsigned p=0;p<4u;p++){v->patch_octave[p]=0;v->patch_fine_cents[p]=0;}
 }
+/* A track owns its macro/tuning sidecar values, but the live Amp/Drive + EQ
+ * chain is shared by both sequencer lanes. Track focus copies only the
+ * Instrument-owned fields and deliberately preserves the active master chain. */
+static inline void fm1lab_insert_state_activate_instrument(
+        fm1lab_insert_state_t *active, const fm1lab_insert_state_t *instrument) {
+    if (!active || !instrument) return;
+    for (unsigned m=0;m<4u;m++) active->instrument_macros[m]=instrument->instrument_macros[m];
+    for (unsigned p=0;p<4u;p++) {
+        active->patch_octave[p]=instrument->patch_octave[p];
+        active->patch_fine_cents[p]=instrument->patch_fine_cents[p];
+    }
+}
 static inline int fm1lab_insert_state_valid(const fm1lab_insert_state_t *v) {
     if (!v || v->amp_enabled>1u || v->drive>100u || v->tone>100u ||
         v->output>100u || v->eq_enabled>15u) return 0;

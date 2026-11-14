@@ -7,10 +7,46 @@
 #define FM1LAB_STORE_BANK_COUNT 4u
 #define FM1LAB_STORE_INSTRUMENTS_PER_BANK 8u
 #define FM1LAB_STORE_INSTRUMENT_COUNT 32u
+#define FM1LAB_STORE_PATCHES_PER_BANK 32u
+#define FM1LAB_STORE_NAME_BYTES FM1LAB_INSTRUMENT_NAME_BYTES
+#define FM1LAB_STORE_PATCH_BANK_BYTES 3752u
+#define FM1LAB_STORE_METADATA_BYTES 1742u
 
-/* Uses four 3,840-byte bank objects plus one versioned sidecar in the existing
- * pooled flash area. Control task only; the sidecar stores one global stereo
- * Amp/Drive + parametric-EQ state per Instrument, not per-patch inserts. */
+/* Last load failure, exposed for native diagnostics and the compact device
+ * status overlay. Zero means no failure / success. */
+enum fm1lab_store_load_stage {
+    FM1LAB_STORE_LOAD_OK = 0,
+    FM1LAB_STORE_LOAD_BAD_ARGUMENT,
+    FM1LAB_STORE_LOAD_META_LOOKUP,
+    FM1LAB_STORE_LOAD_META_SIZE,
+    FM1LAB_STORE_LOAD_META_READ,
+    FM1LAB_STORE_LOAD_META_HEADER,
+    FM1LAB_STORE_LOAD_META_CRC,
+    FM1LAB_STORE_LOAD_PATCH_IDS,
+    FM1LAB_STORE_LOAD_INSERTS,
+    FM1LAB_STORE_LOAD_BANK_LOOKUP,
+    FM1LAB_STORE_LOAD_BANK_SIZE,
+    FM1LAB_STORE_LOAD_BANK_READ,
+    FM1LAB_STORE_LOAD_BANK_DATA,
+    FM1LAB_STORE_LOAD_INSTRUMENT
+};
+enum fm1lab_store_load_stage fm1lab_store_library_last_load_stage(void);
+
+/* Startup formatter diagnostics. The load stage remains separate so a later
+ * attempted Instrument load cannot erase the reason formatting failed. */
+enum fm1lab_store_format_stage {
+    FM1LAB_STORE_FORMAT_OK = 0,
+    FM1LAB_STORE_FORMAT_BAD_ARGUMENT,
+    FM1LAB_STORE_FORMAT_BANK_SAVE,
+    FM1LAB_STORE_FORMAT_META_SAVE,
+    FM1LAB_STORE_FORMAT_POOL_FULL,
+    FM1LAB_STORE_FORMAT_META_VERIFY
+};
+enum fm1lab_store_format_stage fm1lab_store_library_last_format_stage(void);
+
+/* Four 32-patch banks (IDs 0..127) and one Instrument directory. Each Instrument
+ * owns four stable patch IDs: instrument_index*4 + slot. Factory-preset selection
+ * copies into those IDs; switching Instruments never resets their saved patch data. */
 int fm1lab_store_library_load(unsigned index, fm1lab_instrument_t *out);
 int fm1lab_store_library_save(unsigned index, const fm1lab_instrument_t *instrument);
 int fm1lab_store_library_load_full(unsigned index, fm1lab_instrument_t *instrument, fm1lab_insert_state_t *inserts);

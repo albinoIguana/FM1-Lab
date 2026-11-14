@@ -649,6 +649,9 @@ async function switchOn() {
     const [wasm] = await Promise.all([fetch("app.wasm").then((r) => { if (!r.ok) throw new Error(`app.wasm: ${r.status}`); return r.arrayBuffer(); }),
                                       ac.audioWorklet.addModule("worklet.js")]);
     node = new AudioWorkletNode(ac, "fm1", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+    node.addEventListener("processorerror", () => {
+      window.emuProcessorError = "AudioWorklet processor stopped unexpectedly";
+    });
     gain = ac.createGain();
     gain.gain.value = $("mute").getAttribute("aria-pressed") === "true" ? 0 : 1;
     node.connect(gain).connect(ac.destination);
@@ -663,7 +666,10 @@ async function switchOn() {
           window.emuLast = m;
           if (m.load !== undefined) cpu.textContent = `FM1 C0 ${m.deviceCore0 ?? 0}% · C2 ${m.deviceCore2 ?? 0}% · budget ${m.deviceLoad ?? 0}% (XR ${m.deviceXruns ?? 0}) · browser ${m.load}%`;
           if (m.store) saveStore(m.store);
-        } else if (m.type === "app" && appPart && appPart.message) appPart.message(m);
+        } else if (m.type === "test-home-refusal-result") window.emuTestHomeRefusalResult = m;
+        else if (m.type === "pong") window.emuWorkletPong = true;
+        else if (m.type === "runtime-error") window.emuRuntimeError = m.message;
+        else if (m.type === "app" && appPart && appPart.message) appPart.message(m);
       };
     });
     // the app's own part of the page (APP_DIR/web/emu/app.js), if it has one: attach({ node, ac, status }), and

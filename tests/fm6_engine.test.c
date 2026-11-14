@@ -7,6 +7,8 @@
 enum { TEST_FRAMES = 128, TEST_WORDS = TEST_FRAMES * 2 };
 static int32_t output[TEST_WORDS];
 static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
+static int32_t stress_reference[96u * 256u * 2u];
+static int32_t stress_candidate[96u * 256u * 2u];
 
 static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voices,
                              int32_t *destination)
@@ -23,6 +25,20 @@ static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voice
                          (uint8_t)(92u - note * 4u), mask);
     assert(fm6_active_voices() == expected_voices);
     fm6_render(destination, TEST_FRAMES, 4096u);
+    /* 128 frames are four 32-frame quanta. The timing counters are callback
+     * sums/maxima, not values carried over from earlier render calls. */
+    assert(fm6_callback_voice_peak_count()==expected_voices);
+    assert(fm6_render_quantum_count()==4u);
+    assert(fm6_cpu2_quantum_count()==4u);
+    if(mode==1u) {
+        assert(fm6_cpu2_dispatch_count()==4u);
+        assert(fm6_cpu2_fallback_count()==0u);
+        assert(fm6_cpu2_job_sum_us()>=fm6_cpu2_last_job_us());
+        assert(fm6_cpu2_backup_voice_count()==(expected_voices/2u)*4u);
+    } else {
+        assert(fm6_cpu2_dispatch_count()==0u);
+        assert(fm6_cpu2_fallback_count()==4u);
+    }
 }
 static int32_t peak(const int32_t *samples, unsigned count) {
     int32_t result = 0;
@@ -77,6 +93,26 @@ static uint64_t render_pan_send_peak(uint8_t pan, unsigned effect, unsigned chan
     fm6_note_on_mask(60u,110u,0x01u);
     fm6_render(output,TEST_FRAMES,4096u);
     return fm6_test_fx_send_peak(effect,channel);
+}
+
+static uint64_t render_fx_send_peak_layers(uint8_t patch_mask)
+{
+    static int32_t warmup[2048u * 2u];
+    uint8_t voice[156];
+    fm6_init();
+    memcpy(voice,fm6_patch_data(0u),155u);
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++) {
+        if(patch && fm6_patch_set_voice(patch,voice)!=0)return 0u;
+        uint8_t enabled=(uint8_t)((patch_mask&(1u<<patch))!=0u);
+        fm6_patch_set_enabled(patch,enabled);
+        fm6_patch_set_level(patch,enabled?31u:0u);
+    }
+    fm6_fx_set_enabled(FM6_FX_CHORUS,1u);
+    fm6_fx_set_send(0u,FM6_FX_CHORUS,100u);
+    fm6_render(warmup,2048u,4096u);
+    fm6_note_on_mask(60u,110u,patch_mask);
+    fm6_render(output,TEST_FRAMES,4096u);
+    return fm6_test_fx_send_peak(FM6_FX_CHORUS,0u);
 }
 
 static int32_t render_pan_channel_peak(uint8_t pan, unsigned channel)
@@ -239,7 +275,90 @@ static void render_patch_pitch(int octave,int fine_cents,int32_t *destination)
         fm6_render(destination+block*TEST_WORDS,TEST_FRAMES,4096u);
 }
 
+static void render_hardware_callback_stress(uint8_t mode, int32_t *destination)
+{
+    int32_t block[256u * 2u];
+    fm6_init();
+    for (unsigned patch=0u; patch<FM6_ENGINE_PATCH_COUNT; ++patch) {
+        fm6_patch_set_enabled((uint8_t)patch,1u);
+        fm6_patch_set_level((uint8_t)patch,31u);
+    }
+    fm6_test_set_cpu2_mode(mode);
+    for (unsigned note=0u; note<8u; ++note)
+        fm6_note_on_mask((uint8_t)(48u+note), (uint8_t)(104u-note*3u), 0x0fu);
+
+    /* Model real 256-frame FM1 DMA callbacks, not a single four-quantum
+     * render. Keep polyphony busy while notes are released and replaced. */
+    for (unsigned callback=0u; callback<96u; ++callback) {
+        if (callback && (callback%8u)==0u) {
+            unsigned note_index=(callback/8u-1u)&7u;
+            uint8_t old_note=(uint8_t)(48u+note_index);
+            uint8_t new_note=(uint8_t)(60u+callback/8u);
+            fm6_note_off_mask(old_note,0x0fu);
+            fm6_note_on_mask(new_note,(uint8_t)(100u-(callback/8u)%5u),0x0fu);
+        }
+        fm6_render(block,256u,4096u);
+        assert(peak(block,256u*2u)>0);
+        memcpy(destination+callback*256u*2u,block,sizeof block);
+    }
+}
+
+
+static void install_test_instrument_bank(unsigned lane, uint8_t attack)
+{
+    uint8_t voice[156];
+    assert(lane < 2u);
+    assert(FM6_ENGINE_PATCH_COUNT >= 8u);
+    memcpy(voice, fm6_patch_data(0u), 155u);
+    for (unsigned patch = 0u; patch < 4u; ++patch) {
+        unsigned engine_patch = lane * 4u + patch;
+        voice[0] = (uint8_t)(attack + patch);
+        voice[145] = (uint8_t)('A' + lane);
+        voice[146] = (uint8_t)('0' + patch);
+        assert(fm6_patch_set_voice(engine_patch, voice) == 0);
+        fm6_patch_set_enabled(engine_patch, 1u);
+        fm6_patch_set_level(engine_patch, 31u);
+    }
+}
+
+static void render_track_one_after_track_two_change(uint8_t change_track_two,
+                                                     int32_t *destination)
+{
+    static int32_t warmup[256u * 2u];
+    fm6_init();
+    install_test_instrument_bank(0u, 20u);
+    install_test_instrument_bank(1u, 35u);
+    if (change_track_two)
+        install_test_instrument_bank(1u, 80u);
+    /* T1 owns engine patches 0..3. A T2 bank replacement is not in this mask. */
+    fm6_note_on_mask(60u, 105u, 0x0fu);
+    fm6_render(warmup, 256u, 4096u);
+    fm6_render(destination, TEST_FRAMES, 4096u);
+}
+
+static void test_two_resident_instrument_banks(void)
+{
+    int32_t reference[TEST_WORDS], after_t2_change[TEST_WORDS];
+    uint8_t before[4][155];
+    fm6_init();
+    assert(FM6_ENGINE_PATCH_COUNT >= 8u);
+    install_test_instrument_bank(0u, 20u);
+    install_test_instrument_bank(1u, 35u);
+    for (unsigned patch = 0u; patch < 4u; ++patch)
+        memcpy(before[patch], fm6_patch_data(patch), sizeof before[patch]);
+
+    /* Replace only T2's four slots, exactly the bank addressed by lane*4. */
+    install_test_instrument_bank(1u, 80u);
+    for (unsigned patch = 0u; patch < 4u; ++patch)
+        assert(memcmp(before[patch], fm6_patch_data(patch), sizeof before[patch]) == 0);
+
+    render_track_one_after_track_two_change(0u, reference);
+    render_track_one_after_track_two_change(1u, after_t2_change);
+    assert(memcmp(reference, after_t2_change, sizeof reference) == 0);
+}
+
 int main(void) {
+    test_two_resident_instrument_banks();
     /* A single patch's active voices split across the cores, not by fixed
      * patch index. A partial worker failure must restore state before fallback. */
     /* One isolated patch: eight notes split four/four. */
@@ -248,6 +367,22 @@ int main(void) {
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     render_cpu2_mode(2u, 0x01u, 8u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    fm6_init();
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++) {
+        uint8_t enabled=(uint8_t)(patch==0u);
+        fm6_patch_set_enabled(patch,enabled);
+        fm6_patch_set_level(patch,enabled?31u:0u);
+    }
+    fm6_test_set_cpu2_mode(1u);
+    fm6_cpu2_disable(); /* same DSP state reached after startup self-test failure */
+    for(unsigned note=0u;note<8u;note++)
+        fm6_note_on_mask((uint8_t)(48u+note*3u),(uint8_t)(92u-note*4u),0x01u);
+    fm6_render(chunk_b,TEST_FRAMES,4096u);
+    assert(fm6_cpu2_split_is_disabled());
+    assert(fm6_cpu2_dispatch_count()==0u);
+    assert(fm6_cpu2_quantum_count()==0u);
+    assert(fm6_cpu2_fallback_count()==4u);
+    assert(memcmp(chunk_a,chunk_b,TEST_WORDS*sizeof(int32_t))==0);
 
     /* One four-layer Instrument (not two sequencer Instruments or a sampler):
      * eight notes fan out to 32 active FM voices, split 16/16. */
@@ -256,6 +391,15 @@ int main(void) {
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     render_cpu2_mode(2u, 0x0fu, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+
+    /* A single 128-frame equality check is too short to catch state drift
+     * across DMA boundaries. Compare 96 consecutive 256-frame callbacks
+     * under repeated 32-voice note-on/off activity in all worker modes. */
+    render_hardware_callback_stress(0u,stress_reference);
+    render_hardware_callback_stress(1u,stress_candidate);
+    assert(memcmp(stress_reference,stress_candidate,sizeof stress_reference)==0);
+    render_hardware_callback_stress(2u,stress_candidate);
+    assert(memcmp(stress_reference,stress_candidate,sizeof stress_reference)==0);
 
     /* MAELSTROM amount zero is a truly transparent bypass, independent of
      * the parked modulation controls. Engaged settings must alter the mix. */
@@ -272,6 +416,23 @@ int main(void) {
     render_chaos_tempo(90u,chunk_a);
     render_chaos_tempo(150u,chunk_b);
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
+    fm6_init();
+    {
+        fm6_performance_state_t wet_budget;
+        unsigned total_wet=0u;
+        fm6_performance_state_get(&wet_budget);
+        for(unsigned fx=0u;fx<4u;fx++) {
+            wet_budget.fx_enabled[fx]=1u;
+            wet_budget.fx_mix[fx]=100u;
+        }
+        assert(fm6_performance_state_update(&wet_budget)==0);
+        for(unsigned fx=0u;fx<4u;fx++) {
+            unsigned effective=fm6_test_fx_mix_effective((uint8_t)fx);
+            total_wet+=effective;
+            assert(effective==12u);
+        }
+        assert(total_wet==48u);
+    }
     fm6_init();
     {
         fm6_performance_state_t state,check;
@@ -417,6 +578,15 @@ int main(void) {
     int32_t center_r=render_pan_channel_peak(64u,1u);
     assert(center_l>0 && center_r>0);
     assert(center_l*100>center_r*99 && center_l*100<center_r*101);
+    /* Layering four identical patches must not multiply the shared FX send
+     * by four. The bus uses the average active-layer send level. */
+    {
+        uint64_t one=render_fx_send_peak_layers(0x01u);
+        uint64_t four=render_fx_send_peak_layers(0x0fu);
+        assert(one>0u && four>0u);
+        assert(four<=one*2u);
+        assert(four*2u>=one);
+    }
     /* Every shared FX bus receives the patch after its smoothed pan stage. */
     for(unsigned effect=0u;effect<FM6_FX_COUNT;effect++) {
         assert(render_pan_send_peak(0u,effect,0u)>0u);
@@ -723,6 +893,8 @@ int main(void) {
     assert(stress_peak > 0u);
     assert(fm6_test_output_peak() <= 7470000u);
     assert(fm6_test_limiter_events() > 0u);
+    assert(fm6_pre_limiter_peak_q23() >= fm6_test_output_peak());
+    assert(fm6_limiter_reduction_q15() > 0u);
     assert(stereo_frames > 0u); /* chorus is actually contributing stereo output */
     assert(fm6_sequencer_step() > 0u);
     fm6_panic();

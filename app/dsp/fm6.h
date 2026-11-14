@@ -110,6 +110,8 @@ void fm6_init(void);
 void fm6_panic(void);
 void fm6_overload(void); /* gracefully shed one oldest voice after an audio deadline warning */
 uint32_t fm6_overload_shed_count(void);
+uint32_t fm6_overload_last_voice_count(void);
+uint32_t fm6_overload_shed_voice_at(uint32_t age);
 uint32_t fm6_cpu2_total_job_ticks(void);
 void fm6_note_on(uint8_t note, uint8_t velocity);
 void fm6_note_on_mask(uint8_t note, uint8_t velocity, uint8_t patch_mask);
@@ -143,6 +145,7 @@ uint8_t fm6_arpeggiator_mode(void);
 void fm6_arpeggiator_set_latch(uint8_t enabled);
 #ifdef FM6_TEST
 uint8_t fm6_test_arpeggiator_amp_level(void);
+uint8_t fm6_test_fx_mix_effective(uint8_t effect);
 void fm6_test_set_cpu2_mode(uint8_t mode); /* 0 serial, 1 split, 2 simulated partial-job fallback */
 #endif
 int fm6_performance_state_valid(const fm6_performance_state_t *state);
@@ -166,6 +169,22 @@ uint8_t fm6_fx_get_send(uint8_t patch, uint8_t effect);
 void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12);
 uint32_t fm6_cpu2_last_job_us(void);
 uint32_t fm6_cpu2_last_wait_us(void);
+/* Per-callback sums and counts; maxima are exposed separately above. */
+uint32_t fm6_cpu0_voice_us(void);
+uint32_t fm6_cpu2_job_sum_us(void);
+uint32_t fm6_cpu2_wait_sum_us(void);
+uint32_t fm6_cpu2_backup_sum_us(void);
+uint32_t fm6_cpu2_backup_sum_ns(void);
+uint32_t fm6_cpu2_backup_voice_count(void);
+void fm6_cpu2_disable(void);
+uint8_t fm6_cpu2_split_is_disabled(void);
+uint32_t fm6_render_quantum_count(void);
+uint32_t fm6_cpu2_quantum_count(void);
+uint32_t fm6_cpu2_dispatch_count(void);
+uint32_t fm6_cpu2_fallback_count(void);
+uint32_t fm6_callback_voice_peak_count(void);
+uint32_t fm6_pre_limiter_peak_q23(void);
+uint32_t fm6_limiter_reduction_q15(void);
 #ifdef FM6_TEST
 /* Test-only pre-clip Q24 probes; never used by the device UI/audio path. */
 uint64_t fm6_test_patch_peak(uint32_t patch);

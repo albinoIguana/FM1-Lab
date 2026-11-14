@@ -1,4 +1,4 @@
-#include "fm1lab_instrument.h"
+#include "../app/fm1lab_instrument.h"
 
 #include <assert.h>
 #include <stdio.h>

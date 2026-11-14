@@ -70,7 +70,9 @@ static inline int settings_v2_valid(const settings_v2_t *v) {
 }
 
 static inline int settings_legacy_performance_valid(const fm6_performance_state_v9_t *legacy) {
-    fm6_performance_state_t current;
+    /* Called only by the serial startup migration path. Keep the full current
+     * record out of the FM1 main stack; legacy records are checked one at a time. */
+    static fm6_performance_state_t current;
     memset(&current,0,sizeof current);
     memcpy(&current,legacy,sizeof *legacy);
     return fm6_performance_state_valid(&current);

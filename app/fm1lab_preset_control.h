@@ -8,10 +8,11 @@ enum {
     FM1LAB_PRESET_TARGET_PATCH = 1u
 };
 
-/* Patch focus is explicit UI state: the PRESETS encoder must not infer it
- * from the current page, because focus persists while editing that patch. */
-static inline uint8_t fm1lab_preset_target(uint8_t patch_focus)
+/* A focused Home patch card changes only that voice. With no focused card,
+ * PRESETS changes the complete four-patch Instrument. */
+static inline uint8_t fm1lab_preset_target(uint8_t patch_focus, uint8_t all_patches_active)
 {
+    (void)all_patches_active;
     return patch_focus ? FM1LAB_PRESET_TARGET_PATCH : FM1LAB_PRESET_TARGET_INSTRUMENT;
 }
 
@@ -33,6 +34,16 @@ static inline uint8_t fm1lab_preset_cursor_advance(uint8_t cursor, int delta,
     next = ((int32_t)cursor + delta) % (int32_t)voice_count;
     if (next < 0) next += (int32_t)voice_count;
     return (uint8_t)next;
+}
+
+/* A newly loaded Instrument has no selected DX7 voice. Its first positive
+ * detent selects voice 0; its first negative detent selects the final voice. */
+static inline uint8_t fm1lab_preset_cursor_step(uint8_t cursor, int delta,
+                                                uint32_t voice_count)
+{
+    if (!voice_count) return 0u;
+    if (cursor == 255u) return (uint8_t)(delta < 0 ? voice_count - 1u : 0u);
+    return fm1lab_preset_cursor_advance(cursor, delta, voice_count);
 }
 
 #endif

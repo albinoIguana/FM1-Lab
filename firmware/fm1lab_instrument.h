@@ -6,6 +6,7 @@
 #define FM1LAB_INSTRUMENT_MAGIC 0x31494c46u
 #define FM1LAB_INSTRUMENT_VERSION 1u
 #define FM1LAB_PATCH_COUNT 4u
+#define FM1LAB_PATCH_ID_COUNT 128u
 #define FM1LAB_PATCH_BYTES 156u
 #define FM1LAB_PATCH_NAME_BYTES 10u
 #define FM1LAB_INSTRUMENT_NAME_BYTES 24u
@@ -31,11 +32,14 @@ typedef struct {
 typedef struct {
     uint32_t magic;
     uint8_t version;
+    uint8_t patch_ids[FM1LAB_PATCH_COUNT]; /* persistent 0..127 patch-record addresses */
     char name[FM1LAB_INSTRUMENT_NAME_BYTES];
     fm1lab_patch_t patches[FM1LAB_PATCH_COUNT];
 } fm1lab_instrument_t;
 
-/* The expanded voice's non-synthesis sentinel byte stores patch pan. */
+/* The expanded 156-byte voice has one non-synthesis sentinel byte at index 155.
+ * FM1-Lab uses that reserved byte for per-patch pan (0=left, 64=center, 127=right).
+ * It is never sent to the FM6 core or encoded as DX7 operator data. */
 static inline uint8_t fm1lab_patch_pan(const fm1lab_instrument_t *instrument, unsigned patch)
 {
     return instrument && patch < FM1LAB_PATCH_COUNT ? instrument->patches[patch].voice[155] : 64u;
@@ -52,8 +56,15 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name);
 int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
                            const uint8_t voice[FM1LAB_PATCH_BYTES]);
 
+/* Replace a patch's voice while preserving slot-owned mix, tuning, pan and macros. */
+int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
+                               const uint8_t voice[FM1LAB_PATCH_BYTES]);
+
 /* Validate the complete serialized value before loading or saving it. */
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument);
+
+/* True only for the legacy empty INSTR nn slots created by bank_init. */
+int fm1lab_instrument_is_blank_library_slot(const fm1lab_instrument_t *instrument);
 
 /* Carrier mask bits are OP1..OP6 in bits 0..5, from M-VAVE's DX7 algorithm routing. */
 uint8_t fm1lab_carrier_mask(unsigned algorithm);

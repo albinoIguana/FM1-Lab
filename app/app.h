@@ -23,12 +23,15 @@ enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_INSTRUMENTS0, OBJ_INSTRUMENTS1, OBJ
  * samples (0xA0000..0xDBFFF), user preset banks (0xDC000..0xDFFFF),
  * autosave (0xE5000..0xE6FFF), voice bank (0xE7000) and globals (0xFC000+).
  * App objects live in the otherwise unused user-reserved sectors EA000..EFFFF;
- * the 12-sector pool at F0000..FBFFF holds four Instrument banks plus the insert sidecar. */
+ * the 12-sector pool at F0000..FBFFF holds four independent patch banks plus the Instrument directory. */
 #define APP_STORE_MAP {0xEA000u, 0xEC000u, 0xEE000u, 0xF0000u, 0xF0000u, 0xF0000u, 0xF0000u, 0xF0000u}
 #define APP_STORE_POOL
 #define APP_STORE_POOL_BASE 0xF0000u
 #define APP_STORE_POOL_N 12u
-#define APP_STORE_POOL_OLD 0u
+/* fm1-base initializes its pool scan length from APP_STORE_POOL_OLD. The
+ * FM1 unity build does not call the legacy-pool migration helper, so set this
+ * to the active pool size or pooled objects are never discoverable after save. */
+#define APP_STORE_POOL_OLD APP_STORE_POOL_N
 #define APP_STORE_POOL_OBJ0 OBJ_INSTRUMENTS0
 #define APP_STORE_POOL_OBJN 5u
 
@@ -48,4 +51,10 @@ void app_say(const char *a, const char *b);   /* a short message on the screen a
 
 /* the host simulator's checks (host/plat_host.c "expect"): octave, wave, note (-1 none), dirty, turnsN */
 #define APP_HOST_EXPECT
+#ifdef PLAT_HOST
+#define APP_HOST_FAILS
+#define APP_HOST_CMD
+int app_host_fails(void);
+int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d);
+#endif
 int app_expect(const char *what, int *got);

@@ -78,6 +78,7 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
     instrument->version = FM1LAB_INSTRUMENT_VERSION;
     copy_name(instrument->name, sizeof instrument->name, name);
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
+        instrument->patch_ids[p] = (uint8_t)p;
         for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             instrument->patches[p].macros[m] = 50;
         instrument->patches[p].enabled = 1;
@@ -142,6 +143,7 @@ int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
     }
     for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p) {
         const fm1lab_patch_t *patch = &instrument->patches[p];
+        if (instrument->patch_ids[p] >= FM1LAB_PATCH_ID_COUNT) return 0;
         if (patch->enabled > 1 || patch->level > 127 ||
             patch->octave < -4 || patch->octave > 4 ||
             patch->fine_cents < -100 || patch->fine_cents > 100 ||
@@ -159,6 +161,32 @@ int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
 uint8_t fm1lab_carrier_mask(unsigned algorithm)
 {
     return carrier_masks[algorithm & 31u];
+}
+
+int fm1lab_instrument_is_blank_library_slot(const fm1lab_instrument_t *instrument)
+{
+    if (!fm1lab_instrument_valid(instrument) ||
+        instrument->name[0] != 'I' || instrument->name[1] != 'N' ||
+        instrument->name[2] != 'S' || instrument->name[3] != 'T' ||
+        instrument->name[4] != 'R' || instrument->name[5] != ' ' ||
+        instrument->name[6] < '0' || instrument->name[6] > '9' ||
+        instrument->name[7] < '0' || instrument->name[7] > '9')
+        return 0;
+    for (unsigned n = 8u; n < FM1LAB_INSTRUMENT_NAME_BYTES; ++n)
+        if (instrument->name[n] && instrument->name[n] != ' ') return 0;
+
+    for (unsigned patch = 0u; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        const uint8_t *voice = instrument->patches[patch].voice;
+        uint8_t carriers = fm1lab_carrier_mask(voice[VOICE_ALGORITHM]);
+        for (unsigned n = 0u; n < FM1LAB_PATCH_NAME_BYTES; ++n)
+            if (voice[145u + n] && voice[145u + n] != ' ') return 0;
+        for (unsigned op = 1u; op <= OPERATOR_COUNT; ++op) {
+            unsigned offset = (OPERATOR_COUNT - op) * OPERATOR_STRIDE;
+            if ((carriers & (1u << (op - 1u))) && voice[offset + 16u])
+                return 0;
+        }
+    }
+    return 1;
 }
 
 int fm1lab_operator_modulates(unsigned algorithm, unsigned source_operator,
