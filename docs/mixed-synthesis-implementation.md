@@ -9,7 +9,7 @@ An Instrument remains exactly four sound slots. The two sequencer instrument ban
 1. One four-operator FM engine.
 2. One wavetable engine.
 3. One subtractive engine.
-4. One plucked-string engine.
+4. One PSG engine (pulse/noise).
 
 This is an alternative to four four-operator FM slots, not an additional fifth slot. Engine selection must not change Instrument library indices, preset selection, sequencer lane mapping, or existing save/load migration semantics.
 
@@ -36,10 +36,14 @@ The current FM6 core remains available for the one FM slot until a measured four
 - Keep oscillator and filter oversampling off in the first implementation.
 - Per-voice envelope; shared LFO/modulation inputs where practical.
 
-### Plucked string
-- Karplus-Strong-style delay loop with damping and fractional tuning only if the measured cost permits.
-- Explicitly budget delay memory per active voice before choosing maximum delay length.
-- Support bass fundamentals; do not silently cap the delay so high that low notes become unusable.
+### PSG
+- Fixed-point pulse oscillator plus a deterministic LFSR noise source.
+- Keep duty/noise controls independent when the engine is expanded beyond the first prototype.
+- Bound oscillator and noise state per voice; no per-voice sample buffers.
+
+### Deferred: plucked string
+- Revisit a Karplus–Strong delay loop only if its per-voice delay memory and target callback cost can be justified.
+- Preserve usable bass fundamentals; do not silently cap the delay so high that low notes become unusable.
 - No heap allocation and no buffer clearing proportional to maximum delay on every render sample.
 
 ## Performance accounting
