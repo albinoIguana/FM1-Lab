@@ -9,13 +9,6 @@ static uint8_t nor_flash[0x100000];
 static int fail_after = -1;
 static unsigned operations;
 
-#define APP_STORE_MAP {0xEA000u,0xEC000u,0xEE000u,0xF0000u,0xF0000u,0xF0000u,0xF0000u,0xF0000u}
-#define APP_STORE_POOL
-#define APP_STORE_POOL_BASE 0xF0000u
-#define APP_STORE_POOL_N 12u
-#define APP_STORE_POOL_OLD 12u
-#define APP_STORE_POOL_OBJ0 OBJ_INSTRUMENTS0
-#define APP_STORE_POOL_OBJN 5u
 #include "../base/device/storage.c"
 
 static int st_read(uint32_t off, void *dst, uint32_t n)
