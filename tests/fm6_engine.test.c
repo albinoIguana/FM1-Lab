@@ -532,12 +532,9 @@ int main(void) {
     fm6_sequencer_note_on(60u,100u,0x01u,2u); /* reserved source IDs are rejected */
     assert(fm6_active_voices_patch(0u)==0u);
 
-    /* Patch 1 remains the six-operator FM6 calibration reference. */
+    /* Patch 1 remains the existing six-operator FM6 reference. */
     uint64_t single_dry_peak = 0u;
     uint64_t single_patch_peak = render_stack_patch_peak(0x01u, &single_dry_peak);
-    assert(single_patch_peak > 0u);
-    /* Patch 1 remains the existing six-operator FM6 reference. Its dry
-     * calibration is unchanged even though slots 2–4 now use other engines. */
     assert(single_patch_peak > 0u);
     assert(single_dry_peak > (uint64_t)(1u << 22) * 98u / 100u);
     assert(single_dry_peak < (uint64_t)(1u << 22) * 102u / 100u);

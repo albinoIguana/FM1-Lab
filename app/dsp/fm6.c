@@ -1112,9 +1112,9 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
         v->tune16 = tune16;
         {
             fm1lab_patch_engine_t engine = fm1lab_patch_engine_for_context((uint8_t)i);
-            int32_t pitch16 = ((int32_t)note + p->effective[FP_TRNSP] - 24) * 16 + tune16;
-            pitch16 += (int32_t)p->octave * 192;
-            pitch16 += (int32_t)p->fine_cents * 16 / 100;
+            int32_t pitch256 = ((int32_t)note + p->effective[FP_TRNSP] - 24) * 256 + (int32_t)tune16 * 16;
+            pitch256 += (int32_t)p->octave * 3072;
+            pitch256 += (int32_t)p->fine_cents * 256 / 100;
             if (engine == FM1LAB_PATCH_ENGINE_FM6) {
                 fm6_note_init(&v->state.fm6, p->effective,
                               (int32_t)note + p->effective[FP_TRNSP] - 24, velocity, 1);
@@ -1126,7 +1126,7 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
                 fm1lab_synth_init(&v->state.synth, synth_engine);
                 fm1lab_synth_note_on(&v->state.synth, note, velocity);
                 (void)fm1lab_synth_set_pitch(&v->state.synth,
-                    (int16_t)(pitch16 < 0 ? 0 : pitch16 > 127 * 16 ? 127 * 16 : pitch16));
+                    (int16_t)(pitch256 < 0 ? 0 : pitch256 > 127 * 256 ? 127 * 256 : pitch256));
                 v->synth_dc = 0;
             }
         }
@@ -1296,15 +1296,15 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
                 voice->used = 0;
             }
         } else {
-            int32_t pitch16 = ((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16;
+            int32_t pitch256 = ((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 256;
             int32_t dc = voice->synth_dc;
             uint8_t shedding = voice->fade_out != 0u;
-            pitch16 += voice->tune16 + pitch_bend_16;
-            pitch16 += (int32_t)patch->octave * 192;
-            pitch16 += (int32_t)patch->fine_cents * 16 / 100;
-            if (pitch16 < 0) pitch16 = 0;
-            if (pitch16 > 127 * 16) pitch16 = 127 * 16;
-            (void)fm1lab_synth_set_pitch(&voice->state.synth, (int16_t)pitch16);
+            pitch256 += ((int32_t)voice->tune16 + pitch_bend_16) * 16;
+            pitch256 += (int32_t)patch->octave * 3072;
+            pitch256 += (int32_t)patch->fine_cents * 256 / 100;
+            if (pitch256 < 0) pitch256 = 0;
+            if (pitch256 > 127 * 256) pitch256 = 127 * 256;
+            (void)fm1lab_synth_set_pitch(&voice->state.synth, (int16_t)pitch256);
             (void)fm1lab_synth_render(&voice->state.synth, synth_out, FM6_N);
             for (i = 0; i < FM6_N; i++) {
                 int32_t x = ((int32_t)synth_out[i] << 9) - dc; /* Q15 prototype -> FM6 Q24 mix domain */
