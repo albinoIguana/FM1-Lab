@@ -100,6 +100,8 @@ A reproducible host microbenchmark is available as `tests/bench-mixed-synth.sh`.
 
 These are host measurements only. They show the simple FM4 proof-of-path at roughly 3.5× the per-voice sample cost of these minimal lightweight prototypes on this host, but they do not compare against the existing six-operator FM6 core and must not be converted into FM1 callback budgets. The FM1's CPU0/CPU2 callback diagnostics remain the deciding measurement.
 
+For equal eight-voice pools in all four slots, summing those per-voice host costs gives a rough comparison of about 435–459 ns per output frame for four FM4 slots versus 203–213 ns per output frame for one FM4 plus the three lightweight engines: approximately 51–56% less prototype synthesis work on this host. This arithmetic excludes the shared FM6 wrapper, mixing, effects, and dual-core scheduling; it is a directional comparison, not a device estimate.
+
 Prototype limitations are deliberate and remain open:
 - The FM4 module is a cost/topology proof, not a production DX7-compatible engine: it has four simple routing topologies, fixed operator ratios/feedback, one shared envelope, and a sine-only operator waveform. It does not replace the current FM6 core.
 - The wavetable is a sine-only proof of the table/interpolation path, not a multi-table instrument.
