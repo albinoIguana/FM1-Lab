@@ -491,7 +491,7 @@ static void fm1lab_seed_factory_library(void)
 {
     /* Curated CC0 six-operator DX7 library: 8 bass, 8 choir, one FM rhythm,
      * one synth-percussion, plus analog-like, lead, pad and motion Instruments.
-     * Exact-match legacy detection replaces untouched old factory/DX7 slots;
+     * Exact-match migration replaces untouched prior Digitone/DX7 slots;
      * renamed or edited user Instruments remain untouched. */
     for(uint32_t index=0;index<FM1LAB_DX7_INSTRUMENT_COUNT;index++) {
         fm1lab_instrument_t existing,seed;
@@ -1919,13 +1919,13 @@ void app_init(void)
         instrument_sync_settings();
         instrument_apply_engine();
         if(format_failure==FM1LAB_STORE_FORMAT_POOL_FULL)
-            app_say("FACTORY FALLBACK","POOL FULL");
+            app_say("ROM FALLBACK","POOL FULL");
         else if(format_failure==FM1LAB_STORE_FORMAT_META_SAVE)
-            app_say("FACTORY FALLBACK","META WRITE FAIL");
+            app_say("ROM FALLBACK","META WRITE FAIL");
         else if(format_failure==FM1LAB_STORE_FORMAT_META_VERIFY)
-            app_say("FACTORY FALLBACK","META VERIFY FAIL");
+            app_say("ROM FALLBACK","META VERIFY FAIL");
         else if(format_failure==FM1LAB_STORE_FORMAT_BANK_SAVE)
-            app_say("FACTORY FALLBACK","BANK WRITE FAIL");
+            app_say("ROM FALLBACK","BANK WRITE FAIL");
         else
             app_say("ROM FALLBACK",fm1lab_store_load_failure_label());
     }
@@ -4054,7 +4054,7 @@ static void draw(void)
         cv_text_fit(8,13,&FONT_B,ui.msg[0],accent,166);
         cv_text_fit(8,24,&FONT_XS,ui.msg[1],C_PEWTER,166);
     } else {
-        /* Page identity replaces the generic FACTORY instrument label. */
+        /* Page identity is the compiled or stored Instrument name. */
         cv_text_fit(8,15,&FONT_B,page==PAGE_HOME?instrument_display_name():page_title(page),accent,140);
     }
     cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_PEWTER);
