@@ -256,20 +256,38 @@ static int fm1lab_name_is_padded(const char *name,const char *expected)
         if(name[n] && name[n]!=' ') return 0;
     return 1;
 }
+static int fm1lab_default_slot_name_matches(const char *name,uint32_t index)
+{
+    static const char full_prefix[]="INSTRUMENT ";
+    static const char short_prefix[]="INSTR ";
+    char full[14],short_name[9];
+    uint32_t number=index+1u;
+    if(index>=FM1LAB_STORE_INSTRUMENT_COUNT || number>99u) return 0;
+    memcpy(full,full_prefix,sizeof full_prefix-1u);
+    full[11]=(char)('0'+number/10u);
+    full[12]=(char)('0'+number%10u);
+    full[13]='\\0';
+    memcpy(short_name,short_prefix,sizeof short_prefix-1u);
+    short_name[6]=(char)('0'+number/10u);
+    short_name[7]=(char)('0'+number%10u);
+    short_name[8]='\\0';
+    return fm1lab_name_is_padded(name,full) ||
+           fm1lab_name_is_padded(name,short_name);
+}
 static int fm1lab_is_previous_factory_instrument(uint32_t index,
         const fm1lab_instrument_t *existing)
 {
     static const uint32_t voice_hash[FM1LAB_PATCH_COUNT]={
         0xbbedcce1u,0x8a9adc54u,0x689191ffu,0x96452f30u
     };
-    /* The retired M-VAVE record was saved as FACTORY. Some earlier directory
-     * formats retained the default slot label instead. Accept only those
-     * exact slot-0 placeholders; voice hashes and neutral patch state below
-     * remain mandatory, so a renamed or edited user Instrument is preserved. */
-    if(index!=0u || !existing || !fm1lab_instrument_valid(existing) ||
-       (fm1lab_strncmp(existing->name,"FACTORY",7u)!=0 &&
-        !fm1lab_name_is_padded(existing->name,"INSTRUMENT 01") &&
-        !fm1lab_name_is_padded(existing->name,"INSTR 01"))) return 0;
+    /* The retired M-VAVE record was saved as FACTORY. Other old slots can
+     * contain the same untouched four-voice placeholder under their generated
+     * INSTRUMENT nn / INSTR nn label. Match the slot-specific label, then still
+     * require all four exact voice fingerprints and neutral patch state. */
+    if(index>=FM1LAB_STORE_INSTRUMENT_COUNT || !existing ||
+       !fm1lab_instrument_valid(existing) ||
+       !((index==0u && fm1lab_strncmp(existing->name,"FACTORY",7u)==0) ||
+         fm1lab_default_slot_name_matches(existing->name,index))) return 0;
     for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
         const fm1lab_patch_t *part=&existing->patches[patch];
         if(fm1lab_legacy_factory_voice_hash(part->voice)!=voice_hash[patch] ||
@@ -4445,27 +4463,46 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         fm1lab_insert_state_t inserts;
         app_host_legacy_factory_migration_pass=0u;
         fm1lab_insert_state_init(&inserts);
-        {
-            static const char *const legacy_names[]={
-                "FACTORY","INSTRUMENT 01","INSTR 01"
-            };
-            for(uint32_t name=0u;name<sizeof legacy_names/sizeof legacy_names[0];name++) {
-                fm1lab_instrument_init(&legacy,legacy_names[name]);
-                for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
-                    if(fm1lab_patch_set_voice(&legacy,patch,
-                            fm1lab_legacy_factory_fixture[patch])!=0) return 1;
-                if(!fm1lab_is_previous_factory_instrument(0u,&legacy) ||
-                   fm1lab_is_previous_factory_instrument(1u,&legacy)) return 1;
-                if(fm1lab_store_library_save_full(0u,&legacy,&inserts)!=0) return 1;
-                fm1lab_seed_factory_library();
-                if(fm1lab_store_library_load_full(0u,&migrated,&inserts)!=0 ||
-                   fm1lab_seed_dx7_instrument(0u,&expected)!=0 ||
-                   memcmp(migrated.name,expected.name,sizeof migrated.name)!=0 ||
-                   memcmp(migrated.patches,expected.patches,sizeof migrated.patches)!=0)
-                    return 1;
-            }
+        fm1lab_instrument_init(&legacy,"FACTORY");
+        for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
+            if(fm1lab_patch_set_voice(&legacy,patch,
+                    fm1lab_legacy_factory_fixture[patch])!=0) return 1;
+        if(!fm1lab_is_previous_factory_instrument(0u,&legacy) ||
+           fm1lab_is_previous_factory_instrument(1u,&legacy)) return 1;
+
+        /* Reproduce every slot left by the old directory formatter: it used
+         * INSTRUMENT nn / INSTR nn names while copying the same old four
+         * factory voices into each slot. All 32 must migrate to distinct
+         * curated Instruments, not merely acquire a new displayed number. */
+        for(uint32_t index=0u;index<FM1LAB_STORE_INSTRUMENT_COUNT;index++) {
+            char slot_name[FM1LAB_INSTRUMENT_NAME_BYTES+1u];
+            uint32_t number=index+1u;
+            memset(slot_name,' ',FM1LAB_INSTRUMENT_NAME_BYTES);
+            memcpy(slot_name,"INSTRUMENT ",11u);
+            slot_name[11]=(char)('0'+number/10u);
+            slot_name[12]=(char)('0'+number%10u);
+            slot_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\\0';
+            fm1lab_instrument_init(&legacy,slot_name);
+            for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
+                if(fm1lab_patch_set_voice(&legacy,patch,
+                        fm1lab_legacy_factory_fixture[patch])!=0) return 1;
+            if(!fm1lab_is_previous_factory_instrument(index,&legacy)) return 1;
+            if(fm1lab_store_library_save_full(index,&legacy,&inserts)!=0) return 1;
         }
+        fm1lab_seed_factory_library();
+        for(uint32_t index=0u;index<FM1LAB_STORE_INSTRUMENT_COUNT;index++) {
+            if(fm1lab_store_library_load_full(index,&migrated,&inserts)!=0 ||
+               fm1lab_seed_dx7_instrument(index,&expected)!=0 ||
+               memcmp(migrated.name,expected.name,sizeof migrated.name)!=0 ||
+               memcmp(migrated.patches,expected.patches,sizeof migrated.patches)!=0)
+                return 1;
+        }
+
         /* A one-byte user edit must make the legacy fingerprint fail closed. */
+        fm1lab_instrument_init(&legacy,"INSTRUMENT 01");
+        for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
+            if(fm1lab_patch_set_voice(&legacy,patch,
+                    fm1lab_legacy_factory_fixture[patch])!=0) return 1;
         edited=legacy;
         edited.patches[1].voice[0]^=1u;
         if(fm1lab_is_previous_factory_instrument(0u,&edited) ||
