@@ -26,6 +26,9 @@
 #include "fm1lab_pending_watch.h"
 #include "fm1lab_event_order.h"
 #include <stddef.h>
+#ifdef PLAT_HOST
+#include "../tests/fixtures/fm1lab_legacy_factory_fixture.h"
+#endif
 
 #define C_PEWTER RGB(175,185,195)
 /* Small freestanding string helpers: the device libc only supplies memcmp. */
@@ -115,6 +118,7 @@ typedef struct {
 static app_track_state_t track_state[2];
 #ifdef PLAT_HOST
 static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
+static uint8_t app_host_legacy_factory_migration_pass;
 static uint8_t app_host_force_meta_lookup_failure, app_host_rom_fallback_pass;
 static uint8_t app_host_resync_pass;
 static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
@@ -224,6 +228,38 @@ static int fm1lab_is_untouched_factory(const fm1lab_instrument_t *in)
         if(in->patches[p].level!=31u || !in->patches[p].enabled) return 0;
         for(uint32_t m=0;m<FM1LAB_MACRO_COUNT;m++)
             if(in->patches[p].macros[m]!=50u) return 0;
+    }
+    return 1;
+}
+
+/* Exact fingerprint for the retired M-VAVE factory Instrument. This is a
+ * migration recognizer only: the old recipes are not available to the engine
+ * or preset browser. Hashes cover the complete stored 156-byte voice after
+ * fm1lab_patch_set_voice() applies its centered-pan normalization. */
+static uint32_t fm1lab_legacy_factory_voice_hash(const uint8_t *voice)
+{
+    uint32_t hash=2166136261u;
+    for(uint32_t i=0u;i<FM1LAB_PATCH_BYTES;i++) {
+        hash^=voice[i];
+        hash*=16777619u;
+    }
+    return hash;
+}
+static int fm1lab_is_previous_factory_instrument(uint32_t index,
+        const fm1lab_instrument_t *existing)
+{
+    static const uint32_t voice_hash[FM1LAB_PATCH_COUNT]={
+        0xbbedcce1u,0x8a9adc54u,0x689191ffu,0x96452f30u
+    };
+    if(index!=0u || !existing || !fm1lab_instrument_valid(existing) ||
+       fm1lab_strncmp(existing->name,"FACTORY",7u)!=0) return 0;
+    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
+        const fm1lab_patch_t *part=&existing->patches[patch];
+        if(fm1lab_legacy_factory_voice_hash(part->voice)!=voice_hash[patch] ||
+           part->level!=31u || !part->enabled || part->octave!=0 ||
+           part->fine_cents!=0) return 0;
+        for(uint32_t macro=0u;macro<FM1LAB_MACRO_COUNT;macro++)
+            if(part->macros[macro]!=50u) return 0;
     }
     return 1;
 }
@@ -527,6 +563,7 @@ static void fm1lab_seed_factory_library(void)
             (uint8_t)(1u << (index/FM1LAB_STORE_INSTRUMENTS_PER_BANK))) != 0u);
         if(!freshly_formatted &&
            !fm1lab_is_untouched_factory(&existing) &&
+           !fm1lab_is_previous_factory_instrument(index,&existing) &&
            !fm1lab_instrument_is_blank_library_slot(&existing) &&
            !fm1lab_is_previous_digitone_instrument(index,&existing) &&
            !fm1lab_is_previous_dx7_instrument(index,&existing)) continue;
@@ -4302,6 +4339,8 @@ int app_expect(const char *what, int *got)
         *got = app_host_name_migration_stage;
     else if (!fm1lab_strcmp(what, "rom_fallback"))
         *got = app_host_rom_fallback_pass;
+    else if (!fm1lab_strcmp(what, "legacy_factory_migration"))
+        *got = app_host_legacy_factory_migration_pass;
 #endif
     else if (!fm1lab_strcmp(what, "page"))
         *got = page;
@@ -4384,6 +4423,38 @@ int app_host_fails(void)
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
+    if(!fm1lab_strcmp(cmd,"fm1lab_legacy_factory_migration_test")) {
+        fm1lab_instrument_t legacy,migrated,expected,edited;
+        fm1lab_insert_state_t inserts;
+        app_host_legacy_factory_migration_pass=0u;
+        fm1lab_instrument_init(&legacy,"FACTORY");
+        for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
+            if(fm1lab_patch_set_voice(&legacy,patch,
+                    fm1lab_legacy_factory_fixture[patch])!=0) return 1;
+        if(!fm1lab_is_previous_factory_instrument(0u,&legacy) ||
+           fm1lab_is_previous_factory_instrument(1u,&legacy)) return 1;
+        fm1lab_insert_state_init(&inserts);
+        if(fm1lab_store_library_save_full(0u,&legacy,&inserts)!=0) return 1;
+        fm1lab_seed_factory_library();
+        if(fm1lab_store_library_load_full(0u,&migrated,&inserts)!=0 ||
+           fm1lab_seed_dx7_instrument(0u,&expected)!=0 ||
+           memcmp(migrated.name,expected.name,sizeof migrated.name)!=0 ||
+           memcmp(migrated.patches,expected.patches,sizeof migrated.patches)!=0)
+            return 1;
+        /* A one-byte user edit must make the legacy fingerprint fail closed. */
+        edited=legacy;
+        edited.patches[1].voice[0]^=1u;
+        if(fm1lab_is_previous_factory_instrument(0u,&edited) ||
+           fm1lab_store_library_save_full(0u,&edited,&inserts)!=0) return 1;
+        fm1lab_seed_factory_library();
+        if(fm1lab_store_library_load_full(0u,&migrated,&inserts)!=0 ||
+           memcmp(migrated.name,edited.name,sizeof migrated.name)!=0 ||
+           memcmp(migrated.patches,edited.patches,sizeof migrated.patches)!=0)
+            return 1;
+        if(fm1lab_store_library_save_full(0u,&expected,&inserts)!=0) return 1;
+        app_host_legacy_factory_migration_pass=1u;
+        return 1;
+    }
     if(!fm1lab_strcmp(cmd,"fm1lab_rom_fallback_test")) {
         fm1lab_instrument_t rom_instrument,expected_instrument;
         fm1lab_insert_state_t rom_inserts;
