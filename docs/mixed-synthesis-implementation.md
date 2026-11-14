@@ -74,32 +74,35 @@ The earlier normalized cost figures (wavetable 0.15–0.30, subtractive 0.35–0
 
 ## Prototype checkpoint — 2026-11-14
 
-Three lightweight fixed-point candidates now exist as standalone native prototypes:
+The four-slot Option B now has standalone fixed-point prototypes for all four engine roles:
 
-- **Wavetable:** 64-sample sine table, Q32 phase accumulator, linear interpolation.
-- **PSG:** pulse oscillator plus deterministic 15-bit LFSR noise.
-- **Subtractive:** two slightly detuned saw oscillators into a one-pole fixed-point low-pass.
+1. **Four-operator FM:** four phase accumulators, four operator sine evaluations per sample, four simple routing topologies, and fixed feedback.
+2. **Wavetable:** 64-sample sine table, Q32 phase accumulator, linear interpolation.
+3. **PSG:** pulse oscillator plus deterministic 15-bit LFSR noise.
+4. **Subtractive:** two slightly detuned saw oscillators into a one-pole fixed-point low-pass.
 
-The shared prototype API is in `app/dsp/fm1lab_synth_engines.[ch]`. It uses a compact attack/sustain/release envelope and a 36-byte per-voice state. At eight voices per candidate slot, that is 288 bytes per slot or 864 bytes across the three non-FM slots, excluding the small shared read-only tables. There is no per-voice table copy, heap allocation, floating-point DSP, or per-voice effect state.
+The three lightweight candidate engines share the API in `app/dsp/fm1lab_synth_engines.[ch]`; the FM proof-of-path is in `app/dsp/fm1lab_fm4.[ch]`. Each uses a compact attack/sustain/release envelope. The FM4 voice state is 44 bytes; each lightweight voice state is 36 bytes. At eight voices per Instrument slot, the four-slot Option B requires 352 bytes for the FM4 pool plus 864 bytes for the three lightweight pools: **1,216 bytes of voice state total**, excluding the small read-only lookup tables. There is no per-voice table copy, heap allocation, floating-point DSP, or per-voice effect state.
 
-The standalone native test is included in `tests/test-fm6-engine.sh`. It checks silence before note-on, deterministic output for identical voices, distinct candidate outputs, bounded samples, octave phase-increment behavior, note-off/release completion, invalid engine rejection, and the 36-byte state size.
+The standalone native tests are included in `tests/test-fm6-engine.sh`. They check silence before note-on, deterministic output for identical voices, distinct outputs/topologies, bounded samples, octave phase-increment behavior, note-off/release completion, invalid engine rejection, and voice-state sizes.
 
-A reproducible host microbenchmark is available as `tests/bench-mixed-synth.sh`. On the current x86_64 KVM development host (AMD EPYC 9V74, GCC 14.2, `-O2`), the initial 8-voice / 256-frame / 12,000-block / 5-trial runs produced noisy medians across three process launches:
+A reproducible host microbenchmark is available as `tests/bench-mixed-synth.sh`. On the current x86_64 KVM development host (AMD EPYC 9V74, GCC 14.2, `-O2`), eight voices per engine rendered in 256-frame blocks for 12,000 blocks per trial, with five trials per process. Across three process launches, observed median ranges were:
 
 | Prototype | Observed median range |
 |---|---:|
-| Wavetable | 3.96–4.22 ns / voice-sample |
-| PSG | 4.33–4.80 ns / voice-sample |
-| Subtractive | 3.90–4.51 ns / voice-sample |
+| Four-op FM prototype | 13.60–14.34 ns / voice-sample |
+| Wavetable | 3.83–3.88 ns / voice-sample |
+| PSG | 4.24–4.47 ns / voice-sample |
+| Subtractive | 3.71–3.94 ns / voice-sample |
 
-These are host measurements only. The spread is large enough that they do not establish a reliable winner, and they must not be converted into FM1 callback budgets. They do suggest that the simple PSG implementation is not automatically the cheapest of these three on every CPU. The FM1's CPU0/CPU2 callback diagnostics remain the deciding measurement.
+These are host measurements only. They show the simple FM4 proof-of-path at roughly 3.5× the per-voice sample cost of these minimal lightweight prototypes on this host, but they do not compare against the existing six-operator FM6 core and must not be converted into FM1 callback budgets. The FM1's CPU0/CPU2 callback diagnostics remain the deciding measurement.
 
 Prototype limitations are deliberate and remain open:
+- The FM4 module is a cost/topology proof, not a production DX7-compatible engine: it has four simple routing topologies, fixed operator ratios/feedback, one shared envelope, and a sine-only operator waveform. It does not replace the current FM6 core.
 - The wavetable is a sine-only proof of the table/interpolation path, not a multi-table instrument.
 - The subtractive saws are not band-limited yet; aliasing and a musical filter control model must be addressed before integration.
 - PSG pulse/noise balance is fixed in this first pass.
-- The current envelope is intentionally minimal, not the final FM1 envelope model.
-- These modules are not connected to the live FM6 allocator or device build. The existing FM6 six-operator path remains untouched; a genuine lower-cost four-operator FM core is still required.
+- The current envelopes are intentionally minimal, not the final FM1 envelope model.
+- None of these modules is connected to the live FM6 allocator or device build. Engine-state dispatch, CPU0/CPU2 backup semantics, and a genuine four-op/FM6 performance comparison remain future work.
 - Plucked string is deferred until its per-voice delay memory and target cost are justified.
 
 No engine choice, Instrument schema change, preset migration, UI change, or hardware-performance claim is made by this checkpoint.
