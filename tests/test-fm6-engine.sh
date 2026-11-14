@@ -24,6 +24,13 @@ MIXED_BIN="$TMP/mixed-synth-prototypes-test"
 cc -std=c11 -O2 -Wall -Wextra -Werror \
   -I"$ROOT/app/dsp" \
   "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/tests/fm1lab_synth_engines.test.c" -o "$MIXED_BIN"
+
+# Standalone four-operator FM prototype.
+FM4_BIN="$TMP/fm4-prototype-test"
+cc -std=c11 -O2 -Wall -Wextra -Werror \
+  -I"$ROOT/app/dsp" \
+  "$ROOT/app/dsp/fm1lab_fm4.c" "$ROOT/tests/fm1lab_fm4.test.c" -o "$FM4_BIN"
+"$FM4_BIN"
 "$MIXED_BIN"
 
 DX7_BIN="$TMP/fm6-dx7-audit"
