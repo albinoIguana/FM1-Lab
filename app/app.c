@@ -7,6 +7,7 @@
  * Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fm6.h"
+#include "dsp/fm1lab_instrument_engine_map.h"
 #include "fm1lab_cpu2_startup.h"
 #include "fm1lab_audio_peak_window.h"
 #include "fm1lab_settings_record.h"
@@ -156,6 +157,7 @@ static uint8_t patch_preset_cursor[2][FM1LAB_PATCH_COUNT] = {
     {255u,255u,255u,255u}, {255u,255u,255u,255u}
 };
 static enum fm1lab_dx7_preset_result patch_preset_last_result = FM1LAB_DX7_PRESET_OK;
+static uint8_t patch_preset_engine_locked;
 static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
@@ -393,6 +395,7 @@ static const char *fm1lab_store_load_failure_label(void)
 }
 static const char *fm1lab_patch_preset_failure_label(void)
 {
+    if (patch_preset_engine_locked) return "FIXED ENGINE SLOT";
     switch(patch_preset_last_result) {
     case FM1LAB_DX7_PRESET_BAD_ARGUMENT: return "BAD ARGUMENT";
     case FM1LAB_DX7_PRESET_INDEX_INVALID: return "INDEX INVALID";
@@ -409,8 +412,13 @@ static int fm1lab_patch_preset_step(int delta)
     uint8_t lane=(uint8_t)(seq_ui_lane&1u);
     uint8_t next;
     enum fm1lab_dx7_preset_result result;
+    patch_preset_engine_locked=0u;
     if (!delta) { patch_preset_last_result=FM1LAB_DX7_PRESET_BAD_ARGUMENT; return -1; }
     if (set.patch >= FM1LAB_PATCH_COUNT) { patch_preset_last_result=FM1LAB_DX7_PRESET_INDEX_INVALID; return -1; }
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+        patch_preset_engine_locked=1u;
+        return -1;
+    }
     result=fm1lab_dx7_patch_preset_step(&current_instrument,set.patch,
         patch_preset_cursor[lane][set.patch],delta,&next);
     patch_preset_last_result=result;
@@ -692,7 +700,8 @@ static void instrument_apply_engine_bank(uint8_t lane,const fm1lab_instrument_t 
     for(uint32_t p=0;p<FM1LAB_PATCH_COUNT;++p){
         const fm1lab_patch_t *part=&source->patches[p];
         uint32_t engine_patch=base+p;
-        (void)fm6_patch_set_voice(engine_patch,part->voice);
+        if (fm1lab_patch_engine_for_context((uint8_t)engine_patch) == FM1LAB_PATCH_ENGINE_FM6)
+            (void)fm6_patch_set_voice(engine_patch,part->voice);
         fm6_patch_set_enabled(engine_patch,1u);
         fm6_patch_set_level(engine_patch,part->level);
         fm6_patch_set_pan(engine_patch,fm1lab_patch_pan(source,p));
@@ -1134,7 +1143,8 @@ static void ui_events_drain(void)
 
 static void voice_update_publish(void)
 {
-    if (!voice_dirty || voice_update_pending || !instrument_loaded) return;
+    if (!voice_dirty || voice_update_pending || !instrument_loaded ||
+        fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) return;
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     for (uint32_t i = 0; i < FM1LAB_PATCH_BYTES; ++i)
         voice_update_snapshot[i] = voice[i];
@@ -1199,6 +1209,7 @@ static void compressor_edit(uint32_t field,uint8_t value)
 
 static void voice_edit_global(fm1lab_global_field_t field, int delta)
 {
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) return;
     uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint8_t value;
     unsigned maximum = field == FM1LAB_GLOBAL_ALGORITHM ? 32u :
@@ -1217,6 +1228,7 @@ static void voice_edit_global(fm1lab_global_field_t field, int delta)
 
 static void voice_edit_adsr(uint32_t control, int delta)
 {
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) return;
     uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint8_t adsr[4];
     if (control >= 4u || !delta || fm1lab_voice_adsr_get(voice, adsr)) return;
@@ -1230,6 +1242,7 @@ static void voice_edit_adsr(uint32_t control, int delta)
 
 static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
 {
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) return;
     uint8_t *voice = current_instrument.patches[set.patch].voice;
     uint8_t value;
     if (!delta || fm1lab_voice_operator_get(voice, env_operator, field, &value)) return;
@@ -2432,7 +2445,11 @@ static void input(void)
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_BLOCKED: app_say("SAVE FAILED", "TRACK NOT CHANGED"); break;
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED: app_say("SAVE FAILED", "PRESET CHANGED"); break;
             case FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED: app_say("SAVE FAILED", "PRESET UNCHANGED"); break;
-            case FM1LAB_INPUT_RESULT_PATCH_FAILED: app_say("PATCH PRESET", fm1lab_patch_preset_failure_label()); break;
+            case FM1LAB_INPUT_RESULT_PATCH_FAILED:
+                app_say(patch_preset_engine_locked ? "ENGINE SLOT" : "PATCH PRESET",
+                        patch_preset_engine_locked ? fm1lab_patch_engine_name(set.patch) :
+                                                     fm1lab_patch_preset_failure_label());
+                break;
             case FM1LAB_INPUT_RESULT_APPLIED:
                 if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP) app_say("PATCH", patch_display_name(set.patch));
                 else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP) app_say("PATCH PRESET", patch_display_name(set.patch));
@@ -2478,12 +2495,20 @@ static void input(void)
             btdev_choose(btdev_pick() + e);
             ble_device_say();
         } else if (k == EN_ALGO && page == PAGE_LFO && lfo_view < 3u) {
+            if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+                app_say("FIXED ENGINE",fm1lab_patch_engine_name(set.patch));
+                continue;
+            }
             voice_edit_global(FM1LAB_GLOBAL_ALGORITHM,e);
             uint8_t algorithm=1u;
             (void)fm1lab_voice_global_get(current_instrument.patches[set.patch].voice,
                 FM1LAB_GLOBAL_ALGORITHM,&algorithm);
             int_text(algorithm,t);app_say("FM ALGORITHM",t);
         } else if (k == EN_ALGO && (page == PAGE_HOME || page == PAGE_OPERATOR_MAP)) {
+            if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+                app_say("FIXED ENGINE",fm1lab_patch_engine_name(set.patch));
+                continue;
+            }
             /* ALGO edits the selected patch's actual FM algorithm. PRESET
              * owns Instrument selection; the two controls stay independent. */
             voice_edit_global(FM1LAB_GLOBAL_ALGORITHM, e);
@@ -2498,6 +2523,10 @@ static void input(void)
             instrument_insert_edit(field,(uint8_t)clamp((int32_t)value+e,0,31));
             app_say("EQ Q","UPDATED");
         } else if (k == EN_SELECT && page == PAGE_LFO && lfo_view < 3u) {
+            if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+                app_say("FIXED ENGINE",fm1lab_patch_engine_name(set.patch));
+                continue;
+            }
             int32_t next=((int32_t)env_operator-1+e)%6;
             if(next<0)next+=6;
             env_operator=(uint8_t)(next+1);
@@ -3082,6 +3111,8 @@ static const char *patch_display_name(uint32_t patch)
     static char fallback[FM1LAB_PATCH_COUNT][12];
     if (patch >= FM1LAB_PATCH_COUNT) patch = 0u;
     /* Use the DX voice-name accessor, never the containing Instrument name. */
+    if (fm1lab_patch_engine_for_context((uint8_t)patch) != FM1LAB_PATCH_ENGINE_FM6)
+        return fm1lab_patch_engine_name((uint8_t)patch);
     if (fm1lab_voice_name_get(current_instrument.patches[patch].voice,
                               display[patch]) == 0) {
         uint32_t n = fm1lab_strlen(display[patch]);
@@ -3124,9 +3155,14 @@ static void draw_home_panel(void)
         cv_text(x + 65, y + 5, &FONT_XS, enabled ? "ON" : "MUTED",
                 enabled ? RGB(75,235,135) : C_PEWTER);
         cv_text_fit(x+12,y+23,&FONT_B,patch_display_name(p),C_WHITE,96);
-        cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_PEWTER);
-        int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
-        cv_text(x + 34, y + 49, &FONT_XS, t, accent);
+        if (p == FM1LAB_SLOT_FM6) {
+            cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_PEWTER);
+            int_text((int32_t)fm6_patch_algorithm(p) + 1, t);
+            cv_text(x + 34, y + 49, &FONT_XS, t, accent);
+        } else {
+            cv_text(x + 12, y + 49, &FONT_XS, "ENGINE", C_PEWTER);
+            cv_text(x + 55, y + 49, &FONT_XS, fm1lab_patch_engine_short_name((uint8_t)p), accent);
+        }
         cv_text(x + 59, y + 49, &FONT_XS, "LEVEL", C_PEWTER);
         int_text(set.levels[p], t);
         cv_text(x + 91, y + 49, &FONT_XS, t, C_WHITE);
@@ -3453,8 +3489,26 @@ static const char *env_rate_word(uint8_t value)
     return "VERY SLOW";
 }
 
+static void draw_fixed_engine_panel(void)
+{
+    const char *engine=fm1lab_patch_engine_name(set.patch);
+    const char *detail=set.patch==FM1LAB_SLOT_WAVETABLE?"FIXED-POINT TABLE":
+        set.patch==FM1LAB_SLOT_PSG?"PULSE + NOISE":"TWO OSCILLATORS";
+    uint16_t accent=patch_color(set.patch);
+    instrument_card(5,18,230,142,panel_fill(),accent,accent);
+    cv_text_fit(15,30,&FONT_XS,"FIXED INSTRUMENT ENGINE",C_PEWTER,205);
+    cv_text_fit(15,55,&FONT_B,engine,accent,205);
+    cv_text_fit(15,84,&FONT_XS,detail,C_WHITE,205);
+    cv_text_fit(15,111,&FONT_XS,"SIX-OP EDITOR IS PATCH 1 ONLY",C_PEWTER,205);
+    cv_text_fit(15,132,&FONT_XS,"LEVEL / PAN / TUNING REMAIN ACTIVE",C_PEWTER,205);
+}
+
 static void draw_envelope_panel(void)
 {
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+        draw_fixed_engine_panel();
+        return;
+    }
     char t[16];
     const uint8_t *voice=current_instrument.patches[set.patch].voice;
     uint16_t accent=patch_color(set.patch);
@@ -3497,6 +3551,10 @@ static void draw_envelope_panel(void)
 
 static void draw_operator_workbench(uint8_t view)
 {
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+        draw_fixed_engine_panel();
+        return;
+    }
     const uint8_t *voice=current_instrument.patches[set.patch].voice;
     uint16_t accent=patch_color(set.patch);
     char t[20];
@@ -3572,6 +3630,10 @@ static void draw_operator_workbench(uint8_t view)
 
 static void draw_lfo_panel(uint32_t modulation)
 {
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+        draw_fixed_engine_panel();
+        return;
+    }
     static const char *const labels[2][4] = {
         {"K1  SHAPE", "K2  RATE", "K3  PITCH", "K4  VOLUME"},
         {"K1  DELAY", "K2  PITCH SENS", "K3  LFO RESET", "K4  PHASE RESET"}

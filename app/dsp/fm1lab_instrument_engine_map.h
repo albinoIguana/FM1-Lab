@@ -16,6 +16,10 @@ typedef enum {
 } fm1lab_patch_engine_t;
 
 #define FM1LAB_INSTRUMENT_SLOT_COUNT 4u
+#define FM1LAB_SLOT_FM6 0u
+#define FM1LAB_SLOT_WAVETABLE 1u
+#define FM1LAB_SLOT_PSG 2u
+#define FM1LAB_SLOT_SUBTRACTIVE 3u
 #define FM1LAB_INSTRUMENT_BANK_COUNT 2u
 #define FM1LAB_PATCH_CONTEXT_COUNT (FM1LAB_INSTRUMENT_SLOT_COUNT * FM1LAB_INSTRUMENT_BANK_COUNT)
 
@@ -23,5 +27,32 @@ static inline fm1lab_patch_engine_t fm1lab_patch_engine_for_context(uint8_t patc
 {
     if (patch_context >= FM1LAB_PATCH_CONTEXT_COUNT)
         return FM1LAB_PATCH_ENGINE_INVALID;
-    return (fm1lab_patch_engine_t)(patch_context % FM1LAB_INSTRUMENT_SLOT_COUNT);
+    switch (patch_context % FM1LAB_INSTRUMENT_SLOT_COUNT) {
+    case FM1LAB_SLOT_FM6: return FM1LAB_PATCH_ENGINE_FM6;
+    case FM1LAB_SLOT_WAVETABLE: return FM1LAB_PATCH_ENGINE_WAVETABLE;
+    case FM1LAB_SLOT_PSG: return FM1LAB_PATCH_ENGINE_PSG;
+    case FM1LAB_SLOT_SUBTRACTIVE: return FM1LAB_PATCH_ENGINE_SUBTRACTIVE;
+    default: return FM1LAB_PATCH_ENGINE_INVALID;
+    }
+}
+
+static inline const char *fm1lab_patch_engine_name(uint8_t patch_context)
+{
+    switch (fm1lab_patch_engine_for_context(patch_context)) {
+    case FM1LAB_PATCH_ENGINE_FM6: return "FM6";
+    case FM1LAB_PATCH_ENGINE_WAVETABLE: return "WAVETABLE";
+    case FM1LAB_PATCH_ENGINE_PSG: return "PSG";
+    case FM1LAB_PATCH_ENGINE_SUBTRACTIVE: return "SUBTRACTIVE";
+    default: return "INVALID";
+    }
+}
+static inline const char *fm1lab_patch_engine_short_name(uint8_t patch_context)
+{
+    switch (fm1lab_patch_engine_for_context(patch_context)) {
+    case FM1LAB_PATCH_ENGINE_FM6: return "FM6";
+    case FM1LAB_PATCH_ENGINE_WAVETABLE: return "WT";
+    case FM1LAB_PATCH_ENGINE_PSG: return "PSG";
+    case FM1LAB_PATCH_ENGINE_SUBTRACTIVE: return "SUB";
+    default: return "--";
+    }
 }
