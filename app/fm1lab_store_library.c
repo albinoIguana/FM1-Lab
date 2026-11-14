@@ -22,8 +22,11 @@ _Static_assert(META_TOTAL_BYTES == FM1LAB_STORE_METADATA_BYTES, "Instrument dire
 _Static_assert(META_TOTAL_BYTES <= 3840u, "Instrument directory exceeds pooled object capacity");
 
 static enum fm1lab_store_load_stage last_load_stage;
+static enum fm1lab_store_format_stage last_format_stage;
 enum fm1lab_store_load_stage fm1lab_store_library_last_load_stage(void)
 { return last_load_stage; }
+enum fm1lab_store_format_stage fm1lab_store_library_last_format_stage(void)
+{ return last_format_stage; }
 
 static PLAT_POOL uint8_t bank_work[PATCH_BANK_BYTES];
 static PLAT_POOL uint8_t meta_work[META_TOTAL_BYTES];
@@ -233,12 +236,28 @@ static int meta_snapshot_load(void)
 }
 static int meta_snapshot_commit(void)
 {
+    uint8_t verify[META_TOTAL_BYTES];
     uint8_t *snapshot=meta_work+META_HEADER_BYTES;
+    int rc;
     bytes_copy(snapshot,meta_snapshot_work,META_SNAPSHOT_BYTES);
     meta_snapshot_seal(snapshot);
     meta_header_seal(meta_work);
-    /* plat_store_save already commits through the pool's CRC-protected A/B copies. */
-    return plat_store_save(OBJ_INSERTS,meta_work,META_TOTAL_BYTES);
+    /* plat_store_save commits through the pool's CRC-protected A/B copies. */
+    rc=plat_store_save(OBJ_INSERTS,meta_work,META_TOTAL_BYTES);
+    if(rc!=0) {
+        last_format_stage=(rc==-8)?FM1LAB_STORE_FORMAT_POOL_FULL:
+                                     FM1LAB_STORE_FORMAT_META_SAVE;
+        return rc;
+    }
+    if(plat_store_size(OBJ_INSERTS)!=(int)META_TOTAL_BYTES ||
+       plat_store_load(OBJ_INSERTS,verify,sizeof verify)!=(int)META_TOTAL_BYTES ||
+       !meta_header_valid(verify) ||
+       !meta_snapshot_valid(verify+META_HEADER_BYTES)) {
+        last_format_stage=FM1LAB_STORE_FORMAT_META_VERIFY;
+        return -1;
+    }
+    last_format_stage=FM1LAB_STORE_FORMAT_OK;
+    return 0;
 }
 static void meta_snapshot_format(void)
 {
@@ -340,13 +359,20 @@ int fm1lab_store_library_save(unsigned index,const fm1lab_instrument_t *in)
 }
 int fm1lab_store_library_format_bank(unsigned bank,const fm1lab_instrument_t *factory)
 {
-    if(bank>=FM1LAB_STORE_BANK_COUNT || !fm1lab_instrument_valid(factory))return -1;
+    last_format_stage=FM1LAB_STORE_FORMAT_OK;
+    if(bank>=FM1LAB_STORE_BANK_COUNT || !fm1lab_instrument_valid(factory)) {
+        last_format_stage=FM1LAB_STORE_FORMAT_BAD_ARGUMENT;
+        return -1;
+    }
     bytes_zero(bank_work,PATCH_BANK_BYTES);
     for(unsigned instrument=0;instrument<FM1LAB_STORE_INSTRUMENTS_PER_BANK;instrument++)
         for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++)
             patch_encode(patch_record_at(bank_work,instrument*FM1LAB_PATCH_COUNT+p),
                          &factory->patches[p]);
-    if(patch_bank_save(bank)!=0)return -1;
+    if(patch_bank_save(bank)!=0) {
+        last_format_stage=FM1LAB_STORE_FORMAT_BANK_SAVE;
+        return -1;
+    }
 
     if(meta_snapshot_load()!=0)meta_snapshot_format();
     for(unsigned slot=0;slot<FM1LAB_STORE_INSTRUMENTS_PER_BANK;slot++){
@@ -370,7 +396,11 @@ int fm1lab_store_library_format_bank(unsigned bank,const fm1lab_instrument_t *fa
 }
 int fm1lab_store_library_format(const fm1lab_instrument_t *factory)
 {
-    if(!fm1lab_instrument_valid(factory))return -1;
+    last_format_stage=FM1LAB_STORE_FORMAT_OK;
+    if(!fm1lab_instrument_valid(factory)) {
+        last_format_stage=FM1LAB_STORE_FORMAT_BAD_ARGUMENT;
+        return -1;
+    }
     for(unsigned bank=0;bank<FM1LAB_STORE_BANK_COUNT;bank++)
         if(fm1lab_store_library_format_bank(bank,factory)!=0)return -1;
     return 0;

@@ -32,6 +32,18 @@ enum fm1lab_store_load_stage {
 };
 enum fm1lab_store_load_stage fm1lab_store_library_last_load_stage(void);
 
+/* Startup formatter diagnostics. The load stage remains separate so a later
+ * attempted Instrument load cannot erase the reason formatting failed. */
+enum fm1lab_store_format_stage {
+    FM1LAB_STORE_FORMAT_OK = 0,
+    FM1LAB_STORE_FORMAT_BAD_ARGUMENT,
+    FM1LAB_STORE_FORMAT_BANK_SAVE,
+    FM1LAB_STORE_FORMAT_META_SAVE,
+    FM1LAB_STORE_FORMAT_POOL_FULL,
+    FM1LAB_STORE_FORMAT_META_VERIFY
+};
+enum fm1lab_store_format_stage fm1lab_store_library_last_format_stage(void);
+
 /* Four 32-patch banks (IDs 0..127) and one Instrument directory. Each Instrument
  * owns four stable patch IDs: instrument_index*4 + slot. Factory-preset selection
  * copies into those IDs; switching Instruments never resets their saved patch data. */

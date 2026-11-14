@@ -2142,6 +2142,7 @@ void app_init(void)
     int performance_loaded = 0;
     int loaded;
     uint8_t fresh_bank_mask=0u;
+    enum fm1lab_store_format_stage format_failure=FM1LAB_STORE_FORMAT_OK;
     master_trim_pct=100u;
 #if defined(PLAT_WEB)
     web_device_cpu_q12 = web_device_cpu_pct = 0u;
@@ -2358,10 +2359,12 @@ void app_init(void)
          * replaced, not migrated. A malformed current-format bank is preserved. */
         if (reset_patch_library || size < 0 || size == 3840 ||
             size == (int)sizeof(fm1lab_instrument_t)) {
-            if (fm1lab_store_library_format_bank(bank, &factory_instrument) != 0)
-                app_say("PATCH BANK", "FORMAT FAILED");
-            else
+            if (fm1lab_store_library_format_bank(bank, &factory_instrument) != 0) {
+                if(format_failure==FM1LAB_STORE_FORMAT_OK)
+                    format_failure=fm1lab_store_library_last_format_stage();
+            } else {
                 fresh_bank_mask |= (uint8_t)(1u << bank);
+            }
             continue;
         }
         if (size == (int)FM1LAB_STORE_PATCH_BANK_BYTES) {
@@ -2392,7 +2395,16 @@ void app_init(void)
         instrument_dirty = 0u;
         instrument_sync_settings();
         instrument_apply_engine();
-        app_say("LIBRARY", "FACTORY FALLBACK");
+        if(format_failure==FM1LAB_STORE_FORMAT_POOL_FULL)
+            app_say("FACTORY FALLBACK","POOL FULL");
+        else if(format_failure==FM1LAB_STORE_FORMAT_META_SAVE)
+            app_say("FACTORY FALLBACK","META WRITE FAIL");
+        else if(format_failure==FM1LAB_STORE_FORMAT_META_VERIFY)
+            app_say("FACTORY FALLBACK","META VERIFY FAIL");
+        else if(format_failure==FM1LAB_STORE_FORMAT_BANK_SAVE)
+            app_say("FACTORY FALLBACK","BANK WRITE FAIL");
+        else
+            app_say("FACTORY FALLBACK","META LOOKUP");
     }
     app_track_stash(seq_ui_lane & 1u);
     {

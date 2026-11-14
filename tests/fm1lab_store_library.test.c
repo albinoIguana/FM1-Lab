@@ -183,6 +183,20 @@ int main(void)
     assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_READ);
     fail_load_obj=-1;
 
+    /* Initial formatting reports whether the patch-bank write or the
+     * Instrument-directory commit failed; a generic META LOOKUP later must
+     * not hide the original startup write failure. */
+    fail_obj=OBJ_INSTRUMENTS0;
+    assert(fm1lab_store_library_format_bank(0u,&factory)<0);
+    assert(fm1lab_store_library_last_format_stage()==FM1LAB_STORE_FORMAT_BANK_SAVE);
+    fail_obj=OBJ_INSERTS;
+    assert(fm1lab_store_library_format_bank(0u,&factory)<0);
+    assert(fm1lab_store_library_last_format_stage()==FM1LAB_STORE_FORMAT_META_SAVE);
+    assert(fm1lab_store_library_format_bank(FM1LAB_STORE_BANK_COUNT,&factory)<0);
+    assert(fm1lab_store_library_last_format_stage()==FM1LAB_STORE_FORMAT_BAD_ARGUMENT);
+    assert(fm1lab_store_library_format_bank(0u,&factory)==0);
+    assert(fm1lab_store_library_last_format_stage()==FM1LAB_STORE_FORMAT_OK);
+
     /* Header, snapshot CRC, patch references and insert sidecar validation
      * each fail at their own boundary rather than collapsing into LOAD FAILED. */
     uint8_t saved_meta[FM1LAB_STORE_METADATA_BYTES];
