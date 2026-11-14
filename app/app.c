@@ -744,15 +744,24 @@ static int instrument_load_record(uint32_t index,fm1lab_instrument_t *candidate,
         fm1lab_insert_state_t *inserts,uint8_t *rom_fallback)
 {
     int loaded;
+    enum fm1lab_store_load_stage failure;
 #ifdef PLAT_HOST
-    if(app_host_force_meta_lookup_failure) loaded=-1;
-    else
+    if(app_host_force_meta_lookup_failure) {
+        loaded=-1;
+        failure=FM1LAB_STORE_LOAD_META_LOOKUP;
+    } else
 #endif
+    {
         loaded=fm1lab_store_library_load_full(index,candidate,inserts);
+        failure=fm1lab_store_library_last_load_stage();
+    }
     if(rom_fallback) *rom_fallback=0u;
     if(loaded!=0) {
-        /* Factory Instruments are compiled into the firmware. A failed flash
-         * read falls back to that exact numbered ROM slot, read-only. */
+        /* A missing or obsolete directory has no resolvable user records.
+         * Browse the exact numbered curated ROM slot read-only; corrupt
+         * current-format records remain errors and are never substituted. */
+        if(failure!=FM1LAB_STORE_LOAD_META_LOOKUP &&
+           failure!=FM1LAB_STORE_LOAD_META_SIZE) return -1;
         if(fm1lab_seed_dx7_instrument(index,candidate)!=0) return -1;
         fm1lab_insert_state_init(inserts);
         if(rom_fallback) *rom_fallback=1u;
@@ -4037,6 +4046,7 @@ static void draw(void)
                           battery >= 3 ? RGB(75,235,135) : accent);
     }
     if (arp_ui_mode) cv_text(216, 1, &FONT_XS, "ARP", RGB(75,235,135));
+    else if (instrument_rom_fallback) cv_text(216, 1, &FONT_XS, "ROM", C_PEWTER);
 
     /* Short-lived input refusals and confirmations must be visible. Keep
      * the existing algorithm-preview message prefix intact for its overlay. */
@@ -4389,7 +4399,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             instrument_rom_fallback &&
             fm1lab_strcmp(current_instrument.name,fm1lab_dx7_instrument_names[index])==0 &&
             fm1lab_voice_name_get(current_instrument.patches[0].voice,patch_name)==0 &&
-            fm1lab_strcmp(patch_name,"NEON KEYS")!=0);
+            fm1lab_strcmp(patch_name,"JH.SUSBS 1")==0);
         current_instrument=saved_current; current_inserts=saved_inserts;
         instrument_index=saved_index; instrument_dirty=saved_dirty;
         instrument_loaded=saved_loaded; instrument_rom_fallback=saved_rom;
