@@ -2380,7 +2380,20 @@ void app_init(void)
     fm1lab_seed_fresh_bank_mask=0u;
     set.patch = seq_ui_patch[seq_ui_lane];
     patch_focus = 0u;
-    instrument_load(seq_ui_instrument[seq_ui_lane], 0);
+    if (instrument_load(seq_ui_instrument[seq_ui_lane], 0) != FM1LAB_LOAD_OK) {
+        /* A missing/corrupt library directory must not leave the active lane
+         * uninitialized. That used to make patch replacement reject its
+         * invalid current_instrument and made Track 1 impossible to reactivate
+         * after switching to the already-fallback-loaded Track 2. Keep a
+         * playable RAM-only factory Instrument until storage is repaired. */
+        instrument_factory_defaults();
+        instrument_index = seq_ui_instrument[seq_ui_lane];
+        instrument_loaded = 1u;
+        instrument_dirty = 0u;
+        instrument_sync_settings();
+        instrument_apply_engine();
+        app_say("LIBRARY", "FACTORY FALLBACK");
+    }
     app_track_stash(seq_ui_lane & 1u);
     {
         uint8_t other_lane=(uint8_t)(seq_ui_lane^1u);
