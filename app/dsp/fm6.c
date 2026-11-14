@@ -1503,6 +1503,11 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 split=k+1u;
                 if(cpu0_cost>=target_cost)break;
             }
+            /* The rollback snapshot is intentionally sized for at most half
+             * the voice pool; never let a weighted split overrun that buffer. */
+            uint32_t min_split=active_voice_count>VOICES/2u?
+                active_voice_count-VOICES/2u:1u;
+            if(split<min_split)split=min_split;
             fm6_cpu2_job_start = split;
             fm6_cpu2_job_count = active_voice_count - split;
 #ifdef FM6_TEST
