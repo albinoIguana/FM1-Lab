@@ -809,6 +809,7 @@ static const char *fm1lab_patch_preset_failure_label(void)
     switch(patch_preset_last_result) {
     case FM1LAB_DX7_PRESET_BAD_ARGUMENT: return "BAD ARGUMENT";
     case FM1LAB_DX7_PRESET_INDEX_INVALID: return "INDEX INVALID";
+    case FM1LAB_DX7_PRESET_DATA_MISSING: return "PRESET NOT FOUND";
     case FM1LAB_DX7_PRESET_DECODE_FAILED: return "DECODE FAILED";
     case FM1LAB_DX7_PRESET_VOICE_INVALID: return "VOICE INVALID";
     case FM1LAB_DX7_PRESET_PATCH_REPLACE_FAILED: return "REPLACE FAILED";
