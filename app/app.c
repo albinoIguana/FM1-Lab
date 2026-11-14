@@ -4423,7 +4423,7 @@ int app_host_fails(void)
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
-    if(!fm1lab_strcmp(cmd,"fm1lab_legacy_factory_migration_test")) {
+    if(!fm1lab_strcmp(cmd,"fm1lab_legacy_migration_test")) {
         fm1lab_instrument_t legacy,migrated,expected,edited;
         fm1lab_insert_state_t inserts;
         app_host_legacy_factory_migration_pass=0u;
