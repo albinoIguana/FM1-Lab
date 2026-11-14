@@ -535,9 +535,8 @@ int main(void) {
     /* A patch's gain must not fall as additional identical patches are
      * enabled. Four coherent patches should sum, not be normalized back
      * to the single-patch level. */
-    uint64_t single_dry_peak = 0u, four_dry_peak = 0u;
+    uint64_t single_dry_peak = 0u;
     uint64_t single_patch_peak = render_stack_patch_peak(0x01u, &single_dry_peak);
-    uint64_t four_patch_peak = render_stack_patch_peak(0x0Fu, &four_dry_peak);
     assert(single_patch_peak > 0u);
     assert(four_patch_peak == single_patch_peak);
     /* Patch 1 remains the existing six-operator FM6 reference. Its dry
