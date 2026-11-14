@@ -94,9 +94,20 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
 "$SEQUENCER_BIN"
 echo "FM1-Lab native voice editor tests passed."
 
+# Exercise the exact bundled DX7 decoder and patch replacement used by app.c.
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" \
+  "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/fm1lab_dx7_preset.c" \
+  "$ROOT/tests/fm1lab_dx7_preset.test.c" -o "$PRESET_BIN"
+"$PRESET_BIN"
+echo "FM1-Lab bundled DX7 preset decode/replacement tests passed."
+
 # Exercise the legacy M-VAVE SDK prototype engine, then the active Felucca FM6 device core.
 bash "$ROOT/tests/test-audio-engine.sh"
 bash "$ROOT/tests/test-fm6-engine.sh"
 
 # The active app's compact 4-bank store is separate from the legacy SDK bank codec.
 bash "$ROOT/tests/test-store-library.sh"
+
+# Run fm1-base's native test against the exact pinned production storage.c pool implementation.
+cc -std=c11 -Wall -Wextra -Werror "$ROOT/base/tests/storage_pool_test.c" -o "$CONTROLS_BIN"
+"$CONTROLS_BIN"
