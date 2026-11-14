@@ -7,12 +7,12 @@ BIN="$(mktemp)"
 trap 'rm -f "$BIN"' EXIT
 
 # GCC supports -Wno-array-parameter; Apple Clang may reject it as unknown.
-ARRAY_PARAMETER_FLAG=()
+ARRAY_PARAMETER_FLAG=""
 if printf 'int main(void) { return 0; }\\n' | cc -std=c11 -Werror -Wno-array-parameter -x c -fsyntax-only - >/dev/null 2>&1; then
-  ARRAY_PARAMETER_FLAG=(-Wno-array-parameter)
+  ARRAY_PARAMETER_FLAG="-Wno-array-parameter"
 fi
 
-cc -std=c11 -O2 -Wall -Wextra -Werror "${ARRAY_PARAMETER_FLAG[@]}" \
+cc -std=c11 -O2 -Wall -Wextra -Werror ${ARRAY_PARAMETER_FLAG:+$ARRAY_PARAMETER_FLAG} \
   -DFM1_HOST_TEST -DFM1_DSP_ENTRY= \
   -I"$ROOT/firmware" \
   -I"$SOURCE/app/synth" \
