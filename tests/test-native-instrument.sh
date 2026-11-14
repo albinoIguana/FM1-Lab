@@ -62,7 +62,7 @@ cc -std=c11 -Wall -Wextra -Werror "$ROOT/tests/fm1lab_cpu2_startup.test.c" -o "$
 "$CPU2_STARTUP_BIN"
 echo "FM1-Lab CPU2 startup self-test tests passed."
 
-cc -std=c11 -Wall -Wextra -Werror \
+cc -std=c11 -Wall -Wextra -Werror -DFM1_DSP_CODE= \
   -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
   "$ROOT/firmware/fm1lab_instrument.c" \
   "$ROOT/firmware/fm1lab_bank_metadata.c" \
@@ -78,7 +78,7 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/
 "$RUNTIME_BIN"
 echo "FM1-Lab runtime control tests passed."
 
-cc -std=c11 -Wall -Wextra -Werror \
+cc -std=c11 -Wall -Wextra -Werror -DFM1_DSP_CODE= \
   -I"$ROOT/firmware" -I"$ROOT/vendor/m-vave-fm1/app" -I"$ROOT/vendor/m-vave-fm1/app/synth" -I"$ROOT/vendor/m-vave-fm1/sdk/include" \
   "$ROOT/firmware/fm1lab_sequencer.c" "$ROOT/tests/fm1lab_sequencer.test.c" -o "$SEQUENCER_BIN"
 "$SEQUENCER_BIN"
