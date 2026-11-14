@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# The active app must not compile the retired M-VAVE 16-recipe factory path.
+if grep -Eq "fm1lab_factory_voice_build|fm1lab_factory_names|NEON KEYS" "$ROOT/app/app.c"; then
+  echo "retired M-VAVE factory recipe source is still present in app/app.c" >&2
+  exit 1
+fi
 INSTRUMENT_BIN="$(mktemp)"
 METADATA_BIN="$(mktemp)"
 CONTROLS_BIN="$(mktemp)"
