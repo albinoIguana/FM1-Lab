@@ -113,7 +113,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function "$ROOT/base/tests/storage
 "$CONTROLS_BIN"
 
 # Exercise the pinned storage.c pool with FM1-Lab's exact object IDs and 12-sector layout.
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function \
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -DFM1_HOST_TEST \
   -I"$ROOT/app" -I"$ROOT/app/dsp" -I"$ROOT/base/include" \
   "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/fm1lab_store_library.c" \
   "$ROOT/tests/fm1lab_flash_pool.test.c" -o "$CONTROLS_BIN"
