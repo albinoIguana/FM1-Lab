@@ -109,5 +109,5 @@ bash "$ROOT/tests/test-fm6-engine.sh"
 bash "$ROOT/tests/test-store-library.sh"
 
 # Run fm1-base's native test against the exact pinned production storage.c pool implementation.
-cc -std=c11 -Wall -Wextra -Werror "$ROOT/base/tests/storage_pool_test.c" -o "$CONTROLS_BIN"
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function "$ROOT/base/tests/storage_pool_test.c" -o "$CONTROLS_BIN"
 "$CONTROLS_BIN"
