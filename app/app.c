@@ -805,7 +805,9 @@ static uint8_t instrument_repair_missing_voices(fm1lab_instrument_t *instrument)
 {
     uint8_t repaired=0u;
     if(!instrument || !fm1lab_instrument_valid(instrument))return 0u;
-    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
+    /* Only slot 1 is an FM voice. Slots 2-4 are fixed wavetable, PSG and
+     * subtractive engines; their legacy DX7 payloads are not carrier data. */
+    for(uint32_t patch=0u;patch<1u;patch++) {
         if(!fm1lab_voice_has_audible_carrier(instrument->patches[patch].voice)) {
             uint8_t playable[FM1LAB_PATCH_BYTES];
             uint8_t previous_level=instrument->patches[patch].level;
@@ -1143,8 +1145,13 @@ static void ui_events_drain(void)
 
 static void voice_update_publish(void)
 {
-    if (!voice_dirty || voice_update_pending || !instrument_loaded ||
-        fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) return;
+    if (!voice_dirty || voice_update_pending || !instrument_loaded) return;
+    if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
+        /* Names in non-FM slots live in the existing patch record; they do
+         * not require publishing a six-operator voice into the DSP. */
+        voice_dirty=0u;
+        return;
+    }
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     for (uint32_t i = 0; i < FM1LAB_PATCH_BYTES; ++i)
         voice_update_snapshot[i] = voice[i];
@@ -2466,6 +2473,11 @@ static void input(void)
                 break;
             case FM1LAB_INPUT_RESULT_NONE: default: break;
             }
+            continue;
+        }
+        if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6 &&
+            (page == PAGE_ENV || page == PAGE_LFO || page == PAGE_LFO_MOD)) {
+            app_say("FIXED ENGINE",fm1lab_patch_engine_name(set.patch));
             continue;
         }
         if (k == EN_PRESET && page != PAGE_HOME && page != PAGE_SEQ &&
