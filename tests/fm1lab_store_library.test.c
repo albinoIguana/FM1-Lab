@@ -10,6 +10,7 @@ static uint16_t object_len[5];
 static int present[5];
 static int fail_obj=-1;
 static int fail_size_obj=-1;
+static int wrong_size_obj=-1;
 static int fail_load_obj=-1;
 
 static uint16_t test_crc16(const uint8_t *p, unsigned n)
@@ -35,6 +36,7 @@ static void reseal_metadata_snapshot(void)
 
 int plat_store_size(uint32_t obj) {
     if((int)obj==fail_size_obj)return -1;
+    if((int)obj==wrong_size_obj && obj>=OBJ_INSTRUMENTS0 && obj<=OBJ_INSERTS && present[obj-OBJ_INSTRUMENTS0]) return (int)object_len[obj-OBJ_INSTRUMENTS0]-1;
     if(obj<OBJ_INSTRUMENTS0 || obj>OBJ_INSERTS || !present[obj-OBJ_INSTRUMENTS0]) return -1;
     return object_len[obj-OBJ_INSTRUMENTS0];
 }
@@ -158,16 +160,24 @@ int main(void)
     /* Fault injection identifies lookup/read/validation failures precisely. */
     fail_size_obj=OBJ_INSERTS;
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
-    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_SIZE);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_LOOKUP);
     fail_size_obj=-1;
+    wrong_size_obj=OBJ_INSERTS;
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_SIZE);
+    wrong_size_obj=-1;
     fail_load_obj=OBJ_INSERTS;
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
     assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_META_READ);
     fail_load_obj=-1;
     fail_size_obj=OBJ_INSTRUMENTS0;
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
-    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_SIZE);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_LOOKUP);
     fail_size_obj=-1;
+    wrong_size_obj=OBJ_INSTRUMENTS0;
+    assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
+    assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_SIZE);
+    wrong_size_obj=-1;
     fail_load_obj=OBJ_INSTRUMENTS0;
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)<0);
     assert(fm1lab_store_library_last_load_stage()==FM1LAB_STORE_LOAD_BANK_READ);
