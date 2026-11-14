@@ -70,3 +70,36 @@ The earlier normalized cost figures (wavetable 0.15–0.30, subtractive 0.35–0
 - No changes to legacy factory preset migration.
 - No new per-engine FX chains; all four slots feed the existing shared instrument FX/master chain.
 - No claim of hardware performance based on host benchmarks or CI build success.
+
+
+## Prototype checkpoint — 2026-11-14
+
+Three lightweight fixed-point candidates now exist as standalone native prototypes:
+
+- **Wavetable:** 64-sample sine table, Q32 phase accumulator, linear interpolation.
+- **PSG:** pulse oscillator plus deterministic 15-bit LFSR noise.
+- **Subtractive:** two slightly detuned saw oscillators into a one-pole fixed-point low-pass.
+
+The shared prototype API is in `app/dsp/fm1lab_synth_engines.[ch]`. It uses a compact attack/sustain/release envelope and a 36-byte per-voice state. At eight voices per candidate slot, that is 288 bytes per slot or 864 bytes across the three non-FM slots, excluding the small shared read-only tables. There is no per-voice table copy, heap allocation, floating-point DSP, or per-voice effect state.
+
+The standalone native test is included in `tests/test-fm6-engine.sh`. It checks silence before note-on, deterministic output for identical voices, distinct candidate outputs, bounded samples, octave phase-increment behavior, note-off/release completion, invalid engine rejection, and the 36-byte state size.
+
+A reproducible host microbenchmark is available as `tests/bench-mixed-synth.sh`. On the current x86_64 KVM development host (AMD EPYC 9V74, GCC 14.2, `-O2`), the initial 8-voice / 256-frame / 12,000-block / 5-trial runs produced noisy medians across three process launches:
+
+| Prototype | Observed median range |
+|---|---:|
+| Wavetable | 3.96–4.22 ns / voice-sample |
+| PSG | 4.33–4.80 ns / voice-sample |
+| Subtractive | 3.90–4.51 ns / voice-sample |
+
+These are host measurements only. The spread is large enough that they do not establish a reliable winner, and they must not be converted into FM1 callback budgets. They do suggest that the simple PSG implementation is not automatically the cheapest of these three on every CPU. The FM1's CPU0/CPU2 callback diagnostics remain the deciding measurement.
+
+Prototype limitations are deliberate and remain open:
+- The wavetable is a sine-only proof of the table/interpolation path, not a multi-table instrument.
+- The subtractive saws are not band-limited yet; aliasing and a musical filter control model must be addressed before integration.
+- PSG pulse/noise balance is fixed in this first pass.
+- The current envelope is intentionally minimal, not the final FM1 envelope model.
+- These modules are not connected to the live FM6 allocator or device build. The existing FM6 six-operator path remains untouched; a genuine lower-cost four-operator FM core is still required.
+- Plucked string is deferred until its per-voice delay memory and target cost are justified.
+
+No engine choice, Instrument schema change, preset migration, UI change, or hardware-performance claim is made by this checkpoint.
