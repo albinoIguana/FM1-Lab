@@ -16,7 +16,7 @@ static const uint32_t semitone_ratio_q24[12] = {
     21138677u, 22396723u, 23730359u, 25143906u,
     26642354u, 28230670u, 29913627u, 31697061u
 };
-static const uint32_t c4_phase_inc = 25487311u;
+static const uint32_t c4_phase_inc = 25480119u;
 static const int16_t sine64[64] = {
     0, 3212, 6393, 9512, 12539, 15446, 18204, 20787,
     23170, 25329, 27245, 28898, 30273, 31356, 32137, 32609,
@@ -61,7 +61,7 @@ void fm1lab_synth_init(fm1lab_synth_voice_t *v, fm1lab_synth_engine_t engine)
     if (!v) return;
     memset(v, 0, sizeof(*v));
     v->engine = (uint8_t)engine;
-    v->noise = 0x1ace1u;
+    v->noise = 0x2ce1u;
     v->filter_alpha_q15 = 8192u;
 }
 
@@ -76,7 +76,7 @@ void fm1lab_synth_note_on(fm1lab_synth_voice_t *v, uint8_t note, uint8_t velocit
     v->envelope_q15 = 0u;
     v->gate = 1u; v->active = 1u;
     v->filter_state = 0;
-    if (!v->noise) v->noise = 0x1ace1u;
+    if (!v->noise) v->noise = 0x2ce1u;
 }
 
 void fm1lab_synth_note_off(fm1lab_synth_voice_t *v)
