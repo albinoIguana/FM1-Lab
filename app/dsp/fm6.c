@@ -1830,10 +1830,13 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 (fm6_engine_cost_ticks[engine]*3u+sample)/4u:sample;
         }
     }
-    if(fm6_cpu0_postmix_ticks)
+    if(fm6_cpu0_postmix_ticks && fm6_render_quanta) {
+        /* Scheduling happens once per 32-frame quantum, so compare per-quantum
+         * postmix time with the per-voice/per-quantum engine measurements. */
+        uint32_t postmix_sample=fm6_cpu0_postmix_ticks/fm6_render_quanta;
         fm6_postmix_cost_ticks=fm6_postmix_cost_ticks?
-            (fm6_postmix_cost_ticks*3u+fm6_cpu0_postmix_ticks)/4u:
-            fm6_cpu0_postmix_ticks;
+            (fm6_postmix_cost_ticks*3u+postmix_sample)/4u:postmix_sample;
+    }
 }
 
 
