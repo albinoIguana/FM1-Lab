@@ -144,6 +144,12 @@ static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
  * maxima remain separate so they are never mistaken for callback totals. */
 static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu0_postmix_ticks;
 static volatile uint32_t fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
+/* Per-engine voice timing is collected independently on each core. The audio
+ * owner folds it into an EWMA after CPU2 has joined, then schedules the next
+ * callback using measured device costs rather than fixed engine multipliers. */
+static volatile uint32_t fm6_engine_voice_ticks[2][4], fm6_engine_voice_count[2][4];
+static uint32_t fm6_engine_cost_ticks[4] = { 6u, 1u, 2u, 3u };
+static uint32_t fm6_postmix_cost_ticks;
 static volatile uint32_t fm6_cpu2_backup_ticks_sum, fm6_cpu2_backup_voice_total;
 static volatile uint32_t fm6_render_quanta, fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
 static volatile uint8_t fm6_cpu2_split_disabled;
@@ -1266,7 +1272,7 @@ void fm6_pitch_bend(uint16_t value)
  * Each worker owns its voices, output accumulator and FM6 operator bus. */
 static void fm6_render_voice_range(uint32_t first, uint32_t end,
                                    int64_t patch_mix[PATCHES][FM6_N],
-                                   int32_t bus[FM6_N])
+                                   int32_t bus[FM6_N], uint32_t core)
 {
     int16_t synth_out[FM6_N];
     for (uint32_t k = first; k < end; ++k) {
@@ -1277,6 +1283,7 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
         if (!voice->used)
             continue;
         engine = fm1lab_patch_engine_for_context(voice->patch);
+        uint32_t voice_t0 = plat_ticks24();
         if (engine == FM1LAB_PATCH_ENGINE_FM6) {
             int32_t pitch, fb;
             pitch = fm6_note_logfreq(((int32_t)voice->note + patch->effective[FP_TRNSP] - 24) * 16 + voice->tune16 + pitch_bend_16, 0);
@@ -1346,6 +1353,10 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
                 voice->used = 0u;
             }
         }
+        if ((uint32_t)engine < 4u && core < 2u) {
+            fm6_engine_voice_ticks[core][(uint32_t)engine] += plat_ticks24() - voice_t0;
+            fm6_engine_voice_count[core][(uint32_t)engine]++;
+        }
     }
 }
 /* CPU0-only wrapper: measures every CPU0 voice-range pass, including a
@@ -1355,7 +1366,7 @@ static void fm6_render_voice_range_cpu0(uint32_t first, uint32_t end,
                                         int32_t bus[FM6_N])
 {
     uint32_t t0=plat_ticks24();
-    fm6_render_voice_range(first,end,patch_mix,bus);
+    fm6_render_voice_range(first,end,patch_mix,bus,0u);
     fm6_cpu0_voice_ticks += plat_ticks24()-t0;
 }
 
@@ -1365,7 +1376,7 @@ static void fm6_cpu2_voice_job(uint32_t unused)
     uint32_t t0 = plat_ticks24();
     fm6_render_voice_range(fm6_cpu2_job_start,
                            fm6_cpu2_job_start + fm6_cpu2_job_count,
-                           fm6_patch_mix[1], fm6_voice_bus[1]);
+                           fm6_patch_mix[1], fm6_voice_bus[1], 1u);
     {
         uint32_t elapsed = plat_ticks24() - t0;
         fm6_cpu2_job_ticks_sum += elapsed;
@@ -1422,6 +1433,11 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     fm6_cpu2_wait_us=0u;
     fm6_cpu0_voice_ticks=0u;
     fm6_cpu0_postmix_ticks=0u;
+    for(uint32_t core=0u;core<2u;core++)
+        for(uint32_t engine=0u;engine<4u;engine++) {
+            fm6_engine_voice_ticks[core][engine]=0u;
+            fm6_engine_voice_count[core][engine]=0u;
+        }
     fm6_cpu2_job_ticks_sum=0u;
     fm6_cpu2_wait_ticks_sum=0u;
     fm6_cpu2_backup_ticks_sum=0u;
@@ -1470,24 +1486,22 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
         if(active_voice_count>fm6_callback_voice_peak)fm6_callback_voice_peak=active_voice_count;
         if (active_voice_count > 1u && !fm6_cpu2_split_disabled) {
             ++fm6_cpu2_quanta;
-            /* FM6 voices cost substantially more than the lightweight engines.
-             * Stable-sort by estimated cost, then leave roughly 40% of synthesis
-             * work on CPU0 and 60% on CPU2. CPU0 also owns transport, mixing and FX. */
+            /* Sort voices by measured per-engine execution cost. The CPU0
+             * target subtracts its previous postmix cost before balancing the
+             * remaining synthesis work against CPU2. This targets equal total
+             * core time, not an arbitrary 40/60 voice-only split. */
             uint32_t total_cost=0u;
             for(uint32_t k=0u;k<active_voice_count;k++) {
                 fm1lab_patch_engine_t e=fm1lab_patch_engine_for_context(
                     voices[fm6_voice_work[k]].patch);
-                uint8_t cost=e==FM1LAB_PATCH_ENGINE_FM6?6u:
-                    (e==FM1LAB_PATCH_ENGINE_SUBTRACTIVE?3u:
-                    (e==FM1LAB_PATCH_ENGINE_PSG?2u:1u));
+                uint32_t cost=(uint32_t)e<4u?fm6_engine_cost_ticks[(uint32_t)e]:1u;
                 total_cost+=cost;
                 uint32_t j=k;
                 while(j>0u) {
                     fm1lab_patch_engine_t prev=fm1lab_patch_engine_for_context(
                         voices[fm6_voice_work[j-1u]].patch);
-                    uint8_t prev_cost=prev==FM1LAB_PATCH_ENGINE_FM6?6u:
-                        (prev==FM1LAB_PATCH_ENGINE_SUBTRACTIVE?3u:
-                        (prev==FM1LAB_PATCH_ENGINE_PSG?2u:1u));
+                    uint32_t prev_cost=(uint32_t)prev<4u?
+                        fm6_engine_cost_ticks[(uint32_t)prev]:1u;
                     if(prev_cost<=cost)break;
                     uint8_t swap=fm6_voice_work[j-1u];
                     fm6_voice_work[j-1u]=fm6_voice_work[j];
@@ -1495,14 +1509,14 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                     --j;
                 }
             }
-            uint32_t target_cost=(total_cost*40u+99u)/100u;
+            uint32_t target_cost=total_cost>fm6_postmix_cost_ticks?
+                (total_cost-fm6_postmix_cost_ticks)/2u:1u;
+            if(!target_cost)target_cost=1u;
             uint32_t cpu0_cost=0u, split=1u;
             for(uint32_t k=0u;k+1u<active_voice_count;k++) {
                 fm1lab_patch_engine_t e=fm1lab_patch_engine_for_context(
                     voices[fm6_voice_work[k]].patch);
-                cpu0_cost+=e==FM1LAB_PATCH_ENGINE_FM6?6u:
-                    (e==FM1LAB_PATCH_ENGINE_SUBTRACTIVE?3u:
-                    (e==FM1LAB_PATCH_ENGINE_PSG?2u:1u));
+                cpu0_cost+=(uint32_t)e<4u?fm6_engine_cost_ticks[(uint32_t)e]:1u;
                 split=k+1u;
                 if(cpu0_cost>=target_cost)break;
             }
@@ -1802,6 +1816,24 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
         }
         fm6_cpu0_postmix_ticks += plat_ticks24()-postmix_t0;
     }
+
+    /* Learn costs only after both workers have completed. Each core writes a
+     * separate timing row while rendering; CPU0 folds the samples into a
+     * conservative 3:1 EWMA for the next callback. */
+    for(uint32_t engine=0u;engine<4u;engine++) {
+        uint32_t ticks=fm6_engine_voice_ticks[0][engine]+fm6_engine_voice_ticks[1][engine];
+        uint32_t voices_seen=fm6_engine_voice_count[0][engine]+fm6_engine_voice_count[1][engine];
+        if(voices_seen) {
+            uint32_t sample=ticks/voices_seen;
+            if(!sample)sample=1u;
+            fm6_engine_cost_ticks[engine]=fm6_engine_cost_ticks[engine]?
+                (fm6_engine_cost_ticks[engine]*3u+sample)/4u:sample;
+        }
+    }
+    if(fm6_cpu0_postmix_ticks)
+        fm6_postmix_cost_ticks=fm6_postmix_cost_ticks?
+            (fm6_postmix_cost_ticks*3u+fm6_cpu0_postmix_ticks)/4u:
+            fm6_cpu0_postmix_ticks;
 }
 
 
