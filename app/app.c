@@ -55,7 +55,8 @@ static volatile uint32_t render_core0_active_us, render_cpu2_job_us, render_cpu2
 static volatile uint32_t render_heartbeat;
 static volatile uint8_t app_resync_requested;
 static fm1lab_pending_watch_t pending_watch;
-static volatile uint32_t render_cpu0_voice_us, render_cpu2_job_sum_us, render_cpu2_wait_sum_us;
+static volatile uint32_t render_cpu0_voice_us, render_cpu0_postmix_us;
+static volatile uint32_t render_cpu2_job_sum_us, render_cpu2_wait_sum_us;
 static volatile uint32_t render_cpu2_backup_ns, render_cpu2_backup_voices;
 static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
 static volatile uint32_t render_peak_all_us, render_peak_window_us;
@@ -1630,6 +1631,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         render_cpu2_job_us=fm6_cpu2_last_job_us();
         render_cpu2_wait_us=fm6_cpu2_last_wait_us();
         render_cpu0_voice_us=fm6_cpu0_voice_us();
+        render_cpu0_postmix_us=fm6_cpu0_postmix_us();
         render_cpu2_job_sum_us=fm6_cpu2_job_sum_us();
         render_cpu2_wait_sum_us=wait_sum_us;
         render_cpu2_backup_ns=fm6_cpu2_backup_sum_ns();
@@ -3440,7 +3442,8 @@ static void draw_audio_diag_panel(void)
             cv_text(x+8,y+6,&FONT_XS,"CPU0 BUSY / VOICE",C_PEWTER);
             int_text((int32_t)render_core0_active_us,value);text_cat(value," us");
             cv_text(x+8,y+21,&FONT_B,value,colors[i]);
-            int_text((int32_t)render_cpu0_voice_us,detail);text_cat(detail," voice");
+            int_text((int32_t)render_cpu0_voice_us,detail);text_cat(detail," voice  ");
+            int_text((int32_t)render_cpu0_postmix_us,value);text_cat(detail,value);text_cat(detail," post");
             cv_text_fit(x+8,y+48,&FONT_XS,detail,C_PEWTER,UI_GRID_CARD_W-16);
             int_text((int32_t)render_ui_us,detail);text_cat(detail," UI  ");
             int_text((int32_t)render_midi_us,value);text_cat(detail,value);text_cat(detail," MIDI");
@@ -4470,6 +4473,7 @@ int app_expect(const char *what, int *got)
     else if (!fm1lab_strcmp(what, "core0us"))
         *got = (int)render_core0_active_us;
     else if (!fm1lab_strcmp(what, "cpu0voice")) *got=(int)render_cpu0_voice_us;
+    else if (!fm1lab_strcmp(what, "cpu0postmix")) *got=(int)render_cpu0_postmix_us;
     else if (!fm1lab_strcmp(what, "cpu2jobsum")) *got=(int)render_cpu2_job_sum_us;
     else if (!fm1lab_strcmp(what, "cpu2waitsum")) *got=(int)render_cpu2_wait_sum_us;
     else if (!fm1lab_strcmp(what, "uius")) *got=(int)render_ui_us;
