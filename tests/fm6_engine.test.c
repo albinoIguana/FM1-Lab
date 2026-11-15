@@ -11,47 +11,8 @@ static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
 static int32_t stress_reference[96u * 256u * 2u];
 static int32_t stress_candidate[96u * 256u * 2u];
 
-/* Mirror the production weighted partition for this test fixture:
- * eight simultaneous notes are started on every enabled patch. Keeping this
- * expectation engine-aware catches both accidental 50/50 regressions and
- * changes that would exceed the CPU2 rollback snapshot capacity. */
-static uint32_t expected_cpu2_voices(uint8_t mask)
-{
-    uint8_t costs[FM6_ENGINE_PATCH_COUNT * 8u];
-    uint32_t count = 0u, total_cost = 0u;
-    for (uint32_t patch = 0u; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
-        if (!(mask & (1u << patch))) continue;
-        fm1lab_patch_engine_t engine = fm1lab_patch_engine_for_context(patch);
-        uint8_t cost = engine == FM1LAB_PATCH_ENGINE_FM6 ? 6u :
-            (engine == FM1LAB_PATCH_ENGINE_SUBTRACTIVE ? 3u :
-            (engine == FM1LAB_PATCH_ENGINE_PSG ? 2u : 1u));
-        for (uint32_t note = 0u; note < 8u; ++note) {
-            costs[count++] = cost;
-            total_cost += cost;
-        }
-    }
-    if (count < 2u) return 0u;
-    for (uint32_t i = 1u; i < count; ++i) {
-        uint8_t cost = costs[i];
-        uint32_t j = i;
-        while (j > 0u && costs[j - 1u] > cost) {
-            costs[j] = costs[j - 1u];
-            --j;
-        }
-        costs[j] = cost;
-    }
-    uint32_t target_cost = (total_cost * 40u + 99u) / 100u;
-    uint32_t cpu0_cost = 0u, split = 1u;
-    for (uint32_t i = 0u; i + 1u < count; ++i) {
-        cpu0_cost += costs[i];
-        split = i + 1u;
-        if (cpu0_cost >= target_cost) break;
-    }
-    uint32_t min_split = count > (FM6_ENGINE_PATCH_COUNT * 8u) / 2u ?
-        count - (FM6_ENGINE_PATCH_COUNT * 8u) / 2u : 1u;
-    if (split < min_split) split = min_split;
-    return count - split;
-}
+/* The production scheduler learns per-engine execution costs at runtime;
+ * tests therefore assert safety bounds rather than a fixed voice ratio. */
 
 static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voices,
                              int32_t *destination)
@@ -77,7 +38,8 @@ static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voice
         assert(fm6_cpu2_dispatch_count()==4u);
         assert(fm6_cpu2_fallback_count()==0u);
         assert(fm6_cpu2_job_sum_us()>=fm6_cpu2_last_job_us());
-        assert(fm6_cpu2_backup_voice_count()==expected_cpu2_voices(mask)*4u);
+        assert(fm6_cpu2_backup_voice_count()>=4u);
+        assert(fm6_cpu2_backup_voice_count()<=(expected_voices/2u)*4u);
     } else {
         assert(fm6_cpu2_dispatch_count()==0u);
         assert(fm6_cpu2_fallback_count()==4u);
