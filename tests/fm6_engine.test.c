@@ -1369,6 +1369,12 @@ int main(void) {
         assert(fm6_test_sequencer_active_events(0u)==0u);
     }
 
+    /* The postmix timing probe must run even with no active voices: this is the
+     * baseline CPU0 workload that was previously invisible in voice-only stats. */
+    fm6_init();
+    fm6_render(output,32u,4096u);
+    assert(fm6_cpu0_postmix_us()>0u);
+
     puts("Felucca FM6 engine: voice pools, 32nd-note sequencing, ARP capture, lane clear, stereo FX, Instrument-wide Amp/Drive, parametric EQ and linked master compressor passed");
     return 0;
 }
