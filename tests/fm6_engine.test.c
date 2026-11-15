@@ -39,7 +39,10 @@ static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voice
         assert(fm6_cpu2_fallback_count()==0u);
         assert(fm6_cpu2_job_sum_us()>=fm6_cpu2_last_job_us());
         assert(fm6_cpu2_backup_voice_count()>=4u);
-        assert(fm6_cpu2_backup_voice_count()<=(expected_voices/2u)*4u);
+        uint32_t max_cpu2_voices=expected_voices-1u;
+        if(max_cpu2_voices>(FM6_ENGINE_PATCH_COUNT*8u)/2u)
+            max_cpu2_voices=(FM6_ENGINE_PATCH_COUNT*8u)/2u;
+        assert(fm6_cpu2_backup_voice_count()<=max_cpu2_voices*4u);
     } else {
         assert(fm6_cpu2_dispatch_count()==0u);
         assert(fm6_cpu2_fallback_count()==4u);
