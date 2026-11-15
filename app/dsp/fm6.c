@@ -142,7 +142,8 @@ static uint32_t fm6_cpu2_job_start, fm6_cpu2_job_count;
 static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 /* Per-callback accounting. Tick sums retain sub-microsecond quantum precision;
  * maxima remain separate so they are never mistaken for callback totals. */
-static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
+static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu0_postmix_ticks;
+static volatile uint32_t fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
 static volatile uint32_t fm6_cpu2_backup_ticks_sum, fm6_cpu2_backup_voice_total;
 static volatile uint32_t fm6_render_quanta, fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
 static volatile uint8_t fm6_cpu2_split_disabled;
@@ -1391,6 +1392,7 @@ static void *fm6_cpu2_test_thread(void *unused)
 uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
 uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
 uint32_t fm6_cpu0_voice_us(void) { return fm6_cpu0_voice_ticks/PLAT_TICKS_PER_US; }
+uint32_t fm6_cpu0_postmix_us(void) { return fm6_cpu0_postmix_ticks/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_job_sum_us(void) { return fm6_cpu2_job_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_wait_sum_us(void) { return fm6_cpu2_wait_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_backup_sum_us(void) { return fm6_cpu2_backup_ticks_sum/PLAT_TICKS_PER_US; }
@@ -1419,6 +1421,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     fm6_cpu2_job_us=0u;
     fm6_cpu2_wait_us=0u;
     fm6_cpu0_voice_ticks=0u;
+    fm6_cpu0_postmix_ticks=0u;
     fm6_cpu2_job_ticks_sum=0u;
     fm6_cpu2_wait_ticks_sum=0u;
     fm6_cpu2_backup_ticks_sum=0u;
@@ -1618,6 +1621,9 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fx_send_gain_q15[patch][fx]=(uint16_t)(
                     (uint32_t)fx_send[patch][fx]*32768u/send_divisor);
         fm6_fx_coefficients_update();
+        /* Time the complete post-voice sample stage once per 32-frame quantum.
+         * This includes transport/mix, FX, master inserts, compressor and limiter. */
+        uint32_t postmix_t0=plat_ticks24();
         for (i = 0; i < count; i++) {
             int32_t delta=(int32_t)master_gain_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
@@ -1794,6 +1800,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             stereo[(base+i)*2u] = (int32_t)out_l;
             stereo[(base+i)*2u+1u] = (int32_t)out_r;
         }
+        fm6_cpu0_postmix_ticks += plat_ticks24()-postmix_t0;
     }
 }
 
