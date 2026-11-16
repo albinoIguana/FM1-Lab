@@ -144,6 +144,7 @@ def main(package: Path, out: Path) -> None:
       <button id="fm1diag-stop" type="button" disabled>Stop</button>
       <button id="fm1diag-download" type="button" disabled>Download diagnostics CSV</button>
       <button id="fm1diag-events-download" type="button" disabled>Download key events CSV</button>
+      <button id="fm1diag-controls-download" type="button" disabled>Download control events CSV</button>
     </div>
     <p id="fm1diag-status" role="status" aria-live="polite" style="font-size:.9rem; margin:.35rem 0">Not connected. Use a desktop browser with Web MIDI support (Chrome or Edge recommended) over HTTPS.</p>
     <div id="fm1diag-live" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:.5rem; margin:.75rem 0"></div>
@@ -155,7 +156,9 @@ def main(package: Path, out: Path) -> None:
     const $ = id => document.getElementById("fm1diag-" + id);
     const status = $("status"), portSelect = $("port"), startBtn = $("start"), stopBtn = $("stop"), downloadBtn = $("download");
     let access = null, input = null, output = null, listener = null, timer = null, recording = false, pending = null, rows = [], sampleCount = 0;
-    let keyEvents = [], recordingStarted = 0;
+    let keyEvents = [], controlEvents = [], recordingStarted = 0;
+    const buttonNames = ["FX","SEL","ENV","LFO","EDIT","GLO","HOME","SAVE","ARP","SEQ","PLAY","REC","OCT-","OCT+"];
+    const encoderNames = ["SELECT","ALGO","PRESET","K1","K2","K3","K4"];
     const setStatus = s => { status.textContent = s; };
     const say = (s, v) => { const e = document.createElement("div"); e.style.cssText = "padding:.55rem;border:1px solid #59616b;border-radius:8px;font-size:.82rem;overflow-wrap:anywhere"; e.textContent = s + ": " + v; $("live").appendChild(e); };
     const csvCell = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
@@ -166,7 +169,7 @@ def main(package: Path, out: Path) -> None:
     }
     function snapshot() {
       if (!recording || !output || pending) return;
-      pending = { values: {}, started: performance.now() };
+      pending = { values: {}, events: [], event: {}, started: performance.now() };
       try { output.send([0xF0, 0x7D, 0x4C, 0x47, 0xF7]); }
       catch (e) { pending = null; stop(); setStatus("USB-MIDI send failed: " + e.message); }
       if (pending) timer = setTimeout(() => {
@@ -221,7 +224,28 @@ def main(package: Path, out: Path) -> None:
       const split = payload.indexOf("=");
       if (split > 0) {
         const key = payload.slice(0, split), value = Number(payload.slice(split + 1));
-        if (Number.isFinite(value)) pending.values[key] = value;
+        if (Number.isFinite(value)) {
+          if (key.startsWith("event_")) {
+            if (key === "event_end") {
+              const ev = pending.event;
+              if (ev.event_type !== undefined) {
+                const encoder = ev.event_type === 2;
+                controlEvents.push({
+                  host_time_utc: new Date().toISOString(),
+                  elapsed_ms: Math.round(performance.now() - recordingStarted),
+                  device_ms: ev.event_ms,
+                  event: encoder ? "encoder_turn" : "button_press",
+                  control: encoder ? (encoderNames[ev.event_control] || "unknown") : (buttonNames[ev.event_control] || "unknown"),
+                  control_id: ev.event_control,
+                  value: encoder ? ((ev.event_value << 16) >> 16) : ev.event_value
+                });
+                pending.events.push(controlEvents[controlEvents.length - 1]);
+                $("controls-download").disabled = false;
+              }
+              pending.event = {};
+            } else pending.event[key] = value;
+          } else pending.values[key] = value;
+        }
       }
     }
     function connect() {
@@ -267,6 +291,7 @@ def main(package: Path, out: Path) -> None:
     }
     downloadBtn.addEventListener("click", () => downloadCsv(rows, "fm1-diagnostics"));
     $("events-download").addEventListener("click", () => downloadCsv(keyEvents, "fm1-key-events"));
+    $("controls-download").addEventListener("click", () => downloadCsv(controlEvents, "fm1-control-events"));
     if (!window.isSecureContext) setStatus("Web MIDI requires a secure HTTPS page.");
   })();
   </script>
