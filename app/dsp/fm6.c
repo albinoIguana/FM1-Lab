@@ -146,12 +146,6 @@ static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
  * maxima remain separate so they are never mistaken for callback totals. */
 static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu0_postmix_ticks;
 static volatile uint32_t fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
-/* Per-engine voice timing is collected independently on each core. The audio
- * owner folds it into an EWMA after CPU2 has joined, then schedules the next
- * callback using measured device costs rather than fixed engine multipliers. */
-static volatile uint32_t fm6_engine_voice_ticks[2][4], fm6_engine_voice_count[2][4];
-static uint32_t fm6_engine_cost_ticks[4] = { 6u, 1u, 2u, 3u };
-static uint32_t fm6_postmix_cost_ticks;
 static volatile uint32_t fm6_cpu2_backup_ticks_sum, fm6_cpu2_backup_voice_total;
 static volatile uint32_t fm6_render_quanta, fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
 static volatile uint8_t fm6_cpu2_split_disabled;
@@ -1279,6 +1273,7 @@ static void fm6_render_voice_range(uint32_t first, uint32_t end,
                                    int32_t bus[FM6_N], uint32_t core)
 {
     int16_t synth_out[FM6_N];
+    (void)core;
     for (uint32_t k = first; k < end; ++k) {
         uint32_t i;
         fm1lab_voice_t *voice = &voices[fm6_voice_work[k]];
@@ -1436,11 +1431,6 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     fm6_cpu2_wait_us=0u;
     fm6_cpu0_voice_ticks=0u;
     fm6_cpu0_postmix_ticks=0u;
-    for(uint32_t core=0u;core<2u;core++)
-        for(uint32_t engine=0u;engine<4u;engine++) {
-            fm6_engine_voice_ticks[core][engine]=0u;
-            fm6_engine_voice_count[core][engine]=0u;
-        }
     fm6_cpu2_job_ticks_sum=0u;
     fm6_cpu2_wait_ticks_sum=0u;
     fm6_cpu2_backup_ticks_sum=0u;
