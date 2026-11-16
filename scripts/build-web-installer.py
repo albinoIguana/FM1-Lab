@@ -158,7 +158,7 @@ def main(package: Path, out: Path) -> None:
     const say = (s, v) => { const e = document.createElement("div"); e.style.cssText = "padding:.55rem;border:1px solid #59616b;border-radius:8px;font-size:.82rem;overflow-wrap:anywhere"; e.textContent = s + ": " + v; $("live").appendChild(e); };
     const csvCell = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
     function stop() {
-      recording = false; if (timer) clearTimeout(timer); timer = null;
+      recording = false; if (timer) clearTimeout(timer); timer = null; pending = null;
       startBtn.disabled = !input || !output; stopBtn.disabled = true;
       setStatus("Recording stopped. " + rows.length + " snapshots captured.");
     }
@@ -181,7 +181,9 @@ def main(package: Path, out: Path) -> None:
       if (!pending) return;
       if (payload === "end") {
         clearTimeout(timer); timer = null;
-        const values = pending.values; pending = null;
+        const values = pending.values;
+        const elapsed = performance.now() - pending.started;
+        pending = null;
         if (Object.keys(values).length) {
           const row = { host_time_utc: new Date().toISOString(), stage: $("stage").value, notes: $("notes").value, ...values };
           rows.push(row); sampleCount++;
@@ -191,7 +193,7 @@ def main(package: Path, out: Path) -> None:
           downloadBtn.disabled = false;
           setStatus("Recording · " + sampleCount + " snapshots · " + row.host_time_utc);
         }
-        if (recording) timer = setTimeout(snapshot, Math.max(0, 1000 - (performance.now() - pendingStarted)));
+        if (recording) timer = setTimeout(snapshot, Math.max(0, 1000 - elapsed));
         return;
       }
       const split = payload.indexOf("=");
@@ -200,7 +202,6 @@ def main(package: Path, out: Path) -> None:
         if (Number.isFinite(value)) pending.values[key] = value;
       }
     }
-    let pendingStarted = 0;
     function connect() {
       if (!navigator.requestMIDIAccess) { setStatus("Web MIDI is unavailable. Use Chrome or Edge on desktop over HTTPS."); return; }
       navigator.requestMIDIAccess({ sysex: true }).then(midi => {
