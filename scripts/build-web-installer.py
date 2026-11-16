@@ -142,11 +142,12 @@ def main(package: Path, out: Path) -> None:
       <button id="fm1diag-connect" type="button">Connect FM1</button>
       <button id="fm1diag-start" type="button" disabled>Start recording</button>
       <button id="fm1diag-stop" type="button" disabled>Stop</button>
-      <button id="fm1diag-download" type="button" disabled>Download CSV</button>
+      <button id="fm1diag-download" type="button" disabled>Download diagnostics CSV</button>
+      <button id="fm1diag-events-download" type="button" disabled>Download key events CSV</button>
     </div>
     <p id="fm1diag-status" role="status" aria-live="polite" style="font-size:.9rem; margin:.35rem 0">Not connected. Use a desktop browser with Web MIDI support (Chrome or Edge recommended) over HTTPS.</p>
     <div id="fm1diag-live" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:.5rem; margin:.75rem 0"></div>
-    <p id="fm1diag-count" style="font-size:.82rem; margin:.35rem 0">0 samples recorded</p>
+    <p id="fm1diag-count" style="font-size:.82rem; margin:.35rem 0">0 samples recorded · 0 key events</p>
     <details><summary>What is recorded?</summary><p style="font-size:.88rem">Render time and budget, deadline misses, CPU0 busy/voice/postmix time, CPU2 job/wait/backup/fallback metrics, voice peak and shedding, CPU clock/load, DMA xruns, pre-limiter peak and limiter reduction. Each row also includes host UTC time, device uptime, test stage and your notes. Cumulative counters are since device boot.</p></details>
   </section>
   <script>
@@ -154,6 +155,7 @@ def main(package: Path, out: Path) -> None:
     const $ = id => document.getElementById("fm1diag-" + id);
     const status = $("status"), portSelect = $("port"), startBtn = $("start"), stopBtn = $("stop"), downloadBtn = $("download");
     let access = null, input = null, output = null, listener = null, timer = null, recording = false, pending = null, rows = [], sampleCount = 0;
+    let keyEvents = [], recordingStarted = 0;
     const setStatus = s => { status.textContent = s; };
     const say = (s, v) => { const e = document.createElement("div"); e.style.cssText = "padding:.55rem;border:1px solid #59616b;border-radius:8px;font-size:.82rem;overflow-wrap:anywhere"; e.textContent = s + ": " + v; $("live").appendChild(e); };
     const csvCell = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
@@ -176,7 +178,27 @@ def main(package: Path, out: Path) -> None:
     }
     function onMessage(event) {
       const d = event.data;
-      if (!d || d.length < 5 || d[0] !== 0xF0 || d[1] !== 0x7D || d[2] !== 0x4C || d[3] !== 0x47) return;
+      if (!d || !d.length) return;
+      // The FM1 keybed already mirrors note-on/off and poly-aftertouch to USB MIDI.
+      // Capture those incoming device events without adding firmware/audio-thread work.
+      if (d[0] !== 0xF0) {
+        if (!recording) return;
+        const statusByte = d[0], kind = statusByte & 0xF0, channel = (statusByte & 0x0F) + 1;
+        if ((kind === 0x80 || kind === 0x90 || kind === 0xA0) && d.length >= 3) {
+          const value = d[2], isOff = kind === 0x80 || (kind === 0x90 && value === 0);
+          keyEvents.push({
+            host_time_utc: new Date().toISOString(),
+            elapsed_ms: Math.round(performance.now() - recordingStarted),
+            event: kind === 0xA0 ? "poly_aftertouch" : (isOff ? "note_off" : "note_on"),
+            channel, note: d[1] & 0x7F, value,
+            source_port: input ? input.name : ""
+          });
+          $("count").textContent = sampleCount + " samples recorded · " + keyEvents.length + " key events";
+          $("events-download").disabled = false;
+        }
+        return;
+      }
+      if (d.length < 5 || d[1] !== 0x7D || d[2] !== 0x4C || d[3] !== 0x47) return;
       const payload = new TextDecoder().decode(d.slice(4, d[d.length - 1] === 0xF7 ? -1 : undefined));
       if (!pending) return;
       if (payload === "end") {
@@ -187,7 +209,7 @@ def main(package: Path, out: Path) -> None:
         if (Object.keys(values).length) {
           const row = { host_time_utc: new Date().toISOString(), stage: $("stage").value, notes: $("notes").value, ...values };
           rows.push(row); sampleCount++;
-          $("count").textContent = sampleCount + " samples recorded";
+          $("count").textContent = sampleCount + " samples recorded · " + keyEvents.length + " key events";
           $("live").replaceChildren();
           ["render_us","render_budget_us","cpu0_busy_us","cpu2_job_sum_us","voice_peak","xruns","deadline_misses","cpu2_fallbacks","shed_total"].forEach(k => { if (values[k] !== undefined) say(k.replaceAll("_"," "), values[k]); });
           downloadBtn.disabled = false;
@@ -230,19 +252,21 @@ def main(package: Path, out: Path) -> None:
     });
     startBtn.addEventListener("click", () => {
       if (!input || !output) return;
-      recording = true; startBtn.disabled = true; stopBtn.disabled = false;
-      setStatus("Requesting first diagnostic snapshot…"); snapshot();
+      recording = true; recordingStarted = performance.now(); startBtn.disabled = true; stopBtn.disabled = false;
+      setStatus("Recording diagnostics and keybed MIDI events…"); snapshot();
     });
     stopBtn.addEventListener("click", stop);
-    downloadBtn.addEventListener("click", () => {
-      if (!rows.length) return;
-      const keys = [...new Set(rows.flatMap(r => Object.keys(r)))];
-      const csv = [keys.map(csvCell).join(","), ...rows.map(r => keys.map(k => csvCell(r[k])).join(","))].join("\r\n");
+    function downloadCsv(data, filename) {
+      if (!data.length) return;
+      const keys = [...new Set(data.flatMap(r => Object.keys(r)))];
+      const csv = [keys.map(csvCell).join(","), ...data.map(r => keys.map(k => csvCell(r[k])).join(","))].join("\r\n");
       const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
       const url = URL.createObjectURL(blob), a = document.createElement("a");
-      a.href = url; a.download = "fm1-diagnostics-" + new Date().toISOString().replace(/[:.]/g,"-") + ".csv";
+      a.href = url; a.download = filename + "-" + new Date().toISOString().replace(/[:.]/g,"-") + ".csv";
       a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    });
+    }
+    downloadBtn.addEventListener("click", () => downloadCsv(rows, "fm1-diagnostics"));
+    $("events-download").addEventListener("click", () => downloadCsv(keyEvents, "fm1-key-events"));
     if (!window.isSecureContext) setStatus("Web MIDI requires a secure HTTPS page.");
   })();
   </script>
