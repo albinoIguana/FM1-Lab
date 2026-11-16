@@ -1596,6 +1596,58 @@ FM1LAB_WEB_EXPORT uint32_t app_audio_core2_pct(void)
 #endif
 }
 uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count(); }
+/* APP_LOG is called from fm1-base's main loop after an LG SysEx request.
+ * Each record is a short key=value line; never called from the audio ISR. */
+static void app_diag_log_u32(void (*line)(const char *), const char *key, uint32_t value)
+{
+    char out[40], digits[10];
+    uint32_t n=0u, d=0u;
+    while(key[n] && n<24u) { out[n]=key[n]; ++n; }
+    out[n++]='=';
+    do { digits[d++]=(char)('0'+value%10u); value/=10u; } while(value && d<10u);
+    while(d) out[n++]=digits[--d];
+    out[n]=0;
+    line(out);
+}
+void app_log(void (*line)(const char *t))
+{
+    if(!line) return;
+    app_diag_log_u32(line,"device_ms",plat_ms());
+    app_diag_log_u32(line,"render_us",render_last_us);
+    app_diag_log_u32(line,"render_budget_us",render_budget_us);
+    app_diag_log_u32(line,"render_peak_us",render_peak_window_us);
+    app_diag_log_u32(line,"render_peak_all_us",render_peak_all_us);
+    app_diag_log_u32(line,"deadline_misses",render_deadline_misses);
+    app_diag_log_u32(line,"cpu0_busy_us",render_core0_active_us);
+    app_diag_log_u32(line,"cpu0_voice_us",render_cpu0_voice_us);
+    app_diag_log_u32(line,"cpu0_postmix_us",render_cpu0_postmix_us);
+    app_diag_log_u32(line,"cpu2_job_sum_us",render_cpu2_job_sum_us);
+    app_diag_log_u32(line,"cpu2_wait_sum_us",render_cpu2_wait_sum_us);
+    app_diag_log_u32(line,"cpu2_job_max_us",render_cpu2_job_us);
+    app_diag_log_u32(line,"cpu2_wait_max_us",render_cpu2_wait_us);
+    app_diag_log_u32(line,"cpu2_backup_ns",render_cpu2_backup_ns);
+    app_diag_log_u32(line,"cpu2_backup_voices",render_cpu2_backup_voices);
+    app_diag_log_u32(line,"ui_us",render_ui_us);
+    app_diag_log_u32(line,"midi_us",render_midi_us);
+    app_diag_log_u32(line,"gain_us",render_gain_us);
+    app_diag_log_u32(line,"voice_peak",render_voice_peak);
+    app_diag_log_u32(line,"render_quanta",render_quanta);
+    app_diag_log_u32(line,"cpu2_quanta",render_cpu2_quanta);
+    app_diag_log_u32(line,"cpu2_dispatches",render_cpu2_dispatches);
+    app_diag_log_u32(line,"cpu2_fallbacks",render_cpu2_fallbacks);
+    app_diag_log_u32(line,"cpu_pct",plat_cpu_pct());
+    app_diag_log_u32(line,"cpu_khz",plat_cpu_khz());
+    app_diag_log_u32(line,"xruns",plat_xruns());
+    app_diag_log_u32(line,"shed_total",fm6_overload_shed_count());
+    app_diag_log_u32(line,"shed_last_voices",fm6_overload_last_voice_count());
+    app_diag_log_u32(line,"prelimit_peak_q23",render_pre_limiter_peak_window_q23);
+    app_diag_log_u32(line,"limiter_gr_q15",render_limiter_reduction_window_q15);
+    app_diag_log_u32(line,"cpu2_on",plat_cpu2_on());
+    app_diag_log_u32(line,"cpu2_gave_up",plat_cpu2_gave_up());
+    app_diag_log_u32(line,"cpu2_bad_jobs",plat_cpu2_bad());
+    app_diag_log_u32(line,"cpu2_stack_bytes",plat_cpu2_stack());
+    app_diag_log_u32(line,"cpu2_barred",plat_cpu2_barred());
+}
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
