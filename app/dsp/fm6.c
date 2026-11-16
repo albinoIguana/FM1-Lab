@@ -1468,9 +1468,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             patch_lfo_delay[p] = fm6_lfo_delay(&patch_lfo[p]);
         }
 
-        /* Pack only sounding voices, then divide that list. This is important:
-         * a fixed split by patch index would leave the second core idle when a
-         * single patch is being played. */
+        /* Pack only sounding voices. The complete packed list is submitted
+         * to CPU2, independent of which fixed-slot engine each voice uses. */
         uint32_t active_voice_count = 0u;
         for (v = 0; v < VOICES; ++v)
             if (voices[v].used)
@@ -1538,7 +1537,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                     if(wait_us>fm6_cpu2_wait_us)fm6_cpu2_wait_us=wait_us;
                     if (wait_rc != 0) {
                         ++fm6_cpu2_fallbacks;
-                        fm6_cpu2_split_disabled=1u; /* retire split for the rest of this session */
+                        fm6_cpu2_split_disabled=1u; /* retire second-core routing for this session */
                         /* The BSP has held/retired CPU2 before returning failure.
                          * Roll back its state before CPU0 renders the dropped job. */
                         fm6_zero_bytes(fm6_patch_mix[0], sizeof fm6_patch_mix[0]);
