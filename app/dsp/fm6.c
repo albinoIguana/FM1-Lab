@@ -1484,6 +1484,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
              * removes per-engine core placement and per-quantum voice sorting. */
             fm6_cpu2_job_start = 0u;
             fm6_cpu2_job_count = active_voice_count;
+            uint32_t split = 0u; /* compatibility index for rollback paths */
 #ifdef FM6_TEST
             if (fm6_test_cpu2_mode == 1u || fm6_test_cpu2_mode == 2u) {
                 fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
