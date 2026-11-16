@@ -13,6 +13,9 @@
 #define APP_OVERLOAD                    /* shed a voice gracefully when the measured render exceeds 90% */
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_BTDEV                        /* Bluetooth MIDI devices (lib/btdev.h) */
+#define APP_LOG                         /* read-only diagnostics over USB-MIDI SysEx */
+#define APP_CPU_KHZ                     /* expose the measured system clock */
+/*                        /* Bluetooth MIDI devices (lib/btdev.h) */
 #define APP_BLE_AT_BOOT (!fm1lab_ble_off())   /* Bluetooth at power-on: as the player left it (REC held) */
 int fm1lab_ble_off(void);
 
@@ -42,6 +45,7 @@ void app_overload(void);                /* audio deadline >90%: shed one voice w
 uint32_t app_audio_cpu_pct(void);       /* measured, smoothed device render load (percent) */
 uint32_t app_audio_xruns(void);          /* audio DMA deadline misses since boot */
 uint32_t app_audio_overload_shed_count(void); /* FM6 voices faded after overload callbacks */
+void app_log(void (*line)(const char *t)); /* development telemetry snapshot, main loop only */
 void app_panic(void);                    /* silence now (before an update rewrites the flash) */
 void app_splash(void);                  /* suppress the generic platform splash */
 void app_ui_init(void);                  /* the first screen, after the splash */
