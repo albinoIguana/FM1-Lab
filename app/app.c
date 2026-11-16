@@ -61,6 +61,20 @@ static volatile uint32_t render_cpu2_backup_ns, render_cpu2_backup_voices;
 static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
 static volatile uint32_t render_peak_all_us, render_peak_window_us;
 static volatile uint32_t render_voice_peak, render_quanta, render_cpu2_quanta, render_cpu2_dispatches, render_cpu2_fallbacks;
+/* Bounded main-loop-only control event queue. No allocation, formatting, or
+ * cross-core synchronization is needed: input() produces and app_log() drains. */
+typedef struct { uint32_t ms; int16_t value; uint8_t type, control; } app_diag_event_t;
+enum { APP_DIAG_EVENT_BUTTON=1u, APP_DIAG_EVENT_ENCODER=2u, APP_DIAG_EVENT_CAPACITY=16u };
+static app_diag_event_t app_diag_events[APP_DIAG_EVENT_CAPACITY];
+static uint8_t app_diag_event_head, app_diag_event_tail;
+static uint32_t app_diag_event_dropped;
+static void app_diag_event_push(uint8_t type,uint8_t control,int16_t value)
+{
+    uint8_t next=(uint8_t)((app_diag_event_head+1u)%APP_DIAG_EVENT_CAPACITY);
+    if(next==app_diag_event_tail) { ++app_diag_event_dropped; return; }
+    app_diag_events[app_diag_event_head]=(app_diag_event_t){plat_ms(),value,type,control};
+    app_diag_event_head=next;
+}
 static volatile uint32_t render_pre_limiter_peak_q23, render_limiter_reduction_q15;
 static volatile uint32_t render_pre_limiter_peak_window_q23, render_limiter_reduction_window_q15;
 static void app_audio_timing_reset_window(void)
@@ -1647,6 +1661,16 @@ void app_log(void (*line)(const char *t))
     app_diag_log_u32(line,"cpu2_bad_jobs",plat_cpu2_bad());
     app_diag_log_u32(line,"cpu2_stack_bytes",plat_cpu2_stack());
     app_diag_log_u32(line,"cpu2_barred",plat_cpu2_barred());
+    app_diag_log_u32(line,"control_events_dropped",app_diag_event_dropped);
+    while(app_diag_event_tail!=app_diag_event_head) {
+        app_diag_event_t event=app_diag_events[app_diag_event_tail];
+        app_diag_event_tail=(uint8_t)((app_diag_event_tail+1u)%APP_DIAG_EVENT_CAPACITY);
+        app_diag_log_u32(line,"event_type",event.type);
+        app_diag_log_u32(line,"event_control",event.control);
+        app_diag_log_u32(line,"event_value",(uint16_t)event.value);
+        app_diag_log_u32(line,"event_ms",event.ms);
+        app_diag_log_u32(line,"event_end",1u);
+    }
 }
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
@@ -2286,6 +2310,7 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
+        app_diag_event_push(APP_DIAG_EVENT_BUTTON,(uint8_t)k,1);
         if (k != B_HOME && k != B_GLO && k != B_ENV && k != B_LFO &&
             k != B_EDIT && k != B_SEL && k != B_SEQ && k != B_ARP && k != B_FX && k != B_SAVE)
             app_audio_timing_reset_window();
@@ -2460,6 +2485,7 @@ static void input(void)
             continue;
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
+        app_diag_event_push(APP_DIAG_EVENT_ENCODER,(uint8_t)k,(int16_t)e);
         if(seq_clear_prompt && !(page==PAGE_SEQ && k==EN_K2)) {
             seq_clear_prompt=0u;seq_clear_turn=0;
         }
