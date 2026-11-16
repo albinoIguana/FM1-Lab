@@ -135,7 +135,7 @@ static int32_t fm6_patch_gain_q15[PATCHES];
  * The active-voice index list is rebuilt each 32-sample quantum, so a single
  * patch's notes are split too (rather than splitting fixed patch-slot ranges). */
 static uint8_t fm6_voice_work[VOICES] PLAT_POOL;
-static int64_t fm6_patch_mix[2][PATCHES][FM6_N] PLAT_POOL;
+static int64_t fm6_patch_mix[1][PATCHES][FM6_N] PLAT_POOL;
 static int32_t fm6_voice_bus[2][FM6_N] PLAT_POOL;
 #if defined(FM1_CPU1) || defined(FM6_TEST)
 static fm1lab_voice_t fm6_cpu2_voice_backup[VOICES] PLAT_POOL;
@@ -1374,7 +1374,7 @@ static void fm6_cpu2_voice_job(uint32_t unused)
     uint32_t t0 = plat_ticks24();
     fm6_render_voice_range(fm6_cpu2_job_start,
                            fm6_cpu2_job_start + fm6_cpu2_job_count,
-                           fm6_patch_mix[1], fm6_voice_bus[1], 1u);
+                           fm6_patch_mix[0], fm6_voice_bus[1], 1u);
     {
         uint32_t elapsed = plat_ticks24() - t0;
         fm6_cpu2_job_ticks_sum += elapsed;
@@ -1487,7 +1487,6 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             uint32_t split = 0u; /* compatibility index for rollback paths */
 #ifdef FM6_TEST
             if (fm6_test_cpu2_mode == 1u || fm6_test_cpu2_mode == 2u) {
-                fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
                 uint32_t backup_t0=plat_ticks24();
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
@@ -1503,16 +1502,13 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                     fm6_render_voice_range_cpu0(0u, 0u, fm6_patch_mix[0], fm6_voice_bus[0]);
                     if (pthread_join(worker, 0) != 0)
                         abort();
-                    for (p = 0; p < PATCHES; ++p)
-                        for (i = 0; i < FM6_N; ++i)
-                            fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
                 } else {
                     ++fm6_cpu2_fallbacks;
                     uint32_t partial = fm6_cpu2_job_count / 2u;
                     if (!partial) partial = 1u;
                     fm6_render_voice_range_cpu0(split, split + partial,
-                                           fm6_patch_mix[1], fm6_voice_bus[1]);
-                    fm6_render_voice_range_cpu0(0u, split, fm6_patch_mix[0], fm6_voice_bus[0]);
+                                           fm6_patch_mix[0], fm6_voice_bus[1]);
+                    fm6_zero_bytes(fm6_patch_mix[0], sizeof fm6_patch_mix[0]);
                     for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                         voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
                     fm6_render_voice_range_cpu0(split, active_voice_count,
@@ -1525,7 +1521,6 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
 #elif defined(FM1_CPU1)
             if (plat_cpu2_on()) {
-                fm6_zero_bytes(fm6_patch_mix[1], sizeof fm6_patch_mix[1]);
                 uint32_t backup_t0=plat_ticks24();
                 for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                     fm6_cpu2_voice_backup[k] = voices[fm6_voice_work[split + k]];
@@ -1541,15 +1536,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                     uint32_t wait_us=wait_ticks/PLAT_TICKS_PER_US;
                     fm6_cpu2_wait_ticks_sum += wait_ticks;
                     if(wait_us>fm6_cpu2_wait_us)fm6_cpu2_wait_us=wait_us;
-                    if (wait_rc == 0) {
-                        for (p = 0; p < PATCHES; ++p)
-                            for (i = 0; i < FM6_N; ++i)
-                                fm6_patch_mix[0][p][i] += fm6_patch_mix[1][p][i];
-                    } else {
+                    if (wait_rc != 0) {
                         ++fm6_cpu2_fallbacks;
                         fm6_cpu2_split_disabled=1u; /* retire split for the rest of this session */
                         /* The BSP has held/retired CPU2 before returning failure.
                          * Roll back its state before CPU0 renders the dropped job. */
+                        fm6_zero_bytes(fm6_patch_mix[0], sizeof fm6_patch_mix[0]);
                         for (uint32_t k = 0; k < fm6_cpu2_job_count; ++k)
                             voices[fm6_voice_work[split + k]] = fm6_cpu2_voice_backup[k];
                         fm6_render_voice_range_cpu0(split, active_voice_count,
