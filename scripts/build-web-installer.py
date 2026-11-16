@@ -118,6 +118,138 @@ def main(package: Path, out: Path) -> None:
   </aside>
 """
     html_doc = html_doc.replace(heading + build_panel, heading + notice + build_panel)
+
+    # Read-only hardware diagnostics share the installer's existing Web MIDI page.
+    # The firmware answers fm1-base's established LG SysEx log request (F0 7D 4C 47 F7).
+    diagnostics_panel = r"""
+  <section id="fm1-diagnostics" aria-label="FM1 hardware diagnostics" style="margin: 1.25rem 0; padding: 1rem; border: 1px solid #59616b; border-radius: 12px; background: rgba(127,127,127,.08)">
+    <h2 style="margin: 0 0 .4rem">Hardware diagnostics</h2>
+    <p style="margin: 0 0 .8rem; font-size: .9rem">Connect your FM1 by USB, grant Web MIDI access, then record live audio-engine measurements directly from the device. This is read-only: it does not send notes or change sounds.</p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: .65rem; align-items: end">
+      <label style="display:grid; gap:.25rem; font-size:.88rem">FM1 MIDI port
+        <select id="fm1diag-port" style="padding:.55rem; min-width:0; width:100%"><option value="">Connect to list ports…</option></select>
+      </label>
+      <label style="display:grid; gap:.25rem; font-size:.88rem">Test stage
+        <select id="fm1diag-stage" style="padding:.55rem; min-width:0; width:100%">
+          <option>Idle / FX bypassed</option><option>Held notes / FX bypassed</option><option>Increasing polyphony</option><option>Both sequencer tracks</option><option>Chorus</option><option>Delay</option><option>Reverb</option><option>Phaser</option><option>Amp, EQ and compressor</option><option>Full-load stress test</option>
+        </select>
+      </label>
+      <label style="display:grid; gap:.25rem; font-size:.88rem">Stage notes
+        <input id="fm1diag-notes" type="text" maxlength="120" placeholder="Instrument, chord, FX settings…" style="padding:.55rem; min-width:0; width:100%; box-sizing:border-box">
+      </label>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0">
+      <button id="fm1diag-connect" type="button">Connect FM1</button>
+      <button id="fm1diag-start" type="button" disabled>Start recording</button>
+      <button id="fm1diag-stop" type="button" disabled>Stop</button>
+      <button id="fm1diag-download" type="button" disabled>Download CSV</button>
+    </div>
+    <p id="fm1diag-status" role="status" aria-live="polite" style="font-size:.9rem; margin:.35rem 0">Not connected. Use a desktop browser with Web MIDI support (Chrome or Edge recommended) over HTTPS.</p>
+    <div id="fm1diag-live" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:.5rem; margin:.75rem 0"></div>
+    <p id="fm1diag-count" style="font-size:.82rem; margin:.35rem 0">0 samples recorded</p>
+    <details><summary>What is recorded?</summary><p style="font-size:.88rem">Render time and budget, deadline misses, CPU0 busy/voice/postmix time, CPU2 job/wait/backup/fallback metrics, voice peak and shedding, CPU clock/load, DMA xruns, pre-limiter peak and limiter reduction. Each row also includes host UTC time, device uptime, test stage and your notes. Cumulative counters are since device boot.</p></details>
+  </section>
+  <script>
+  (() => {
+    const $ = id => document.getElementById("fm1diag-" + id);
+    const status = $("status"), portSelect = $("port"), startBtn = $("start"), stopBtn = $("stop"), downloadBtn = $("download");
+    let access = null, input = null, output = null, listener = null, timer = null, recording = false, pending = null, rows = [], sampleCount = 0;
+    const setStatus = s => { status.textContent = s; };
+    const say = (s, v) => { const e = document.createElement("div"); e.style.cssText = "padding:.55rem;border:1px solid #59616b;border-radius:8px;font-size:.82rem;overflow-wrap:anywhere"; e.textContent = s + ": " + v; $("live").appendChild(e); };
+    const csvCell = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    function stop() {
+      recording = false; if (timer) clearTimeout(timer); timer = null;
+      startBtn.disabled = !input || !output; stopBtn.disabled = true;
+      setStatus("Recording stopped. " + rows.length + " snapshots captured.");
+    }
+    function snapshot() {
+      if (!recording || !output || pending) return;
+      pending = { values: {}, started: performance.now() };
+      try { output.send([0xF0, 0x7D, 0x4C, 0x47, 0xF7]); }
+      catch (e) { pending = null; stop(); setStatus("USB-MIDI send failed: " + e.message); }
+      if (pending) timer = setTimeout(() => {
+        if (!pending) return;
+        pending = null;
+        setStatus("No diagnostic response. Check that this FM1 is running an FM1-Lab build with telemetry support.");
+        timer = setTimeout(snapshot, 1000);
+      }, 1800);
+    }
+    function onMessage(event) {
+      const d = event.data;
+      if (!d || d.length < 5 || d[0] !== 0xF0 || d[1] !== 0x7D || d[2] !== 0x4C || d[3] !== 0x47) return;
+      const payload = new TextDecoder().decode(d.slice(4, d[d.length - 1] === 0xF7 ? -1 : undefined));
+      if (!pending) return;
+      if (payload === "end") {
+        clearTimeout(timer); timer = null;
+        const values = pending.values; pending = null;
+        if (Object.keys(values).length) {
+          const row = { host_time_utc: new Date().toISOString(), stage: $("stage").value, notes: $("notes").value, ...values };
+          rows.push(row); sampleCount++;
+          $("count").textContent = sampleCount + " samples recorded";
+          $("live").replaceChildren();
+          ["render_us","render_budget_us","cpu0_busy_us","cpu2_job_sum_us","voice_peak","xruns","deadline_misses","cpu2_fallbacks","shed_total"].forEach(k => { if (values[k] !== undefined) say(k.replaceAll("_"," "), values[k]); });
+          downloadBtn.disabled = false;
+          setStatus("Recording · " + sampleCount + " snapshots · " + row.host_time_utc);
+        }
+        if (recording) timer = setTimeout(snapshot, Math.max(0, 1000 - (performance.now() - pendingStarted)));
+        return;
+      }
+      const split = payload.indexOf("=");
+      if (split > 0) {
+        const key = payload.slice(0, split), value = Number(payload.slice(split + 1));
+        if (Number.isFinite(value)) pending.values[key] = value;
+      }
+    }
+    let pendingStarted = 0;
+    function connect() {
+      if (!navigator.requestMIDIAccess) { setStatus("Web MIDI is unavailable. Use Chrome or Edge on desktop over HTTPS."); return; }
+      navigator.requestMIDIAccess({ sysex: true }).then(midi => {
+        access = midi;
+        const ins = [...midi.inputs.values()], outs = [...midi.outputs.values()];
+        const pairs = ins.map(i => ({ input:i, output:outs.find(o => o.name === i.name) || (outs.length === 1 ? outs[0] : null) })).filter(p => p.output);
+        portSelect.replaceChildren();
+        pairs.forEach((p,i) => { const o=document.createElement("option"); o.value=String(i); o.textContent=p.input.name || "USB MIDI port"; portSelect.appendChild(o); });
+        if (!pairs.length) { setStatus("No paired MIDI input/output ports found. Connect the FM1 by USB and try again."); return; }
+        portSelect._pairs = pairs;
+        setStatus(pairs.length + " MIDI port(s) found. Select the FM1 and connect.");
+        $("connect").textContent = "Connect selected port";
+      }).catch(e => setStatus("MIDI access was not granted: " + e.message));
+    }
+    $("connect").addEventListener("click", () => {
+      if (!access) { connect(); return; }
+      const pair = portSelect._pairs && portSelect._pairs[Number(portSelect.value)];
+      if (!pair) { setStatus("Select an FM1 MIDI port first."); return; }
+      if (input && listener) input.removeEventListener("midimessage", listener);
+      input = pair.input; output = pair.output; listener = onMessage;
+      Promise.all([input.open(), output.open()]).then(() => {
+        input.addEventListener("midimessage", listener);
+        startBtn.disabled = false; $("connect").disabled = true; portSelect.disabled = true;
+        setStatus("Connected to " + (input.name || "FM1") + ". Ready to record.");
+      }).catch(e => setStatus("Could not open MIDI port: " + e.message));
+    });
+    startBtn.addEventListener("click", () => {
+      if (!input || !output) return;
+      recording = true; startBtn.disabled = true; stopBtn.disabled = false;
+      setStatus("Requesting first diagnostic snapshot…"); snapshot();
+    });
+    stopBtn.addEventListener("click", stop);
+    downloadBtn.addEventListener("click", () => {
+      if (!rows.length) return;
+      const keys = [...new Set(rows.flatMap(r => Object.keys(r)))];
+      const csv = [keys.map(csvCell).join(","), ...rows.map(r => keys.map(k => csvCell(r[k])).join(","))].join("\r\n");
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+      const url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = "fm1-diagnostics-" + new Date().toISOString().replace(/[:.]/g,"-") + ".csv";
+      a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+    if (!window.isSecureContext) setStatus("Web MIDI requires a secure HTTPS page.");
+  })();
+  </script>
+"""
+    if html_doc.count("</body>") != 1:
+        raise SystemExit("Expected exactly one closing body tag in upstream installer")
+    html_doc = html_doc.replace("</body>", diagnostics_panel + "\n</body>")
+
     (out / "index.html").write_text(html_doc, encoding="utf-8")
     (out / "package-info.json").write_text(json.dumps({
         "version": VERSION,
