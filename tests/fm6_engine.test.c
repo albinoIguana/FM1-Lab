@@ -11,8 +11,8 @@ static int32_t chunk_a[4096u * 2u], chunk_b[4096u * 2u];
 static int32_t stress_reference[96u * 256u * 2u];
 static int32_t stress_candidate[96u * 256u * 2u];
 
-/* The production scheduler learns per-engine execution costs at runtime;
- * tests therefore assert safety bounds rather than a fixed voice ratio. */
+/* CPU2 owns all normal voice rendering; tests compare its output and full
+ * voice-state rollback against the CPU0 serial fallback. */
 
 static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voices,
                              int32_t *destination)
