@@ -39,10 +39,7 @@ static void render_cpu2_mode(uint8_t mode, uint8_t mask, uint32_t expected_voice
         assert(fm6_cpu2_fallback_count()==0u);
         assert(fm6_cpu2_job_sum_us()>=fm6_cpu2_last_job_us());
         assert(fm6_cpu2_backup_voice_count()>=4u);
-        uint32_t max_cpu2_voices=expected_voices-1u;
-        if(max_cpu2_voices>(FM6_ENGINE_PATCH_COUNT*8u)/2u)
-            max_cpu2_voices=(FM6_ENGINE_PATCH_COUNT*8u)/2u;
-        assert(fm6_cpu2_backup_voice_count()<=max_cpu2_voices*4u);
+        assert(fm6_cpu2_backup_voice_count()==expected_voices*4u);
     } else {
         assert(fm6_cpu2_dispatch_count()==0u);
         assert(fm6_cpu2_fallback_count()==4u);
@@ -377,9 +374,9 @@ int main(void) {
     assert(fm1lab_patch_engine_for_context(8u)==FM1LAB_PATCH_ENGINE_INVALID);
 
     test_two_resident_instrument_banks();
-    /* A single patch's active voices split across the cores, not by fixed
-     * patch index. A partial worker failure must restore state before fallback. */
-    /* One isolated patch: eight notes split four/four. */
+    /* All engines render on CPU2; a partial worker failure must restore every
+     * voice state before CPU0 takes over the complete render job. */
+    /* One isolated patch: all eight notes are owned by CPU2. */
     render_cpu2_mode(0u, 0x01u, 8u, chunk_a);
     render_cpu2_mode(1u, 0x01u, 8u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
@@ -403,7 +400,7 @@ int main(void) {
     assert(memcmp(chunk_a,chunk_b,TEST_WORDS*sizeof(int32_t))==0);
 
     /* One four-slot Instrument: eight notes fan out to 32 mixed-engine voices,
-     * split 16/16. Every engine state must survive CPU2 backup/rollback. */
+     * all owned by CPU2. Every engine state survives backup/rollback. */
     render_cpu2_mode(0u, 0x0fu, 32u, chunk_a);
     render_cpu2_mode(1u, 0x0fu, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
