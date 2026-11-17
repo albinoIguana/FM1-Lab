@@ -124,7 +124,7 @@ def main(package: Path, out: Path) -> None:
     diagnostics_panel = r"""
   <section id="fm1-diagnostics" aria-label="FM1 hardware diagnostics" style="margin: 1.25rem 0; padding: 1rem; border: 1px solid #59616b; border-radius: 12px; background: rgba(127,127,127,.08)">
     <h2 style="margin: 0 0 .4rem">Hardware diagnostics</h2>
-    <p style="margin: 0 0 .8rem; font-size: .9rem">Connect your FM1, start one recording, then play normally: change patches, hold chords, use the arp and sequencer, and switch effects as you like. The recorder captures the complete timeline and combines device telemetry, keybed MIDI and physical controls into one CSV. It is read-only and does not send notes or change sounds.</p>
+    <p style="margin: 0 0 .8rem; font-size: .9rem">Connect your FM1 and start a session. The guided runner automatically records timed test stages, correlates device telemetry with keybed MIDI and physical controls, and produces a scored report plus the complete CSV. It never sends notes or changes sounds; you perform the prompted playing steps.</p>
     <div style="display: grid; grid-template-columns: minmax(0,1fr); gap: .65rem">
       <label style="display:grid; gap:.25rem; font-size:.88rem">FM1 MIDI port
         <select id="fm1diag-port" style="padding:.55rem; min-width:0; width:100%"><option value="">Connect to list ports…</option></select>
@@ -132,11 +132,19 @@ def main(package: Path, out: Path) -> None:
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0">
       <button id="fm1diag-connect" type="button">Connect FM1</button>
-      <button id="fm1diag-start" type="button" disabled>Start test recording</button>
+      <button id="fm1diag-start" type="button" disabled>Start session</button>
+      <button id="fm1diag-run" type="button" disabled>Run guided test</button>
+      <button id="fm1diag-next" type="button" disabled>Begin next stage</button>
       <button id="fm1diag-stop" type="button" disabled>Stop</button>
       <button id="fm1diag-download" type="button" disabled>Download complete test CSV</button>
+      <button id="fm1diag-report" type="button" disabled>Download test report</button>
     </div>
     <p id="fm1diag-status" role="status" aria-live="polite" style="font-size:.9rem; margin:.35rem 0">Not connected. Use a desktop browser with Web MIDI support (Chrome or Edge recommended) over HTTPS.</p>
+    <div id="fm1diag-runner" style="margin:.75rem 0; padding:.8rem; border:1px solid #59616b; border-radius:9px">
+      <strong id="fm1diag-stage">Test runner ready</strong>
+      <p id="fm1diag-instructions" style="font-size:.9rem; margin:.4rem 0">Start a session, then run the guided suite. Keep the FM1 connected throughout.</p>
+      <p id="fm1diag-progress" aria-live="polite" style="font-size:.85rem; margin:.3rem 0">No test running.</p>
+    </div>
     <div id="fm1diag-live" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:.5rem; margin:.75rem 0"></div>
     <p id="fm1diag-count" style="font-size:.82rem; margin:.35rem 0">0 samples · 0 key events · 0 control events</p>
     <details><summary>What is recorded?</summary><p style="font-size:.88rem">Render time and budget, deadline misses, CPU0 busy/voice/postmix time, CPU2 job/wait/backup/fallback metrics, voice peak and shedding, CPU clock/load, DMA xruns, pre-limiter peak and limiter reduction. All records share one elapsed-time timeline: telemetry snapshots, keybed MIDI events, physical button/encoder events, and session start/stop markers. Device uptime is retained for clock correlation. Cumulative firmware counters are since device boot.</p></details>
@@ -145,9 +153,19 @@ def main(package: Path, out: Path) -> None:
   (() => {
     const $ = id => document.getElementById("fm1diag-" + id);
     const status = $("status"), portSelect = $("port"), startBtn = $("start"), stopBtn = $("stop"), downloadBtn = $("download");
+    const runBtn = $("run"), nextBtn = $("next"), reportBtn = $("report");
     let access = null, input = null, output = null, listener = null, timer = null, recording = false, pending = null;
     let timeline = [], sampleCount = 0, keyEventCount = 0, controlEventCount = 0;
     let recordingStarted = 0, recordingWallStarted = 0, lastClockAnchor = null, sessionId = "";
+    let testRunning = false, stageIndex = -1, stageTimer = null, stageDeadline = 0, testResults = [];
+    const stages = [
+      {id:"idle_baseline", title:"1 · Idle baseline", seconds:10, instruction:"Hands off the FM1. Let the synth sit idle so we can measure its baseline."},
+      {id:"four_engine_chord", title:"2 · Four-engine chord", seconds:20, instruction:"Select one Instrument with all four patch slots enabled. Hold a four-note chord for the full stage, then release it when the stage ends."},
+      {id:"fx_stress", title:"3 · Effects stress", seconds:20, instruction:"Enable the instrument/master effects you normally test. Hold a four-note chord steadily; do not change settings during this stage."},
+      {id:"polyphony_ramp", title:"4 · Polyphony ramp", seconds:30, instruction:"With all four engines and effects active, add notes gradually until you reach a comfortable sustained chord. Do not exceed what feels safe."},
+      {id:"release_recovery", title:"5 · Release and recovery", seconds:10, instruction:"Release every key and stop the arp/sequencer. Leave the FM1 untouched while we measure recovery."},
+      {id:"physical_controls", title:"6 · Physical controls and aftertouch", seconds:20, instruction:"Play a few notes with varying key pressure, turn a few encoders, and press a few buttons. This checks event capture, not sound quality."}
+    ];
     const buttonNames = ["FX","SEL","ENV","LFO","EDIT","GLO","HOME","SAVE","ARP","SEQ","PLAY","REC","OCT-","OCT+"];
     const encoderNames = ["SELECT","ALGO","PRESET","K1","K2","K3","K4"];
     const setStatus = s => { status.textContent = s; };
@@ -173,7 +191,9 @@ def main(package: Path, out: Path) -> None:
         event: "recording_stopped"
       });
       recording = false; if (timer) clearTimeout(timer); timer = null; pending = null;
-      startBtn.disabled = !input || !output; stopBtn.disabled = true;
+      if (stageTimer) clearTimeout(stageTimer); stageTimer = null;
+      testRunning = false; runBtn.disabled = !timeline.length; nextBtn.disabled = true;
+      startBtn.disabled = !input || !output; stopBtn.disabled = true; reportBtn.disabled = !timeline.length;
       setStatus("Recording stopped. " + sampleCount + " telemetry samples, " + keyEventCount + " key events and " + controlEventCount + " control events captured in one timeline.");
     }
     function snapshot() {
@@ -294,6 +314,125 @@ def main(package: Path, out: Path) -> None:
       setStatus("Recording one synchronized test timeline. Play normally; stop when finished."); snapshot();
     });
     stopBtn.addEventListener("click", stop);
+    function markStage(event, stage, extra={}) {
+      addRecord("session_marker", {
+        host_time_utc:new Date().toISOString(),
+        elapsed_ms:Math.round(performance.now()-recordingStarted),
+        event, stage, ...extra
+      });
+    }
+    function stageSamples(id) {
+      const starts=timeline.filter(r=>r.record_type==="session_marker"&&r.event==="test_stage_started"&&r.stage===id);
+      const ends=timeline.filter(r=>r.record_type==="session_marker"&&r.event==="test_stage_completed"&&r.stage===id);
+      if(!starts.length||!ends.length)return [];
+      const a=starts[starts.length-1].elapsed_ms,b=ends[ends.length-1].elapsed_ms;
+      return timeline.filter(r=>r.record_type==="telemetry_sample"&&r.elapsed_ms>=a&&r.elapsed_ms<=b);
+    }
+    function finishStage() {
+      if(stageTimer)clearTimeout(stageTimer); stageTimer=null;
+      if(stageIndex<0||stageIndex>=stages.length)return;
+      const s=stages[stageIndex];
+      markStage("test_stage_completed",s.id,{duration_ms:s.seconds*1000});
+      testResults.push({id:s.id,samples:stageSamples(s.id).length});
+      $("progress").textContent=s.title+" complete. "+testResults[testResults.length-1].samples+" telemetry samples captured.";
+      stageIndex++;
+      if(stageIndex>=stages.length){completeTest();return;}
+      nextBtn.disabled=false;
+      $("stage").textContent=stages[stageIndex].title;
+      $("instructions").textContent=stages[stageIndex].instruction;
+      $("progress").textContent="Ready. Click Begin next stage when you are performing the requested action.";
+    }
+    function beginStage(index) {
+      if(!recording||index<0||index>=stages.length)return;
+      stageIndex=index; const s=stages[index];
+      nextBtn.disabled=true; markStage("test_stage_started",s.id,{duration_ms:s.seconds*1000});
+      $("stage").textContent=s.title; $("instructions").textContent=s.instruction;
+      stageDeadline=performance.now()+s.seconds*1000;
+      const tick=()=>{
+        const left=Math.max(0,Math.ceil((stageDeadline-performance.now())/1000));
+        $("progress").textContent="Stage running · "+left+"s remaining";
+        if(left<=0){finishStage();return;}
+        stageTimer=setTimeout(tick,250);
+      }; tick();
+    }
+    function completeTest() {
+      testRunning=false; runBtn.disabled=true; nextBtn.disabled=true; reportBtn.disabled=false;
+      markStage("test_suite_completed","guided_suite");
+      $("stage").textContent="Guided test complete";
+      $("instructions").textContent="The test is recorded. Download the CSV and scored report; review any inconclusive findings before changing firmware.";
+      $("progress").textContent="All "+stages.length+" stages completed. "+sampleCount+" telemetry snapshots, "+keyEventCount+" key events, "+controlEventCount+" control events.";
+      setStatus("Guided test complete. Download the report and CSV.");
+    }
+    function runGuidedTest() {
+      if(!recording||testRunning)return;
+      testRunning=true;testResults=[];stageIndex=-1;runBtn.disabled=true;
+      $("progress").textContent="Starting timed baseline.";
+      beginStage(0);
+    }
+    function buildReport() {
+      const samples=timeline.filter(r=>r.record_type==="telemetry_sample");
+      const keys=timeline.filter(r=>r.record_type==="key_event");
+      const controls=timeline.filter(r=>r.record_type==="control_event");
+      const num=(r,k)=>Number(r[k]??0);
+      const max=(k)=>samples.reduce((m,r)=>Math.max(m,num(r,k)),0);
+      const first=samples[0]||{},last=samples[samples.length-1]||{};
+      const delta=k=>Math.max(0,num(last,k)-num(first,k));
+      const xruns=delta("xruns"), deadlines=delta("deadline_misses"), shed=delta("shed_total");
+      const budgetOver=samples.filter(r=>num(r,"render_us")>num(r,"render_budget_us")).length;
+      const noteOns=keys.filter(r=>r.event==="note_on"),noteOffs=keys.filter(r=>r.event==="note_off");
+      const held=new Map();
+      keys.forEach(r=>{if(r.event==="note_on"&&num(r,"value")>0)held.set(String(r.channel)+":"+String(r.note),r);else if(r.event==="note_off")held.delete(String(r.channel)+":"+String(r.note));});
+      const contradictory=samples.some(r=>num(r,"voice_peak")===0)&&noteOns.length>0;
+      const gaps=samples.slice(1).reduce((n,r,i)=>n+(num(r,"elapsed_ms")-num(samples[i],"elapsed_ms")>2500?1:0),0);
+      const findings=[];
+      if(samples.length<10)findings.push("INCONCLUSIVE: fewer than 10 telemetry snapshots; session is too short for a reliable score.");
+      if(xruns>0)findings.push("FAIL: DMA xrun counter increased by "+xruns+".");
+      if(deadlines>0)findings.push("FAIL: render deadline-miss counter increased by "+deadlines+".");
+      if(shed>0)findings.push("FAIL: overload voice-shedding counter increased by "+shed+".");
+      if(budgetOver>0)findings.push("FAIL: "+budgetOver+" telemetry snapshots reported render time above render budget.");
+      if(contradictory)findings.push("INCONCLUSIVE: keybed note-ons were captured while at least one telemetry sample reported zero active voices. USB MIDI-out is not proof of internal voice allocation.");
+      if(gaps>0)findings.push("INCONCLUSIVE: "+gaps+" telemetry gaps exceeded 2.5 seconds.");
+      if(!findings.length)findings.push("No configured failure or data-quality flags were detected. This is not proof of stable audio; physical listening and repeat testing are still required.");
+      const verdict=findings.some(x=>x.startsWith("FAIL"))?"FAIL":findings.some(x=>x.startsWith("INCONCLUSIVE"))?"INCONCLUSIVE":"NO FLAGS";
+      const lines=[
+        "FM1-Lab Guided Hardware Test Report",
+        "Session: "+sessionId,
+        "Verdict: "+verdict,
+        "",
+        "CAPTURE",
+        "Telemetry samples: "+samples.length,
+        "Key events: "+keys.length+" (note-on "+noteOns.length+", note-off "+noteOffs.length+", currently unmatched note-ons "+held.size+")",
+        "Physical control events: "+controls.length,
+        "Polyphonic aftertouch events: "+keys.filter(r=>r.event==="poly_aftertouch").length,
+        "Maximum reported voice_peak: "+max("voice_peak"),
+        "Maximum render_us: "+max("render_us"),
+        "Maximum render_peak_all_us: "+max("render_peak_all_us"),
+        "Maximum CPU0 postmix us: "+max("cpu0_postmix_us"),
+        "Maximum CPU2 job sum us: "+max("cpu2_job_sum_us"),
+        "Counter deltas: xruns "+xruns+", deadline misses "+deadlines+", shed_total "+shed,
+        "Snapshots above render budget: "+budgetOver,
+        "Telemetry gaps over 2.5s: "+gaps,
+        "",
+        "STAGES",
+        ...stages.map(s=>{const n=stageSamples(s.id).length;return s.title+": "+(n?"captured "+n+" telemetry samples":"not completed / no telemetry");}),
+        "",
+        "FINDINGS",
+        ...findings.map(x=>"- "+x),
+        "",
+        "Interpretation: Automated scoring checks telemetry and event consistency. It cannot hear the audio, prove every engine produced sound, or certify stability. Follow up on every FAIL or INCONCLUSIVE result."
+      ];
+      return lines.join("\n");
+    }
+    function downloadReport() {
+      if(!timeline.length)return;
+      const blob=new Blob([buildReport()],{type:"text/plain;charset=utf-8"});
+      const url=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=url;a.download="fm1-test-report-"+new Date().toISOString().replace(/[:.]/g,"-")+".txt";
+      a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+    runBtn.addEventListener("click",runGuidedTest);
+    nextBtn.addEventListener("click",()=>beginStage(stageIndex));
+    reportBtn.addEventListener("click",downloadReport);
     function downloadUnifiedCsv() {
       if (!timeline.length) return;
       const ordered = timeline.map((row, index) => ({ row, index })).sort((a,b) =>
