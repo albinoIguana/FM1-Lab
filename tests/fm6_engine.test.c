@@ -181,9 +181,9 @@ static void render_four_engine_fx_case(uint8_t fx_mask, uint8_t shifted_patch,
     for (unsigned fx=0u; fx<FM6_FX_COUNT; ++fx) {
         fm6_fx_set_enabled((uint8_t)fx,(uint8_t)((fx_mask&(1u<<fx))!=0u));
         fm6_fx_set_mix((uint8_t)fx,100u);
-        fm6_fx_set_time((uint8_t)fx,50u);
-        fm6_fx_set_feedback((uint8_t)fx,35u);
-        fm6_fx_set_depth((uint8_t)fx,50u);
+        fm6_fx_set_time((uint8_t)fx,100u);
+        fm6_fx_set_feedback((uint8_t)fx,(uint8_t)(fx==FM6_FX_CHORUS?70u:90u));
+        fm6_fx_set_depth((uint8_t)fx,100u);
     }
     for (unsigned patch=0u; patch<FM1LAB_PATCH_COUNT; ++patch) {
         uint8_t note=(uint8_t)(60u+patch*7u);
