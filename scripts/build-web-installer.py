@@ -427,7 +427,12 @@ def main(package: Path, out: Path) -> None:
         "Telemetry gaps over 2.5s: "+gaps,
         "",
         "STAGES",
-        ...stages.map(s=>{const n=stageSamples(s.id).length;return s.title+": "+(n?"captured "+n+" telemetry samples":"not completed / no telemetry");}),
+        ...stages.map(s=>{
+          const rows=stageSamples(s.id),a=rows[0]||{},b=rows[rows.length-1]||{};
+          const stageDelta=k=>Math.max(0,num(b,k)-num(a,k));
+          if(!rows.length)return s.title+": not completed / no telemetry";
+          return s.title+": "+rows.length+" samples; max render "+Math.max(...rows.map(r=>num(r,"render_us")))+" us; max CPU0 postmix "+Math.max(...rows.map(r=>num(r,"cpu0_postmix_us")))+" us; peak voices "+Math.max(...rows.map(r=>num(r,"voice_peak")))+"; counter deltas xruns/deadlines/shed "+stageDelta("xruns")+"/"+stageDelta("deadline_misses")+"/"+stageDelta("shed_total");
+        }),
         "",
         "FINDINGS",
         ...findings.map(x=>"- "+x),
