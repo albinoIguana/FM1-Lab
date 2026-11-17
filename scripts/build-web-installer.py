@@ -124,48 +124,57 @@ def main(package: Path, out: Path) -> None:
     diagnostics_panel = r"""
   <section id="fm1-diagnostics" aria-label="FM1 hardware diagnostics" style="margin: 1.25rem 0; padding: 1rem; border: 1px solid #59616b; border-radius: 12px; background: rgba(127,127,127,.08)">
     <h2 style="margin: 0 0 .4rem">Hardware diagnostics</h2>
-    <p style="margin: 0 0 .8rem; font-size: .9rem">Connect your FM1 by USB, grant Web MIDI access, then record live audio-engine measurements directly from the device. This is read-only: it does not send notes or change sounds.</p>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: .65rem; align-items: end">
+    <p style="margin: 0 0 .8rem; font-size: .9rem">Connect your FM1, start one recording, then play normally: change patches, hold chords, use the arp and sequencer, and switch effects as you like. The recorder captures the complete timeline and combines device telemetry, keybed MIDI and physical controls into one CSV. It is read-only and does not send notes or change sounds.</p>
+    <div style="display: grid; grid-template-columns: minmax(0,1fr); gap: .65rem">
       <label style="display:grid; gap:.25rem; font-size:.88rem">FM1 MIDI port
         <select id="fm1diag-port" style="padding:.55rem; min-width:0; width:100%"><option value="">Connect to list ports…</option></select>
-      </label>
-      <label style="display:grid; gap:.25rem; font-size:.88rem">Test stage
-        <select id="fm1diag-stage" style="padding:.55rem; min-width:0; width:100%">
-          <option>Idle / FX bypassed</option><option>Held notes / FX bypassed</option><option>Increasing polyphony</option><option>Both sequencer tracks</option><option>Chorus</option><option>Delay</option><option>Reverb</option><option>Phaser</option><option>Amp, EQ and compressor</option><option>Full-load stress test</option>
-        </select>
-      </label>
-      <label style="display:grid; gap:.25rem; font-size:.88rem">Stage notes
-        <input id="fm1diag-notes" type="text" maxlength="120" placeholder="Instrument, chord, FX settings…" style="padding:.55rem; min-width:0; width:100%; box-sizing:border-box">
       </label>
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0">
       <button id="fm1diag-connect" type="button">Connect FM1</button>
-      <button id="fm1diag-start" type="button" disabled>Start recording</button>
+      <button id="fm1diag-start" type="button" disabled>Start test recording</button>
       <button id="fm1diag-stop" type="button" disabled>Stop</button>
-      <button id="fm1diag-download" type="button" disabled>Download diagnostics CSV</button>
-      <button id="fm1diag-events-download" type="button" disabled>Download key events CSV</button>
-      <button id="fm1diag-controls-download" type="button" disabled>Download control events CSV</button>
+      <button id="fm1diag-download" type="button" disabled>Download complete test CSV</button>
     </div>
     <p id="fm1diag-status" role="status" aria-live="polite" style="font-size:.9rem; margin:.35rem 0">Not connected. Use a desktop browser with Web MIDI support (Chrome or Edge recommended) over HTTPS.</p>
     <div id="fm1diag-live" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:.5rem; margin:.75rem 0"></div>
-    <p id="fm1diag-count" style="font-size:.82rem; margin:.35rem 0">0 samples recorded · 0 key events</p>
-    <details><summary>What is recorded?</summary><p style="font-size:.88rem">Render time and budget, deadline misses, CPU0 busy/voice/postmix time, CPU2 job/wait/backup/fallback metrics, voice peak and shedding, CPU clock/load, DMA xruns, pre-limiter peak and limiter reduction. Each row also includes host UTC time, device uptime, test stage and your notes. Cumulative counters are since device boot.</p></details>
+    <p id="fm1diag-count" style="font-size:.82rem; margin:.35rem 0">0 samples · 0 key events · 0 control events</p>
+    <details><summary>What is recorded?</summary><p style="font-size:.88rem">Render time and budget, deadline misses, CPU0 busy/voice/postmix time, CPU2 job/wait/backup/fallback metrics, voice peak and shedding, CPU clock/load, DMA xruns, pre-limiter peak and limiter reduction. All records share one elapsed-time timeline: telemetry snapshots, keybed MIDI events, physical button/encoder events, and session start/stop markers. Device uptime is retained for clock correlation. Cumulative firmware counters are since device boot.</p></details>
   </section>
   <script>
   (() => {
     const $ = id => document.getElementById("fm1diag-" + id);
     const status = $("status"), portSelect = $("port"), startBtn = $("start"), stopBtn = $("stop"), downloadBtn = $("download");
-    let access = null, input = null, output = null, listener = null, timer = null, recording = false, pending = null, rows = [], sampleCount = 0;
-    let keyEvents = [], controlEvents = [], recordingStarted = 0;
+    let access = null, input = null, output = null, listener = null, timer = null, recording = false, pending = null;
+    let timeline = [], sampleCount = 0, keyEventCount = 0, controlEventCount = 0;
+    let recordingStarted = 0, recordingWallStarted = 0, lastClockAnchor = null, sessionId = "";
     const buttonNames = ["FX","SEL","ENV","LFO","EDIT","GLO","HOME","SAVE","ARP","SEQ","PLAY","REC","OCT-","OCT+"];
     const encoderNames = ["SELECT","ALGO","PRESET","K1","K2","K3","K4"];
     const setStatus = s => { status.textContent = s; };
     const say = (s, v) => { const e = document.createElement("div"); e.style.cssText = "padding:.55rem;border:1px solid #59616b;border-radius:8px;font-size:.82rem;overflow-wrap:anywhere"; e.textContent = s + ": " + v; $("live").appendChild(e); };
     const csvCell = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    function updateCount() {
+      $("count").textContent = sampleCount + " samples · " + keyEventCount + " key events · " + controlEventCount + " control events";
+      downloadBtn.disabled = timeline.length === 0;
+    }
+    function addRecord(record_type, fields) {
+      timeline.push({ record_type, session_id: sessionId, ...fields });
+      updateCount();
+    }
+    function elapsedForDeviceTime(deviceMs) {
+      if (!lastClockAnchor || !Number.isFinite(deviceMs)) return Math.round(performance.now() - recordingStarted);
+      const delta = (deviceMs - lastClockAnchor.device_ms) | 0;
+      return Math.max(0, lastClockAnchor.elapsed_ms + delta);
+    }
     function stop() {
+      if (recording) addRecord("session_marker", {
+        host_time_utc: new Date().toISOString(),
+        elapsed_ms: Math.round(performance.now() - recordingStarted),
+        event: "recording_stopped"
+      });
       recording = false; if (timer) clearTimeout(timer); timer = null; pending = null;
       startBtn.disabled = !input || !output; stopBtn.disabled = true;
-      setStatus("Recording stopped. " + rows.length + " snapshots captured.");
+      setStatus("Recording stopped. " + sampleCount + " telemetry samples, " + keyEventCount + " key events and " + controlEventCount + " control events captured in one timeline.");
     }
     function snapshot() {
       if (!recording || !output || pending) return;
@@ -189,15 +198,14 @@ def main(package: Path, out: Path) -> None:
         const statusByte = d[0], kind = statusByte & 0xF0, channel = (statusByte & 0x0F) + 1;
         if ((kind === 0x80 || kind === 0x90 || kind === 0xA0) && d.length >= 3) {
           const value = d[2], isOff = kind === 0x80 || (kind === 0x90 && value === 0);
-          keyEvents.push({
+          keyEventCount++;
+          addRecord("key_event", {
             host_time_utc: new Date().toISOString(),
             elapsed_ms: Math.round(performance.now() - recordingStarted),
             event: kind === 0xA0 ? "poly_aftertouch" : (isOff ? "note_off" : "note_on"),
             channel, note: d[1] & 0x7F, value,
             source_port: input ? input.name : ""
           });
-          $("count").textContent = sampleCount + " samples recorded · " + keyEvents.length + " key events";
-          $("events-download").disabled = false;
         }
         return;
       }
@@ -210,9 +218,11 @@ def main(package: Path, out: Path) -> None:
         const elapsed = performance.now() - pending.started;
         pending = null;
         if (Object.keys(values).length) {
-          const row = { host_time_utc: new Date().toISOString(), stage: $("stage").value, notes: $("notes").value, ...values };
-          rows.push(row); sampleCount++;
-          $("count").textContent = sampleCount + " samples recorded · " + keyEvents.length + " key events";
+          const elapsedMs = Math.round(performance.now() - recordingStarted);
+          const row = { host_time_utc: new Date().toISOString(), elapsed_ms: elapsedMs, ...values };
+          if (Number.isFinite(values.device_ms)) lastClockAnchor = { device_ms: values.device_ms, elapsed_ms: elapsedMs };
+          sampleCount++;
+          addRecord("telemetry_sample", row);
           $("live").replaceChildren();
           ["render_us","render_budget_us","cpu0_busy_us","cpu2_job_sum_us","voice_peak","xruns","deadline_misses","cpu2_fallbacks","shed_total"].forEach(k => { if (values[k] !== undefined) say(k.replaceAll("_"," "), values[k]); });
           downloadBtn.disabled = false;
@@ -230,17 +240,17 @@ def main(package: Path, out: Path) -> None:
               const ev = pending.event;
               if (ev.event_type !== undefined) {
                 const encoder = ev.event_type === 2;
-                controlEvents.push({
-                  host_time_utc: new Date().toISOString(),
-                  elapsed_ms: Math.round(performance.now() - recordingStarted),
+                controlEventCount++;
+                const eventElapsed = elapsedForDeviceTime(ev.event_ms);
+                addRecord("control_event", {
+                  host_time_utc: new Date(recordingWallStarted + eventElapsed).toISOString(),
+                  elapsed_ms: eventElapsed,
                   device_ms: ev.event_ms,
                   event: encoder ? "encoder_turn" : "button_press",
                   control: encoder ? (encoderNames[ev.event_control] || "unknown") : (buttonNames[ev.event_control] || "unknown"),
                   control_id: ev.event_control,
                   value: encoder ? ((ev.event_value << 16) >> 16) : ev.event_value
                 });
-                pending.events.push(controlEvents[controlEvents.length - 1]);
-                $("controls-download").disabled = false;
               }
               pending.event = {};
             } else pending.event[key] = value;
@@ -276,22 +286,29 @@ def main(package: Path, out: Path) -> None:
     });
     startBtn.addEventListener("click", () => {
       if (!input || !output) return;
-      recording = true; recordingStarted = performance.now(); startBtn.disabled = true; stopBtn.disabled = false;
-      setStatus("Recording diagnostics and keybed MIDI events…"); snapshot();
+      timeline = []; sampleCount = 0; keyEventCount = 0; controlEventCount = 0; lastClockAnchor = null;
+      recording = true; recordingStarted = performance.now(); recordingWallStarted = Date.now();
+      sessionId = "fm1-" + new Date(recordingWallStarted).toISOString().replace(/[:.]/g,"-");
+      startBtn.disabled = true; stopBtn.disabled = false; updateCount();
+      addRecord("session_marker", { host_time_utc: new Date(recordingWallStarted).toISOString(), elapsed_ms: 0, event: "recording_started" });
+      setStatus("Recording one synchronized test timeline. Play normally; stop when finished."); snapshot();
     });
     stopBtn.addEventListener("click", stop);
-    function downloadCsv(data, filename) {
-      if (!data.length) return;
-      const keys = [...new Set(data.flatMap(r => Object.keys(r)))];
-      const csv = [keys.map(csvCell).join(","), ...data.map(r => keys.map(k => csvCell(r[k])).join(","))].join("\r\n");
+    function downloadUnifiedCsv() {
+      if (!timeline.length) return;
+      const ordered = timeline.map((row, index) => ({ row, index })).sort((a,b) =>
+        (Number(a.row.elapsed_ms) || 0) - (Number(b.row.elapsed_ms) || 0) || a.index - b.index
+      ).map(item => item.row);
+      const preferred = ["record_type","session_id","host_time_utc","elapsed_ms","device_ms","event","stage","notes","channel","note","value","control","control_id","source_port"];
+      const allKeys = [...new Set(ordered.flatMap(row => Object.keys(row)))];
+      const keys = [...preferred.filter(key => allKeys.includes(key)), ...allKeys.filter(key => !preferred.includes(key))];
+      const csv = [keys.map(csvCell).join(","), ...ordered.map(row => keys.map(key => csvCell(row[key])).join(","))].join("\r\n");
       const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
       const url = URL.createObjectURL(blob), a = document.createElement("a");
-      a.href = url; a.download = filename + "-" + new Date().toISOString().replace(/[:.]/g,"-") + ".csv";
+      a.href = url; a.download = "fm1-test-" + new Date().toISOString().replace(/[:.]/g,"-") + ".csv";
       a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
-    downloadBtn.addEventListener("click", () => downloadCsv(rows, "fm1-diagnostics"));
-    $("events-download").addEventListener("click", () => downloadCsv(keyEvents, "fm1-key-events"));
-    $("controls-download").addEventListener("click", () => downloadCsv(controlEvents, "fm1-control-events"));
+    downloadBtn.addEventListener("click", downloadUnifiedCsv);
     if (!window.isSecureContext) setStatus("Web MIDI requires a secure HTTPS page.");
   })();
   </script>
