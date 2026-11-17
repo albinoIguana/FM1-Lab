@@ -307,11 +307,15 @@ def main(package: Path, out: Path) -> None:
     startBtn.addEventListener("click", () => {
       if (!input || !output) return;
       timeline = []; sampleCount = 0; keyEventCount = 0; controlEventCount = 0; lastClockAnchor = null;
+      testRunning = false; stageIndex = -1; testResults = [];
       recording = true; recordingStarted = performance.now(); recordingWallStarted = Date.now();
       sessionId = "fm1-" + new Date(recordingWallStarted).toISOString().replace(/[:.]/g,"-");
-      startBtn.disabled = true; stopBtn.disabled = false; updateCount();
+      startBtn.disabled = true; stopBtn.disabled = false; runBtn.disabled = false; nextBtn.disabled = true; reportBtn.disabled = true; updateCount();
       addRecord("session_marker", { host_time_utc: new Date(recordingWallStarted).toISOString(), elapsed_ms: 0, event: "recording_started" });
-      setStatus("Recording one synchronized test timeline. Play normally; stop when finished."); snapshot();
+      $("stage").textContent = "Session recording";
+      $("instructions").textContent = "Start the guided suite when ready. The runner will time each stage and mark it in the same CSV.";
+      $("progress").textContent = "Ready to run the guided hardware test.";
+      setStatus("Session recording. Start the guided test when ready."); snapshot();
     });
     stopBtn.addEventListener("click", stop);
     function markStage(event, stage, extra={}) {
@@ -382,7 +386,16 @@ def main(package: Path, out: Path) -> None:
       const noteOns=keys.filter(r=>r.event==="note_on"),noteOffs=keys.filter(r=>r.event==="note_off");
       const held=new Map();
       keys.forEach(r=>{if(r.event==="note_on"&&num(r,"value")>0)held.set(String(r.channel)+":"+String(r.note),r);else if(r.event==="note_off")held.delete(String(r.channel)+":"+String(r.note));});
-      const contradictory=samples.some(r=>num(r,"voice_peak")===0)&&noteOns.length>0;
+      const orderedKeys=keys.slice().sort((a,b)=>num(a,"elapsed_ms")-num(b,"elapsed_ms"));
+      let keyCursor=0; const heldAtSample=new Map(); let contradictory=false;
+      samples.forEach(sample=>{
+        while(keyCursor<orderedKeys.length&&num(orderedKeys[keyCursor],"elapsed_ms")<=num(sample,"elapsed_ms")){
+          const ev=orderedKeys[keyCursor++],id=String(ev.channel)+":"+String(ev.note);
+          if(ev.event==="note_on"&&num(ev,"value")>0)heldAtSample.set(id,ev);
+          else if(ev.event==="note_off")heldAtSample.delete(id);
+        }
+        if(heldAtSample.size>0&&num(sample,"voice_peak")===0)contradictory=true;
+      });
       const gaps=samples.slice(1).reduce((n,r,i)=>n+(num(r,"elapsed_ms")-num(samples[i],"elapsed_ms")>2500?1:0),0);
       const findings=[];
       if(samples.length<10)findings.push("INCONCLUSIVE: fewer than 10 telemetry snapshots; session is too short for a reliable score.");
