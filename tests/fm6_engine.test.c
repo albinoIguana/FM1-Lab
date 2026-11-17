@@ -161,6 +161,56 @@ static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
 }
 
 
+
+/* Exercise every enabled-FX combination with all four physical engines
+ * sounding together. For each case, remove one patch at a time and require
+ * the final stereo output to change. This catches a wet-return/master-chain
+ * interaction that isolated-engine and FX-bus tests cannot see. */
+static void render_four_engine_fx_case(uint8_t fx_mask, uint8_t patch_mask,
+                                       int32_t *destination)
+{
+    static int32_t warmup[2048u * 2u];
+    fm6_init();
+    for (unsigned patch=0u; patch<FM1LAB_PATCH_COUNT; ++patch) {
+        uint8_t enabled=(uint8_t)((patch_mask&(1u<<patch))!=0u);
+        fm6_patch_set_enabled(patch,enabled);
+        fm6_patch_set_level(patch,enabled?31u:0u);
+        for (unsigned fx=0u; fx<FM6_FX_COUNT; ++fx)
+            fm6_fx_set_send(patch,(uint8_t)fx,100u);
+    }
+    for (unsigned fx=0u; fx<FM6_FX_COUNT; ++fx) {
+        fm6_fx_set_enabled((uint8_t)fx,(uint8_t)((fx_mask&(1u<<fx))!=0u));
+        fm6_fx_set_mix((uint8_t)fx,100u);
+        fm6_fx_set_time((uint8_t)fx,50u);
+        fm6_fx_set_feedback((uint8_t)fx,35u);
+        fm6_fx_set_depth((uint8_t)fx,50u);
+    }
+    fm6_note_on_mask(60u,110u,patch_mask);
+    fm6_render(warmup,2048u,4096u);
+    memset(destination,0,TEST_WORDS*sizeof destination[0]);
+    fm6_render(destination,TEST_FRAMES,4096u);
+}
+
+static void test_four_engine_audibility_across_fx_combinations(void)
+{
+    for (uint8_t fx_mask=0u; fx_mask<(1u<<FM6_FX_COUNT); ++fx_mask) {
+        render_four_engine_fx_case(fx_mask,0x0fu,chunk_a);
+        assert(peak(chunk_a,TEST_WORDS)>0);
+        for (unsigned patch=0u; patch<FM1LAB_PATCH_COUNT; ++patch)
+            assert(fm6_test_patch_peak(patch)>0u);
+
+        for (unsigned omitted=0u; omitted<FM1LAB_PATCH_COUNT; ++omitted) {
+            uint8_t patch_mask=(uint8_t)(0x0fu&~(1u<<omitted));
+            render_four_engine_fx_case(fx_mask,patch_mask,chunk_b);
+            assert(peak(chunk_b,TEST_WORDS)>0);
+            /* Same deterministic note, FX state and warm-up. If removing a
+             * layer cannot change the final output, that layer is being lost
+             * somewhere after its individual voice render. */
+            assert(memcmp(chunk_a,chunk_b,sizeof output)!=0);
+        }
+    }
+}
+
 static void render_insert_variant(uint8_t amp, uint8_t eq, int32_t *destination)
 {
     fm6_init();
@@ -363,6 +413,7 @@ static void test_two_resident_instrument_banks(void)
 }
 
 int main(void) {
+    test_four_engine_audibility_across_fx_combinations();
     assert(fm1lab_patch_engine_for_context(0u)==FM1LAB_PATCH_ENGINE_FM6);
     assert(fm1lab_patch_engine_for_context(1u)==FM1LAB_PATCH_ENGINE_WAVETABLE);
     assert(fm1lab_patch_engine_for_context(2u)==FM1LAB_PATCH_ENGINE_PSG);
