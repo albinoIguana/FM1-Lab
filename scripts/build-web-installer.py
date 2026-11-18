@@ -139,6 +139,22 @@ def main(package: Path, out: Path) -> None:
       <button id="fm1diag-download" type="button" disabled>Download complete test CSV</button>
       <button id="fm1diag-report" type="button" disabled>Download test report</button>
     </div>
+    <div style="margin:.8rem 0; padding:.8rem; border:1px solid #59616b; border-radius:9px">
+      <strong>MIDI controller / input test</strong>
+      <p style="font-size:.85rem; margin:.35rem 0 .6rem">Send controlled MIDI from the installer into the FM1. Listen to the instrument while testing. These controls do not flash firmware or change saved presets.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:.45rem">
+        <button id="fm1diag-midi-chord" type="button" disabled>Send C chord</button>
+        <button id="fm1diag-midi-release" type="button" disabled>Release test notes</button>
+        <button id="fm1diag-midi-velocity" type="button" disabled>Velocity sweep</button>
+        <button id="fm1diag-midi-bend" type="button" disabled>Pitch bend up</button>
+        <button id="fm1diag-midi-center" type="button" disabled>Pitch bend center</button>
+        <button id="fm1diag-midi-mod" type="button" disabled>Mod wheel</button>
+        <button id="fm1diag-midi-sustain" type="button" disabled>Sustain on</button>
+        <button id="fm1diag-midi-sustain-off" type="button" disabled>Sustain off</button>
+        <button id="fm1diag-midi-panic" type="button" disabled>All notes off / panic</button>
+      </div>
+      <p id="fm1diag-midi-status" role="status" aria-live="polite" style="font-size:.82rem; margin:.5rem 0 0">Connect the FM1 to enable MIDI output tests. Use Release or Panic after each test.</p>
+    </div>
     <p id="fm1diag-status" role="status" aria-live="polite" style="font-size:.9rem; margin:.35rem 0">Not connected. Use a desktop browser with Web MIDI support (Chrome or Edge recommended) over HTTPS.</p>
     <div id="fm1diag-runner" style="margin:.75rem 0; padding:.8rem; border:1px solid #59616b; border-radius:9px">
       <strong id="fm1diag-stage">Test runner ready</strong>
@@ -158,6 +174,37 @@ def main(package: Path, out: Path) -> None:
     let timeline = [], sampleCount = 0, keyEventCount = 0, controlEventCount = 0;
     let recordingStarted = 0, recordingWallStarted = 0, lastClockAnchor = null, sessionId = "";
     let testRunning = false, stageIndex = -1, stageTimer = null, stageDeadline = 0, testResults = [];
+    const activeTestNotes = new Set();
+    const midiTestButtons = ["chord","release","velocity","bend","center","mod","sustain","sustain-off","panic"].map(id => $("midi-" + id));
+    const midiTestStatus = $("midi-status");
+    function midiSend(bytes, label) {
+      if (!output) { midiTestStatus.textContent = "Connect the FM1 before sending MIDI."; return false; }
+      try {
+        output.send(bytes);
+        midiTestStatus.textContent = "Sent " + label + " · MIDI channel 1.";
+        if (recording) addRecord("midi_test_tx", {
+          host_time_utc:new Date().toISOString(),
+          elapsed_ms:Math.round(performance.now()-recordingStarted),
+          event:label, midi_bytes:bytes.map(v=>v.toString(16).padStart(2,"0")).join(" ")
+        });
+        return true;
+      } catch (e) {
+        midiTestStatus.textContent = "MIDI send failed: " + e.message;
+        return false;
+      }
+    }
+    function noteOn(note, velocity) {
+      if (midiSend([0x90,note,velocity],"note_on " + note + " velocity " + velocity)) activeTestNotes.add(note);
+    }
+    function noteOff(note) {
+      midiSend([0x80,note,0],"note_off " + note);
+      activeTestNotes.delete(note);
+    }
+    function releaseTestNotes() {
+      [...activeTestNotes].forEach(noteOff);
+      midiSend([0xB0,64,0],"sustain_off");
+      midiSend([0xB0,123,0],"all_notes_off");
+    }
     const stages = [
       {id:"idle_baseline", title:"1 · Idle baseline", seconds:10, instruction:"Hands off the FM1. Let the synth sit idle so we can measure its baseline."},
       {id:"four_engine_chord", title:"2 · Four-engine chord", seconds:20, instruction:"Select one Instrument with all four patch slots enabled. Hold a four-note chord for the full stage, then release it when the stage ends."},
@@ -301,9 +348,32 @@ def main(package: Path, out: Path) -> None:
       Promise.all([input.open(), output.open()]).then(() => {
         input.addEventListener("midimessage", listener);
         startBtn.disabled = false; $("connect").disabled = true; portSelect.disabled = true;
-        setStatus("Connected to " + (input.name || "FM1") + ". Ready to record.");
+        midiTestButtons.forEach(button => { button.disabled = false; });
+        setStatus("Connected to " + (input.name || "FM1") + ". Ready to record and send MIDI tests.");
       }).catch(e => setStatus("Could not open MIDI port: " + e.message));
     });
+    $("midi-chord").addEventListener("click", () => {
+      [60,64,67,72].forEach(note => noteOn(note,96));
+      midiTestStatus.textContent = "C-major chord sent. Listen for all four notes; use Release test notes when finished.";
+    });
+    $("midi-release").addEventListener("click", releaseTestNotes);
+    $("midi-velocity").addEventListener("click", () => {
+      const note=60, velocities=[32,64,96,127];
+      velocities.forEach((velocity,index) => setTimeout(() => {
+        noteOff(note); noteOn(note,velocity);
+        midiTestStatus.textContent = "Velocity sweep · " + velocity + "/127. Listen for four distinct levels.";
+        if(index===velocities.length-1) setTimeout(() => noteOff(note),350);
+      },index*500));
+    });
+    $("midi-bend").addEventListener("click", () => midiSend([0xE0,0x7F,0x7F],"pitch_bend_max"));
+    $("midi-center").addEventListener("click", () => midiSend([0xE0,0x00,0x40],"pitch_bend_center"));
+    $("midi-mod").addEventListener("click", () => {
+      midiSend([0xB0,1,127],"mod_wheel_max");
+      setTimeout(() => midiSend([0xB0,1,0],"mod_wheel_zero"),700);
+    });
+    $("midi-sustain").addEventListener("click", () => midiSend([0xB0,64,127],"sustain_on"));
+    $("midi-sustain-off").addEventListener("click", () => midiSend([0xB0,64,0],"sustain_off"));
+    $("midi-panic").addEventListener("click", releaseTestNotes);
     startBtn.addEventListener("click", () => {
       if (!input || !output) return;
       timeline = []; sampleCount = 0; keyEventCount = 0; controlEventCount = 0; lastClockAnchor = null;
