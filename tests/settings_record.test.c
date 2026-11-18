@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "fm1lab_settings_record.h"
+#include "fm1lab_live_performance_state.h"
 
 _Static_assert(offsetof(settings_v3_t, performance) == 28u, "legacy v3 settings prefix changed");
 _Static_assert(sizeof(fm6_performance_state_v3_t) == 542u, "legacy v3 performance layout changed");
@@ -408,6 +409,44 @@ int main(void)
     assert(imported.performance.seq_events[0][0].duration==4u);
     settings_seal(&imported);assert(settings_valid(&imported));
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7/V8/V9/V10/V11 -> V12 migration tests passed");
+    /* The live state is a distinct one-lane type. Compatibility decode
+     * retains lane 0, discards lane 1, and keeps ARP, Maelstrom and all FX. */
+    {
+        fm1lab_live_performance_state_t live;
+        memset(&live, 0xA5, sizeof live);
+        fm6_performance_state_t compatibility = good.performance;
+        compatibility.lane_instrument[0] = 7u;
+        compatibility.lane_instrument[1] = 19u;
+        compatibility.seq_enabled[0][3] = 1u;
+        compatibility.seq_enabled[1][3] = 0u;
+        compatibility.seq_note[0][3] = 67u;
+        compatibility.seq_note[1][3] = 22u;
+        compatibility.seq_event_count[0] = 1u;
+        compatibility.seq_events[0][0] = (fm6_seq_event_t){6u, 8u, 67u, 111u, 40u};
+        compatibility.seq_event_count[1] = 1u;
+        compatibility.seq_events[1][0] = (fm6_seq_event_t){2u, 4u, 22u, 50u, 0u};
+        compatibility.chaos_amount = 83u;
+        compatibility.chaos_rate = 37u;
+        compatibility.chaos_tone = 61u;
+        compatibility.chaos_shape = 4u;
+        compatibility.fx_enabled[FM6_FX_PHASER] = 1u;
+        compatibility.fx_mix[FM6_FX_PHASER] = 47u;
+        compatibility.fx_send[3][FM6_FX_PHASER] = 72u;
+        assert(fm1lab_live_performance_from_compat(&live, &compatibility) == 0);
+        assert(live.instrument == 7u);
+        assert(live.seq_enabled[3] == 1u && live.seq_note[3] == 67u);
+        assert(live.seq_event_count == 1u);
+        assert(live.seq_events[0].start == 6u && live.seq_events[0].pitch == 67u);
+        assert(live.arp_mode == compatibility.arp_mode);
+        assert(live.arp_step_gain[5] == compatibility.arp_step_gain[5]);
+        assert(live.fx_enabled[FM6_FX_PHASER] == 1u);
+        assert(live.fx_mix[FM6_FX_PHASER] == 47u);
+        assert(live.fx_send[3][FM6_FX_PHASER] == 72u);
+        assert(live.chaos_amount == 83u && live.chaos_rate == 37u);
+        assert(live.chaos_tone == 61u && live.chaos_shape == 4u);
+        assert(fm1lab_live_performance_from_compat(NULL, &compatibility) == -1);
+    }
+
+    puts("FM1-Lab settings record and single-track live-state migration tests passed");
     return 0;
 }
