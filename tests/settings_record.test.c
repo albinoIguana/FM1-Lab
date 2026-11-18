@@ -445,6 +445,31 @@ int main(void)
         assert(live.chaos_amount == 83u && live.chaos_rate == 37u);
         assert(live.chaos_tone == 61u && live.chaos_shape == 4u);
         assert(fm1lab_live_performance_from_compat(NULL, &compatibility) == -1);
+
+        {
+            fm6_performance_state_t roundtrip;
+            assert(fm1lab_live_performance_to_compat(&roundtrip, &live) == 0);
+            assert(roundtrip.lane_instrument[0] == 7u);
+            assert(roundtrip.lane_instrument[1] == 0u);
+            assert(roundtrip.seq_enabled[0][3] == 1u);
+            assert(roundtrip.seq_enabled[1][3] == 0u);
+            assert(roundtrip.seq_event_count[0] == 1u);
+            assert(roundtrip.seq_event_count[1] == 0u);
+            assert(roundtrip.seq_events[0][0].pitch == 67u);
+            assert(roundtrip.arp_mode == live.arp_mode);
+            assert(roundtrip.fx_enabled[FM6_FX_PHASER] == 1u);
+            assert(roundtrip.fx_send[3][FM6_FX_PHASER] == 72u);
+            assert(roundtrip.chaos_amount == 83u && roundtrip.chaos_rate == 37u);
+            assert(roundtrip.compressor_enabled == 0u);
+            assert(fm6_performance_state_valid(&roundtrip));
+            assert(fm1lab_live_performance_to_compat(&roundtrip, NULL) == -1);
+        }
+        {
+            fm1lab_live_performance_state_t invalid = live;
+            fm6_performance_state_t rejected;
+            invalid.instrument = 32u;
+            assert(fm1lab_live_performance_to_compat(&rejected, &invalid) == -1);
+        }
     }
 
 
