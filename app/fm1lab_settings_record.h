@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "fm6.h"
+#include "fm1lab_settings_legacy_types.h"
 #define SET_MAGIC_V1 0x4C314D46u
 #define SET_MAGIC_V2 0x4C314D47u
 #define SET_MAGIC_V3 0x4C314D48u
