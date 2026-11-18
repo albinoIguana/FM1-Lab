@@ -4448,7 +4448,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         app_render(audio,32u,4096u);
         app_render(audio,32u,4096u);
         app_host_resync_pass=(uint8_t)(!instrument_apply_pending &&
-            fm6_macro_get(0u,0u)==30u && fm6_macro_get(4u,0u)==0u &&
+            fm6_macro_get(0u,0u)==30u && fm6_patch_count()==FM1LAB_PATCH_COUNT &&
             fm6_master_insert_get(FM6_INSERT_DRIVE)==77u);
         return 1;
     }

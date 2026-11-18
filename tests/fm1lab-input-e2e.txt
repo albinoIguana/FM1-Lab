@@ -4,7 +4,7 @@ wait 5000
 expect lane 0
 expect focus 0
 expect trackinst0 0
-expect trackinst1 0
+expect trackinst1 -1
 
 # Single-track build: SEQ navigation must not switch lanes or load a
 # second Instrument. SELECT and PRESETS remain inert for track selection.
@@ -17,7 +17,7 @@ spin PRESET 1
 wait 100
 expect lane 0
 expect trackinst0 0
-expect trackinst1 0
+expect trackinst1 -1
 expect instrument 0
 expect pending 0
 
@@ -42,7 +42,7 @@ spin PRESET 1
 wait 100
 expect instrument 1
 expect trackinst0 1
-expect trackinst1 0
+expect trackinst1 -1
 expect pending 0
 
 # The single active Instrument retains its selected patch and preset cursor.
