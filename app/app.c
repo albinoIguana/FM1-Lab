@@ -2474,6 +2474,7 @@ static void input(void)
                 (uint8_t)FM1LAB_PATCH_COUNT, &app_input_ops, &context);
             patch_focus = state.patch_focus;
             set.patch = state.patch;
+            seq_ui_patch[0] = state.patch;
             if (result == FM1LAB_INPUT_RESULT_APPLIED ||
                 result == FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED)
                 set_dirty = 1u;
