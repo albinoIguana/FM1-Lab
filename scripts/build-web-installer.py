@@ -149,6 +149,9 @@ def main(package: Path, out: Path) -> None:
         <button id="fm1diag-midi-bend" type="button" disabled>Pitch bend up</button>
         <button id="fm1diag-midi-center" type="button" disabled>Pitch bend center</button>
         <button id="fm1diag-midi-mod" type="button" disabled>Mod wheel</button>
+        <button id="fm1diag-midi-poly-pressure" type="button" disabled>Poly aftertouch</button>
+        <button id="fm1diag-midi-channel-pressure" type="button" disabled>Channel pressure</button>
+        <button id="fm1diag-midi-transport" type="button" disabled>Transport start / stop</button>
         <button id="fm1diag-midi-sustain" type="button" disabled>Sustain on</button>
         <button id="fm1diag-midi-sustain-off" type="button" disabled>Sustain off</button>
         <button id="fm1diag-midi-panic" type="button" disabled>All notes off / panic</button>
@@ -176,7 +179,7 @@ def main(package: Path, out: Path) -> None:
     let testRunning = false, stageIndex = -1, stageTimer = null, stageDeadline = 0, testResults = [];
     const activeTestNotes = new Set();
     const midiTimers = [];
-    const midiTestButtons = ["chord","release","velocity","bend","center","mod","sustain","sustain-off","panic"].map(id => $("midi-" + id));
+    const midiTestButtons = ["chord","release","velocity","bend","center","mod","poly-pressure","channel-pressure","transport","sustain","sustain-off","panic"].map(id => $("midi-" + id));
     const midiTestStatus = $("midi-status");
     function midiSend(bytes, label) {
       if (!output) { midiTestStatus.textContent = "Connect the FM1 before sending MIDI."; return false; }
@@ -374,7 +377,19 @@ def main(package: Path, out: Path) -> None:
     $("midi-center").addEventListener("click", () => midiSend([0xE0,0x00,0x40],"pitch_bend_center"));
     $("midi-mod").addEventListener("click", () => {
       midiSend([0xB0,1,127],"mod_wheel_max");
-      setTimeout(() => midiSend([0xB0,1,0],"mod_wheel_zero"),700);
+      midiTimers.push(setTimeout(() => midiSend([0xB0,1,0],"mod_wheel_zero"),700));
+    });
+    $("midi-poly-pressure").addEventListener("click", () => {
+      midiSend([0xA0,60,127],"poly_aftertouch_max_note_60");
+      midiTimers.push(setTimeout(() => midiSend([0xA0,60,0],"poly_aftertouch_zero_note_60"),700));
+    });
+    $("midi-channel-pressure").addEventListener("click", () => {
+      midiSend([0xD0,127],"channel_pressure_max");
+      midiTimers.push(setTimeout(() => midiSend([0xD0,0],"channel_pressure_zero"),700));
+    });
+    $("midi-transport").addEventListener("click", () => {
+      midiSend([0xFA],"transport_start");
+      midiTimers.push(setTimeout(() => midiSend([0xFC],"transport_stop"),1000));
     });
     $("midi-sustain").addEventListener("click", () => midiSend([0xB0,64,127],"sustain_on"));
     $("midi-sustain-off").addEventListener("click", () => midiSend([0xB0,64,0],"sustain_off"));
