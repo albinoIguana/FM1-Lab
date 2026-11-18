@@ -2112,6 +2112,7 @@ void fm6_chaos_get(uint8_t *amount,uint8_t *rate,uint8_t *tone,uint8_t *shape)
 }
 void fm6_master_insert_reset_state(void)
 {
+    (void)fm6_master_insert_channel; /* legacy DSP retained for source compatibility, not in the render path */
     fm6_amp_tone_state[0]=fm6_amp_tone_state[1]=0;
     fm6_zero_bytes(fm6_eq_x1,sizeof(fm6_eq_x1));
     fm6_zero_bytes(fm6_eq_x2,sizeof(fm6_eq_x2));
