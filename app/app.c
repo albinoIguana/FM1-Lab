@@ -2014,18 +2014,32 @@ void app_init(void)
             set_dirty = 1u;
         }
         /* Retire lane 1 in the next settings save, without altering its old
-         * bytes before the one-lane conversion above has completed. */
-        set.performance.lane_instrument[1]=0u;
-        set.performance.seq_event_count[1]=0u;
+         * bytes before the one-lane conversion above has completed. Only mark
+         * settings dirty when the retired lane actually contained data. */
+        uint8_t retired_lane_has_data=(uint8_t)(
+            set.performance.lane_instrument[1] != 0u ||
+            set.performance.seq_event_count[1] != 0u);
         for(uint32_t step=0u;step<64u;step++) {
+            if(set.performance.seq_enabled[1][step] ||
+               set.performance.seq_note[1][step] ||
+               set.performance.seq_velocity[1][step] ||
+               set.performance.seq_gate[1][step])
+                retired_lane_has_data=1u;
             set.performance.seq_enabled[1][step]=0u;
             set.performance.seq_note[1][step]=0u;
             set.performance.seq_velocity[1][step]=0u;
             set.performance.seq_gate[1][step]=0u;
         }
-        for(uint32_t i=0u;i<APP_SEQ_EVENTS_PER_LANE;i++)
+        for(uint32_t i=0u;i<APP_SEQ_EVENTS_PER_LANE;i++) {
+            const fm6_seq_event_t *event=&set.performance.seq_events[1][i];
+            if(event->start || event->duration || event->pitch ||
+               event->velocity || event->accent)
+                retired_lane_has_data=1u;
             set.performance.seq_events[1][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
-        set_dirty=1u;
+        }
+        set.performance.lane_instrument[1]=0u;
+        set.performance.seq_event_count[1]=0u;
+        if(retired_lane_has_data) set_dirty=1u;
     } else {
         arp_ui_mode = 0u;
         fm6_arpeggiator_set_mode(0u);
