@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "fm6.h"
 #include "fm1lab_settings_legacy_types.h"
+#include "fm1lab_live_performance_state.h"
 #define SET_MAGIC_V1 0x4C314D46u
 #define SET_MAGIC_V2 0x4C314D47u
 #define SET_MAGIC_V3 0x4C314D48u
@@ -517,4 +518,32 @@ static inline int settings_import_v1(settings_t *dst,const settings_v1_t *src) {
     if(!dst || !settings_v1_valid(src)) return -1;
     dst->swing=50u;
     dst->octave=src->octave; dst->patch=src->patch; dst->enabled_mask=src->enabled_mask; dst->ble_off=src->ble_off; return 0;
+}
+
+
+/* Decode historical two-lane records straight into the one-lane live model.
+ * The legacy importers validate CRC/layout and perform version-specific
+ * conversions first; the final adapter keeps lane 0 and drops lane 1. */
+static inline int settings_import_live_v9(
+    fm1lab_live_performance_state_t *dst, const settings_v9_t *src) {
+    settings_t decoded = {0};
+    if (!dst || settings_import_v9(&decoded, src) != 0) return -1;
+    return fm1lab_live_performance_from_compat(dst, &decoded.performance);
+}
+static inline int settings_import_live_v10(
+    fm1lab_live_performance_state_t *dst, const settings_v10_t *src) {
+    settings_t decoded = {0};
+    if (!dst || settings_import_v10(&decoded, src) != 0) return -1;
+    return fm1lab_live_performance_from_compat(dst, &decoded.performance);
+}
+static inline int settings_import_live_v11(
+    fm1lab_live_performance_state_t *dst, const settings_v11_t *src) {
+    settings_t decoded = {0};
+    if (!dst || settings_import_v11(&decoded, src) != 0) return -1;
+    return fm1lab_live_performance_from_compat(dst, &decoded.performance);
+}
+static inline int settings_import_live_v12(
+    fm1lab_live_performance_state_t *dst, const settings_t *src) {
+    if (!dst || !settings_valid(src)) return -1;
+    return fm1lab_live_performance_from_compat(dst, &src->performance);
 }
