@@ -2499,13 +2499,9 @@ static void input(void)
             case FM1LAB_INPUT_RESULT_APPLIED:
                 if (action == FM1LAB_INPUT_PATCH_FOCUS_STEP) app_say("PATCH", patch_display_name(set.patch));
                 else if (action == FM1LAB_INPUT_PATCH_PRESET_STEP) app_say("PATCH PRESET", patch_display_name(set.patch));
-                else if (action == FM1LAB_INPUT_TRACK_TOGGLE) app_say("SEQUENCER TRACK", seq_ui_lane ? "T2 INSTRUMENT" : "T1 INSTRUMENT");
-                else if (action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP ||
-                         action == FM1LAB_INPUT_INSTRUMENT_STEP) {
+                else if (action == FM1LAB_INPUT_INSTRUMENT_STEP) {
                     if(instrument_rom_fallback)
                         app_say("ROM INSTRUMENT",fm1lab_store_load_failure_label());
-                    else if(action == FM1LAB_INPUT_TRACK_INSTRUMENT_STEP)
-                        app_say("TRACK INSTRUMENT","LOADING");
                 }
                 /* HOME Instrument selection is shown by the persistent
                  * Instrument name in the header; no temporary numeric overlay. */
