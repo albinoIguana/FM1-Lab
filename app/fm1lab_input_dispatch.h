@@ -56,6 +56,7 @@ static inline enum fm1lab_input_result fm1lab_input_apply(
         if (value < 0) value += patch_count;
         state->patch = (uint8_t)value;
         state->patch_focus = 1u;
+        state->track_patch[state->lane & 1u] = state->patch;
         if (ops->publish) ops->publish(context);
         return FM1LAB_INPUT_RESULT_APPLIED;
     }
