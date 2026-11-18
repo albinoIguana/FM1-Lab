@@ -1221,12 +1221,13 @@ int main(void) {
     saved.arp_step_gate[0]=2u;
     assert(!fm6_performance_state_valid(&saved));
 
-    /* Amp/Drive and EQ are one bypassable Instrument-wide post-FX stereo chain. */
+    /* Legacy Amp/Drive and EQ controls remain readable but are intentionally
+     * bypassed in the reduced stability build. */
     render_insert_variant(0u,0u,chunk_a);
     render_insert_variant(1u,0u,chunk_b);
-    assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)!=0);
+    assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)==0);
     render_insert_variant(0u,1u,chunk_b);
-    assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)!=0);
+    assert(memcmp(chunk_a,chunk_b,sizeof chunk_a)==0);
     fm6_init();
     fm6_master_insert_set(FM6_INSERT_DRIVE,255u);
     fm6_master_insert_set(FM6_INSERT_EQ_MID_GAIN,255u);
@@ -1259,13 +1260,11 @@ int main(void) {
     assert(right_peak > 0);
     assert(left_peak == 0);
 
-    /* Linked master compression reduces sustained four-layer peaks and is
-     * fully bypassable; its state is included in performance persistence. */
+    /* The shelved master compressor must not change the output. */
     int32_t compressor_bypass_peak=render_compressor_peak(0u);
     int32_t compressor_active_peak=render_compressor_peak(1u);
     assert(compressor_bypass_peak>0);
-    assert(compressor_active_peak>0);
-    assert(compressor_active_peak<compressor_bypass_peak);
+    assert(compressor_active_peak==compressor_bypass_peak);
 
     /* The loud left layer must also pull down the quiet right layer. Compare
      * per-channel gain ratios against bypass; equal ratios prove one shared

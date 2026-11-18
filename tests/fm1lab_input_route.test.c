@@ -89,7 +89,6 @@ static void test_complete_route_matrix(void)
                         ? FM1LAB_INPUT_PATCH_PRESET_STEP
                         : FM1LAB_INPUT_INSTRUMENT_STEP;
                 } else if (page == FM1LAB_INPUT_PAGE_SEQ) {
-                    if (encoder == 0u) expected = FM1LAB_INPUT_TRACK_TOGGLE;
                     if (encoder == 2u) expected = FM1LAB_INPUT_TRACK_INSTRUMENT_STEP;
                 }
                 uint32_t claims = fm1lab_input_route_claims(page, encoder, focus);
@@ -139,53 +138,19 @@ static void test_home_patch_and_instrument_actions(void)
     assert(fake.bank_instrument[1] == 7u); /* HOME change only replaces T1's bank. */
 }
 
-static void test_track_round_trip_and_isolation(void)
+static void test_second_track_is_shelved(void)
 {
-    fm1lab_input_state_t state = {0u, 1u, 0u, 3u, {3u, 7u}, {1u, 2u}, 0u, 0u};
+    fm1lab_input_state_t state = {0u, 0u, 0u, 3u, {3u, 7u}, {0u, 2u}, 0u, 0u};
     fake_engine_t fake;
-    uint8_t t1_before[FM1LAB_PATCH_COUNT];
     memset(&fake, 0, sizeof fake);
-    fake.bank_instrument[0] = 3u;
-    fake.bank_instrument[1] = 7u;
-    for (unsigned p = 0u; p < FM1LAB_PATCH_COUNT; ++p) {
-        fake.bank_patch[0][p] = (uint8_t)(10u + p);
-        fake.bank_patch[1][p] = (uint8_t)(20u + p);
-    }
-    memcpy(t1_before, fake.bank_patch[0], sizeof t1_before);
-
-    /* T1 -> T2; a multi-count report still toggles exactly once. */
-    assert(fm1lab_input_apply(&state,
-        fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 1u), 5,
-        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
-        == FM1LAB_INPUT_RESULT_APPLIED);
-    assert(state.lane == 1u && state.instrument == 7u && state.patch == 2u);
-    assert(fake.engine_target == FM1LAB_PATCH_COUNT);
-    assert(fake.switch_calls == 1u);
-    assert(fake.save_calls == 0u && fake.load_calls == 0u);
-    assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
-
-    /* PRESETS is completely inactive on SEQ OPTIONS. */
-    assert(fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ_OPTIONS, 2u, 0u)
-        == FM1LAB_INPUT_NONE);
-    assert(state.track_instrument[1] == 7u && state.instrument == 7u);
-    assert(fake.bank_instrument[1] == 7u);
-    assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
-    state.instrument_apply_pending = 0u; /* model completion of the queued bank apply */
-    unsigned saves_before_toggle = fake.save_calls;
-    unsigned loads_before_toggle = fake.load_calls;
-
-    /* T2 -> T1 restores T1's own Instrument and patch selection. */
-    assert(fm1lab_input_apply(&state,
-        fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 0u), -1,
-        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
-        == FM1LAB_INPUT_RESULT_APPLIED);
-    assert(state.lane == 0u && state.instrument == 3u && state.patch == 1u);
-    assert(fake.engine_target == 0u);
-    assert(fake.switch_calls == 2u);
-    assert(fake.save_calls == saves_before_toggle && fake.load_calls == loads_before_toggle);
-    assert(memcmp(fake.bank_patch[0], t1_before, sizeof t1_before) == 0);
-    assert(fake.bank_instrument[0] == 3u && fake.bank_instrument[1] == 7u);
+    assert(fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 0u) == FM1LAB_INPUT_NONE);
+    assert(fm1lab_input_apply(&state, fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 0u), 1,
+        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_NONE);
+    assert(state.lane == 0u && state.instrument == 3u);
+    assert(fake.switch_calls == 0u && fake.load_calls == 0u && fake.save_calls == 0u);
 }
+
+
 
 static void test_busy_and_save_failure_statuses(void)
 {
@@ -226,7 +191,7 @@ int main(void)
 {
     test_complete_route_matrix();
     test_home_patch_and_instrument_actions();
-    test_track_round_trip_and_isolation();
+    test_second_track_is_shelved();
     test_busy_and_save_failure_statuses();
     return 0;
 }
