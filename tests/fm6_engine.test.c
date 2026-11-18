@@ -375,6 +375,7 @@ int main(void) {
     assert(fm1lab_patch_engine_for_context(1u)==FM1LAB_PATCH_ENGINE_WAVETABLE);
     assert(fm1lab_patch_engine_for_context(2u)==FM1LAB_PATCH_ENGINE_PSG);
     assert(fm1lab_patch_engine_for_context(3u)==FM1LAB_PATCH_ENGINE_SUBTRACTIVE);
+    assert(fm1lab_patch_engine_for_context(4u)==FM1LAB_PATCH_ENGINE_INVALID);
     assert(fm1lab_patch_engine_for_context(8u)==FM1LAB_PATCH_ENGINE_INVALID);
 
     test_single_instrument_capacity();
@@ -410,12 +411,10 @@ int main(void) {
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     render_cpu2_mode(2u, 0x0fu, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
-    /* The second sequencer bank has the same fixed engine order. */
-    render_cpu2_mode(0u, 0xf0u, 32u, chunk_a);
-    render_cpu2_mode(1u, 0xf0u, 32u, chunk_b);
-    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
-    render_cpu2_mode(2u, 0xf0u, 32u, chunk_b);
-    assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    /* Retired context masks cannot allocate voices beyond the one live bank. */
+    fm6_init();
+    fm6_note_on_mask(60u,100u,0xf0u);
+    assert(fm6_active_voices()==0u);
 
     /* A single 128-frame equality check is too short to catch state drift
      * across DMA boundaries. Compare 96 consecutive 256-frame callbacks
