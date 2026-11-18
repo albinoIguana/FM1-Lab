@@ -948,7 +948,6 @@ static int app_input_save_current(void *opaque)
     int result = instrument_save();
     if (context && context->state) {
         context->state->instrument_dirty = instrument_dirty;
-        context->state->track_instrument[seq_ui_lane & 1u] = seq_ui_instrument[seq_ui_lane & 1u];
     }
     return result;
 }
@@ -964,7 +963,6 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
         seq_ui_lane = previous_lane;
     if (context && context->state && result == FM1LAB_LOAD_OK) {
         context->state->instrument = instrument_index;
-        context->state->track_instrument[seq_ui_lane] = seq_ui_instrument[seq_ui_lane];
         context->state->instrument_apply_pending = instrument_apply_pending;
         context->state->instrument_dirty = instrument_dirty;
     }
@@ -2464,9 +2462,7 @@ static void input(void)
         enum fm1lab_input_action action = fm1lab_input_route(page, (uint8_t)k, patch_focus);
         if (action != FM1LAB_INPUT_NONE) {
             fm1lab_input_state_t state = {
-                patch_focus, set.patch, seq_ui_lane, instrument_index,
-                {seq_ui_instrument[0], seq_ui_instrument[1]},
-                {seq_ui_patch[0], seq_ui_patch[1]},
+                patch_focus, set.patch, instrument_index,
                 instrument_apply_pending, instrument_dirty
             };
             app_input_context_t context = { &state };
@@ -2475,11 +2471,6 @@ static void input(void)
                 (uint8_t)FM1LAB_PATCH_COUNT, &app_input_ops, &context);
             patch_focus = state.patch_focus;
             set.patch = state.patch;
-            seq_ui_lane = state.lane;
-            seq_ui_instrument[0] = state.track_instrument[0];
-            seq_ui_instrument[1] = state.track_instrument[1];
-            seq_ui_patch[0] = state.track_patch[0];
-            seq_ui_patch[1] = state.track_patch[1];
             if (result == FM1LAB_INPUT_RESULT_APPLIED ||
                 result == FM1LAB_INPUT_RESULT_SAVE_FAILED_CHANGED)
                 set_dirty = 1u;
