@@ -447,6 +447,7 @@ static void fm6_master_insert_process(int64_t *left,int64_t *right)
      * inert so old settings records and callers remain source-compatible. */
     (void)left;
     (void)right;
+    (void)fm6_master_insert_channel;
 }
 static uint32_t fm6_chaos_next_random(void)
 {
