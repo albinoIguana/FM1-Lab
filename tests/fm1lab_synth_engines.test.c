@@ -25,8 +25,8 @@ int main(void)
     };
     for (uint8_t slot = 0; slot < FM1LAB_INSTRUMENT_SLOT_COUNT; ++slot) {
         assert(fm1lab_patch_engine_for_context(slot) == expected[slot]);
-        assert(fm1lab_patch_engine_for_context((uint8_t)(slot + 4u)) == expected[slot]);
     }
+    assert(fm1lab_patch_engine_for_context(4u) == FM1LAB_PATCH_ENGINE_INVALID);
     assert(fm1lab_patch_engine_for_context(8u) == FM1LAB_PATCH_ENGINE_INVALID);
     uint32_t hashes[FM1LAB_SYNTH_ENGINE_COUNT];
     for (uint32_t engine = 0; engine < FM1LAB_SYNTH_ENGINE_COUNT; ++engine) {
