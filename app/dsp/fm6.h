@@ -2,13 +2,10 @@
  * FM1-Lab: four-patch Instrument API. FM6 core provenance is retained in fm6.c. */
 #pragma once
 #include <stdint.h>
+#include "fm1lab_dsp_config.h"
 #include "fm1lab_insert_state.h"
 
 #define FM6_SAMPLE_RATE_HZ 44100u /* fm1-base device/main_fm1.c: FS */
-#define FM1LAB_PATCH_COUNT 4u
-#define FM6_ENGINE_PATCH_COUNT 8u /* two independent four-patch sequencer instruments */
-#define FM1LAB_MACRO_COUNT 4u
-#define FM1LAB_VOICE_LIMIT 8u /* voices per patch; eight independent pools */
 enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUNT };
 
 /* Event positions and durations are measured in 32nd-note ticks:
