@@ -889,7 +889,7 @@ int main(void) {
     fm6_set_tempo(300u);
     fm6_sequencer_set_length(64u);
     fm6_sequencer_set_lane(0u, 0u);
-    for (unsigned lane = 0; lane < 2u; ++lane)
+    for (unsigned lane = 0; lane < 1u; ++lane)
         for (unsigned step = 0; step < 64u; ++step)
             fm6_sequencer_set_step((uint8_t)lane, (uint8_t)step, 1u,
                 (uint8_t)(48u + lane * 12u + step % 12u), 110u, 90u);

@@ -112,7 +112,6 @@ static settings_migration_scratch_t settings_migration;
 /* app_init scans and migrates banks serially; reuse these large records rather
  * than reserving multiple instrument/insert objects in the startup stack frame. */
 static fm1lab_instrument_t startup_instrument_scratch;
-static fm1lab_insert_state_t startup_insert_scratch;
 
 static settings_t set;
 static uint8_t set_dirty;
@@ -163,9 +162,10 @@ static uint8_t patch_preset_cursor[1][FM1LAB_PATCH_COUNT] = {
 static enum fm1lab_dx7_preset_result patch_preset_last_result = FM1LAB_DX7_PRESET_OK;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
-static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[1]={0u}, seq_ui_note[1][64], seq_ui_velocity[1][64],
+static uint8_t seq_ui_step, seq_ui_instrument[1]={0u}, seq_ui_note[1][64], seq_ui_velocity[1][64],
                seq_ui_gate[1][64], seq_ui_enabled[1][64], seq_ui_tie[1][64], seq_ui_accent[1][64], seq_ui_patch[1]={0u};
 static char seq_ui_instrument_name[1][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A','C','T','O','R','Y',0}};
+#define FM1LAB_LIVE_LANE 0u
 static fm1lab_instrument_t instrument_apply_snapshot;
 static fm1lab_insert_state_t inserts_apply_snapshot;
 static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
@@ -412,7 +412,7 @@ static const char *fm1lab_patch_preset_failure_label(void)
 
 static int fm1lab_patch_preset_step(int delta)
 {
-    uint8_t lane=(uint8_t)(seq_ui_lane&1u);
+    uint8_t lane=(uint8_t)(FM1LAB_LIVE_LANE&1u);
     uint8_t next;
     enum fm1lab_dx7_preset_result result;
     if (!delta) { patch_preset_last_result=FM1LAB_DX7_PRESET_BAD_ARGUMENT; return -1; }
@@ -631,7 +631,6 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 static void performance_publish(void)
 {
     if (performance_update_pending) { performance_update_dirty=1u; return; }
-    seq_ui_lane = 0u;
     set.performance.tempo_bpm = transport_ui_bpm;
     set.performance.arp_mode = arp_ui_mode;
     set.performance.arp_division=arp_ui_division;set.performance.arp_gate=arp_ui_gate;
@@ -725,7 +724,7 @@ static void instrument_apply_engine_bank(uint8_t lane,const fm1lab_instrument_t 
 
 static void instrument_apply_engine(void)
 {
-    instrument_apply_engine_bank(seq_ui_lane,&current_instrument,&current_inserts,1u);
+    instrument_apply_engine_bank(FM1LAB_LIVE_LANE,&current_instrument,&current_inserts,1u);
 }
 
 static uint8_t instrument_macro_effective(uint32_t patch, uint32_t macro)
@@ -828,7 +827,7 @@ static int instrument_load(uint32_t index, int from_audio)
     if (index >= USER_INSTRUMENT_COUNT) return FM1LAB_LOAD_INVALID;
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
-    uint8_t previous_instrument=seq_ui_instrument[seq_ui_lane&1u];
+    uint8_t previous_instrument=seq_ui_instrument[FM1LAB_LIVE_LANE&1u];
     uint8_t rom_fallback=0u;
 #ifdef PLAT_HOST
     ++app_host_store_load_calls;
@@ -844,10 +843,10 @@ static int instrument_load(uint32_t index, int from_audio)
     instrument_index = (uint8_t)index;
     if(previous_instrument!=instrument_index)
         for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++)
-            patch_preset_cursor[seq_ui_lane&1u][p]=255u;
-    seq_ui_instrument[seq_ui_lane]=instrument_index;
-    fm6_sequencer_set_lane(seq_ui_lane,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT));
-    sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
+            patch_preset_cursor[FM1LAB_LIVE_LANE&1u][p]=255u;
+    seq_ui_instrument[FM1LAB_LIVE_LANE]=instrument_index;
+    fm6_sequencer_set_lane(FM1LAB_LIVE_LANE,(uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT));
+    sequencer_cache_instrument_name(FM1LAB_LIVE_LANE,current_instrument.name);
     instrument_loaded = 1u;
     instrument_dirty = 0u;
     instrument_sync_settings();
@@ -857,7 +856,7 @@ static int instrument_load(uint32_t index, int from_audio)
         instrument_apply_snapshot=current_instrument;
         inserts_apply_snapshot=current_inserts;
         instrument_apply_pending = 1u;
-        ui_event_push(EV_INSTRUMENT_LOAD, seq_ui_lane, 0u, 1u);
+        ui_event_push(EV_INSTRUMENT_LOAD, FM1LAB_LIVE_LANE, 0u, 1u);
     } else if (from_audio == 2) {
         /* Track focus is UI-only. Both four-patch banks are already resident;
          * rewriting voices here kills active notes and creates an audible dip. */
@@ -881,8 +880,8 @@ static int instrument_save_to(uint32_t index)
     instrument_index=(uint8_t)index;
     instrument_dirty=0u;
     instrument_rom_fallback=0u;
-    seq_ui_instrument[seq_ui_lane]=instrument_index;
-    sequencer_cache_instrument_name(seq_ui_lane,current_instrument.name);
+    seq_ui_instrument[FM1LAB_LIVE_LANE]=instrument_index;
+    sequencer_cache_instrument_name(FM1LAB_LIVE_LANE,current_instrument.name);
     return 0;
 }
 static int instrument_save(void) { return instrument_save_to(instrument_index); }
@@ -892,7 +891,7 @@ typedef struct { fm1lab_input_state_t *state; } app_input_context_t;
 static int app_input_save_current(void *opaque)
 {
     app_input_context_t *context = (app_input_context_t *)opaque;
-    seq_ui_lane = 0u;
+
     int result = instrument_save();
     if (context && context->state) {
         context->state->instrument_dirty = instrument_dirty;
@@ -903,13 +902,10 @@ static int app_input_save_current(void *opaque)
 static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, int mode)
 {
     app_input_context_t *context = (app_input_context_t *)opaque;
-    uint8_t previous_lane = seq_ui_lane;
     int result;
     (void)lane;
-    seq_ui_lane = 0u;
+
     result = instrument_load(index, mode);
-    if (result != FM1LAB_LOAD_OK)
-        seq_ui_lane = previous_lane;
     if (context && context->state && result == FM1LAB_LOAD_OK) {
         context->state->instrument = instrument_index;
         context->state->instrument_apply_pending = instrument_apply_pending;
@@ -1094,7 +1090,7 @@ static void voice_update_publish(void)
     const uint8_t *voice = current_instrument.patches[set.patch].voice;
     for (uint32_t i = 0; i < FM1LAB_PATCH_BYTES; ++i)
         voice_update_snapshot[i] = voice[i];
-    voice_update_patch = (uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT+set.patch);
+    voice_update_patch = (uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT+set.patch);
     voice_dirty = 0u;
     voice_update_pending = 1u;
     ui_event_push(EV_PATCH_VOICE, voice_update_patch, 0, 0);
@@ -1119,7 +1115,7 @@ static void patch_pitch_edit(unsigned control,int delta)
     if(control==0u)patch->octave=(int8_t)next;
     else patch->fine_cents=(int8_t)next;
     instrument_dirty=1u;set_dirty=1u;
-    ui_event_push(EV_PATCH_PITCH,(uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT+set.patch),
+    ui_event_push(EV_PATCH_PITCH,(uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT+set.patch),
         (uint8_t)patch->octave,(uint8_t)patch->fine_cents);
 }
 
@@ -1259,7 +1255,7 @@ static void sequencer_events_import_legacy(void)
 
 static void sequencer_select_event(int direction)
 {
-    uint8_t lane=seq_ui_lane,count=seq_event_count[lane];
+    uint8_t lane=FM1LAB_LIVE_LANE,count=seq_event_count[lane];
     if(!count){seq_selected_event[lane]=255u;return;}
     uint8_t order[APP_SEQ_EVENTS_PER_LANE];
     for(uint32_t i=0;i<count;i++)order[i]=(uint8_t)i;
@@ -1288,7 +1284,7 @@ static void sequencer_select_event(int direction)
 }
 static fm6_seq_event_t *sequencer_selected_event(void)
 {
-    uint8_t lane=seq_ui_lane,index=seq_selected_event[lane];
+    uint8_t lane=FM1LAB_LIVE_LANE,index=seq_selected_event[lane];
     if(index>=seq_event_count[lane])return 0;
     return &seq_event_store[lane][index];
 }
@@ -1309,7 +1305,7 @@ static void sequencer_event_edit(uint8_t field,int delta)
 }
 static void sequencer_event_delete_selected(void)
 {
-    uint8_t lane=seq_ui_lane,index=seq_selected_event[lane];
+    uint8_t lane=FM1LAB_LIVE_LANE,index=seq_selected_event[lane];
     if(index>=seq_event_count[lane])return;
     for(uint32_t i=index+1u;i<seq_event_count[lane];i++)
         seq_event_store[lane][i-1u]=seq_event_store[lane][i];
@@ -1325,7 +1321,7 @@ static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocit
 {
     if(!seq_record_armed || arp_ui_mode || key>=NKEYS+128u)return;
     sequencer_events_import_legacy();
-    uint8_t lane=seq_ui_lane;
+    uint8_t lane=FM1LAB_LIVE_LANE;
     uint8_t tick=fm6_sequencer_running()?fm6_sequencer_tick_position():(uint8_t)(seq_ui_step*2u);
     uint8_t step=(uint8_t)(tick/2u);
     if(seq_record_active[key] && seq_record_note[key]==note)return;
@@ -1420,7 +1416,7 @@ static void sequencer_record_step_advance(void)
 
     /* OVERWRITE clears only the portion of this lane reached by the record
      * head. Remove notes beginning here and trim notes that cross this step. */
-    uint8_t lane=seq_ui_lane;
+    uint8_t lane=FM1LAB_LIVE_LANE;
     uint32_t write=0u;
     uint32_t step_start=(uint32_t)step*2u,step_end=step_start+2u;
     for(uint32_t i=0;i<seq_event_count[lane];i++) {
@@ -1442,11 +1438,11 @@ static void sequencer_record_step_advance(void)
 static void note_on(int32_t note, uint32_t vel)
 {
     voice_note = note;
-    ui_event_push(EV_NOTE_ON, (uint8_t)note, (uint8_t)vel, (uint8_t)(0x0fu << (seq_ui_lane*FM1LAB_PATCH_COUNT)));
+    ui_event_push(EV_NOTE_ON, (uint8_t)note, (uint8_t)vel, (uint8_t)(0x0fu << (FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT)));
 }
 static void note_off(int32_t note)
 {
-    ui_event_push(EV_NOTE_OFF, (uint8_t)note, 0, (uint8_t)(0x0fu << (seq_ui_lane*FM1LAB_PATCH_COUNT)));
+    ui_event_push(EV_NOTE_OFF, (uint8_t)note, 0, (uint8_t)(0x0fu << (FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT)));
     if (voice_note == note)
         voice_note = -1;
 }
@@ -1466,10 +1462,10 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
         if ((st & 0xF0u) == 0x90u && d2) {
             voice_note = (int32_t)d1;
             sequencer_record_capture(NKEYS+d1,(uint8_t)d1,(uint8_t)d2);
-            fm6_note_on_mask((uint8_t)d1,(uint8_t)d2,(uint8_t)(0x0fu<<(seq_ui_lane*FM1LAB_PATCH_COUNT))); /* selected Instrument only */
+            fm6_note_on_mask((uint8_t)d1,(uint8_t)d2,(uint8_t)(0x0fu<<(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT))); /* selected Instrument only */
         } else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
             sequencer_record_release(NKEYS+d1,(uint8_t)d1);
-            fm6_note_off_mask((uint8_t)d1,(uint8_t)(0x0fu<<(seq_ui_lane*FM1LAB_PATCH_COUNT)));
+            fm6_note_off_mask((uint8_t)d1,(uint8_t)(0x0fu<<(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT)));
             if (voice_note == (int32_t)d1)
                 voice_note = -1;
         }
@@ -1887,8 +1883,7 @@ void app_init(void)
             arp_ui_accent[step]=performance_update_snapshot.arp_step_accent[step];
             arp_ui_step_gate[step]=performance_update_snapshot.arp_step_gate[step];
         }
-        seq_ui_lane=0u;
-        seq_ui_instrument[0]=performance_update_snapshot.instrument;
+            seq_ui_instrument[0]=performance_update_snapshot.instrument;
         for (uint32_t lane = 0u; lane < 1u; ++lane) {
             seq_ui_patch[lane] = 0u;
             for (uint32_t step = 0u; step < 64u; ++step) {
@@ -2005,15 +2000,15 @@ void app_init(void)
     fm1lab_seed_fresh_bank_mask=fresh_bank_mask;
     fm1lab_seed_factory_library();
     fm1lab_seed_fresh_bank_mask=0u;
-    set.patch = seq_ui_patch[seq_ui_lane];
+    set.patch = seq_ui_patch[FM1LAB_LIVE_LANE];
     patch_focus = 0u;
-    if (instrument_load(seq_ui_instrument[seq_ui_lane], 0) != FM1LAB_LOAD_OK) {
+    if (instrument_load(seq_ui_instrument[FM1LAB_LIVE_LANE], 0) != FM1LAB_LOAD_OK) {
         /* A missing/corrupt library directory must not leave the active lane
          * uninitialized. That used to make patch replacement reject its
          * invalid current_instrument and made Track 1 impossible to reactivate
          * after switching to the already-fallback-loaded Track 2. Keep a
          * playable RAM-only factory Instrument until storage is repaired. */
-        if(fm1lab_seed_dx7_instrument(seq_ui_instrument[seq_ui_lane],
+        if(fm1lab_seed_dx7_instrument(seq_ui_instrument[FM1LAB_LIVE_LANE],
                                       &current_instrument)==0) {
             fm1lab_insert_state_init(&current_inserts);
             instrument_rom_fallback=1u;
@@ -2021,7 +2016,7 @@ void app_init(void)
             instrument_factory_defaults();
             instrument_rom_fallback=1u;
         }
-        instrument_index = seq_ui_instrument[seq_ui_lane];
+        instrument_index = seq_ui_instrument[FM1LAB_LIVE_LANE];
         instrument_loaded = 1u;
         instrument_dirty = 0u;
         instrument_sync_settings();
@@ -2245,7 +2240,7 @@ static void input(void)
             ui.rec_t = plat_ms();                /* short release arms recording; long hold retains Bluetooth toggle */
         else if (k == B_HOME) {
             page_change(PAGE_HOME);
-            set.patch = seq_ui_patch[seq_ui_lane];
+            set.patch = seq_ui_patch[FM1LAB_LIVE_LANE];
             patch_focus = 0u;
             app_say("INSTRUMENT", "PATCH SELECTION");
         } else if (k == B_GLO) {
@@ -2266,8 +2261,8 @@ static void input(void)
             if (page == PAGE_SEQ || page == PAGE_SEQ_OPTIONS) {
                 sequencer_events_import_legacy();
                 sequencer_events_publish();
-                if(seq_event_count[seq_ui_lane] && seq_selected_event[seq_ui_lane]>=seq_event_count[seq_ui_lane])
-                    seq_selected_event[seq_ui_lane]=0u;
+                if(seq_event_count[FM1LAB_LIVE_LANE] && seq_selected_event[FM1LAB_LIVE_LANE]>=seq_event_count[FM1LAB_LIVE_LANE])
+                    seq_selected_event[FM1LAB_LIVE_LANE]=0u;
                 page_change(PAGE_SEQ_PIANO);
                 seq_clear_prompt=0u;seq_clear_turn=0;
                 app_say("PIANO ROLL","NOTE EDITOR");
@@ -2291,7 +2286,7 @@ static void input(void)
                 if(page==PAGE_HOME && !patch_focus) {
                     set.patch=0u;
                     patch_focus=1u;
-                    seq_ui_patch[seq_ui_lane]=0u;
+                    seq_ui_patch[FM1LAB_LIVE_LANE]=0u;
                 }
                 page_change(PAGE_MACRO);
                 app_say("PATCH MACROS",patch_display_name(set.patch));
@@ -2315,7 +2310,7 @@ static void input(void)
             if(page!=PAGE_SAVE) save_screen_open();
             else {
                 set.patch=save_patch;
-                seq_ui_patch[seq_ui_lane]=save_patch;
+                seq_ui_patch[FM1LAB_LIVE_LANE]=save_patch;
                 performance_publish();
                 int instrument_result=instrument_save_to(save_slot);
                 settings_seal(&set);
@@ -2351,7 +2346,7 @@ static void input(void)
     if(ui.seq_hold_t) {
         if(btn&(1u<<B_SEQ)) {
             if(!ui.seq_hold_fired && (uint32_t)(plat_ms()-ui.seq_hold_t)>=3000u) {
-                uint8_t lane=seq_ui_lane;
+                uint8_t lane=FM1LAB_LIVE_LANE;
                 for(uint32_t step=0;step<64u;step++){
                     seq_ui_enabled[lane][step]=0u;seq_ui_note[lane][step]=60u;
                     seq_ui_velocity[lane][step]=100u;seq_ui_gate[lane][step]=75u;
@@ -2418,7 +2413,7 @@ static void input(void)
          * and unrelated page controls continue through their existing handlers. */
         enum fm1lab_input_action action = fm1lab_input_route(page, (uint8_t)k, patch_focus);
         if (action != FM1LAB_INPUT_NONE) {
-            seq_ui_lane = 0u;
+
             fm1lab_input_state_t state = {
                 patch_focus, set.patch, instrument_index,
                 instrument_apply_pending, instrument_dirty
@@ -2476,7 +2471,7 @@ static void input(void)
             } else if(k==EN_SELECT) {
                 int32_t next=((int32_t)save_patch+e)%(int32_t)FM1LAB_PATCH_COUNT;
                 if(next<0)next+=(int32_t)FM1LAB_PATCH_COUNT;
-                save_patch=(uint8_t)next;set.patch=save_patch;seq_ui_patch[seq_ui_lane]=save_patch;
+                save_patch=(uint8_t)next;set.patch=save_patch;seq_ui_patch[FM1LAB_LIVE_LANE]=save_patch;
                 save_name_cursor=0u;app_say("PATCH",patch_display_name(save_patch));
             } else if(k==EN_K1) {
                 uint32_t length=save_name_target?FM1LAB_PATCH_NAME_BYTES:FM1LAB_STORE_NAME_BYTES;
@@ -2539,7 +2534,7 @@ static void input(void)
             set.patch = (uint8_t)next;
             if (page == PAGE_HOME) {
                 patch_focus = 1u;
-                seq_ui_patch[seq_ui_lane] = set.patch;
+                seq_ui_patch[FM1LAB_LIVE_LANE] = set.patch;
                 performance_publish();
             }
             set_dirty = 1;
@@ -2597,7 +2592,7 @@ static void input(void)
             } else if (page == PAGE_SEQ_PIANO) {
                 sequencer_event_edit((uint8_t)index,e);
             } else if (page == PAGE_SEQ) {
-                uint8_t lane=seq_ui_lane, step=seq_ui_step;
+                uint8_t lane=FM1LAB_LIVE_LANE, step=seq_ui_step;
                 if(index==0u) {
                     int32_t next=((int32_t)step+e)%64;
                     if(next<0)next+=64;
@@ -2759,7 +2754,7 @@ static void input(void)
                 current_inserts.instrument_macros[index] = (uint8_t)value;
                 instrument_dirty = 1u;
                 for (uint32_t p = 0; p < FM1LAB_PATCH_COUNT; ++p)
-                    ui_event_push(EV_MACRO_SET, (uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT+p), (uint8_t)index,
+                    ui_event_push(EV_MACRO_SET, (uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT+p), (uint8_t)index,
                                   instrument_macro_effective(p, index));
                 set_dirty = 1u;
                 app_say("INSTRUMENT MACRO", "UPDATED");
@@ -2770,7 +2765,7 @@ static void input(void)
                 set.macros[set.patch][index] = (uint8_t)value;
                 current_instrument.patches[set.patch].macros[index] = (uint8_t)value;
                 instrument_dirty = 1u;
-                ui_event_push(EV_MACRO_SET, (uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT+set.patch), (uint8_t)index, (uint8_t)value);
+                ui_event_push(EV_MACRO_SET, (uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT+set.patch), (uint8_t)index, (uint8_t)value);
                 set_dirty = 1;
                 app_say("MACRO", "UPDATED");
             } else if (page == PAGE_HOME) {
@@ -2778,7 +2773,7 @@ static void input(void)
                  * continues to adjust that layer's level. */
                 patch_focus = 1u;
                 set.patch = (uint8_t)index;
-                seq_ui_patch[seq_ui_lane] = set.patch;
+                seq_ui_patch[FM1LAB_LIVE_LANE] = set.patch;
                 performance_publish();
                 int32_t value = (int32_t)set.levels[index] + e;
                 if (value < 0) value = 0;
@@ -2786,7 +2781,7 @@ static void input(void)
                 set.levels[index] = (uint8_t)value;
                 current_instrument.patches[index].level = (uint8_t)value;
                 instrument_dirty = 1u;
-                ui_event_push(EV_PATCH_LEVEL, (uint8_t)(seq_ui_lane*FM1LAB_PATCH_COUNT+index), (uint8_t)value, 0);
+                ui_event_push(EV_PATCH_LEVEL, (uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT+index), (uint8_t)value, 0);
                 set_dirty = 1;
                 app_say("PATCH", patch_display_name(index));
             } else {
@@ -3598,7 +3593,7 @@ static void draw_sequencer_panel(void)
 static void draw_sequencer_piano_panel(void)
 {
     char value[20], pitch[20];
-    const uint8_t lane=seq_ui_lane, first=(uint8_t)((seq_ui_step/16u)*16u);
+    const uint8_t lane=FM1LAB_LIVE_LANE, first=(uint8_t)((seq_ui_step/16u)*16u);
     const uint16_t accent=patch_color(seq_ui_patch[lane]);
     const int32_t gx=24, gy=26, gw=208, gh=72, cw=13, rh=3;
     const fm6_seq_event_t *selected=sequencer_selected_event();
@@ -3882,7 +3877,7 @@ static void draw_seq_clear_prompt(void)
     rounded_panel(20,58,200,72,4,RGB(12,18,29),RGB(57,66,72));
     cv_text(120-text_w(&FONT_B,"CLEAR STEP?")/2,72,&FONT_B,"CLEAR STEP?",RGB(255,226,95));
     cv_text(120-text_w(&FONT_XS,"TURN K2 TO CONFIRM")/2,96,&FONT_XS,"TURN K2 TO CONFIRM",C_WHITE);
-    t[0]='T';t[1]=(char)('1'+seq_ui_lane);t[2]=' ';t[3]='S';t[4]='T';t[5]='E';t[6]='P';t[7]=' ';
+    t[0]='S';t[1]='E';t[2]='Q';t[3]=' ';t[4]='S';t[5]='T';t[6]='E';t[7]='P';
     int_text((int32_t)seq_ui_step+1,t+8);
     cv_text(120-text_w(&FONT_XS,t)/2,115,&FONT_XS,t,C_PEWTER);
 }
@@ -3979,7 +3974,7 @@ static void page_counter(uint8_t current, char *out, uint32_t out_size)
         total = 5u;
     } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS) {
         /* The sequencer and its options are separate destinations. The
-         * main two-lane pattern view is a single page, regardless of loop length. */
+         * single-track pattern view is a single page, regardless of loop length. */
         index = 1u;
         total = 1u;
     } else if (current == PAGE_ENV) {
@@ -4242,11 +4237,11 @@ int app_expect(const char *what, int *got)
     else if (!fm1lab_strcmp(what, "dirty"))
         *got = set_dirty;
     else if (!fm1lab_strcmp(what, "lane"))
-        *got = seq_ui_lane;
+        *got = FM1LAB_LIVE_LANE;
     else if (!fm1lab_strcmp(what, "focus"))
         *got = patch_focus;
     else if (!fm1lab_strcmp(what, "presetcursor"))
-        *got = patch_preset_cursor[seq_ui_lane&1u][set.patch];
+        *got = patch_preset_cursor[FM1LAB_LIVE_LANE&1u][set.patch];
     else if (!fm1lab_strcmp(what, "instrument"))
         *got = instrument_index;
     else if (!fm1lab_strncmp(what, "trackinst", 9))
@@ -4435,8 +4430,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
     }
     if(!fm1lab_strcmp(cmd,"fm1lab_track_cache_test")) {
         app_host_track_cache_pass=(uint8_t)(
-            seq_ui_lane==0u && fm6_patch_count()==FM1LAB_PATCH_COUNT &&
-            fm6_sequencer_set_events(1u,NULL,0u)==-1);
+
         return 1;
     }
     if(!fm1lab_strcmp(cmd,"fm1lab_resync_panic_test") ||
@@ -4636,7 +4630,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
     instrument_apply_pending=1u;
     performance_update_pending=1u;
     note_on(60,100u);
-    ui_event_push(EV_INSTRUMENT_LOAD,seq_ui_lane,0u,0u);
+    ui_event_push(EV_INSTRUMENT_LOAD,FM1LAB_LIVE_LANE,0u,0u);
     ui_event_push(EV_PERFORMANCE_APPLY,0u,0u,0u);
     return 1;
 }
