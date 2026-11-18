@@ -109,7 +109,7 @@ int main(void)
     {
         fm1lab_input_state_t state={0};
         fm1lab_input_ops_t ops={0};
-        state.instrument=0u; state.track_instrument[0]=0u;
+        state.instrument=0u;
         ops.load_instrument=dispatch_load;
         enum fm1lab_input_action action=fm1lab_input_route(
             FM1LAB_INPUT_PAGE_HOME,FM1LAB_ENCODER_PRESETS,0u);
