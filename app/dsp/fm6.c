@@ -1822,7 +1822,7 @@ void fm6_performance_state_get(fm6_performance_state_t *s)
             else s->seq_events[lane][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
         }
     }
-    for (uint32_t lane = 0; lane < 2u; ++lane) {
+    for (uint32_t lane = 0; lane < FM6_SEQ_LANES; ++lane) {
         s->lane_instrument[lane]=seq_lane_instrument[lane];
         for (uint32_t step = 0; step < 64u; ++step) {
             s->seq_enabled[lane][step] = seq_pattern[lane][step].enabled;
