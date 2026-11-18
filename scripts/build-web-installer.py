@@ -175,6 +175,7 @@ def main(package: Path, out: Path) -> None:
     let recordingStarted = 0, recordingWallStarted = 0, lastClockAnchor = null, sessionId = "";
     let testRunning = false, stageIndex = -1, stageTimer = null, stageDeadline = 0, testResults = [];
     const activeTestNotes = new Set();
+    const midiTimers = [];
     const midiTestButtons = ["chord","release","velocity","bend","center","mod","sustain","sustain-off","panic"].map(id => $("midi-" + id));
     const midiTestStatus = $("midi-status");
     function midiSend(bytes, label) {
@@ -201,9 +202,11 @@ def main(package: Path, out: Path) -> None:
       activeTestNotes.delete(note);
     }
     function releaseTestNotes() {
+      while (midiTimers.length) clearTimeout(midiTimers.pop());
       [...activeTestNotes].forEach(noteOff);
       midiSend([0xB0,64,0],"sustain_off");
       midiSend([0xB0,123,0],"all_notes_off");
+      midiSend([0xB0,120,0],"all_sound_off");
     }
     const stages = [
       {id:"idle_baseline", title:"1 · Idle baseline", seconds:10, instruction:"Hands off the FM1. Let the synth sit idle so we can measure its baseline."},
@@ -237,6 +240,7 @@ def main(package: Path, out: Path) -> None:
         elapsed_ms: Math.round(performance.now() - recordingStarted),
         event: "recording_stopped"
       });
+      releaseTestNotes();
       recording = false; if (timer) clearTimeout(timer); timer = null; pending = null;
       if (stageTimer) clearTimeout(stageTimer); stageTimer = null;
       testRunning = false; runBtn.disabled = !timeline.length; nextBtn.disabled = true;
@@ -359,11 +363,12 @@ def main(package: Path, out: Path) -> None:
     $("midi-release").addEventListener("click", releaseTestNotes);
     $("midi-velocity").addEventListener("click", () => {
       const note=60, velocities=[32,64,96,127];
-      velocities.forEach((velocity,index) => setTimeout(() => {
+      while (midiTimers.length) clearTimeout(midiTimers.pop());
+      velocities.forEach((velocity,index) => midiTimers.push(setTimeout(() => {
         noteOff(note); noteOn(note,velocity);
         midiTestStatus.textContent = "Velocity sweep · " + velocity + "/127. Listen for four distinct levels.";
-        if(index===velocities.length-1) setTimeout(() => noteOff(note),350);
-      },index*500));
+        if(index===velocities.length-1) midiTimers.push(setTimeout(() => noteOff(note),350));
+      },index*500)));
     });
     $("midi-bend").addEventListener("click", () => midiSend([0xE0,0x7F,0x7F],"pitch_bend_max"));
     $("midi-center").addEventListener("click", () => midiSend([0xE0,0x00,0x40],"pitch_bend_center"));
