@@ -2347,11 +2347,11 @@ static void input(void)
                     seq_selected_event[seq_ui_lane]=0u;
                 page_change(PAGE_SEQ_PIANO);
                 seq_clear_prompt=0u;seq_clear_turn=0;
-                app_say("PIANO ROLL",seq_ui_lane?"TRACK 2":"TRACK 1");
+                app_say("PIANO ROLL","TRACK 1");
             } else if (page == PAGE_SEQ_PIANO) {
                 page_change(PAGE_SEQ);
                 seq_clear_prompt=0u;seq_clear_turn=0;
-                app_say("SEQUENCER","TWO LANES");
+                app_say("SEQUENCER","SINGLE TRACK");
             } else if (page == PAGE_CHAOS) {
                 page_change(PAGE_HOME);
                 app_say("HOME", "ALL FOUR PATCHES");
@@ -2378,9 +2378,9 @@ static void input(void)
         } else if (k == B_ARP) {
             ui.arp_hold_t=plat_ms();ui.arp_hold_fired=0u;
         } else if (k == B_FX) {
-            if (page < PAGE_FX_AMP || page > PAGE_FX_EQ) page_change(PAGE_FX_AMP);
-            else page_change(page >= PAGE_FX_EQ ? PAGE_FX_AMP : (uint8_t)(page + 1u));
-            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PHASER");
+            if (page < PAGE_FX_CHORUS || page > PAGE_FX_PHASER) page_change(PAGE_FX_CHORUS);
+            else page_change(page >= PAGE_FX_PHASER ? PAGE_FX_CHORUS : (uint8_t)(page + 1u));
+            app_say("FX SECTION",page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":"PHASER");
         } else if (k == B_PLAY) {
             /* PLAY is a global transport toggle; the current page only
              * determines what is displayed, never whether transport runs. */
@@ -2621,12 +2621,12 @@ static void input(void)
         } else if (k == EN_ALGO && page == PAGE_FX_COMPRESSOR) {
             compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
             app_say("COMP MAKEUP","UPDATED");
-        } else if (k == EN_SELECT && page >= PAGE_FX_AMP && page <= PAGE_FX_EQ) {
-            int32_t next = (int32_t)(page - PAGE_FX_AMP) + e;
-            next %= 7;
-            if (next < 0) next += 7;
-            page_change((uint8_t)(PAGE_FX_AMP + next));
-            app_say("FX SECTION",page==PAGE_FX_AMP?"AMP / DRIVE":page==PAGE_FX_EQ?"PARAMETRIC EQ":page==PAGE_FX_COMPRESSOR?"COMPRESSOR":page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":page==PAGE_FX_PHASER?"PHASER":"PARAMETRIC EQ");
+        } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
+            int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
+            next %= 4;
+            if (next < 0) next += 4;
+            page_change((uint8_t)(PAGE_FX_CHORUS + next));
+            app_say("FX SECTION",page==PAGE_FX_CHORUS?"CHORUS":page==PAGE_FX_DELAY?"DELAY":page==PAGE_FX_REVERB?"REVERB":"PHASER");
         } else if (k == EN_SELECT) {
             int32_t next = ((int32_t)set.patch + e) % (int32_t)FM1LAB_PATCH_COUNT;
             if (next < 0) next += (int32_t)FM1LAB_PATCH_COUNT;

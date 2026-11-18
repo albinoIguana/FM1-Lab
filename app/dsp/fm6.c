@@ -443,8 +443,10 @@ static int64_t fm6_master_insert_channel(uint32_t channel,int64_t input)
 }
 static void fm6_master_insert_process(int64_t *left,int64_t *right)
 {
-    *left=fm6_master_insert_channel(0u,*left);
-    *right=fm6_master_insert_channel(1u,*right);
+    /* Amp/Drive and parametric EQ are shelved. Keep the legacy entry point
+     * inert so old settings records and callers remain source-compatible. */
+    (void)left;
+    (void)right;
 }
 static uint32_t fm6_chaos_next_random(void)
 {
@@ -540,27 +542,10 @@ static void fm6_comp_params_update(void)
 }
 static void fm6_master_comp_process(int64_t *left, int64_t *right)
 {
-    uint64_t al=fm6_abs_i64(*left),ar=fm6_abs_i64(*right);
-    uint64_t peak=al>ar?al:ar;
-    int32_t detector=peak>INT32_MAX?INT32_MAX:(int32_t)peak;
-    int32_t difference=detector-fm6_comp_envelope;
-    uint32_t coefficient=difference>0?fm6_comp_attack_alpha_q15:fm6_comp_release_alpha_q15;
-    int64_t step=((int64_t)difference*coefficient)>>15;
-    if(difference&&!step)step=difference>0?1:-1;
-    fm6_comp_envelope=fm6_clamp_sample((int64_t)fm6_comp_envelope+step);
-    if(!fm6_comp_enabled)return;
-    uint32_t gain_q15=32768u;
-    if((uint32_t)fm6_comp_envelope>fm6_comp_threshold_q24){
-        uint32_t over=(uint32_t)fm6_comp_envelope-fm6_comp_threshold_q24;
-        uint32_t compressed=fm6_comp_threshold_q24+(uint32_t)(((uint64_t)over*fm6_comp_ratio_recip_q15)>>15);
-        uint32_t den=(uint32_t)fm6_comp_envelope>>15;
-        uint32_t num=(compressed>>15)*32768u;
-        gain_q15=den?num/den:32768u;
-        if(gain_q15>32768u)gain_q15=32768u;
-    }
-    gain_q15=(uint32_t)(((uint64_t)gain_q15*fm6_comp_makeup_gain_q15)>>15);
-    *left=(*left*gain_q15)>>15;
-    *right=(*right*gain_q15)>>15;
+    /* The stereo master compressor is shelved; preserve legacy settings
+     * decoding without spending cycles in the audio callback. */
+    (void)left;
+    (void)right;
 }
 
 static int32_t fm6_sat_q23(int64_t x)
