@@ -938,18 +938,6 @@ static int app_input_save_current(void *opaque)
     return result;
 }
 
-static int app_input_switch_track(void *opaque, uint8_t old_lane, uint8_t new_lane)
-{
-    (void)opaque;
-    if (old_lane > 1u || new_lane > 1u || old_lane == new_lane)
-        return -1;
-    app_track_stash(old_lane);
-    if (app_track_activate(new_lane) != 0)
-        return -1;
-    seq_ui_lane = new_lane;
-    return 0;
-}
-
 static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, int mode)
 {
     app_input_context_t *context = (app_input_context_t *)opaque;
@@ -1008,7 +996,6 @@ static void app_input_publish(void *opaque)
 static const fm1lab_input_ops_t app_input_ops = {
     app_input_save_current,
     app_input_load_instrument,
-    app_input_switch_track,
     app_input_patch_preset_step,
     app_input_publish
 };
@@ -2483,7 +2470,7 @@ static void input(void)
                 set_dirty = 1u;
             switch (result) {
             case FM1LAB_INPUT_RESULT_LOAD_BUSY:
-                app_say("LOAD BUSY", action == FM1LAB_INPUT_TRACK_TOGGLE ? "TRACK NOT CHANGED" : "PRESET NOT CHANGED");
+                app_say("LOAD BUSY", "PRESET NOT CHANGED");
                 break;
             case FM1LAB_INPUT_RESULT_LOAD_FAILED:
                 app_say("LOAD FAILED", fm1lab_store_load_failure_label());
