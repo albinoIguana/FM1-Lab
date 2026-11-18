@@ -441,14 +441,6 @@ static int64_t fm6_master_insert_channel(uint32_t channel,int64_t input)
     }
     return eq_output;
 }
-static void fm6_master_insert_process(int64_t *left,int64_t *right)
-{
-    /* Amp/Drive and parametric EQ are shelved. Keep the legacy entry point
-     * inert so old settings records and callers remain source-compatible. */
-    (void)left;
-    (void)right;
-    (void)fm6_master_insert_channel;
-}
 static uint32_t fm6_chaos_next_random(void)
 {
     uint32_t x=fm6_chaos_random;
@@ -540,13 +532,6 @@ static void fm6_comp_params_update(void)
     fm6_comp_release_alpha_q15=32768u/(release_ms*44u);
     fm6_comp_ratio_recip_q15=32768u/ratio;
     fm6_comp_makeup_gain_q15=fm6_comp_makeup_q15(fm6_comp_makeup);
-}
-static void fm6_master_comp_process(int64_t *left, int64_t *right)
-{
-    /* The stereo master compressor is shelved; preserve legacy settings
-     * decoding without spending cycles in the audio callback. */
-    (void)left;
-    (void)right;
 }
 
 static int32_t fm6_sat_q23(int64_t x)
@@ -1694,10 +1679,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             }
             int64_t left=0,right=0;
             fm6_fx_process(trimmed_dry_l,trimmed_dry_r,sends,&left,&right);
-            /* One Instrument-wide post-mix chain: Amp/Drive -> parametric EQ -> stereo-linked compressor. */
+            /* The retained four-effect bus feeds the output stage directly. */
             fm6_chaos_process(&left,&right);
-            fm6_master_insert_process(&left,&right);
-            fm6_master_comp_process(&left,&right);
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * The output stage adds the requested 6 dB; calibrated Instrument
              * levels preserve headroom, with the stereo-linked limiter as backup. */
