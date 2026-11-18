@@ -1126,7 +1126,7 @@ static void ui_events_drain(void)
             instrument_apply_engine_bank(a,&instrument_apply_snapshot,&inserts_apply_snapshot,c);
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
-        else if (type == EV_PERFORMANCE_APPLY) {
+        } else if (type == EV_PERFORMANCE_APPLY) {
             (void)fm6_performance_state_update(&performance_update_snapshot);
             performance_update_pending = 0u;
         } else if (type == EV_SEQ_RUN)
