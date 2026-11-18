@@ -89,7 +89,7 @@ static void test_complete_route_matrix(void)
                         ? FM1LAB_INPUT_PATCH_PRESET_STEP
                         : FM1LAB_INPUT_INSTRUMENT_STEP;
                 } else if (page == FM1LAB_INPUT_PAGE_SEQ) {
-                    if (encoder == 2u) expected = FM1LAB_INPUT_TRACK_INSTRUMENT_STEP;
+                    /* Second-track controls are shelved; no encoder changes track state. */
                 }
                 uint32_t claims = fm1lab_input_route_claims(page, encoder, focus);
                 assert(bit_count(claims) <= 1u); /* no two actions may claim one report */
@@ -143,9 +143,12 @@ static void test_second_track_is_shelved(void)
     fm1lab_input_state_t state = {0u, 0u, 0u, 3u, {3u, 7u}, {0u, 2u}, 0u, 0u};
     fake_engine_t fake;
     memset(&fake, 0, sizeof fake);
-    assert(fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 0u) == FM1LAB_INPUT_NONE);
-    assert(fm1lab_input_apply(&state, fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, 0u, 0u), 1,
-        TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_NONE);
+    for (uint8_t encoder = 0u; encoder < 7u; ++encoder) {
+        enum fm1lab_input_action action = fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, encoder, 0u);
+        assert(action == FM1LAB_INPUT_NONE);
+        assert(fm1lab_input_apply(&state, action, 1, TEST_INSTRUMENT_COUNT,
+            FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_NONE);
+    }
     assert(state.lane == 0u && state.instrument == 3u);
     assert(fake.switch_calls == 0u && fake.load_calls == 0u && fake.save_calls == 0u);
 }
@@ -171,20 +174,7 @@ static void test_busy_and_save_failure_statuses(void)
     assert(state.instrument == 4u); /* failed save does not swallow PRESETS */
     state.instrument_apply_pending = 0u; /* queued apply completed */
 
-    state.lane = 0u;
-    state.instrument = 4u;
-    state.track_instrument[0] = 4u;
-    state.instrument_dirty = 1u;
-    fake.fail_save = 1u;
-    {
-        unsigned saves_before = fake.save_calls;
-        unsigned loads_before = fake.load_calls;
-        assert(fm1lab_input_apply(&state, FM1LAB_INPUT_TRACK_TOGGLE, 1,
-            TEST_INSTRUMENT_COUNT, FM1LAB_PATCH_COUNT, &fake_ops, &fake)
-            == FM1LAB_INPUT_RESULT_APPLIED);
-        assert(state.lane == 1u);
-        assert(fake.save_calls == saves_before && fake.load_calls == loads_before);
-    }
+    /* Track toggle is no longer exposed by the single-track interface. */
 }
 
 int main(void)
