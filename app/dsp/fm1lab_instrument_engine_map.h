@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Fixed physical engine assignment for the four-slot FM1-Lab Instrument.
  *
- * Patch context 0..3 is the first sequencer bank; 4..7 is the second.
- * The bank offset never changes the physical slot's engine identity.
+ * The four runtime contexts are the four physical slots of one Instrument.
  */
 #pragma once
 #include <stdint.h>

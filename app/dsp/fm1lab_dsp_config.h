@@ -17,9 +17,9 @@
 #define FM1LAB_SLOT_PSG 2u
 #define FM1LAB_SLOT_SUBTRACTIVE 3u
 
-/* Compatibility/runtime context sizing: two historical banks still exist in
- * the current DSP implementation. These are not the desired live target. */
-#define FM1LAB_INSTRUMENT_BANK_COUNT 2u
+/* Live runtime is one Instrument: four engine contexts and eight voices per patch.
+ * Historical two-bank records remain isolated in the persistence codec. */
+#define FM1LAB_INSTRUMENT_BANK_COUNT 1u
 #define FM1LAB_PATCH_CONTEXT_COUNT \
     (FM1LAB_INSTRUMENT_SLOT_COUNT * FM1LAB_INSTRUMENT_BANK_COUNT)
 #define FM6_ENGINE_PATCH_COUNT FM1LAB_PATCH_CONTEXT_COUNT

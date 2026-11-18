@@ -81,7 +81,7 @@ void fm6_sequencer_set_running(uint8_t running);
 void fm6_arpeggiator_reset_steps(void);
 void fm6_sequencer_clear_lane(uint8_t lane);
 void fm6_sequencer_set_length(uint8_t steps);
-void fm6_sequencer_set_lane(uint8_t lane, uint8_t patch_base); /* 0 for T1 bank, 4 for T2 bank */
+void fm6_sequencer_set_lane(uint8_t lane, uint8_t patch_base); /* lane 0 / patch base 0 only */
 void fm6_sequencer_set_step(uint8_t lane, uint8_t step, uint8_t enabled, uint8_t note, uint8_t velocity, uint8_t gate);
 int fm6_sequencer_set_events(uint8_t lane, const fm6_seq_event_t *events, uint16_t count);
 uint8_t fm6_sequencer_step(void);

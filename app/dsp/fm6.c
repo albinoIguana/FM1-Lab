@@ -222,34 +222,34 @@ uint8_t fm6_test_effective_byte(uint32_t patch, uint32_t byte_index) {
 
 
 #define FM6_SAMPLE_RATE FM6_SAMPLE_RATE_HZ
-#define FM6_SEQ_LANES 2u
+#define FM6_SEQ_LANES 1u
 #define FM6_SEQ_STEPS 64u
 #define FM6_DELAY_SIZE 8192u
 #define FM6_CHORUS_SIZE 2048u
 typedef struct { uint8_t enabled, note, velocity, gate; } fm6_step_t;
-static volatile fm6_step_t seq_pattern[2][64];
+static volatile fm6_step_t seq_pattern[FM6_SEQ_LANES][64];
 #define FM6_SEQ_EVENTS_PER_LANE 128u
-static fm6_seq_event_t seq_events[2][FM6_SEQ_EVENTS_PER_LANE];
-static volatile uint8_t seq_event_count[2], seq_event_active[2][FM6_SEQ_EVENTS_PER_LANE];
+static fm6_seq_event_t seq_events[FM6_SEQ_LANES][FM6_SEQ_EVENTS_PER_LANE];
+static volatile uint8_t seq_event_count[FM6_SEQ_LANES], seq_event_active[FM6_SEQ_LANES][FM6_SEQ_EVENTS_PER_LANE];
 static volatile uint8_t seq_event_mode;
 #ifdef FM6_TEST
 uint32_t fm6_test_sequencer_active_events(uint8_t lane)
 {
     uint32_t count=0u;
-    if(lane>=2u)return 0u;
+    if(lane!=0u)return 0u;
     for(uint32_t i=0;i<seq_event_count[lane];i++)count+=seq_event_active[lane][i]!=0u;
     return count;
 }
 #endif
-static volatile uint8_t seq_lane_base[2] = {0u,4u}, seq_lane_instrument[2]={0u,0u}, seq_length=16u, seq_position, seq_running;
-static volatile uint8_t seq_start_pending, seq_stop_pending, arp_clear_pending, arp_reset_pending, seq_clear_pending[2];
+static volatile uint8_t seq_lane_base[FM6_SEQ_LANES] = {0u}, seq_lane_instrument[FM6_SEQ_LANES]={0u}, seq_length=16u, seq_position, seq_running;
+static volatile uint8_t seq_start_pending, seq_stop_pending, arp_clear_pending, arp_reset_pending, seq_clear_pending[FM6_SEQ_LANES];
 static volatile uint8_t seq_play_position, arp_play_position;
 static volatile uint8_t seq_tick_position;
 static volatile uint32_t seq_tick_counter;
 static volatile uint8_t arp_capture_head, arp_capture_tail;
 static fm6_arp_capture_event_t arp_capture_queue[64];
-static uint8_t seq_live_note[2], seq_live_mask[2];
-static uint32_t seq_gate_left[2];
+static uint8_t seq_live_note[FM6_SEQ_LANES], seq_live_mask[FM6_SEQ_LANES];
+static uint32_t seq_gate_left[FM6_SEQ_LANES];
 static volatile uint32_t transport_bpm=120u;
 static volatile uint8_t transport_swing=50u;
 static uint32_t transport_phase;
@@ -425,7 +425,7 @@ static void fm6_seq_event_release_lane(uint32_t lane)
 static void fm6_seq_event_tick(void)
 {
     uint32_t loop_ticks=(uint32_t)(seq_length<2u?2u:seq_length)*2u;
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
         for(uint32_t i=0;i<seq_event_count[lane];i++) {
             const fm6_seq_event_t *event=&seq_events[lane][i];
             uint32_t end=((uint32_t)event->start+event->duration)%loop_ticks;
@@ -436,7 +436,7 @@ static void fm6_seq_event_tick(void)
             }
         }
     }
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
         uint8_t mask=(uint8_t)(0x0fu<<seq_lane_base[lane]);
         for(uint32_t i=0;i<seq_event_count[lane];i++) {
             const fm6_seq_event_t *event=&seq_events[lane][i];
@@ -454,7 +454,7 @@ static void fm6_seq_event_tick(void)
 static void fm6_transport_step(void)
 {
     seq_play_position=seq_position;
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
         if(seq_running) {
             volatile fm6_step_t *s=&seq_pattern[lane][seq_position];
             uint8_t continuation=(uint8_t)(s->enabled && s->velocity &&
@@ -853,7 +853,7 @@ void fm6_init(void)
     fm1lab_insert_state_init(&fm6_master_inserts);
     fm6_chaos_amount=0u;fm6_chaos_rate=42u;fm6_chaos_tone=55u;fm6_chaos_shape=0u;
     fm6_chaos_phase=0u;fm6_chaos_random=0x6d2b79f5u;fm6_chaos_random_hold=(int32_t)(fm6_chaos_random>>16)-32768;fm6_chaos_rate_update();
-    for(uint32_t lane=0;lane<2u;lane++) for(uint32_t step=0;step<64u;step++) {
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) for(uint32_t step=0;step<64u;step++) {
         seq_pattern[lane][step].enabled=0u; seq_pattern[lane][step].note=0u;
         seq_pattern[lane][step].velocity=0u; seq_pattern[lane][step].gate=0u;
     }
@@ -871,15 +871,15 @@ void fm6_init(void)
     for(uint32_t fx=0;fx<4u;fx++) fx_enabled[fx]=0u;
     for(uint32_t p=0;p<PATCHES;p++) for(uint32_t fx=0;fx<4u;fx++) fx_send[p][fx]=fx==3u?0u:100u;
     fx_mix[0]=18u; fx_mix[1]=24u; fx_mix[2]=20u; fx_mix[3]=35u; fm6_fx_mix_budget_update(); fx_time[0]=48u; fx_time[1]=52u; fx_time[2]=45u; fx_time[3]=35u; fx_feedback[0]=40u; fx_feedback[1]=42u; fx_feedback[2]=60u; fx_feedback[3]=20u; fx_depth[0]=50u; fx_depth[1]=50u; fx_depth[2]=50u; fx_depth[3]=65u;
-    seq_lane_base[0]=0u; seq_lane_base[1]=4u; seq_lane_instrument[0]=seq_lane_instrument[1]=0u; seq_length=16u; seq_position=0u; seq_play_position=0u; seq_tick_position=0u;seq_tick_counter=0u;seq_running=0u;
-    seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=seq_clear_pending[1]=0u;
+    seq_lane_base[0]=0u; seq_lane_instrument[0]=0u; seq_length=16u; seq_position=0u; seq_play_position=0u; seq_tick_position=0u;seq_tick_counter=0u;seq_running=0u;
+    seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=0u;
     arp_capture_head=arp_capture_tail=0u;
     arp_mode=0u; arp_latch=0u; arp_count=0u; arp_index=0u; arp_play_position=0u; arp_direction=1u; arp_live=0u;arp_live_patch_mask=0x0fu;
     arp_division=3u;arp_gate=75u;arp_octaves=1u;arp_length=16u;arp_output=0u;arp_random=0u;arp_macro_dest=0u;arp_depth=50u;
     arp_step_position=0u;arp_phase=0u;arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;arp_macro_offset=0;
-    transport_bpm=120u;transport_swing=50u; transport_phase=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
-    seq_event_mode=0u;seq_event_count[0]=seq_event_count[1]=0u;
-    for(uint32_t lane=0;lane<2u;lane++)for(uint32_t i=0;i<FM6_SEQ_EVENTS_PER_LANE;i++)seq_event_active[lane][i]=0u;
+    transport_bpm=120u;transport_swing=50u; transport_phase=0u; seq_gate_left[0]=0u;
+    seq_event_mode=0u;seq_event_count[0]=0u;
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++)for(uint32_t i=0;i<FM6_SEQ_EVENTS_PER_LANE;i++)seq_event_active[lane][i]=0u;
     fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=fx_phaser_phase=0u;
     for (i = 0; i < PATCHES; i++) {
         fm6_unpack(FM6_FACTORY[i % FM1LAB_PATCH_COUNT], instrument[i].base);
@@ -929,7 +929,7 @@ void fm6_panic(void)
 {
     fm6_zero_bytes(voices, sizeof(voices));
     pitch_bend_16 = 0;
-    seq_running=0u; seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=seq_clear_pending[1]=0u; seq_gate_left[0]=seq_gate_left[1]=0u;
+    seq_running=0u; seq_start_pending=seq_stop_pending=arp_clear_pending=arp_reset_pending=0u;seq_clear_pending[0]=0u; seq_gate_left[0]=0u;
     arp_count=0u; arp_live=0u; arp_index=0u;arp_gate_left=0u;arp_patch_mask=0x0fu;
     arp_amp_gain_q15=arp_amp_target_q15=32768;fm6_arp_macro_apply(0);
 }
@@ -1418,7 +1418,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             /* Stop first: a rapid stop/start must release the old lane notes
              * before start resets their gate counters. */
             if(seq_stop_pending) {
-                for(uint32_t lane=0;lane<2u;lane++) {
+                for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
                     if(seq_gate_left[lane]) {
                         fm6_note_off_source(seq_live_note[lane],seq_live_mask[lane],(uint8_t)(lane+1u));
                         seq_gate_left[lane]=0u;
@@ -1428,7 +1428,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 seq_stop_pending=0u;
             }
             if(seq_start_pending) {
-                for(uint32_t lane=0;lane<2u;lane++) {
+                for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
                     if(seq_gate_left[lane]) {
                         fm6_note_off_source(seq_live_note[lane],seq_live_mask[lane],(uint8_t)(lane+1u));
                         seq_gate_left[lane]=0u;
@@ -1448,7 +1448,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 arp_play_position=0u;arp_phase=0u;arp_gate_left=0u;
                 arp_amp_target_q15=32768;fm6_arp_macro_apply(0);arp_reset_pending=0u;
             }
-            for(uint32_t lane=0;lane<2u;lane++)if(seq_clear_pending[lane]){
+            for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++)if(seq_clear_pending[lane]){
                 if(seq_gate_left[lane])
                     fm6_note_off_source(seq_live_note[lane],seq_live_mask[lane],(uint8_t)(lane+1u));
                 seq_gate_left[lane]=0u;
@@ -1470,7 +1470,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 fm6_arp_macro_apply(0);
             }
             {int32_t delta=arp_amp_target_q15-arp_amp_gain_q15;if(delta)arp_amp_gain_q15+=delta/32+(delta>0?1:-1);}
-            for(uint32_t lane=0;lane<2u;lane++) if(seq_gate_left[lane] && --seq_gate_left[lane]==0u) {
+            for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) if(seq_gate_left[lane] && --seq_gate_left[lane]==0u) {
                 uint8_t next=(uint8_t)(seq_position%seq_length);
                 volatile fm6_step_t *following=&seq_pattern[lane][next];
                 uint8_t tied=(uint8_t)(seq_running && following->enabled && following->velocity &&
@@ -1605,7 +1605,7 @@ static void fm6_seq_event_trim(uint8_t length)
 {
     if(!seq_event_mode)return;
     uint32_t loop_ticks=(uint32_t)length*2u;
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
         fm6_seq_event_release_lane(lane);
         uint32_t write=0u;
         for(uint32_t i=0;i<seq_event_count[lane];i++) {
@@ -1629,9 +1629,9 @@ void fm6_sequencer_set_length(uint8_t steps) {
     if(seq_tick_position>=loop_ticks)seq_tick_position=0u;
     seq_position=(uint8_t)(seq_tick_position/2u);
 }
-void fm6_sequencer_set_lane(uint8_t lane,uint8_t patch_base) { if(lane<2u&&(patch_base==0u||patch_base==4u)) seq_lane_base[lane]=patch_base; }
+void fm6_sequencer_set_lane(uint8_t lane,uint8_t patch_base) { if(lane==0u&&patch_base==0u) seq_lane_base[0]=0u; }
 void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t note,uint8_t velocity,uint8_t gate) {
-    if(lane>=2u||step>=64u||note>127u||velocity>127u) return;
+    if(lane!=0u||step>=64u||note>127u||velocity>127u) return;
     seq_pattern[lane][step].enabled=0u;
     seq_pattern[lane][step].note=note;
     seq_pattern[lane][step].velocity=velocity;
@@ -1640,7 +1640,7 @@ void fm6_sequencer_set_step(uint8_t lane,uint8_t step,uint8_t enabled,uint8_t no
 }
 int fm6_sequencer_set_events(uint8_t lane,const fm6_seq_event_t *events,uint16_t count)
 {
-    if(lane>=2u || count>FM6_SEQ_EVENTS_PER_LANE || (count && !events)) return -1;
+    if(lane!=0u || count>FM6_SEQ_EVENTS_PER_LANE || (count && !events)) return -1;
     /* Validate the entire replacement before touching the currently sounding pattern. */
     for(uint32_t i=0;i<count;i++) {
         const fm6_seq_event_t *event=&events[i];
@@ -1700,7 +1700,7 @@ void fm6_arpeggiator_set_mode(uint8_t mode) {
 uint8_t fm6_arpeggiator_mode(void) { return arp_mode; }
 void fm6_arpeggiator_reset_steps(void) { arp_reset_pending=1u; }
 void fm6_arpeggiator_set_latch(uint8_t enabled) { arp_latch=(uint8_t)(enabled!=0u); }
-void fm6_sequencer_clear_lane(uint8_t lane) { if(lane<2u)seq_clear_pending[lane]=1u; }
+void fm6_sequencer_clear_lane(uint8_t lane) { if(lane==0u)seq_clear_pending[0]=1u; }
 #ifdef FM6_TEST
 uint8_t fm6_test_arpeggiator_amp_level(void)
 {
@@ -1758,11 +1758,10 @@ void fm6_fx_set_send(uint8_t patch,uint8_t effect,uint8_t send) {
     if(patch<FM1LAB_PATCH_COUNT&&effect<4u) {
         uint8_t value=send>100u?100u:send;
         fx_send[patch][effect]=value;
-        fx_send[patch+FM1LAB_PATCH_COUNT][effect]=value;
     }
 }
 uint8_t fm6_fx_get_send(uint8_t patch,uint8_t effect) {
-    return patch<PATCHES&&effect<4u?fx_send[patch%FM1LAB_PATCH_COUNT][effect]:0u;
+    return patch<PATCHES&&effect<4u?fx_send[patch][effect]:0u;
 }
 
 int fm6_performance_state_valid(const fm6_performance_state_t *s)
@@ -1785,7 +1784,7 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
                 return 0;
         }
     }
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
         if(s->seq_event_count[lane]>FM6_SEQ_EVENTS_PER_LANE)return 0;
         for(uint32_t i=0;i<s->seq_event_count[lane];i++) {
             const fm6_seq_event_t *event=&s->seq_events[lane][i];
@@ -1813,9 +1812,10 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
 void fm6_performance_state_get(fm6_performance_state_t *s)
 {
     if (!s) return;
+    fm6_zero_bytes(s,sizeof(*s));
     s->tempo_bpm = (uint16_t)transport_bpm;
     s->seq_length = seq_length;
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
         s->seq_event_count[lane]=seq_event_mode?seq_event_count[lane]:0u;
         for(uint32_t i=0;i<FM6_SEQ_EVENTS_PER_LANE;i++) {
             if(seq_event_mode && i<seq_event_count[lane])s->seq_events[lane][i]=seq_events[lane][i];
@@ -1866,7 +1866,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
         fm6_seq_event_trim(seq_length);
     }
     if(seq_position>=seq_length)seq_position=0u;
-    for(uint32_t lane=0;lane<2u;lane++){
+    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++){
         seq_lane_instrument[lane]=s->lane_instrument[lane];
         for(uint32_t step=0;step<64u;step++){
             seq_pattern[lane][step].enabled=0u;
@@ -1878,7 +1878,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
     }
     uint8_t any_events=(uint8_t)(s->seq_event_count[0]||s->seq_event_count[1]);
     if(any_events) {
-        for(uint32_t lane=0;lane<2u;lane++) {
+        for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
             uint8_t changed=(uint8_t)(!seq_event_mode || seq_event_count[lane]!=s->seq_event_count[lane]);
             if(!changed)for(uint32_t i=0;i<seq_event_count[lane];i++) {
                 const fm6_seq_event_t *a=&seq_events[lane][i],*b=&s->seq_events[lane][i];
@@ -1888,7 +1888,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
             if(changed && fm6_sequencer_set_events((uint8_t)lane,s->seq_events[lane],s->seq_event_count[lane])!=0)return -1;
         }
     } else if(seq_event_mode) {
-        for(uint32_t lane=0;lane<2u;lane++) {
+        for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
             fm6_seq_event_release_lane(lane);
             seq_event_count[lane]=0u;
         }
@@ -1923,7 +1923,7 @@ int fm6_performance_state_update(const fm6_performance_state_t *s)
         fm6_fx_set_enabled((uint8_t)fx,s->fx_enabled[fx]);fx_mix[fx]=s->fx_mix[fx];
         fx_time[fx]=s->fx_time[fx];fx_feedback[fx]=s->fx_feedback[fx];
         fx_depth[fx]=s->fx_depth[fx];
-        for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++){fx_send[patch][fx]=s->fx_send[patch][fx];fx_send[patch+FM1LAB_PATCH_COUNT][fx]=s->fx_send[patch][fx];}
+        for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++)fx_send[patch][fx]=s->fx_send[patch][fx];
     }
     fm6_fx_mix_budget_update();
     return 0;
@@ -1936,9 +1936,9 @@ int fm6_performance_state_set(const fm6_performance_state_t *s)
     seq_position=0u;seq_tick_position=0u;seq_tick_counter=0u;seq_running=0u;
     seq_start_pending=seq_stop_pending=0u;
     transport_phase=0u;
-    seq_gate_left[0]=seq_gate_left[1]=0u;
-    seq_live_note[0]=seq_live_note[1]=0u;
-    seq_live_mask[0]=seq_live_mask[1]=0u;
+    seq_gate_left[0]=0u;
+    seq_live_note[0]=0u;
+    seq_live_mask[0]=0u;
     arp_count=arp_index=arp_live=0u;
     arp_direction=1u;arp_step_position=arp_play_position=0u;
     arp_phase=arp_gate_left=0u;arp_amp_gain_q15=arp_amp_target_q15=32768;

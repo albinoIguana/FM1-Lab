@@ -361,58 +361,13 @@ static void render_hardware_callback_stress(uint8_t mode, int32_t *destination)
 }
 
 
-static void install_test_instrument_bank(unsigned lane, uint8_t attack)
+static void test_single_instrument_capacity(void)
 {
-    uint8_t voice[156];
-    assert(lane < 2u);
-    assert(FM6_ENGINE_PATCH_COUNT >= 8u);
-    memcpy(voice, fm6_patch_data(0u), 155u);
-    for (unsigned patch = 0u; patch < 4u; ++patch) {
-        unsigned engine_patch = lane * 4u + patch;
-        voice[0] = (uint8_t)(attack + patch);
-        voice[145] = (uint8_t)('A' + lane);
-        voice[146] = (uint8_t)('0' + patch);
-        assert(fm6_patch_set_voice(engine_patch, voice) == 0);
-        fm6_patch_set_enabled(engine_patch, 1u);
-        fm6_patch_set_level(engine_patch, 31u);
-    }
+    assert(FM6_ENGINE_PATCH_COUNT == 4u);
+    assert(fm6_patch_count() == 4u);
+    assert(fm6_patch_set_voice(4u, fm6_patch_data(0u)) != 0);
 }
 
-static void render_track_one_after_track_two_change(uint8_t change_track_two,
-                                                     int32_t *destination)
-{
-    static int32_t warmup[256u * 2u];
-    fm6_init();
-    install_test_instrument_bank(0u, 20u);
-    install_test_instrument_bank(1u, 35u);
-    if (change_track_two)
-        install_test_instrument_bank(1u, 80u);
-    /* T1 owns engine patches 0..3. A T2 bank replacement is not in this mask. */
-    fm6_note_on_mask(60u, 105u, 0x0fu);
-    fm6_render(warmup, 256u, 4096u);
-    fm6_render(destination, TEST_FRAMES, 4096u);
-}
-
-static void test_two_resident_instrument_banks(void)
-{
-    int32_t reference[TEST_WORDS], after_t2_change[TEST_WORDS];
-    uint8_t before[4][155];
-    fm6_init();
-    assert(FM6_ENGINE_PATCH_COUNT >= 8u);
-    install_test_instrument_bank(0u, 20u);
-    install_test_instrument_bank(1u, 35u);
-    for (unsigned patch = 0u; patch < 4u; ++patch)
-        memcpy(before[patch], fm6_patch_data(patch), sizeof before[patch]);
-
-    /* Replace only T2's four slots, exactly the bank addressed by lane*4. */
-    install_test_instrument_bank(1u, 80u);
-    for (unsigned patch = 0u; patch < 4u; ++patch)
-        assert(memcmp(before[patch], fm6_patch_data(patch), sizeof before[patch]) == 0);
-
-    render_track_one_after_track_two_change(0u, reference);
-    render_track_one_after_track_two_change(1u, after_t2_change);
-    assert(memcmp(reference, after_t2_change, sizeof reference) == 0);
-}
 
 int main(void) {
     test_four_engine_audibility_across_fx_combinations();
@@ -420,13 +375,9 @@ int main(void) {
     assert(fm1lab_patch_engine_for_context(1u)==FM1LAB_PATCH_ENGINE_WAVETABLE);
     assert(fm1lab_patch_engine_for_context(2u)==FM1LAB_PATCH_ENGINE_PSG);
     assert(fm1lab_patch_engine_for_context(3u)==FM1LAB_PATCH_ENGINE_SUBTRACTIVE);
-    assert(fm1lab_patch_engine_for_context(4u)==FM1LAB_PATCH_ENGINE_FM6);
-    assert(fm1lab_patch_engine_for_context(5u)==FM1LAB_PATCH_ENGINE_WAVETABLE);
-    assert(fm1lab_patch_engine_for_context(6u)==FM1LAB_PATCH_ENGINE_PSG);
-    assert(fm1lab_patch_engine_for_context(7u)==FM1LAB_PATCH_ENGINE_SUBTRACTIVE);
     assert(fm1lab_patch_engine_for_context(8u)==FM1LAB_PATCH_ENGINE_INVALID);
 
-    test_two_resident_instrument_banks();
+    test_single_instrument_capacity();
     /* All engines render on CPU2; a partial worker failure must restore every
      * voice state before CPU0 takes over the complete render job. */
     /* One isolated patch: all eight notes are owned by CPU2. */
@@ -788,13 +739,11 @@ int main(void) {
     fm6_panic();
     assert(fm6_active_voices() == 0u);
 
-    /* Sample-clocked two-lane sequencer drives the same FM6 note allocator. */
+    /* Single-track sequencer drives the same FM6 note allocator. */
     fm6_init();
     fm6_set_tempo(120u);
     fm6_sequencer_set_lane(0u,0u);
-    fm6_sequencer_set_lane(1u,4u);
     fm6_sequencer_set_step(0u,0u,1u,60u,110u,75u);
-    fm6_sequencer_set_step(1u,0u,1u,67u,100u,75u);
     fm6_sequencer_set_running(1u);
     int32_t seq_peak=0;
     /* At 44.1 kHz / 120 BPM, a 16th note is 5512.5 samples.
@@ -811,7 +760,7 @@ int main(void) {
     assert(fm6_sequencer_step()==1u); /* sample 5513: first tick */
     assert(fm6_sequencer_running()==1u);
     for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++)
-        assert(fm6_active_voices_patch(patch)>=1u); /* each lane fans out to its own four-patch Instrument bank */
+        assert(fm6_active_voices_patch(patch)>=1u); /* one Instrument fans out to all four engine patches */
     memset(output,0,sizeof output); fm6_render(output,128u,4096u);
     seq_peak=peak(output,TEST_WORDS);
     assert(seq_peak>0);
@@ -941,7 +890,6 @@ int main(void) {
     fm6_set_tempo(300u);
     fm6_sequencer_set_length(64u);
     fm6_sequencer_set_lane(0u, 0u);
-    fm6_sequencer_set_lane(1u, 4u);
     for (unsigned lane = 0; lane < 2u; ++lane)
         for (unsigned step = 0; step < 64u; ++step)
             fm6_sequencer_set_step((uint8_t)lane, (uint8_t)step, 1u,
@@ -1093,17 +1041,14 @@ int main(void) {
     saved.tempo_bpm = 137u;
     saved.seq_length = 48u;
     saved.lane_instrument[0] = 2u;
-    saved.lane_instrument[1] = 3u;
-    /* V10 event data is part of the performance snapshot: preserve both
-     * lanes, polyphony, pitch, velocity, accent, and sustained durations. */
+    saved.lane_instrument[1] = 0u;
+    /* V10 compatibility records retain two lanes; live state preserves lane 0. */
     saved.seq_event_count[0] = 3u;
     saved.seq_events[0][0] = (fm6_seq_event_t){0u,8u,60u,112u,25u};
     saved.seq_events[0][1] = (fm6_seq_event_t){0u,8u,64u,96u,0u};
     saved.seq_events[0][2] = (fm6_seq_event_t){12u,4u,67u,88u,50u};
-    saved.seq_event_count[1] = 2u;
-    saved.seq_events[1][0] = (fm6_seq_event_t){4u,2u,48u,100u,10u};
-    saved.seq_events[1][1] = (fm6_seq_event_t){20u,12u,55u,104u,35u};
-    for (unsigned lane = 0; lane < 2u; ++lane)
+    saved.seq_event_count[1] = 0u;
+    for (unsigned lane = 0; lane < 1u; ++lane)
         for (unsigned step = 0; step < 64u; ++step) {
             saved.seq_enabled[lane][step] = (uint8_t)((step % 3u) == lane);
             saved.seq_note[lane][step] = (uint8_t)(36u + lane * 12u + step % 48u);
@@ -1289,11 +1234,11 @@ int main(void) {
     assert(linked_frames>100u);
 
 
-    /* Native event scheduler: independent polyphonic notes on both lanes,
+    /* Native event scheduler: polyphonic notes on the one live track,
      * with different durations and release times on the same transport. */
     fm6_init();
     for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++) {
-        fm6_patch_set_enabled(patch,patch==0u || patch==4u);
+        fm6_patch_set_enabled(patch,1u);
         fm6_patch_set_level(patch,31u);
     }
     const fm6_seq_event_t lane0[] = {
@@ -1301,17 +1246,14 @@ int main(void) {
         {0u,8u,60u,100u,35u},
         {0u,6u,64u,95u,0u}
     };
-    const fm6_seq_event_t lane1[] = {
-        {0u,2u,67u,95u,0u}
-    };
     fm6_sequencer_set_length(16u);
     assert(fm6_sequencer_set_events(0u,lane0,3u)==0);
-    assert(fm6_sequencer_set_events(1u,lane1,1u)==0);
+    assert(fm6_sequencer_set_events(1u,NULL,0u)==-1);
     fm6_sequencer_set_running(1u);
     for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
     fm6_render(output,9u,4096u); /* step zero fires */
     assert(fm6_test_sequencer_active_events(0u)==3u);
-    assert(fm6_test_sequencer_active_events(1u)==1u);
+    assert(fm6_test_sequencer_active_events(1u)==0u);
     for(unsigned step=0u;step<1u;step++) {
         for(unsigned block=0u;block<43u;block++)fm6_render(output,128u,4096u);
         fm6_render(output,9u,4096u);
