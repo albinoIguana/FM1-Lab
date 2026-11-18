@@ -17,7 +17,6 @@ typedef struct {
     unsigned load_calls;
     unsigned patch_calls;
     unsigned publish_calls;
-    unsigned switch_calls;
 } fake_engine_t;
 
 static unsigned bit_count(uint32_t value)
@@ -63,18 +62,8 @@ static void fake_publish(void *opaque)
     ((fake_engine_t *)opaque)->publish_calls++;
 }
 
-static int fake_switch_track(void *opaque, uint8_t old_lane, uint8_t new_lane)
-{
-    fake_engine_t *fake = (fake_engine_t *)opaque;
-    (void)old_lane;
-    fake->switch_calls++;
-    fake->active_lane = new_lane;
-    fake->engine_target = (uint8_t)(new_lane * FM1LAB_PATCH_COUNT);
-    return 0;
-}
-
 static const fm1lab_input_ops_t fake_ops = {
-    fake_save, fake_load, fake_switch_track, fake_patch_preset, fake_publish
+    fake_save, fake_load, fake_patch_preset, fake_publish
 };
 
 static void test_complete_route_matrix(void)
@@ -118,7 +107,6 @@ static void test_home_patch_and_instrument_actions(void)
     assert(fm1lab_input_apply(&state, action, 1, TEST_INSTRUMENT_COUNT,
         FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_APPLIED);
     assert(state.patch == 1u && state.patch_focus == 1u);
-    assert(state.track_patch[0] == 1u);
     assert(fake.publish_calls == 1u);
 
     action = fm1lab_input_route(FM1LAB_INPUT_PAGE_HOME, 2u, state.patch_focus);
@@ -137,23 +125,6 @@ static void test_home_patch_and_instrument_actions(void)
     assert(fake.bank_instrument[0] == 4u);
     assert(fake.bank_instrument[1] == 7u); /* HOME change only replaces T1's bank. */
 }
-
-static void test_second_track_is_shelved(void)
-{
-    fm1lab_input_state_t state = {0u, 0u, 0u, 3u, {3u, 7u}, {0u, 2u}, 0u, 0u};
-    fake_engine_t fake;
-    memset(&fake, 0, sizeof fake);
-    for (uint8_t encoder = 0u; encoder < 7u; ++encoder) {
-        enum fm1lab_input_action action = fm1lab_input_route(FM1LAB_INPUT_PAGE_SEQ, encoder, 0u);
-        assert(action == FM1LAB_INPUT_NONE);
-        assert(fm1lab_input_apply(&state, action, 1, TEST_INSTRUMENT_COUNT,
-            FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_NONE);
-    }
-    assert(state.lane == 0u && state.instrument == 3u);
-    assert(fake.switch_calls == 0u && fake.load_calls == 0u && fake.save_calls == 0u);
-}
-
-
 
 static void test_busy_and_save_failure_statuses(void)
 {
@@ -174,14 +145,12 @@ static void test_busy_and_save_failure_statuses(void)
     assert(state.instrument == 4u); /* failed save does not swallow PRESETS */
     state.instrument_apply_pending = 0u; /* queued apply completed */
 
-    /* Track toggle is no longer exposed by the single-track interface. */
 }
 
 int main(void)
 {
     test_complete_route_matrix();
     test_home_patch_and_instrument_actions();
-    test_second_track_is_shelved();
     test_busy_and_save_failure_statuses();
     return 0;
 }
