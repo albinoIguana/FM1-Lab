@@ -38,9 +38,9 @@ static int fake_load(void *opaque, uint8_t lane, uint8_t instrument, int mode)
     fake_engine_t *fake = (fake_engine_t *)opaque;
     fake->load_calls++;
     if (fake->load_busy) return 1;
-    if (lane > 1u || instrument >= TEST_INSTRUMENT_COUNT) return -1;
+    if (lane != 0u || instrument >= TEST_INSTRUMENT_COUNT) return -1;
     fake->active_lane = lane;
-    fake->engine_target = (uint8_t)(lane * FM1LAB_PATCH_COUNT);
+    fake->engine_target = 0u;
     if (mode == FM1LAB_INPUT_LOAD_ENGINE_BANK) {
         fake->bank_instrument[lane] = instrument;
         for (unsigned p = 0u; p < FM1LAB_PATCH_COUNT; ++p)
@@ -95,7 +95,7 @@ static void test_complete_route_matrix(void)
 
 static void test_home_patch_and_instrument_actions(void)
 {
-    fm1lab_input_state_t state = {0u, 0u, 0u, 3u, {3u, 7u}, {0u, 2u}, 0u, 0u};
+    fm1lab_input_state_t state = {0u, 0u, 3u, 0u, 0u};
     fake_engine_t fake;
     memset(&fake, 0, sizeof fake);
     fake.bank_instrument[0] = 3u;
@@ -114,21 +114,21 @@ static void test_home_patch_and_instrument_actions(void)
     assert(fm1lab_input_apply(&state, action, 2, TEST_INSTRUMENT_COUNT,
         FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_APPLIED);
     assert(fake.patch_calls == 1u && fake.patch_preset[1] == 2u);
-    assert(state.instrument == 3u && state.track_instrument[0] == 3u);
+    assert(state.instrument == 3u);
 
     state.patch_focus = 0u;
     action = fm1lab_input_route(FM1LAB_INPUT_PAGE_HOME, 2u, state.patch_focus);
     assert(action == FM1LAB_INPUT_INSTRUMENT_STEP);
     assert(fm1lab_input_apply(&state, action, 1, TEST_INSTRUMENT_COUNT,
         FM1LAB_PATCH_COUNT, &fake_ops, &fake) == FM1LAB_INPUT_RESULT_APPLIED);
-    assert(state.instrument == 4u && state.track_instrument[0] == 4u);
+    assert(state.instrument == 4u);
     assert(fake.bank_instrument[0] == 4u);
-    assert(fake.bank_instrument[1] == 7u); /* HOME change only replaces T1's bank. */
+    assert(fake.bank_instrument[1] == 7u); /* No second bank is touched. */
 }
 
 static void test_busy_and_save_failure_statuses(void)
 {
-    fm1lab_input_state_t state = {0u, 0u, 0u, 3u, {3u, 7u}, {0u, 1u}, 1u, 1u};
+    fm1lab_input_state_t state = {0u, 0u, 3u, 1u, 1u};
     fake_engine_t fake;
     memset(&fake, 0, sizeof fake);
     assert(fm1lab_input_apply(&state, FM1LAB_INPUT_INSTRUMENT_STEP, 1,

@@ -945,6 +945,7 @@ typedef struct { fm1lab_input_state_t *state; } app_input_context_t;
 static int app_input_save_current(void *opaque)
 {
     app_input_context_t *context = (app_input_context_t *)opaque;
+    seq_ui_lane = 0u;
     int result = instrument_save();
     if (context && context->state) {
         context->state->instrument_dirty = instrument_dirty;
@@ -957,7 +958,8 @@ static int app_input_load_instrument(void *opaque, uint8_t lane, uint8_t index, 
     app_input_context_t *context = (app_input_context_t *)opaque;
     uint8_t previous_lane = seq_ui_lane;
     int result;
-    seq_ui_lane = (uint8_t)(lane & 1u);
+    (void)lane;
+    seq_ui_lane = 0u;
     result = instrument_load(index, mode);
     if (result != FM1LAB_LOAD_OK)
         seq_ui_lane = previous_lane;
@@ -2461,6 +2463,7 @@ static void input(void)
          * and unrelated page controls continue through their existing handlers. */
         enum fm1lab_input_action action = fm1lab_input_route(page, (uint8_t)k, patch_focus);
         if (action != FM1LAB_INPUT_NONE) {
+            seq_ui_lane = 0u;
             fm1lab_input_state_t state = {
                 patch_focus, set.patch, instrument_index,
                 instrument_apply_pending, instrument_dirty

@@ -20,10 +20,7 @@ enum { FM1LAB_INPUT_LOAD_ENGINE_BANK = 1, FM1LAB_INPUT_LOAD_UI_ONLY = 2 };
 typedef struct {
     uint8_t patch_focus;
     uint8_t patch;
-    uint8_t lane;
     uint8_t instrument;
-    uint8_t track_instrument[2];
-    uint8_t track_patch[2];
     uint8_t instrument_apply_pending;
     uint8_t instrument_dirty;
 } fm1lab_input_state_t;
@@ -56,7 +53,6 @@ static inline enum fm1lab_input_result fm1lab_input_apply(
         if (value < 0) value += patch_count;
         state->patch = (uint8_t)value;
         state->patch_focus = 1u;
-        state->track_patch[state->lane & 1u] = state->patch;
         if (ops->publish) ops->publish(context);
         return FM1LAB_INPUT_RESULT_APPLIED;
     }
@@ -78,20 +74,18 @@ static inline enum fm1lab_input_result fm1lab_input_apply(
             if (!save_failed) state->instrument_dirty = 0u;
         }
         {
-            int value = ((int)state->track_instrument[state->lane & 1u] + delta) %
-                (int)instrument_count;
+            int value = ((int)state->instrument + delta) % (int)instrument_count;
             if (value < 0) value += instrument_count;
             next = (uint8_t)value;
         }
         if (next == state->instrument)
             return save_failed ? FM1LAB_INPUT_RESULT_SAVE_FAILED_UNCHANGED
                                : FM1LAB_INPUT_RESULT_NONE;
-        load_result = ops->load_instrument(context, state->lane, next,
+        load_result = ops->load_instrument(context, 0u, next,
                                             FM1LAB_INPUT_LOAD_ENGINE_BANK);
         if (load_result == 1) return FM1LAB_INPUT_RESULT_LOAD_BUSY;
         if (load_result != 0) return FM1LAB_INPUT_RESULT_LOAD_FAILED;
         state->instrument = next;
-        state->track_instrument[state->lane & 1u] = next;
         state->patch_focus = 0u;
         state->instrument_apply_pending = 1u;
         if (ops->publish) ops->publish(context);
