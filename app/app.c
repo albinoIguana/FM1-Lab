@@ -4430,7 +4430,8 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
     }
     if(!fm1lab_strcmp(cmd,"fm1lab_track_cache_test")) {
         app_host_track_cache_pass=(uint8_t)(
-
+            FM1LAB_LIVE_LANE==0u && fm6_patch_count()==FM1LAB_PATCH_COUNT &&
+            fm6_sequencer_set_events(1u,NULL,0u)==-1);
         return 1;
     }
     if(!fm1lab_strcmp(cmd,"fm1lab_resync_panic_test") ||
