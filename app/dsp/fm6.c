@@ -1784,7 +1784,7 @@ int fm6_performance_state_valid(const fm6_performance_state_t *s)
                 return 0;
         }
     }
-    for(uint32_t lane=0;lane<FM6_SEQ_LANES;lane++) {
+    for(uint32_t lane=0;lane<2u;lane++) {
         if(s->seq_event_count[lane]>FM6_SEQ_EVENTS_PER_LANE)return 0;
         for(uint32_t i=0;i<s->seq_event_count[lane];i++) {
             const fm6_seq_event_t *event=&s->seq_events[lane][i];
