@@ -41,8 +41,7 @@ static inline int fm1lab_live_performance_from_compat(
     fm1lab_live_performance_state_t *dst,
     const fm6_performance_state_t *src)
 {
-    if (!dst || !src || src->seq_event_count[0] > 128u) return -1;
-    *dst = (fm1lab_live_performance_state_t){0};
+    if (!dst || !src) return -1;
     dst->tempo_bpm = src->tempo_bpm;
     dst->seq_length = src->seq_length;
     dst->instrument = src->lane_instrument[0];
@@ -76,6 +75,7 @@ static inline int fm1lab_live_performance_from_compat(
             dst->fx_send[patch][fx] = src->fx_send[patch][fx];
     }
     dst->seq_event_count = src->seq_event_count[0];
+    if (dst->seq_event_count > 128u) return -1;
     for (uint32_t i = 0u; i < dst->seq_event_count; ++i) {
         const fm6_seq_event_t *from = &src->seq_events[0][i];
         fm1lab_live_seq_event_t *to = &dst->seq_events[i];

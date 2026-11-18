@@ -447,6 +447,25 @@ int main(void)
         assert(fm1lab_live_performance_from_compat(NULL, &compatibility) == -1);
     }
 
+
+    /* Direct persistence-to-runtime migration: old two-lane saves become a
+     * one-lane state. V9 event reconstruction and V10 tick conversion happen
+     * before lane 1 is discarded. */
+    {
+        fm1lab_live_performance_state_t live;
+        assert(settings_import_live_v9(&live, &v9) == 0);
+        assert(live.instrument == v9.performance.lane_instrument[0]);
+        assert(live.seq_event_count == 2u);
+        assert(live.seq_events[0].pitch == 60u && live.seq_events[1].pitch == 64u);
+        assert(settings_import_live_v10(&live, &v10) == 0);
+        assert(live.instrument == v10.performance.lane_instrument[0]);
+        assert(live.seq_event_count == v10.performance.seq_event_count[0]);
+        assert(live.chaos_amount == 0u && live.chaos_rate == 42u);
+        assert(settings_import_live_v12(&live, &good) == 0);
+        assert(live.instrument == good.performance.lane_instrument[0]);
+        assert(settings_import_live_v12(&live, NULL) == -1);
+    }
+
     puts("FM1-Lab settings record and single-track live-state migration tests passed");
     return 0;
 }
