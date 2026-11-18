@@ -9,7 +9,7 @@ enum {
     FM1LAB_INPUT_PAGE_HOME = 0u,
     FM1LAB_INPUT_PAGE_SEQ = 7u,
     FM1LAB_INPUT_PAGE_SEQ_OPTIONS = 8u,
-    FM1LAB_INPUT_PAGE_COUNT = 23u
+    FM1LAB_INPUT_PAGE_COUNT = 20u
 };
 
 enum fm1lab_input_action {
