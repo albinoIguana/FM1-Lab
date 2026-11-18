@@ -784,6 +784,7 @@ static void app_track_stash(uint8_t lane)
     track->loaded = 1u;
 }
 
+#ifdef PLAT_HOST
 static int app_track_activate(uint8_t lane)
 {
     app_track_state_t *track;
@@ -805,6 +806,20 @@ static int app_track_activate(uint8_t lane)
     instrument_sync_settings();
     return 0;
 }
+
+static int app_input_switch_track(void *opaque, uint8_t old_lane, uint8_t new_lane)
+{
+    (void)opaque;
+    if (old_lane > 1u || new_lane > 1u || old_lane == new_lane)
+        return -1;
+    app_track_stash(old_lane);
+    if (app_track_activate(new_lane) != 0)
+        return -1;
+    seq_ui_lane = new_lane;
+    return 0;
+}
+
+#endif
 
 static void sequencer_cache_instrument_name(uint8_t lane, const char *source);
 
