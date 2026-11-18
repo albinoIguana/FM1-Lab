@@ -157,31 +157,31 @@ static void page_change(uint8_t next_page)
         page, next_page, patch_focus);
     page = next_page;
 }
-static uint8_t patch_preset_cursor[2][FM1LAB_PATCH_COUNT] = {
-    {255u,255u,255u,255u}, {255u,255u,255u,255u}
+static uint8_t patch_preset_cursor[1][FM1LAB_PATCH_COUNT] = {
+    {255u,255u,255u,255u}
 };
 static enum fm1lab_dx7_preset_result patch_preset_last_result = FM1LAB_DX7_PRESET_OK;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
-static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_note[2][64], seq_ui_velocity[2][64],
-               seq_ui_gate[2][64], seq_ui_enabled[2][64], seq_ui_tie[2][64], seq_ui_accent[2][64], seq_ui_patch[2]={0u,1u};
-static char seq_ui_instrument_name[2][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A','C','T','O','R','Y',0},{'F','A','C','T','O','R','Y',0}};
+static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[1]={0u}, seq_ui_note[1][64], seq_ui_velocity[1][64],
+               seq_ui_gate[1][64], seq_ui_enabled[1][64], seq_ui_tie[1][64], seq_ui_accent[1][64], seq_ui_patch[1]={0u};
+static char seq_ui_instrument_name[1][FM1LAB_INSTRUMENT_NAME_BYTES+1u]={{'F','A','C','T','O','R','Y',0}};
 static fm1lab_instrument_t instrument_apply_snapshot;
 static fm1lab_insert_state_t inserts_apply_snapshot;
 static uint8_t seq_record_armed, seq_record_mode, seq_record_last_step=255u;
 static uint8_t save_slot, save_patch, save_name_target, save_name_cursor;
 static uint8_t seq_clear_prompt;
 static int16_t seq_clear_turn;
-static uint8_t seq_record_active[NKEYS+128u], seq_record_step[NKEYS+128u], seq_record_lane[NKEYS+128u], seq_record_note[NKEYS+128u];
+static uint8_t seq_record_active[NKEYS+128u], seq_record_step[NKEYS+128u], seq_record_note[NKEYS+128u];
 static uint32_t seq_record_started[NKEYS+128u];
 static uint8_t seq_record_velocity[NKEYS+128u];
-static uint8_t seq_arp_record_active[2],seq_arp_record_note[2],seq_arp_record_velocity[2];
-static uint32_t seq_arp_record_tick[2];
+static uint8_t seq_arp_record_active[1],seq_arp_record_note[1],seq_arp_record_velocity[1];
+static uint32_t seq_arp_record_tick[1];
 static uint8_t seq_record_redraw;
 #define APP_SEQ_EVENTS_PER_LANE 128u
-static fm6_seq_event_t seq_event_store[2][APP_SEQ_EVENTS_PER_LANE];
-static uint8_t seq_event_count[2], seq_event_store_ready;
-static uint8_t seq_selected_event[2]={255u,255u};
+static fm6_seq_event_t seq_event_store[1][APP_SEQ_EVENTS_PER_LANE];
+static uint8_t seq_event_count[1], seq_event_store_ready;
+static uint8_t seq_selected_event[1]={255u};
 static uint16_t transport_ui_bpm=120u;
 static volatile uint8_t master_trim_pct=100u;
 static uint8_t arp_ui_latch, arp_ui_mode, arp_ui_step, arp_ui_length=16u, arp_ui_gain[16], arp_ui_accent[16], arp_ui_step_gate[16];
@@ -631,8 +631,6 @@ static void ui_event_push(uint8_t type, uint8_t a, uint8_t b, uint8_t c)
 static void performance_publish(void)
 {
     if (performance_update_pending) { performance_update_dirty=1u; return; }
-    /* The persisted settings record remains versioned compatibility data.
-     * The live sequencer is one lane: lane 0 survives and lane 1 is retired. */
     seq_ui_lane = 0u;
     set.performance.tempo_bpm = transport_ui_bpm;
     set.performance.arp_mode = arp_ui_mode;
@@ -647,8 +645,8 @@ static void performance_publish(void)
     }
     if(seq_event_store_ready) {
         uint32_t length=set.performance.seq_length;
-        if (length < 2u) length = 2u;
-        if (length > 64u) length = 64u;
+        if(length<2u)length=2u;
+        if(length>64u)length=64u;
         uint32_t write=0u;
         for(uint32_t i=0u;i<seq_event_count[0];i++) {
             fm6_seq_event_t event=seq_event_store[0][i];
@@ -660,23 +658,19 @@ static void performance_publish(void)
         seq_event_count[0]=(uint8_t)write;
         if(seq_selected_event[0]>=seq_event_count[0])
             seq_selected_event[0]=seq_event_count[0]?(uint8_t)(seq_event_count[0]-1u):255u;
-        seq_event_count[1]=0u;
-        seq_selected_event[1]=255u;
-        for(uint32_t i=0u;i<APP_SEQ_EVENTS_PER_LANE;i++)
-            seq_event_store[1][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
     }
-    set.performance.lane_instrument[0] = seq_ui_instrument[0];
-    set.performance.lane_instrument[1] = 0u;
-    for (uint32_t step=0u; step<64u; ++step) {
-        set.performance.seq_enabled[0][step] = seq_ui_enabled[0][step];
-        set.performance.seq_note[0][step] = seq_ui_note[0][step];
-        set.performance.seq_velocity[0][step] = seq_ui_velocity[0][step];
-        set.performance.seq_gate[0][step] =
-            (uint8_t)(seq_ui_gate[0][step] | (seq_ui_tie[0][step] ? 0x80u : 0u));
-        set.performance.seq_enabled[1][step] = 0u;
-        set.performance.seq_note[1][step] = 0u;
-        set.performance.seq_velocity[1][step] = 0u;
-        set.performance.seq_gate[1][step] = 0u;
+    set.performance.lane_instrument[0]=seq_ui_instrument[0];
+    set.performance.lane_instrument[1]=0u;
+    for(uint32_t step=0u;step<64u;step++) {
+        set.performance.seq_enabled[0][step]=seq_ui_enabled[0][step];
+        set.performance.seq_note[0][step]=seq_ui_note[0][step];
+        set.performance.seq_velocity[0][step]=seq_ui_velocity[0][step];
+        set.performance.seq_gate[0][step]=(uint8_t)(
+            seq_ui_gate[0][step] | (seq_ui_tie[0][step]?0x80u:0u));
+        set.performance.seq_enabled[1][step]=0u;
+        set.performance.seq_note[1][step]=0u;
+        set.performance.seq_velocity[1][step]=0u;
+        set.performance.seq_gate[1][step]=0u;
     }
     set.performance.seq_event_count[1]=0u;
     if(seq_event_store_ready) {
@@ -687,16 +681,15 @@ static void performance_publish(void)
             set.performance.seq_events[1][i]=(fm6_seq_event_t){0u,0u,0u,0u,0u};
         }
     }
-    if (fm1lab_live_performance_from_compat(&performance_update_snapshot,
-                                            &set.performance) != 0 ||
-        fm1lab_live_performance_to_compat(&performance_update_compat_snapshot,
-                                          &performance_update_snapshot) != 0)
+    if(fm1lab_live_performance_from_compat(&performance_update_snapshot,
+                                           &set.performance)!=0 ||
+       fm1lab_live_performance_to_compat(&performance_update_compat_snapshot,
+                                         &performance_update_snapshot)!=0)
         return;
-    performance_update_dirty = 0u;
-    performance_update_pending = 1u;
+    performance_update_dirty=0u;
+    performance_update_pending=1u;
     ui_event_push(EV_PERFORMANCE_APPLY,0u,0u,0u);
 }
-
 static uint8_t instrument_macro_effective_from(const fm1lab_instrument_t *instrument,
         const fm1lab_insert_state_t *inserts,uint32_t patch,uint32_t macro)
 {
@@ -1184,7 +1177,7 @@ static void voice_edit_operator(fm1lab_operator_field_t field, int delta)
 static void sequencer_cache_instrument_name(uint8_t lane, const char *source)
 {
     uint32_t in=0u,out=0u;
-    if(lane>1u)return;
+    if(lane!=0u)return;
     while(source && in<FM1LAB_INSTRUMENT_NAME_BYTES && source[in]) {
         unsigned char ch=(unsigned char)source[in++];
         /* Strip the literal colour-tag fragments found in some imported names. */
@@ -1194,21 +1187,21 @@ static void sequencer_cache_instrument_name(uint8_t lane, const char *source)
             continue;
         }
         if(ch>=32u && ch<=126u && out<FM1LAB_INSTRUMENT_NAME_BYTES)
-            seq_ui_instrument_name[lane][out++]=(char)ch;
-        else if(ch<32u && out && seq_ui_instrument_name[lane][out-1u]!=' ')
-            seq_ui_instrument_name[lane][out++]=' ';
+            seq_ui_instrument_name[0][out++]=(char)ch;
+        else if(ch<32u && out && seq_ui_instrument_name[0][out-1u]!=' ')
+            seq_ui_instrument_name[0][out++]=' ';
     }
-    while(out && seq_ui_instrument_name[lane][out-1u]==' ')--out;
-    seq_ui_instrument_name[lane][out]='\0';
+    while(out && seq_ui_instrument_name[0][out-1u]==' ')--out;
+    seq_ui_instrument_name[0][out]='\0';
     if(!out) {
         const char *fallback="INSTRUMENT";
-        while(*fallback && out<FM1LAB_INSTRUMENT_NAME_BYTES)seq_ui_instrument_name[lane][out++]=*fallback++;
-        seq_ui_instrument_name[lane][out]='\0';
+        while(*fallback && out<FM1LAB_INSTRUMENT_NAME_BYTES)seq_ui_instrument_name[0][out++]=*fallback++;
+        seq_ui_instrument_name[0][out]='\0';
     }
 }
 static void sequencer_events_sync_legacy(void)
 {
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<1u;lane++) {
         for(uint32_t step=0;step<64u;step++) {
             seq_ui_enabled[lane][step]=0u;seq_ui_tie[lane][step]=0u;
             seq_ui_note[lane][step]=60u;seq_ui_velocity[lane][step]=100u;
@@ -1236,7 +1229,7 @@ static void sequencer_events_publish(void)
 static void sequencer_events_import_legacy(void)
 {
     if(seq_event_store_ready)return;
-    for(uint32_t lane=0;lane<2u;lane++) {
+    for(uint32_t lane=0;lane<1u;lane++) {
         uint8_t previous_note=255u;
         int previous_event=-1;
         for(uint32_t step=0;step<set.performance.seq_length && step<64u;step++) {
@@ -1262,7 +1255,6 @@ static void sequencer_events_import_legacy(void)
     }
     seq_event_store_ready=1u;
     seq_selected_event[0]=seq_event_count[0]?0u:255u;
-    seq_selected_event[1]=seq_event_count[1]?0u:255u;
 }
 
 static void sequencer_select_event(int direction)
@@ -1337,7 +1329,7 @@ static void sequencer_record_capture(uint32_t key, uint8_t note, uint8_t velocit
     uint8_t tick=fm6_sequencer_running()?fm6_sequencer_tick_position():(uint8_t)(seq_ui_step*2u);
     uint8_t step=(uint8_t)(tick/2u);
     if(seq_record_active[key] && seq_record_note[key]==note)return;
-    seq_record_active[key]=1u;seq_record_step[key]=tick;seq_record_lane[key]=lane;
+    seq_record_active[key]=1u;seq_record_step[key]=tick;
     seq_record_note[key]=note;seq_record_started[key]=plat_ms();
     seq_record_velocity[key]=velocity;seq_ui_velocity[lane][step]=velocity;
     seq_record_redraw=1u;
@@ -1348,7 +1340,7 @@ static void sequencer_record_release(uint32_t key, uint8_t note)
     uint32_t elapsed=plat_ms()-seq_record_started[key];
     uint32_t tick_ms=60000u/(transport_ui_bpm?transport_ui_bpm:120u)/8u;
     if(!tick_ms)tick_ms=1u;
-    uint8_t lane=seq_record_lane[key], first=seq_record_step[key];
+    uint8_t lane=0u, first=seq_record_step[key];
     uint32_t loop_ticks=(uint32_t)set.performance.seq_length*2u;
     uint32_t duration=fm1lab_recorded_note_duration(elapsed,tick_ms,loop_ticks,first);
     if(seq_event_count[lane]<APP_SEQ_EVENTS_PER_LANE && first<loop_ticks) {
@@ -1372,7 +1364,7 @@ static void sequencer_arp_capture_poll(void)
     uint32_t loop_ticks=(uint32_t)set.performance.seq_length*2u;
     if(loop_ticks<4u)loop_ticks=4u;
     while(fm6_arp_capture_pop(&capture)) {
-        uint8_t lane=capture.lane<2u?capture.lane:0u;
+        uint8_t lane=0u;
         if(capture.on) {
             if(!seq_record_armed || !fm6_sequencer_running())continue;
             if(seq_arp_record_active[lane]) {
@@ -1825,7 +1817,7 @@ void app_init(void)
      * Patch focus is transient UI state, not a preference to restore. */
     set.patch = 0u;
     seq_ui_patch[0] = 0u;
-    seq_ui_patch[1] = 0u;
+    /* Single live patch focus starts at slot zero. */
     patch_focus = 0u;
     for(uint32_t i=0;i<16u;i++){arp_ui_gain[i]=127u;arp_ui_accent[i]=0u;arp_ui_step_gate[i]=1u;}
     instrument_factory_capture();
@@ -1897,8 +1889,7 @@ void app_init(void)
         }
         seq_ui_lane=0u;
         seq_ui_instrument[0]=performance_update_snapshot.instrument;
-        seq_ui_instrument[1]=0u;
-        for (uint32_t lane = 0u; lane < 2u; ++lane) {
+        for (uint32_t lane = 0u; lane < 1u; ++lane) {
             seq_ui_patch[lane] = 0u;
             for (uint32_t step = 0u; step < 64u; ++step) {
                 seq_ui_enabled[lane][step] = lane==0u ? performance_update_snapshot.seq_enabled[step] : 0u;
@@ -1910,8 +1901,7 @@ void app_init(void)
             }
         }
         seq_event_count[0]=performance_update_snapshot.seq_event_count;
-        seq_event_count[1]=0u;
-        for(uint32_t lane=0u;lane<2u;lane++) {
+        for(uint32_t lane=0u;lane<1u;lane++) {
             uint8_t count=lane==0u?seq_event_count[0]:0u;
             for(uint32_t i=0u;i<count;i++) {
                 const fm1lab_live_seq_event_t *from=&performance_update_snapshot.seq_events[i];
@@ -1963,7 +1953,7 @@ void app_init(void)
     } else {
         arp_ui_mode = 0u;
         fm6_arpeggiator_set_mode(0u);
-        for (uint32_t lane = 0; lane < 2u; ++lane) {
+        for (uint32_t lane = 0; lane < 1u; ++lane) {
             seq_ui_instrument[lane] = 0u;
             seq_ui_patch[lane] = 0u;
             for (uint32_t step = 0; step < 64u; ++step) {
@@ -2257,7 +2247,7 @@ static void input(void)
             page_change(PAGE_HOME);
             set.patch = seq_ui_patch[seq_ui_lane];
             patch_focus = 0u;
-            app_say("INSTRUMENT", seq_ui_lane ? "TRACK 2 PATCH" : "TRACK 1 PATCH");
+            app_say("INSTRUMENT", "PATCH SELECTION");
         } else if (k == B_GLO) {
             page_change(page==PAGE_GLOBAL?PAGE_DIAG:page==PAGE_DIAG?PAGE_HOME:PAGE_GLOBAL);
             app_say(page==PAGE_GLOBAL?"GLOBAL":page==PAGE_DIAG?"AUDIO DIAGNOSTICS":"HOME",
@@ -2280,7 +2270,7 @@ static void input(void)
                     seq_selected_event[seq_ui_lane]=0u;
                 page_change(PAGE_SEQ_PIANO);
                 seq_clear_prompt=0u;seq_clear_turn=0;
-                app_say("PIANO ROLL","TRACK 1");
+                app_say("PIANO ROLL","NOTE EDITOR");
             } else if (page == PAGE_SEQ_PIANO) {
                 page_change(PAGE_SEQ);
                 seq_clear_prompt=0u;seq_clear_turn=0;
@@ -2381,13 +2371,13 @@ static void input(void)
                 fm6_sequencer_clear_lane(lane);
                 ui.seq_hold_fired=1u;ui.delete_kind=2u;ui.delete_index=(uint8_t)(lane+1u);
                 ui.delete_until=plat_ms()+2100u;
-                app_say("SEQUENCE CLEARED",lane?"SEQUENCE 2":"SEQUENCE 1");
+                app_say("SEQUENCE CLEARED","ONE TRACK");
             }
         } else {
             if(!ui.seq_hold_fired) {
                 if(page==PAGE_SEQ)page_change(PAGE_SEQ_OPTIONS);
                 else page_change(PAGE_SEQ);
-                app_say("SEQUENCER",page==PAGE_SEQ_OPTIONS?"RECORD MODE":"TWO LANES");
+                app_say("SEQUENCER",page==PAGE_SEQ_OPTIONS?"RECORD MODE":"ONE TRACK");
             }
             ui.seq_hold_t=0u;ui.seq_hold_fired=0u;
         }
@@ -3619,8 +3609,8 @@ static void draw_sequencer_piano_panel(void)
     const int32_t high=low+23;
     instrument_card(4,2,232,176,panel_fill(),accent,accent);
 
-    cv_text_fit(12,8,&FONT_XS,lane?"TRACK 2 / NOTES":"TRACK 1 / NOTES",accent,100);
-    cv_text_fit(120,8,&FONT_XS,seq_ui_instrument_name[lane],C_WHITE,104);
+    cv_text_fit(12,8,&FONT_XS,"NOTES",accent,100);
+    cv_text_fit(120,8,&FONT_XS,seq_ui_instrument_name[0],C_WHITE,104);
 
     /* Piano-roll window. */
     for(uint32_t row=0;row<24u;row++) {
@@ -4045,7 +4035,7 @@ static void draw(void)
     cv_text(165,16,&FONT_XS,fm6_sequencer_running()?"PLAY":"STOP",fm6_sequencer_running()?RGB(75,235,135):C_PEWTER);
     if(seq_record_armed)cv_text(205,16,&FONT_XS,"REC",RGB(255,80,90));
     if (page == PAGE_HOME) {
-        cv_text(151, 17, &FONT_XS, seq_ui_lane ? "T2" : "T1", patch_color(seq_ui_patch[seq_ui_lane]));
+        cv_text(151, 17, &FONT_XS, "PATCH", patch_color(seq_ui_patch[0]));
     }
     cv_rect(0, 34, 240, 3, accent);
     cv_blit(0, 0);
@@ -4260,7 +4250,7 @@ int app_expect(const char *what, int *got)
     else if (!fm1lab_strcmp(what, "instrument"))
         *got = instrument_index;
     else if (!fm1lab_strncmp(what, "trackinst", 9))
-        *got = seq_ui_instrument[(uint32_t)atoi(what + 9) & 1u];
+        *got = ((uint32_t)atoi(what + 9) == 0u) ? seq_ui_instrument[0] : -1;
     else if (!fm1lab_strcmp(what, "pending"))
         *got = instrument_apply_pending;
     else if (!fm1lab_strcmp(what, "resync"))
