@@ -208,6 +208,9 @@ def main(package: Path, out: Path) -> None:
       while (midiTimers.length) clearTimeout(midiTimers.pop());
       [...activeTestNotes].forEach(noteOff);
       midiSend([0xB0,64,0],"sustain_off");
+      midiSend([0xA0,60,0],"poly_aftertouch_zero_note_60");
+      midiSend([0xD0,0],"channel_pressure_zero");
+      midiSend([0xFC],"transport_stop");
       midiSend([0xB0,123,0],"all_notes_off");
       midiSend([0xB0,120,0],"all_sound_off");
     }
