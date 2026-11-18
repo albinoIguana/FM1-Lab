@@ -172,7 +172,6 @@ static uint8_t patch_preset_cursor[2][FM1LAB_PATCH_COUNT] = {
     {255u,255u,255u,255u}, {255u,255u,255u,255u}
 };
 static enum fm1lab_dx7_preset_result patch_preset_last_result = FM1LAB_DX7_PRESET_OK;
-static uint8_t eq_ui_band = 1u;
 static uint8_t env_operator = 1u;
 static uint8_t lfo_view;
 static uint8_t seq_ui_lane, seq_ui_step, seq_ui_instrument[2]={0u,0u}, seq_ui_note[2][64], seq_ui_velocity[2][64],
@@ -219,8 +218,8 @@ static uint8_t touch_note[NKEYS];              /* pitch captured at key-down; oc
 enum { EV_NOTE_ON = FM1LAB_EVENT_NOTE_ON, EV_NOTE_OFF = FM1LAB_EVENT_NOTE_OFF,
        EV_PANIC = FM1LAB_EVENT_PANIC, EV_MACRO_SET = FM1LAB_EVENT_MACRO_SET,
        EV_PATCH_LEVEL = FM1LAB_EVENT_PATCH_LEVEL, EV_INSTRUMENT_LOAD = FM1LAB_EVENT_INSTRUMENT_LOAD,
-       EV_PATCH_VOICE = FM1LAB_EVENT_PATCH_VOICE, EV_MASTER_INSERT = FM1LAB_EVENT_MASTER_INSERT,
-       EV_MASTER_COMP = FM1LAB_EVENT_MASTER_COMP, EV_PERFORMANCE_APPLY = FM1LAB_EVENT_PERFORMANCE_APPLY,
+       EV_PATCH_VOICE = FM1LAB_EVENT_PATCH_VOICE,
+       EV_PERFORMANCE_APPLY = FM1LAB_EVENT_PERFORMANCE_APPLY,
        EV_SEQ_RUN = FM1LAB_EVENT_SEQ_RUN, EV_PATCH_PITCH = FM1LAB_EVENT_PATCH_PITCH };
 static fm6_performance_state_t performance_update_snapshot;
 static volatile uint8_t performance_update_pending, performance_update_dirty;
@@ -1127,10 +1126,6 @@ static void ui_events_drain(void)
             instrument_apply_engine_bank(a,&instrument_apply_snapshot,&inserts_apply_snapshot,c);
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
-        } else if (type == EV_MASTER_INSERT)
-            fm6_master_insert_set(a,b);
-        else if (type == EV_MASTER_COMP)
-            fm6_master_comp_set(a,b);
         else if (type == EV_PERFORMANCE_APPLY) {
             (void)fm6_performance_state_update(&performance_update_snapshot);
             performance_update_pending = 0u;
@@ -1192,35 +1187,6 @@ static void patch_pitch_edit(unsigned control,int delta)
         (uint8_t)patch->octave,(uint8_t)patch->fine_cents);
 }
 
-static void instrument_insert_edit(uint32_t field,uint8_t value)
-{
-    if(field>=FM6_INSERT_FIELD_COUNT)return;
-    fm1lab_insert_state_set(&current_inserts,field,value);
-    instrument_dirty=1u;set_dirty=1u;
-    ui_event_push(EV_MASTER_INSERT,(uint8_t)field,fm1lab_insert_state_get(&current_inserts,field),0u);
-}
-static uint8_t compressor_value(uint32_t field)
-{
-    if(field==FM6_COMP_ENABLED)return set.performance.compressor_enabled;
-    if(field==FM6_COMP_THRESHOLD)return set.performance.compressor_threshold;
-    if(field==FM6_COMP_RATIO)return set.performance.compressor_ratio;
-    if(field==FM6_COMP_ATTACK)return set.performance.compressor_attack;
-    if(field==FM6_COMP_RELEASE)return set.performance.compressor_release;
-    if(field==FM6_COMP_MAKEUP)return set.performance.compressor_makeup;
-    return 0u;
-}
-static void compressor_edit(uint32_t field,uint8_t value)
-{
-    if(field>=FM6_COMP_FIELD_COUNT)return;
-    if(field==FM6_COMP_ENABLED)set.performance.compressor_enabled=value?1u:0u;
-    else if(field==FM6_COMP_THRESHOLD)set.performance.compressor_threshold=value>100u?100u:value;
-    else if(field==FM6_COMP_RATIO)set.performance.compressor_ratio=value>100u?100u:value;
-    else if(field==FM6_COMP_ATTACK)set.performance.compressor_attack=value>100u?100u:value;
-    else if(field==FM6_COMP_RELEASE)set.performance.compressor_release=value>100u?100u:value;
-    else set.performance.compressor_makeup=value>100u?100u:value;
-    set_dirty=1u;
-    ui_event_push(EV_MASTER_COMP,(uint8_t)field,compressor_value(field),0u);
-}
 
 static void voice_edit_global(fm1lab_global_field_t field, int delta)
 {
@@ -2600,11 +2566,6 @@ static void input(void)
                 FM1LAB_GLOBAL_ALGORITHM, &algorithm);
             int_text(algorithm, t);
             app_say("FM ALGORITHM", t);
-        } else if (k == EN_ALGO && page == PAGE_FX_EQ) {
-            uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+2u);
-            uint8_t value=fm1lab_insert_state_get(&current_inserts,field);
-            instrument_insert_edit(field,(uint8_t)clamp((int32_t)value+e,0,31));
-            app_say("EQ Q","UPDATED");
         } else if (k == EN_SELECT && page == PAGE_LFO && lfo_view < 3u) {
             if (fm1lab_patch_engine_for_context(set.patch) != FM1LAB_PATCH_ENGINE_FM6) {
                 app_say("FIXED ENGINE",fm1lab_patch_engine_name(set.patch));
@@ -2618,9 +2579,6 @@ static void input(void)
         } else if (k == EN_SELECT && page == PAGE_SEQ_PIANO) {
             sequencer_select_event(e);
             app_say("NOTE","SELECTED");
-        } else if (k == EN_ALGO && page == PAGE_FX_COMPRESSOR) {
-            compressor_edit(FM6_COMP_MAKEUP,(uint8_t)clamp((int32_t)compressor_value(FM6_COMP_MAKEUP)+e,0,100));
-            app_say("COMP MAKEUP","UPDATED");
         } else if (k == EN_SELECT && page >= PAGE_FX_CHORUS && page <= PAGE_FX_PHASER) {
             int32_t next = (int32_t)(page - PAGE_FX_CHORUS) + e;
             next %= 4;
@@ -2793,43 +2751,6 @@ static void input(void)
                 }
                 performance_publish();
                 set_dirty=1u;
-            } else if (page == PAGE_FX_AMP) {
-                if(index==0u) {
-                    uint8_t value=(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_AMP_ENABLED);
-                    instrument_insert_edit(FM6_INSERT_AMP_ENABLED,value);
-                    app_say("AMP BYPASS",value?"ON":"OFF");
-                } else {
-                    static const uint8_t fields[3]={FM6_INSERT_DRIVE,FM6_INSERT_TONE,FM6_INSERT_OUTPUT};
-                    uint8_t field=fields[index-1u];
-                    instrument_insert_edit(field,(uint8_t)clamp((int32_t)fm1lab_insert_state_get(&current_inserts,field)+e,0,100));
-                    app_say(index==1u?"AMP DRIVE":index==2u?"AMP TONE":"AMP OUTPUT","UPDATED");
-                }
-            } else if (page == PAGE_FX_EQ) {
-                if(index==0u) {
-                    uint8_t value=(uint8_t)!fm1lab_insert_state_get(&current_inserts,FM6_INSERT_EQ_ENABLED);
-                    instrument_insert_edit(FM6_INSERT_EQ_ENABLED,value);
-                    app_say("EQ BYPASS",value?"ON":"OFF");
-                } else if(index==1u) {
-                    int32_t next=((int32_t)eq_ui_band+e)%3;if(next<0)next+=3;
-                    eq_ui_band=(uint8_t)next;
-                    app_say("EQ BAND",eq_ui_band==0u?"LOW":eq_ui_band==1u?"MID":"HIGH");
-                } else {
-                    uint8_t field=(uint8_t)(FM6_INSERT_EQ_LOW_FREQUENCY+eq_ui_band*4u+(index==2u?0u:1u));
-                    uint8_t value=fm1lab_insert_state_get(&current_inserts,field);
-                    instrument_insert_edit(field,(uint8_t)clamp((int32_t)value+e,0,index==2u?100:24));
-                    app_say(index==2u?"EQ FREQUENCY":"EQ GAIN","UPDATED");
-                }
-            } else if (page == PAGE_FX_COMPRESSOR) {
-                if(index==0u) {
-                    uint8_t value=(uint8_t)!compressor_value(FM6_COMP_ENABLED);
-                    compressor_edit(FM6_COMP_ENABLED,value);
-                    app_say("COMP BYPASS",value?"ON":"OFF");
-                } else {
-                    static const uint8_t fields[3]={FM6_COMP_RATIO,FM6_COMP_THRESHOLD,FM6_COMP_ATTACK};
-                    uint8_t field=fields[index-1u];
-                    compressor_edit(field,(uint8_t)clamp((int32_t)compressor_value(field)+e,0,100));
-                    app_say(index==1u?"COMP RATIO":index==2u?"COMP THRESHOLD":"COMP ATTACK","UPDATED");
-                }
             } else if (page == PAGE_CHAOS) {
                 if(index==0u)set.performance.chaos_amount=(uint8_t)clamp((int32_t)set.performance.chaos_amount+e,0,100);
                 else if(index==1u)set.performance.chaos_rate=(uint8_t)fm1lab_chaos_rate_advance(set.performance.chaos_rate,e);
@@ -3361,20 +3282,6 @@ static void draw_operator_map(void)
 }
 
 
-static void draw_amp_panel(void)
-{
-    static const char *const labels[4]={"K1  BYPASS","K2  DRIVE","K3  TONE","K4  OUTPUT"};
-    const fm1lab_insert_state_t *v=&current_inserts;
-    char t[16];uint16_t accent=RGB(36,215,232);
-    uint8_t values[4]={v->amp_enabled,v->drive,v->tone,v->output};
-    for(uint32_t i=0;i<4u;i++){
-        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,labels[i],C_PEWTER);
-        if(i==0u)cv_text(x+7,y+23,&FONT_B,values[i]?"ON":"OFF",values[i]?RGB(75,235,135):RGB(255,82,101));
-        else {int_text(values[i],t);cv_text(x+7,y+23,&FONT_B,t,accent);cv_rect(x+48,y+29,55,5,C_LINE);cv_rect(x+48,y+29,(int32_t)values[i]*55/100,5,accent);}
-    }
-}
 static uint32_t eq_frequency_hz(uint8_t index)
 {
     static const uint16_t anchors[11]={20,40,80,160,320,630,1260,2520,5000,10000,20000};
@@ -3396,74 +3303,7 @@ static void fm1lab_plot_line(int32_t x0,int32_t y0,int32_t x1,int32_t y1,uint16_
     }
 }
 
-static void draw_eq_panel(void)
-{
-    static const uint16_t colors[3]={RGB(242,212,59),RGB(36,215,232),RGB(227,75,210)};
-    static const char *const bands[3]={"LOW","MID","HIGH"};
-    const fm1lab_insert_state_t *v=&current_inserts;
-    const fm1lab_eq_band_state_t *selected=&v->eq[eq_ui_band];
-    int32_t response[109]; char t[20];
-    int32_t left=12,right=228,top=20,bottom=120,zero=70;
-    for(uint32_t i=0;i<109u;i++) {
-        int32_t x=left+(int32_t)i*2,db=0;
-        for(uint32_t band=0;band<3u;band++) {
-            const fm1lab_eq_band_state_t *b=&v->eq[band];
-            int32_t center=left+(int32_t)b->frequency*(right-left)/100;
-            int32_t width=5+(31-(int32_t)b->q)*2,distance=x-center;
-            if(distance<0)distance=-distance;
-            if(band==0u && x<center)distance=0;
-            if(band==2u && x>center)distance=0;
-            if(distance<width)db+=((int32_t)b->gain-12)*(width-distance)/width;
-        }
-        if(db>12)db=12;
-        if(db< -12)db=-12;
-        response[i]=zero-db*4;
-        if(response[i]<top)response[i]=top;
-        if(response[i]>bottom)response[i]=bottom;
-    }
-    cv_text(9,3,&FONT_XS,(v->eq_enabled&1u)?"3-BAND PARAMETRIC / ON":"3-BAND PARAMETRIC / BYPASS",
-            (v->eq_enabled&1u)?RGB(75,235,135):C_PEWTER);
-    for(int32_t y=zero-48;y<=zero+48;y+=24)cv_rect(left,y,right-left,1,y==zero?C_PEWTER:C_DIM);
-    for(int32_t x=left;x<=right;x+=36)cv_rect(x,top,1,bottom-top,C_DIM);
-    for(uint32_t i=1u;i<109u;i++)
-        fm1lab_plot_line(left+(int32_t)(i-1u)*2,response[i-1u],left+(int32_t)i*2,response[i],RGB(36,215,232));
-    {
-        int32_t marker=left+(int32_t)selected->frequency*(right-left)/100;
-        cv_rect(marker-1,top,2,bottom-top,colors[eq_ui_band]);
-    }
-    cv_text(12,125,&FONT_XS,"20",C_PEWTER); cv_text(65,125,&FONT_XS,"200",C_PEWTER);
-    cv_text(119,125,&FONT_XS,"2K",C_PEWTER); cv_text(174,125,&FONT_XS,"10K",C_PEWTER);
-    cv_text(211,125,&FONT_XS,"20K",C_PEWTER);
-    cv_text(10,138,&FONT_XS,"K1 BYPASS",C_PEWTER);
-    cv_text(10,153,&FONT_XS,bands[eq_ui_band],colors[eq_ui_band]);
-    int_text((int32_t)eq_frequency_hz(selected->frequency),t); text_cat(t,"Hz");
-    cv_text(66,153,&FONT_XS,t,C_WHITE);
-    int_text((int32_t)selected->gain-12,t); text_cat(t,"dB");
-    cv_text(143,153,&FONT_XS,t,C_WHITE);
-    int_text(selected->q,t); text_cat(t," Q");
-    cv_text(187,153,&FONT_XS,t,C_WHITE);
-    cv_text(10,165,&FONT_XS,"K2 BAND  K3 FREQ  K4 GAIN  /  SELECT Q",C_PEWTER);
-}
 
-static void draw_compressor_panel(void)
-{
-    uint8_t enabled=compressor_value(FM6_COMP_ENABLED);
-    uint8_t values[4]={enabled,compressor_value(FM6_COMP_RATIO),
-        compressor_value(FM6_COMP_THRESHOLD),compressor_value(FM6_COMP_ATTACK)};
-    char t[16];uint16_t accent=RGB(36,215,232);
-    for(uint32_t i=0;i<4u;i++){
-        int32_t x=panel_grid_x(i),y=panel_grid_y(i,UI_GRID_TOP,UI_GRID_ROW_STEP);
-        panel_grid_card(i,UI_GRID_TOP,UI_GRID_ROW_STEP,accent);
-        cv_text(x+7,y+6,&FONT_XS,i==0u?"K1  BYPASS":i==1u?"K2  RATIO":i==2u?"K3  THRESHOLD":"K4  ATTACK",C_PEWTER);
-        if(i==0u) cv_text(x+7,y+23,&FONT_B,enabled?"ON":"OFF",enabled?RGB(75,235,135):RGB(255,82,101));
-        else {
-            if(i==1u){uint32_t ratio=1u+values[i]*11u/100u;int_text((int32_t)ratio,t);text_cat(t,":1");}
-            else if(i==3u){uint32_t ms=1u+(uint32_t)values[i]*49u/100u;int_text((int32_t)ms,t);text_cat(t,"ms");}
-            else int_text(values[i],t);
-            cv_text(x+7,y+23,&FONT_B,t,accent);
-        }
-    }
-}
 
 static void draw_global_panel(uint32_t pct)
 {
@@ -4169,9 +4009,6 @@ static const char *page_title(uint8_t current)
     case PAGE_ARP: return "ARP ENGINE";
     case PAGE_ARP_STEPS: return "ARP STEP EDIT";
     case PAGE_ARP_LATCH: return "ARP LATCH";
-    case PAGE_FX_AMP: return "AMP / DRIVE";
-    case PAGE_FX_EQ: return "PARAMETRIC EQ";
-    case PAGE_FX_COMPRESSOR: return "COMPRESSOR";
     case PAGE_FX_CHORUS: return "CHORUS";
     case PAGE_FX_DELAY: return "DELAY";
     case PAGE_FX_REVERB: return "REVERB";
@@ -4198,9 +4035,6 @@ static uint16_t page_accent(uint8_t current)
     case PAGE_LFO_MOD: return RGB(75,190,180);
     case PAGE_SEQ: case PAGE_SEQ_OPTIONS: case PAGE_SEQ_PIANO: return RGB(242,212,59);
     case PAGE_ARP: case PAGE_ARP_STEPS: case PAGE_ARP_LATCH: return RGB(227,75,210);
-    case PAGE_FX_AMP: return RGB(255,140,70);
-    case PAGE_FX_EQ: return RGB(85,190,255);
-    case PAGE_FX_COMPRESSOR: return RGB(255,170,75);
     case PAGE_FX_CHORUS: return RGB(36,215,232);
     case PAGE_FX_DELAY: return RGB(85,160,255);
     case PAGE_FX_REVERB: return RGB(150,120,255);
@@ -4214,10 +4048,7 @@ static uint16_t page_accent(uint8_t current)
 static void page_counter(uint8_t current, char *out, uint32_t out_size)
 {
     uint32_t index = 1u, total = 1u;
-    if (current >= PAGE_FX_AMP && current <= PAGE_FX_EQ) {
-        index = (uint32_t)(current - PAGE_FX_AMP) + 1u;
-        total = 7u;
-    } else if (current == PAGE_LFO || current == PAGE_LFO_MOD) {
+    if (current == PAGE_LFO || current == PAGE_LFO_MOD) {
         index = (uint32_t)lfo_view + 1u;
         total = 5u;
     } else if (current == PAGE_SEQ || current == PAGE_SEQ_OPTIONS) {
@@ -4287,9 +4118,6 @@ static void draw(void)
     else if (page == PAGE_MACRO) draw_macro_panel();
     else if (page == PAGE_INSTRUMENT_MACRO) draw_instrument_macro_panel();
     else if (page == PAGE_CHAOS) draw_chaos_panel();
-    else if (page == PAGE_FX_AMP) draw_amp_panel();
-    else if (page == PAGE_FX_EQ) draw_eq_panel();
-    else if (page == PAGE_FX_COMPRESSOR) draw_compressor_panel();
     else if (page == PAGE_OPERATOR_MAP) draw_operator_map();
     else if (page == PAGE_ENV) draw_envelope_panel();
     else if (page == PAGE_LFO) draw_operator_workbench(lfo_view);
