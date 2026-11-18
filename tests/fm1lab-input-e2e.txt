@@ -31,7 +31,7 @@ expect focus 1
 expect patch 1
 spin PRESET 1
 wait 40
-expect instrument 1
+expect instrument 0
 expect presetcursor 0
 expect trackinst1 1
 
@@ -50,7 +50,7 @@ expect pending 0
 spin SELECT 1
 wait 40
 expect focus 1
-expect patch 1
+expect patch 2
 spin PRESET 1
 wait 40
 expect presetcursor 0

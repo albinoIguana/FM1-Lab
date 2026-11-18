@@ -1389,6 +1389,6 @@ int main(void) {
     fm6_render(output,32u,4096u);
     assert(fm6_cpu0_postmix_us()>0u);
 
-    puts("Felucca FM6 engine: voice pools, 32nd-note sequencing, ARP capture, lane clear, stereo FX, Instrument-wide Amp/Drive, parametric EQ and linked master compressor passed");
+    puts("FM6 engine: voice pools, 32nd-note sequencing, ARP capture, lane clear and stereo FX passed; retired Amp/Drive, EQ and compressor paths are bypassed");
     return 0;
 }
