@@ -794,7 +794,7 @@ int main(void) {
         uint8_t saw_generated_note=0u,saw_generated_release=0u;
         while(fm6_arp_capture_pop(&captured))
             if(captured.on && captured.note>=60u && captured.note<=67u) {
-                saw_generated_note=1u;assert(captured.lane==1u);
+                saw_generated_note=1u;assert(captured.lane==0u);
             }
         assert(saw_generated_note); /* recorder sees the generated arp note, not just held input */
         fm6_note_off(60u); fm6_note_off(64u); fm6_note_off(67u);
