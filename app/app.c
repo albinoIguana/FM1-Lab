@@ -284,8 +284,8 @@ static int fm1lab_is_previous_factory_instrument(uint32_t index,
     static const uint32_t fm6_voice_hash=0xbbedcce1u;
     /* The retired M-VAVE record was saved as FACTORY. Other old slots can
      * contain the same untouched four-voice placeholder under their generated
-     * INSTRUMENT nn / INSTR nn label. Match the retained FM6 voice exactly,
-     * plus engine-native defaults and neutral performance state in slots 2-4. */
+     * INSTRUMENT nn / INSTR nn label. After FLP3 migration, match the retained
+     * FM6 voice plus native factory defaults in the other three engine slots. */
     if(index>=FM1LAB_STORE_INSTRUMENT_COUNT || !existing ||
        !fm1lab_instrument_valid(existing) ||
        !((index==0u && fm1lab_strncmp(existing->name,"FACTORY",7u)==0) ||

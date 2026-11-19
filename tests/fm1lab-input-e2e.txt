@@ -21,7 +21,7 @@ expect trackinst1 -1
 expect instrument 0
 expect pending 0
 
-# HOME SELECT focuses patch 2; PRESETS then changes that patch voice only.
+# HOME SELECT focuses the Wavetable slot; PRESETS changes its native patch.
 tap HOME
 wait 40
 expect focus 0

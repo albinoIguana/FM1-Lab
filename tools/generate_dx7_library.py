@@ -109,7 +109,7 @@ def main() -> None:
         "",
         "/* Generated from patches/curated/instrument-bank-v0.3.json.",
         " * Patch source of truth: patches/library/dx7/ by audible sound family.",
-        " * 128 voices / 32 four-patch instruments. Draft selections require listening.",
+        " * 128 DX7 presets / 32 factory FM6 seeds; other slots use native engines.",
         " */",
         "static const char fm1lab_dx7_voice_z85[] =",
     ]

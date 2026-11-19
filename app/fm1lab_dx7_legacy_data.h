@@ -7,7 +7,9 @@
 
 /* 128 expanded six-operator DX7 voices. Source collection is CC0-1.0:
  * visualizersdotnl/Yamaha-DX7-patch-library. Original patch names retained.
- * Each group of four voices forms one FM1-Lab Instrument. */
+ * Groups of four reflect the retired DX7-only Instrument layout. During
+ * FLP3 migration only voice 0 is retained as FM6; slots 1-3 become native
+ * Wavetable, PSG and Subtractive factory patches. */
 static const char fm1lab_dx7_legacy_voice_z85[] =
     "r81xavQJqodG*p+00-GamGr.{1Zk1I8^##LqZRLB000c40z&:%001(c5&Bc8mGs$tc&:kH00D3%0@@QpbQj4gvpGo*04w0I0%nM#00967l@sEZqD^o8e/CMe00il5nDn!(11LAge)qZ)03RyN000c40B(cg00CCxgcvoEgbovA04Gb]000c507]^mq=M:.qY)!W"
     "r81xavQJqodG*p+00-GamGr.{1Zk1I8^##LqZRLB000c40z&:%001(c5&Bc8mGs$tc&:kH00D3%0@@QpbQj4gvpGo*04w0I0%nM#00967l@sEZqD^o8e/CMe00il5nDn!(11LAge)qZ)03RyN000c40B(cg3<nZJgcvoEgbovA04Gb]000c507]^mq=M:.qY)?X"
