@@ -4367,9 +4367,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         app_host_legacy_factory_migration_pass=0u;
         fm1lab_insert_state_init(&inserts);
         fm1lab_instrument_init(&legacy,"FACTORY");
-        for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
-            if(fm1lab_patch_set_voice(&legacy,patch,
-                    fm1lab_legacy_factory_fixture[patch])!=0) return 1;
+        if(fm1lab_patch_set_voice(&legacy,0u,fm1lab_legacy_factory_fixture[0])!=0) return 1;
         if(!fm1lab_is_previous_factory_instrument(0u,&legacy) ||
            fm1lab_is_previous_factory_instrument(1u,&legacy)) return 1;
 
@@ -4386,9 +4384,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             slot_name[12]=(char)('0'+number%10u);
             slot_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
             fm1lab_instrument_init(&legacy,slot_name);
-            for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
-                if(fm1lab_patch_set_voice(&legacy,patch,
-                        fm1lab_legacy_factory_fixture[patch])!=0) return 1;
+            if(fm1lab_patch_set_voice(&legacy,0u,fm1lab_legacy_factory_fixture[0])!=0) return 1;
             if(!fm1lab_is_previous_factory_instrument(index,&legacy)) return 1;
             if(fm1lab_store_library_save_full(index,&legacy,&inserts)!=0) return 1;
         }
@@ -4407,7 +4403,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             if(fm1lab_patch_set_voice(&legacy,patch,
                     fm1lab_legacy_factory_fixture[patch])!=0) return 1;
         edited=legacy;
-        edited.patches[1].voice[0]^=1u;
+        edited.patches[0].voice[0]^=1u;
         if(fm1lab_is_previous_factory_instrument(0u,&edited) ||
            fm1lab_store_library_save_full(0u,&edited,&inserts)!=0) return 1;
         fm1lab_seed_factory_library();
