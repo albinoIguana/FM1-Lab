@@ -3691,7 +3691,9 @@ static void draw_save_panel(void)
     cv_text(14,73,&FONT_B,t,patch_color(save_patch));
     cv_text(14,99,&FONT_XS,save_name_target?"PATCH NAME  /  10 CHARS":"INSTRUMENT NAME  /  11 CHARS",C_PEWTER);
     if(save_name_target) {
-        for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)t[i]=(char)current_instrument.patches[save_patch].voice[145u+i];
+        for(uint32_t i=0;i<FM1LAB_PATCH_NAME_BYTES;i++)
+            t[i]=save_patch==0u?(char)current_instrument.patches[save_patch].voice[145u+i]
+                                :current_instrument.patches[save_patch].name[i];
         t[FM1LAB_PATCH_NAME_BYTES]='\0';
     } else {
         for(uint32_t i=0;i<FM1LAB_STORE_NAME_BYTES;i++)t[i]=current_instrument.name[i];
