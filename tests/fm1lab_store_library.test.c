@@ -121,6 +121,40 @@ int main(void)
     assert(strcmp(loaded.patches[2].name,"ARCADE LEA")==0 && loaded.patches[2].preset_id==2u);
     assert(strcmp(loaded.patches[3].name,"WARM PAD")==0 && loaded.patches[3].preset_id==2u);
 
+
+    /* Legacy FLP3 patch banks contain four DX7-shaped records per Instrument.
+     * Migration keeps the real FM6 voice in slot 0 and replaces old slot 1-3
+     * DX7 payloads with explicit engine-native defaults rather than relabeling
+     * those bytes as Wavetable, PSG or Subtractive parameters. */
+    {
+        uint8_t saved_bank[FM1LAB_STORE_PATCH_BANK_BYTES];
+        memcpy(saved_bank,objects[0],sizeof saved_bank);
+        for(unsigned slot=1u;slot<FM1LAB_STORE_PATCHES_PER_BANK;slot++)
+            memcpy(objects[0]+8u+slot*117u,objects[0]+8u,117u);
+        objects[0][0]='F';objects[0][1]='L';objects[0][2]='P';objects[0][3]='3';
+        objects[0][4]=3u;objects[0][5]=0u;
+        uint16_t legacy_crc=test_crc16(objects[0]+8u,
+            FM1LAB_STORE_PATCH_BANK_BYTES-8u);
+        objects[0][6]=(uint8_t)legacy_crc;
+        objects[0][7]=(uint8_t)(legacy_crc>>8);
+        assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
+        assert(loaded.patches[0].voice[145u]=='A');
+        assert(strcmp(loaded.patches[1].name,"WT INIT")==0);
+        assert(strcmp(loaded.patches[2].name,"PSG INIT")==0);
+        assert(strcmp(loaded.patches[3].name,"SUB INIT")==0);
+        assert(loaded.patches[1].preset_id==0u &&
+               loaded.patches[2].preset_id==0u &&
+               loaded.patches[3].preset_id==0u);
+        fm1lab_synth_patch_t defaults;
+        fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE,&defaults);
+        assert(memcmp(&loaded.patches[1].synth_patch,&defaults,sizeof defaults)==0);
+        fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG,&defaults);
+        assert(memcmp(&loaded.patches[2].synth_patch,&defaults,sizeof defaults)==0);
+        fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE,&defaults);
+        assert(memcmp(&loaded.patches[3].synth_patch,&defaults,sizeof defaults)==0);
+        memcpy(objects[0],saved_bank,sizeof saved_bank);
+    }
+
     /* Exercise the same route + dispatcher used by app.c, ending in the
      * production store loader rather than a mocked successful callback. */
     {
