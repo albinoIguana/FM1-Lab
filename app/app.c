@@ -281,9 +281,7 @@ static int fm1lab_default_slot_name_matches(const char *name,uint32_t index)
 static int fm1lab_is_previous_factory_instrument(uint32_t index,
         const fm1lab_instrument_t *existing)
 {
-    static const uint32_t voice_hash[FM1LAB_PATCH_COUNT]={
-        0xbbedcce1u,0x8a9adc54u,0x689191ffu,0x96452f30u
-    };
+    static const uint32_t fm6_voice_hash=0xbbedcce1u;
     /* The retired M-VAVE record was saved as FACTORY. Other old slots can
      * contain the same untouched four-voice placeholder under their generated
      * INSTRUMENT nn / INSTR nn label. Match the slot-specific label, then still
@@ -294,9 +292,20 @@ static int fm1lab_is_previous_factory_instrument(uint32_t index,
          fm1lab_default_slot_name_matches(existing->name,index))) return 0;
     for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++) {
         const fm1lab_patch_t *part=&existing->patches[patch];
-        if(fm1lab_legacy_factory_voice_hash(part->voice)!=voice_hash[patch] ||
-           part->level!=31u || !part->enabled || part->octave!=0 ||
+        if(part->level!=31u || !part->enabled || part->octave!=0 ||
            part->fine_cents!=0) return 0;
+        if(patch==0u) {
+            if(fm1lab_legacy_factory_voice_hash(part->voice)!=fm6_voice_hash) return 0;
+        } else {
+            fm1lab_synth_patch_t defaults;
+            fm1lab_synth_engine_t engine=patch==1u?FM1LAB_SYNTH_WAVETABLE:
+                patch==2u?FM1LAB_SYNTH_PSG:FM1LAB_SYNTH_SUBTRACTIVE;
+            fm1lab_synth_patch_default(engine,&defaults);
+            const uint8_t *actual=(const uint8_t *)&part->synth_patch;
+            const uint8_t *expected=(const uint8_t *)&defaults;
+            for(uint32_t n=0u;n<sizeof defaults;n++) if(actual[n]!=expected[n]) return 0;
+            if(part->preset_id!=0u) return 0;
+        }
         for(uint32_t macro=0u;macro<FM1LAB_MACRO_COUNT;macro++)
             if(part->macros[macro]!=50u) return 0;
     }
@@ -4399,9 +4408,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
 
         /* A one-byte user edit must make the legacy fingerprint fail closed. */
         fm1lab_instrument_init(&legacy,"INSTRUMENT 01");
-        for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
-            if(fm1lab_patch_set_voice(&legacy,patch,
-                    fm1lab_legacy_factory_fixture[patch])!=0) return 1;
+        if(fm1lab_patch_set_voice(&legacy,0u,fm1lab_legacy_factory_fixture[0])!=0) return 1;
         edited=legacy;
         edited.patches[0].voice[0]^=1u;
         if(fm1lab_is_previous_factory_instrument(0u,&edited) ||
