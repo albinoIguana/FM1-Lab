@@ -101,7 +101,7 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
 echo "FM1-Lab native voice editor tests passed."
 
 # Exercise the exact bundled DX7 decoder and patch replacement used by app.c.
-cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" \
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" -I"$ROOT/app/dsp" \
   "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/app/fm1lab_dx7_preset.c" \
   "$ROOT/tests/fm1lab_dx7_preset.test.c" -o "$PRESET_BIN"
 "$PRESET_BIN"
