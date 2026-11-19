@@ -104,8 +104,32 @@ class Run:
             else:
                 time.sleep(min(0.01, next_sample - now))
 
-    def held_phase(self, count, seconds):
-        phase = f"hold-{count}"
+    def set_maelstrom(self, enabled, amount=60, timeout=4.0):
+        self.out.send(mido.Message("sysex", data=[0x7D, ord("F"), ord("M"), ord("1"), ord("T"), 1 if enabled else 0, amount if enabled else 0]))
+        target = amount if enabled else 0
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            snap = read_snapshot(self.inp, self.out, timeout=0.5)
+            if snap is not None and int(snap.get("chaos_amount", -1)) == target:
+                print("Maelstrom {} verified: amount={}".format("ON" if enabled else "OFF", target))
+                self.rows.append({"host_time_utc": stamp(), "phase": "maelstrom-state", "requested_notes": 0, "port": self.port, **snap})
+                return
+        raise RuntimeError("Maelstrom state did not verify: expected amount={}".format(target))
+
+    def restore_maelstrom(self, original, timeout=4.0):
+        self.out.send(mido.Message("sysex", data=[0x7D, ord("F"), ord("M"), ord("1"), ord("T"), 2, 0]))
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            snap = read_snapshot(self.inp, self.out, timeout=0.5)
+            if snap is not None and int(snap.get("chaos_amount", -1)) == original:
+                print("Maelstrom restored: amount={}".format(original))
+                self.rows.append({"host_time_utc": stamp(), "phase": "maelstrom-restore", "requested_notes": 0, "port": self.port, **snap})
+                return True
+        print("WARNING: restore not confirmed; firmware auto-restores after five minutes.")
+        return False
+
+    def held_phase(self, count, seconds, label=""):
+        phase = f"{label}hold-{count}"
         notes = list(range(BASE_NOTE, BASE_NOTE + count))
         all_off(self.out)
         send_on(self.out, notes)
@@ -117,8 +141,8 @@ class Run:
             all_off(self.out)
             time.sleep(0.12)
 
-    def chord_churn(self, seconds):
-        phase = "chord-churn"
+    def chord_churn(self, seconds, label=""):
+        phase = f"{label}chord-churn"
         print(f"\n[{phase}] rotating four-note chords for {seconds:.1f}s")
         active = []
         end = time.monotonic() + seconds
@@ -226,14 +250,24 @@ def main():
                 f"Preflight rejected: fx_enabled_mask=0x{int(fx):x}; "
                 "bypass every FX before this zero-FX test."
             )
-        print(f"Preflight OK: active patch mask=0x{int(active):x}; FX mask=0x{int(fx):x}")
-        print("The test changes no presets or settings. Sending MIDI stress patterns; Ctrl-C is safe.")
-        run.wait_and_sample("idle-baseline", 0, 2.0)
-        for count in (1, 2, 4, 8, 12):
-            run.held_phase(count, args.phase_seconds)
-        run.chord_churn(args.churn_seconds)
-        all_off(out)
-        run.wait_and_sample("release-check", 0, 2.0)
+        original_chaos = int(baseline.get("chaos_amount", -1))
+        if original_chaos < 0 or original_chaos > 100:
+            raise RuntimeError("Firmware lacks valid chaos_amount telemetry; flash the updated diagnostic build.")
+        print(f"Preflight OK: active patch mask=0x{int(active):x}; other FX mask=0x{int(fx):x}; saved Maelstrom amount={original_chaos}")
+        print("Automated A/B: two-engine polyphony and chord churn with Maelstrom OFF, then ON.")
+        on_amount = max(original_chaos, 60)
+        try:
+            for enabled, label in ((False, "maelstrom-off/"), (True, "maelstrom-on/")):
+                run.set_maelstrom(enabled, on_amount)
+                run.wait_and_sample(label + "idle", 0, 2.0)
+                for count in (1, 2, 4, 8, 12):
+                    run.held_phase(count, args.phase_seconds, label)
+                run.chord_churn(args.churn_seconds, label)
+                all_off(out)
+                run.wait_and_sample(label + "release", 0, 2.0)
+        finally:
+            all_off(out)
+            run.restore_maelstrom(original_chaos)
         run.write_csv()
         result = run.report()
     except KeyboardInterrupt:
