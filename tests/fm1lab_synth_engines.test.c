@@ -156,7 +156,8 @@ int main(void)
         assert(fm1lab_synth_set_pitch(&pitch, 72 * 256) == 0);
         assert(pitch.phase == phase_a && pitch.phase_b == phase_b);
         assert(pitch.phase_inc >= old_inc * 2u - 2u && pitch.phase_inc <= old_inc * 2u + 2u);
-        assert(pitch.phase_inc_b >= pitch.phase_inc);
+        if(engine==FM1LAB_SYNTH_PSG) assert(pitch.phase_inc_b<pitch.phase_inc);
+        else assert(pitch.phase_inc_b >= pitch.phase_inc);
         uint32_t bent_inc = pitch.phase_inc;
         assert(fm1lab_synth_set_pitch(&pitch, 72 * 256 + 128) == 0);
         assert(pitch.phase_inc > bent_inc);
