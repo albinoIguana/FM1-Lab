@@ -309,11 +309,11 @@ static void render_chaos(uint8_t amount,uint8_t rate,uint8_t tone,uint8_t shape,
 
 static void render_chaos_tempo(uint16_t bpm,int32_t *destination)
 {
-    fm6_performance_state_t state;
+    fm1lab_live_performance_state_t state;
     fm6_init();
-    fm6_performance_state_get(&state);
+    fm6_live_performance_state_get(&state);
     state.tempo_bpm=bpm;
-    assert(fm6_performance_state_update(&state)==0);
+    assert(fm6_live_performance_state_update(&state)==0);
     fm6_chaos_set(100u,42u,50u,0u);
     fm6_note_on_mask(60u,110u,0x0fu);
     for(unsigned block=0u;block<32u;block++)
@@ -442,14 +442,14 @@ int main(void) {
     assert(memcmp(chunk_a,chunk_b,32u*TEST_WORDS*sizeof(int32_t))!=0);
     fm6_init();
     {
-        fm6_performance_state_t wet_budget;
+        fm1lab_live_performance_state_t wet_budget;
         unsigned total_wet=0u;
-        fm6_performance_state_get(&wet_budget);
+        fm6_live_performance_state_get(&wet_budget);
         for(unsigned fx=0u;fx<4u;fx++) {
             wet_budget.fx_enabled[fx]=1u;
             wet_budget.fx_mix[fx]=100u;
         }
-        assert(fm6_performance_state_update(&wet_budget)==0);
+        assert(fm6_live_performance_state_update(&wet_budget)==0);
         for(unsigned fx=0u;fx<4u;fx++) {
             unsigned effective=fm6_test_fx_mix_effective((uint8_t)fx);
             total_wet+=effective;
@@ -459,12 +459,12 @@ int main(void) {
     }
     fm6_init();
     {
-        fm6_performance_state_t state,check;
-        fm6_performance_state_get(&state);
+        fm1lab_live_performance_state_t state,check;
+        fm6_live_performance_state_get(&state);
         state.chaos_amount=73u;state.chaos_rate=88u;state.chaos_tone=29u;state.chaos_shape=5u;
-        assert(fm6_performance_state_valid(&state));
-        assert(fm6_performance_state_update(&state)==0);
-        fm6_performance_state_get(&check);
+        assert(fm6_live_performance_state_valid(&state));
+        assert(fm6_live_performance_state_update(&state)==0);
+        fm6_live_performance_state_get(&check);
         assert(check.chaos_amount==73u&&check.chaos_rate==88u&&check.chaos_tone==29u&&check.chaos_shape==5u);
     }
 
@@ -1018,43 +1018,43 @@ int main(void) {
      * field. That made the complete performance snapshot invalid, silently
      * rejecting FX-page edits as well as ARP/sequencer updates. */
     fm6_init();
-    fm6_performance_state_t gate_state, gate_check;
-    fm6_performance_state_get(&gate_state);
+    fm1lab_live_performance_state_t gate_state, gate_check;
+    fm6_live_performance_state_get(&gate_state);
     gate_state.arp_step_gate[0]=100u;
-    assert(!fm6_performance_state_valid(&gate_state));
+    assert(!fm6_live_performance_state_valid(&gate_state));
     gate_state.arp_step_gate[0]=1u;
     gate_state.fx_enabled[FM6_FX_CHORUS]=1u;
     gate_state.fx_mix[FM6_FX_CHORUS]=73u;
-    assert(fm6_performance_state_valid(&gate_state));
-    assert(fm6_performance_state_update(&gate_state)==0);
-    fm6_performance_state_get(&gate_check);
+    assert(fm6_live_performance_state_valid(&gate_state));
+    assert(fm6_live_performance_state_update(&gate_state)==0);
+    fm6_live_performance_state_get(&gate_check);
     assert(gate_check.fx_enabled[FM6_FX_CHORUS]==1u);
     assert(gate_check.fx_mix[FM6_FX_CHORUS]==73u);
 
     /* Performance state snapshot/restore covers every sequencer step, lane
      * assignment, tempo, arp mode, effect control and per-patch send. */
-    fm6_performance_state_t saved, restored;
+    fm1lab_live_performance_state_t saved, restored;
     fm6_init();
-    fm6_performance_state_get(&saved);
+    fm6_live_performance_state_get(&saved);
     memset(&restored, 0, sizeof restored);
     saved.tempo_bpm = 137u;
     saved.seq_length = 48u;
-    saved.lane_instrument[0] = 2u;
-    saved.lane_instrument[1] = 0u;
+    saved.instrument = 2u;
+    
     /* V10 compatibility records retain two lanes; live state preserves lane 0. */
-    saved.seq_event_count[0] = 3u;
-    saved.seq_events[0][0] = (fm6_seq_event_t){0u,8u,60u,112u,25u};
-    saved.seq_events[0][1] = (fm6_seq_event_t){0u,8u,64u,96u,0u};
-    saved.seq_events[0][2] = (fm6_seq_event_t){12u,4u,67u,88u,50u};
-    saved.seq_event_count[1] = 0u;
+    saved.seq_event_count = 3u;
+    saved.seq_events[0] = (fm6_seq_event_t){0u,8u,60u,112u,25u};
+    saved.seq_events[1] = (fm6_seq_event_t){0u,8u,64u,96u,0u};
+    saved.seq_events[2] = (fm6_seq_event_t){12u,4u,67u,88u,50u};
+    
     for (unsigned lane = 0; lane < 1u; ++lane)
         for (unsigned step = 0; step < 64u; ++step) {
-            saved.seq_enabled[lane][step] = (uint8_t)((step % 3u) == lane);
-            saved.seq_note[lane][step] = (uint8_t)(36u + lane * 12u + step % 48u);
-            saved.seq_velocity[lane][step] = (uint8_t)(70u + step % 58u);
-            saved.seq_gate[lane][step] = (uint8_t)(10u + step % 91u);
+            saved.seq_enabled[step] = (uint8_t)((step % 3u) == lane);
+            saved.seq_note[step] = (uint8_t)(36u + lane * 12u + step % 48u);
+            saved.seq_velocity[step] = (uint8_t)(70u + step % 58u);
+            saved.seq_gate[step] = (uint8_t)(10u + step % 91u);
             if (lane == 0u && step > 0u && step < 4u)
-                saved.seq_gate[lane][step] |= 0x80u; /* tied continuation */
+                saved.seq_gate[step] |= 0x80u; /* tied continuation */
         }
     saved.arp_mode=3u;saved.arp_division=4u;saved.arp_gate=63u;
     saved.arp_octaves=3u;saved.arp_length=8u;saved.arp_output=2u;
@@ -1064,9 +1064,6 @@ int main(void) {
         saved.arp_step_accent[step]=(uint8_t)(step*5u);
         saved.arp_step_gate[step]=(uint8_t)(step&1u);
     }
-    saved.compressor_enabled=1u; saved.compressor_threshold=42u;
-    saved.compressor_ratio=67u; saved.compressor_attack=15u;
-    saved.compressor_release=75u; saved.compressor_makeup=10u;
     for (unsigned fx = 0; fx < 3u; ++fx) {
         saved.fx_enabled[fx] = 1u;
         saved.fx_mix[fx] = (uint8_t)(30u + fx * 20u);
@@ -1076,28 +1073,25 @@ int main(void) {
         for (unsigned patch = 0; patch < FM1LAB_PATCH_COUNT; ++patch)
             saved.fx_send[patch][fx] = (uint8_t)(patch * 20u + fx * 5u);
     }
-    assert(fm6_performance_state_valid(&saved));
+    assert(fm6_live_performance_state_valid(&saved));
     fm6_init();
-    assert(fm6_performance_state_set(&saved) == 0);
+    assert(fm6_live_performance_state_set(&saved) == 0);
     assert(fm6_sequencer_running() == 0u);
-    fm6_performance_state_get(&restored);
+    fm6_live_performance_state_get(&restored);
     assert(memcmp(&saved, &restored, sizeof saved) == 0);
-    restored.seq_events[0][0].duration = 0u;
-    assert(!fm6_performance_state_valid(&restored));
-    restored.seq_events[0][0] = saved.seq_events[0][0];
-    restored.seq_event_count[1] = 129u;
-    assert(!fm6_performance_state_valid(&restored));
-    restored.seq_event_count[1] = saved.seq_event_count[1];
+    restored.seq_events[0].duration = 0u;
+    assert(!fm6_live_performance_state_valid(&restored));
+    restored.seq_events[0] = saved.seq_events[0];
+    restored.seq_event_count = 129u;
+    assert(!fm6_live_performance_state_valid(&restored));
+    restored.seq_event_count = saved.seq_event_count;
     restored.fx_depth[FM6_FX_PHASER] = 101u;
-    assert(!fm6_performance_state_valid(&restored));
+    assert(!fm6_live_performance_state_valid(&restored));
     restored.fx_depth[FM6_FX_PHASER] = saved.fx_depth[FM6_FX_PHASER];
-    restored.compressor_makeup=101u;
-    assert(!fm6_performance_state_valid(&restored));
-    restored.compressor_makeup=saved.compressor_makeup;
     restored.tempo_bpm = 29u;
-    assert(!fm6_performance_state_valid(&restored));
-    assert(fm6_performance_state_set(&restored) == -1);
-    fm6_performance_state_get(&restored);
+    assert(!fm6_live_performance_state_valid(&restored));
+    assert(fm6_live_performance_state_set(&restored) == -1);
+    fm6_live_performance_state_get(&restored);
     assert(memcmp(&saved, &restored, sizeof saved) == 0);
     fm6_sequencer_set_running(1u);
     assert(fm6_sequencer_running() == 1u);
@@ -1106,18 +1100,18 @@ int main(void) {
     /* Live performance updates must preserve a held-note arp and its running
      * phase rather than invoking the cold-restore path. */
     fm6_init();
-    fm6_performance_state_get(&saved);
+    fm6_live_performance_state_get(&saved);
     saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=100u;
-    assert(fm6_performance_state_set(&saved)==0);
+    assert(fm6_live_performance_state_set(&saved)==0);
     fm6_note_on(60u,100u);
     for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
     assert(fm6_active_voices()==0u); /* 5512 samples: before first 1/16 note */
     fm6_render(output,9u,4096u);
     assert(fm6_arpeggiator_active()==1u);
     assert(fm6_active_voices()>0u);
-    fm6_performance_state_get(&restored);
+    fm6_live_performance_state_get(&restored);
     restored.arp_gate=55u;
-    assert(fm6_performance_state_update(&restored)==0);
+    assert(fm6_live_performance_state_update(&restored)==0);
     assert(fm6_arpeggiator_active()==1u); /* update retained the sounding note */
     for(unsigned block=0;block<8u;block++)fm6_render(output,128u,4096u);
     assert(fm6_arpeggiator_active()==1u);
@@ -1130,11 +1124,11 @@ int main(void) {
     uint8_t amp_gain_levels[2]={0u,0u};
     for(unsigned gain_case=0;gain_case<2u;gain_case++){
         fm6_init();
-        fm6_performance_state_get(&saved);
+        fm6_live_performance_state_get(&saved);
         saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=100u;
         saved.arp_length=8u;saved.arp_output=1u;
         saved.arp_step_gain[0]=(uint8_t)(gain_case?127u:0u);
-        assert(fm6_performance_state_set(&saved)==0);
+        assert(fm6_live_performance_state_set(&saved)==0);
         fm6_note_on(60u,100u);
         assert(fm6_active_voices()>0u);
         for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
@@ -1148,11 +1142,11 @@ int main(void) {
     /* Per-step gate scales the global gate and closes AMP output early. */
     uint8_t amp_gate_levels[2]={0u,0u};
     for(unsigned gate_case=0;gate_case<2u;gate_case++){
-        fm6_init();fm6_performance_state_get(&saved);
+        fm6_init();fm6_live_performance_state_get(&saved);
         saved.arp_mode=1u;saved.arp_division=4u;saved.arp_gate=20u;
         saved.arp_length=8u;saved.arp_output=1u;
         saved.arp_step_gate[0]=(uint8_t)(gate_case?1u:0u);
-        assert(fm6_performance_state_set(&saved)==0);
+        assert(fm6_live_performance_state_set(&saved)==0);
         fm6_note_on(60u,100u);
         for(unsigned block=0;block<43u;block++)fm6_render(output,128u,4096u);
         fm6_render(output,9u,4096u);
@@ -1161,9 +1155,9 @@ int main(void) {
         fm6_note_off(60u);
     }
     assert(amp_gate_levels[0]<=3u&&amp_gate_levels[1]>=100u);
-    fm6_performance_state_get(&saved);
+    fm6_live_performance_state_get(&saved);
     saved.arp_step_gate[0]=2u;
-    assert(!fm6_performance_state_valid(&saved));
+    assert(!fm6_live_performance_state_valid(&saved));
 
     /* Legacy Amp/Drive and EQ controls remain readable but are intentionally
      * bypassed in the reduced stability build. */
@@ -1281,10 +1275,10 @@ int main(void) {
     fm6_render(output,128u,4096u); /* audio-owner applies the clear request */
     assert(fm6_test_sequencer_active_events(0u)==0u);
     {
-        fm6_performance_state_t cleared;
-        fm6_performance_state_get(&cleared);
-        assert(cleared.seq_event_count[0]==0u);
-        for(unsigned step=0u;step<64u;step++)assert(cleared.seq_enabled[0][step]==0u);
+        fm1lab_live_performance_state_t cleared;
+        fm6_live_performance_state_get(&cleared);
+        assert(cleared.seq_event_count==0u);
+        for(unsigned step=0u;step<64u;step++)assert(cleared.seq_enabled[step]==0u);
     }
     fm6_sequencer_set_running(0u);
 

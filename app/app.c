@@ -211,8 +211,6 @@ enum { EV_NOTE_ON = FM1LAB_EVENT_NOTE_ON, EV_NOTE_OFF = FM1LAB_EVENT_NOTE_OFF,
        EV_PERFORMANCE_APPLY = FM1LAB_EVENT_PERFORMANCE_APPLY,
        EV_SEQ_RUN = FM1LAB_EVENT_SEQ_RUN, EV_PATCH_PITCH = FM1LAB_EVENT_PATCH_PITCH };
 static fm1lab_live_performance_state_t performance_update_snapshot;
-static fm6_performance_state_t performance_update_compat_snapshot;
-static fm6_performance_state_t performance_restore_compat_snapshot;
 static volatile uint8_t performance_update_pending, performance_update_dirty;
 typedef struct { volatile uint8_t type, a, b, c; } ui_event_t;
 static volatile ui_event_t ui_events[64];
@@ -1001,10 +999,8 @@ static void app_resync(void)
     fm6_master_insert_reset_state();
     for(uint32_t field=0u;field<FM6_INSERT_FIELD_COUNT;field++)
         fm6_master_insert_set(field,fm1lab_insert_state_get(&current_inserts,field));
-    if (fm1lab_live_performance_from_compat(&performance_update_snapshot, &set.performance) == 0 &&
-        fm1lab_live_performance_to_compat(&performance_restore_compat_snapshot,
-                                          &performance_update_snapshot) == 0)
-        (void)fm6_performance_state_set(&performance_restore_compat_snapshot);
+    if (fm1lab_live_performance_from_compat(&performance_update_snapshot, &set.performance) == 0)
+        (void)fm6_live_performance_state_set(&performance_update_snapshot);
     fm6_sequencer_set_lane(0u,0u);
     ui_event_tail=ui_event_head;
     ui_event_overflow=0u;
@@ -1059,7 +1055,7 @@ static void ui_events_drain(void)
             instrument_apply_pending = 0u;
             voice_dirty = 0u;
         } else if (type == EV_PERFORMANCE_APPLY) {
-            (void)fm6_performance_state_update(&performance_update_compat_snapshot);
+            (void)fm6_live_performance_state_update(&performance_update_snapshot);
             performance_update_pending = 0u;
         } else if (type == EV_SEQ_RUN)
             fm6_sequencer_set_running(a);
@@ -1677,7 +1673,9 @@ static void settings_defaults(void)
         for (uint32_t m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             set.macros[p][m] = 50u;
     }
-    fm6_performance_state_get(&set.performance);
+    { fm1lab_live_performance_state_t initial_performance;
+      fm6_live_performance_state_get(&initial_performance);
+      (void)fm1lab_live_performance_to_compat(&set.performance,&initial_performance); }
     settings_seal(&set);
 }
 
@@ -1863,11 +1861,8 @@ void app_init(void)
      * before audio_init; the own BLE stack locks the top-of-RAM vector window
      * after attaching its IRQs, which would block the later ALNK0 registration. */
     if (performance_loaded &&
-        fm1lab_live_performance_from_compat(&performance_update_snapshot,
-                                             &set.performance) == 0 &&
-        fm1lab_live_performance_to_compat(&performance_restore_compat_snapshot,
-                                           &performance_update_snapshot) == 0 &&
-        fm6_performance_state_set(&performance_restore_compat_snapshot) == 0) {
+        fm1lab_live_performance_from_compat(&performance_update_snapshot, &set.performance) == 0 &&
+        fm6_live_performance_state_set(&performance_update_snapshot) == 0) {
         transport_ui_bpm = performance_update_snapshot.tempo_bpm;
         arp_ui_mode=performance_update_snapshot.arp_mode;
         arp_ui_division=performance_update_snapshot.arp_division;
@@ -1913,7 +1908,6 @@ void app_init(void)
         if (performance_update_snapshot.arp_mode != 0u) {
             set.performance.arp_mode = 0u;
             performance_update_snapshot.arp_mode = 0u;
-            performance_restore_compat_snapshot.arp_mode = 0u;
             arp_ui_mode = 0u;
             fm6_arpeggiator_set_mode(0u);
             set_dirty = 1u;
@@ -4623,10 +4617,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
     app_host_event_test_active=1u;
     instrument_apply_snapshot=current_instrument;
     inserts_apply_snapshot=current_inserts;
-    if (fm1lab_live_performance_from_compat(&performance_update_snapshot,
-                                             &set.performance) != 0 ||
-        fm1lab_live_performance_to_compat(&performance_update_compat_snapshot,
-                                          &performance_update_snapshot) != 0)
+    if (fm1lab_live_performance_from_compat(&performance_update_snapshot, &set.performance) != 0)
         return 1;
     instrument_apply_pending=1u;
     performance_update_pending=1u;

@@ -14,7 +14,7 @@
  * are absent from the destination type. */
 static inline int fm1lab_live_performance_from_compat(
     fm1lab_live_performance_state_t *dst,
-    const fm6_performance_state_t *src)
+    const fm6_performance_state_compat_t *src)
 {
     if (!dst || !src || src->seq_event_count[0] > 128u) return -1;
     *dst = (fm1lab_live_performance_state_t){0};
@@ -71,13 +71,13 @@ static inline int fm1lab_live_performance_from_compat(
  * DSP internals are migrated. Lane 1 and retired compressor controls are
  * deliberately initialized to inert compatibility defaults. */
 static inline int fm1lab_live_performance_to_compat(
-    fm6_performance_state_t *dst,
+    fm6_performance_state_compat_t *dst,
     const fm1lab_live_performance_state_t *src)
 {
     if (!dst || !src || src->instrument >= 32u ||
         src->seq_length < 1u || src->seq_length > 64u ||
         src->seq_event_count > 128u) return -1;
-    *dst = (fm6_performance_state_t){0};
+    *dst = (fm6_performance_state_compat_t){0};
     dst->tempo_bpm = src->tempo_bpm;
     dst->seq_length = src->seq_length;
     dst->lane_instrument[0] = src->instrument;

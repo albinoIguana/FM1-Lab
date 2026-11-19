@@ -16,7 +16,7 @@ _Static_assert(sizeof(settings_v10_t) < sizeof(settings_t), "V11 MAELSTROM recor
 
 /* The record codec delegates performance-state validation to FM6. Keep this
  * unit test focused on the settings envelope and migration boundary. */
-int fm6_performance_state_valid(const fm6_performance_state_t *s)
+int fm6_compat_performance_state_valid(const fm6_performance_state_compat_t *s)
 {
     if (!s || s->tempo_bpm < 30u || s->tempo_bpm > 300u ||
         s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 4u ||
@@ -414,7 +414,7 @@ int main(void)
     {
         fm1lab_live_performance_state_t live;
         memset(&live, 0xA5, sizeof live);
-        fm6_performance_state_t compatibility = good.performance;
+        fm6_performance_state_compat_t compatibility = good.performance;
         compatibility.lane_instrument[0] = 7u;
         compatibility.lane_instrument[1] = 19u;
         compatibility.seq_enabled[0][3] = 1u;
@@ -447,7 +447,7 @@ int main(void)
         assert(fm1lab_live_performance_from_compat(NULL, &compatibility) == -1);
 
         {
-            fm6_performance_state_t roundtrip;
+            fm6_performance_state_compat_t roundtrip;
             assert(fm1lab_live_performance_to_compat(&roundtrip, &live) == 0);
             assert(roundtrip.lane_instrument[0] == 7u);
             assert(roundtrip.lane_instrument[1] == 0u);
@@ -461,12 +461,12 @@ int main(void)
             assert(roundtrip.fx_send[3][FM6_FX_PHASER] == 72u);
             assert(roundtrip.chaos_amount == 83u && roundtrip.chaos_rate == 37u);
             assert(roundtrip.compressor_enabled == 0u);
-            assert(fm6_performance_state_valid(&roundtrip));
+            assert(fm6_compat_performance_state_valid(&roundtrip));
             assert(fm1lab_live_performance_to_compat(&roundtrip, NULL) == -1);
         }
         {
             fm1lab_live_performance_state_t invalid = live;
-            fm6_performance_state_t rejected;
+            fm6_performance_state_compat_t rejected;
             invalid.instrument = 32u;
             assert(fm1lab_live_performance_to_compat(&rejected, &invalid) == -1);
         }
