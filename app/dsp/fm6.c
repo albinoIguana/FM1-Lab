@@ -953,7 +953,7 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
     for (i = 0; i < PATCHES; i++) {
         fm1lab_patch_t *p = &instrument[i];
         fm1lab_voice_t *v;
-        if (!(patch_mask & (1u << i)) || !p->enabled || !p->level)
+        if (!(patch_mask & (1u << i)) || !(fm6_patch_active_mask() & (1u << i)) || !p->enabled || !p->level)
             continue;
         v = fm6_allocate_voice(i);
         v->patch = (uint8_t)i;
@@ -996,7 +996,7 @@ void fm6_note_on_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patch_mask,int
     if(note>127u || !velocity) return;
     if(arp_mode) {
         uint32_t pos=0u;
-        arp_patch_mask=patch_mask;
+        arp_patch_mask=(uint8_t)(patch_mask & fm6_patch_active_mask());
         if(!arp_count){arp_index=0u;arp_direction=1u;arp_step_position=0u;arp_phase=0u;}
         while(pos<arp_count && arp_notes[pos]<note) ++pos;
         if(pos<arp_count && arp_notes[pos]==note) return;
@@ -1984,6 +1984,21 @@ uint8_t fm6_master_comp_get(uint32_t field)
     return fm6_comp_makeup;
 }
 
+/* Two engine slots maximum. The first two enabled, non-zero-level slots are
+ * active; mute earlier slots to select later engine types. */
+uint8_t fm6_patch_active_mask(void)
+{
+    uint8_t mask=0u; uint32_t active=0u;
+    for(uint32_t patch=0u;patch<PATCHES && active<2u;++patch)
+        if(instrument[patch].enabled && instrument[patch].level) {
+            mask|=(uint8_t)(1u<<patch); ++active;
+        }
+    return mask;
+}
+uint8_t fm6_patch_is_active(uint32_t patch)
+{
+    return patch<PATCHES && (fm6_patch_active_mask()&(uint8_t)(1u<<patch))!=0u;
+}
 uint32_t fm6_patch_count(void) { return PATCHES; }
 const char *fm6_patch_name(uint32_t patch) { return patch < PATCHES ? (const char *)&instrument[patch].base[FP_NAME] : ""; }
 uint8_t fm6_patch_enabled(uint32_t patch) { return patch < PATCHES ? instrument[patch].enabled : 0; }

@@ -125,7 +125,7 @@ uint8_t fm6_test_effective_byte(uint32_t patch, uint32_t byte_index);
 uint32_t fm6_test_sequencer_active_events(uint8_t lane);
 #endif
 
-uint32_t fm6_patch_count(void);
+uint8_t fm6_patch_active_mask(void);\nuint8_t fm6_patch_is_active(uint32_t patch);\nuint32_t fm6_patch_count(void);
 const char *fm6_patch_name(uint32_t patch);
 uint8_t fm6_patch_enabled(uint32_t patch);
 void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled);

@@ -195,21 +195,34 @@ static void render_four_engine_fx_case(uint8_t fx_mask, uint8_t shifted_patch,
     fm6_render(destination,TEST_FRAMES,4096u);
 }
 
-static void test_four_engine_audibility_across_fx_combinations(void)
+static void test_two_engine_runtime_cap_across_fx_combinations(void)
 {
-    for (uint8_t fx_mask=0u; fx_mask<(1u<<FM6_FX_COUNT); ++fx_mask) {
-        render_four_engine_fx_case(fx_mask,0xffu,chunk_a);
-        assert(peak(chunk_a,TEST_WORDS)>0);
-        for (unsigned patch=0u; patch<FM1LAB_PATCH_COUNT; ++patch)
-            assert(fm6_test_patch_peak(patch)>0u);
-
-        for (unsigned shifted=0u; shifted<FM1LAB_PATCH_COUNT; ++shifted) {
-            render_four_engine_fx_case(fx_mask,(uint8_t)shifted,chunk_b);
-            assert(peak(chunk_b,TEST_WORDS)>0);
-            /* All four sources remain active, so this isolates whether the
-             * selected engine survives the shared FX and master output path. */
-            assert(memcmp(chunk_a,chunk_b,sizeof output)!=0);
+    for(uint8_t fx_mask=0u;fx_mask<(1u<<FM6_FX_COUNT);++fx_mask) {
+        fm6_init();
+        for(unsigned p=0u;p<FM1LAB_PATCH_COUNT;++p) {
+            fm6_patch_set_enabled(p,1u);fm6_patch_set_level(p,31u);
+            for(unsigned fx=0u;fx<FM6_FX_COUNT;++fx)fm6_fx_set_send(p,(uint8_t)fx,100u);
         }
+        assert(fm6_patch_active_mask()==0x03u);
+        for(unsigned fx=0u;fx<FM6_FX_COUNT;++fx) {
+            fm6_fx_set_enabled((uint8_t)fx,(uint8_t)((fx_mask&(1u<<fx))!=0u));
+            fm6_fx_set_mix((uint8_t)fx,100u);fm6_fx_set_time((uint8_t)fx,100u);
+            fm6_fx_set_feedback((uint8_t)fx,(uint8_t)(fx==FM6_FX_CHORUS?70u:90u));
+            fm6_fx_set_depth((uint8_t)fx,100u);
+        }
+        for(unsigned p=0u;p<FM1LAB_PATCH_COUNT;++p)
+            fm6_note_on_mask((uint8_t)(60u+p*7u),110u,(uint8_t)(1u<<p));
+        assert(fm6_active_voices()==2u);
+        assert(fm6_active_voices_patch(0u)==1u && fm6_active_voices_patch(1u)==1u);
+        assert(fm6_active_voices_patch(2u)==0u && fm6_active_voices_patch(3u)==0u);
+        fm6_render(output,TEST_FRAMES,4096u);assert(peak(output,TEST_WORDS)>0);
+        fm6_init();fm6_patch_set_level(0u,0u);fm6_patch_set_level(1u,0u);
+        assert(fm6_patch_active_mask()==0x0cu);
+        fm6_note_on_mask(60u,110u,0x0fu);
+        assert(fm6_active_voices()==2u);
+        assert(fm6_active_voices_patch(0u)==0u && fm6_active_voices_patch(1u)==0u);
+        assert(fm6_active_voices_patch(2u)==1u && fm6_active_voices_patch(3u)==1u);
+        fm6_render(output,TEST_FRAMES,4096u);assert(peak(output,TEST_WORDS)>0);
     }
 }
 
@@ -404,7 +417,7 @@ static void test_single_instrument_capacity(void)
 
 
 int main(void) {
-    test_four_engine_audibility_across_fx_combinations();
+    test_two_engine_runtime_cap_across_fx_combinations();
     assert(fm1lab_patch_engine_for_context(0u)==FM1LAB_PATCH_ENGINE_FM6);
     assert(fm1lab_patch_engine_for_context(1u)==FM1LAB_PATCH_ENGINE_WAVETABLE);
     assert(fm1lab_patch_engine_for_context(2u)==FM1LAB_PATCH_ENGINE_PSG);
@@ -440,10 +453,10 @@ int main(void) {
 
     /* One four-slot Instrument: eight notes fan out to 32 mixed-engine voices,
      * all owned by CPU2. Every engine state survives backup/rollback. */
-    render_cpu2_mode(0u, 0x0fu, 32u, chunk_a);
-    render_cpu2_mode(1u, 0x0fu, 32u, chunk_b);
+    render_cpu2_mode(0u, 0x0fu, 16u, chunk_a);
+    render_cpu2_mode(1u, 0x0fu, 16u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
-    render_cpu2_mode(2u, 0x0fu, 32u, chunk_b);
+    render_cpu2_mode(2u, 0x0fu, 16u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     test_engine_native_patch_changes_audio();
 

@@ -3113,7 +3113,7 @@ static void draw_home_panel(void)
         int32_t x = 2 + (int32_t)(p & 1u) * 120;
         int32_t y = 7 + (int32_t)(p >> 1u) * 85;
         uint16_t accent = patch_color(p);
-        int enabled = set.levels[p] != 0u;
+        int enabled = set.levels[p] != 0u;\n        int active = fm6_patch_is_active(p);
         rounded_panel(x, y, 116, 85, 3, panel_fill(),
                       (!patch_focus || p == set.patch) ? accent : C_LINE);
         cv_rect(x + 5, y + 7, 2, 70, accent);
