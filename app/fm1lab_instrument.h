@@ -65,6 +65,11 @@ int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
 /* Replace an FM6 voice while preserving slot-owned mix, tuning, pan and macros. */
 int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
                                const uint8_t voice[FM1LAB_PATCH_BYTES]);
+/* Engine-native patch payloads for Wavetable, PSG and Subtractive slots. */
+int fm1lab_patch_set_synth(fm1lab_instrument_t *instrument, unsigned patch,
+                           const fm1lab_synth_patch_t *settings);
+int fm1lab_patch_replace_synth(fm1lab_instrument_t *instrument, unsigned patch,
+                               const fm1lab_synth_patch_t *settings);
 
 /* Validate the complete serialized value before loading or saving it. */
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument);
