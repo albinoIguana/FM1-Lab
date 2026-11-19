@@ -146,6 +146,7 @@ static volatile uint32_t fm6_cpu2_job_us, fm6_cpu2_wait_us;
 /* Per-callback accounting. Tick sums retain sub-microsecond quantum precision;
  * maxima remain separate so they are never mistaken for callback totals. */
 static volatile uint32_t fm6_cpu0_voice_ticks, fm6_cpu0_postmix_ticks;
+static volatile uint32_t fm6_cpu0_fx_ticks, fm6_cpu0_output_ticks;
 static volatile uint32_t fm6_cpu2_job_ticks_sum, fm6_cpu2_wait_ticks_sum;
 static volatile uint32_t fm6_cpu2_backup_ticks_sum, fm6_cpu2_backup_voice_total;
 static volatile uint32_t fm6_render_quanta, fm6_cpu2_quanta, fm6_cpu2_dispatches, fm6_cpu2_fallbacks;
@@ -1236,6 +1237,8 @@ uint32_t fm6_cpu2_last_job_us(void) { return fm6_cpu2_job_us; }
 uint32_t fm6_cpu2_last_wait_us(void) { return fm6_cpu2_wait_us; }
 uint32_t fm6_cpu0_voice_us(void) { return fm6_cpu0_voice_ticks/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu0_postmix_us(void) { return fm6_cpu0_postmix_ticks/PLAT_TICKS_PER_US; }
+uint32_t fm6_cpu0_fx_us(void) { return fm6_cpu0_fx_ticks/PLAT_TICKS_PER_US; }
+uint32_t fm6_cpu0_output_us(void) { return fm6_cpu0_output_ticks/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_job_sum_us(void) { return fm6_cpu2_job_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_wait_sum_us(void) { return fm6_cpu2_wait_ticks_sum/PLAT_TICKS_PER_US; }
 uint32_t fm6_cpu2_backup_sum_us(void) { return fm6_cpu2_backup_ticks_sum/PLAT_TICKS_PER_US; }
@@ -1265,6 +1268,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
     fm6_cpu2_wait_us=0u;
     fm6_cpu0_voice_ticks=0u;
     fm6_cpu0_postmix_ticks=0u;
+    fm6_cpu0_fx_ticks=0u;
+    fm6_cpu0_output_ticks=0u;
     fm6_cpu2_job_ticks_sum=0u;
     fm6_cpu2_wait_ticks_sum=0u;
     fm6_cpu2_backup_ticks_sum=0u;
@@ -1541,9 +1546,12 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
                 }
             }
             int64_t left=0,right=0;
+            uint32_t fx_t0=plat_ticks24();
             fm6_fx_process(trimmed_dry_l,trimmed_dry_r,sends,&left,&right);
             /* The retained four-effect bus feeds the output stage directly. */
             fm6_chaos_process(&left,&right);
+            fm6_cpu0_fx_ticks+=plat_ticks24()-fx_t0;
+            uint32_t output_t0=plat_ticks24();
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * The output stage adds the requested 6 dB; calibrated Instrument
              * levels preserve headroom, with the stereo-linked limiter as backup. */
@@ -1595,6 +1603,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             stereo[(base+i)*2u] = (int32_t)out_l;
             stereo[(base+i)*2u+1u] = (int32_t)out_r;
         }
+        fm6_cpu0_output_ticks+=plat_ticks24()-output_t0;
         fm6_cpu0_postmix_ticks += plat_ticks24()-postmix_t0;
     }
 

@@ -56,6 +56,7 @@ static volatile uint32_t render_heartbeat;
 static volatile uint8_t app_resync_requested;
 static fm1lab_pending_watch_t pending_watch;
 static volatile uint32_t render_cpu0_voice_us, render_cpu0_postmix_us;
+static volatile uint32_t render_cpu0_fx_us, render_cpu0_output_us;
 static volatile uint32_t render_cpu2_job_sum_us, render_cpu2_wait_sum_us;
 static volatile uint32_t render_cpu2_backup_ns, render_cpu2_backup_voices;
 static volatile uint32_t render_ui_us, render_midi_us, render_gain_us;
@@ -1541,6 +1542,8 @@ void app_log(void (*line)(const char *t))
     app_diag_log_u32(line,"cpu0_busy_us",render_core0_active_us);
     app_diag_log_u32(line,"cpu0_voice_us",render_cpu0_voice_us);
     app_diag_log_u32(line,"cpu0_postmix_us",render_cpu0_postmix_us);
+    app_diag_log_u32(line,"cpu0_fx_us",render_cpu0_fx_us);
+    app_diag_log_u32(line,"cpu0_output_us",render_cpu0_output_us);
     app_diag_log_u32(line,"cpu2_job_sum_us",render_cpu2_job_sum_us);
     app_diag_log_u32(line,"cpu2_wait_sum_us",render_cpu2_wait_sum_us);
     app_diag_log_u32(line,"cpu2_job_max_us",render_cpu2_job_us);
@@ -1614,6 +1617,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         render_cpu2_wait_us=fm6_cpu2_last_wait_us();
         render_cpu0_voice_us=fm6_cpu0_voice_us();
         render_cpu0_postmix_us=fm6_cpu0_postmix_us();
+        render_cpu0_fx_us=fm6_cpu0_fx_us();
+        render_cpu0_output_us=fm6_cpu0_output_us();
         render_cpu2_job_sum_us=fm6_cpu2_job_sum_us();
         render_cpu2_wait_sum_us=wait_sum_us;
         render_cpu2_backup_ns=fm6_cpu2_backup_sum_ns();
