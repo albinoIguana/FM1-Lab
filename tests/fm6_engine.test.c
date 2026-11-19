@@ -883,8 +883,8 @@ int main(void) {
     fm6_fx_set_depth(FM6_FX_PHASER,255u);
     assert(fm6_fx_depth(FM6_FX_PHASER)==100u);
 
-    /* Combined worst-case functional stress: all 32 patch voices occupied,
-     * both sequencer lanes advancing, 16 held arp notes, and every FX bus
+    /* Combined worst-case functional stress: 16 voices across the two active
+     * engine slots, sequencer transport, 16 held arp notes, and every FX bus
      * enabled at maximum wet/send. Render one second of 44.1 kHz audio in
      * 128-frame host-test chunks (the device app callback is 256 frames). This checks integration and bounds, not
      * the target's real-time CPU deadline. */
@@ -897,8 +897,10 @@ int main(void) {
         for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
             fm6_note_on_mask((uint8_t)(36u + patch * 12u + n), 105u,
                              (uint8_t)(1u << patch));
-        assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
+        assert(fm6_active_voices_patch(patch) ==
+            (patch < 2u ? FM1LAB_VOICE_LIMIT : 0u));
     }
+    assert(fm6_active_voices() == 2u * FM1LAB_VOICE_LIMIT);
     for (unsigned effect = 0; effect < FM6_FX_COUNT; ++effect) {
         fm6_fx_set_enabled((uint8_t)effect, 1u);
         fm6_fx_set_mix((uint8_t)effect, 100u);
