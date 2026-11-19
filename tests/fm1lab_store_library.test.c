@@ -81,12 +81,15 @@ static void make_instrument(fm1lab_instrument_t *in,const char *name,unsigned se
         } else if(p==1u) {
             in->patches[p].synth_patch.waveform=(uint8_t)((seed+1u)%4u);
             in->patches[p].synth_patch.attack=(uint8_t)(10u+seed);
+            memcpy(in->patches[p].name,"SAW CLOUD",9u); in->patches[p].name[10]=0; in->patches[p].preset_id=1u;
         } else if(p==2u) {
             in->patches[p].synth_patch.noise_mix=(uint8_t)(20u+seed);
             in->patches[p].synth_patch.duty=(uint8_t)(40u+seed);
+            memcpy(in->patches[p].name,"ARCADE LEA",10u); in->patches[p].name[10]=0; in->patches[p].preset_id=2u;
         } else {
             in->patches[p].synth_patch.cutoff=(uint8_t)(50u+seed);
             in->patches[p].synth_patch.detune=(uint8_t)(15u+seed);
+            memcpy(in->patches[p].name,"WARM PAD",8u); in->patches[p].name[10]=0; in->patches[p].preset_id=2u;
         }
         in->patches[p].voice[155]=(uint8_t)(20u+p*30u);
         in->patches[p].enabled=(uint8_t)(p&1u);
@@ -114,6 +117,9 @@ int main(void)
     assert(loaded.patches[1].synth_patch.waveform==factory.patches[1].synth_patch.waveform);
     assert(loaded.patches[2].synth_patch.noise_mix==factory.patches[2].synth_patch.noise_mix);
     assert(loaded.patches[3].synth_patch.cutoff==factory.patches[3].synth_patch.cutoff);
+    assert(strcmp(loaded.patches[1].name,"SAW CLOUD")==0 && loaded.patches[1].preset_id==1u);
+    assert(strcmp(loaded.patches[2].name,"ARCADE LEA")==0 && loaded.patches[2].preset_id==2u);
+    assert(strcmp(loaded.patches[3].name,"WARM PAD")==0 && loaded.patches[3].preset_id==2u);
 
     /* Exercise the same route + dispatcher used by app.c, ending in the
      * production store loader rather than a mocked successful callback. */
