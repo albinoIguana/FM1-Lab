@@ -3113,15 +3113,16 @@ static void draw_home_panel(void)
         int32_t x = 2 + (int32_t)(p & 1u) * 120;
         int32_t y = 7 + (int32_t)(p >> 1u) * 85;
         uint16_t accent = patch_color(p);
-        int enabled = set.levels[p] != 0u;\n        int active = fm6_patch_is_active(p);
+        int enabled = set.levels[p] != 0u;
+        int active = fm6_patch_is_active(p);
         rounded_panel(x, y, 116, 85, 3, panel_fill(),
                       (!patch_focus || p == set.patch) ? accent : C_LINE);
         cv_rect(x + 5, y + 7, 2, 70, accent);
         t[0] = 'P'; t[1] = 'A'; t[2] = 'T'; t[3] = 'C'; t[4] = 'H'; t[5] = ' ';
         int_text((int32_t)p + 1, t + 6);
         cv_text(x + 12, y + 5, &FONT_XS, t, accent);
-        cv_text(x + 65, y + 5, &FONT_XS, enabled ? "ON" : "MUTED",
-                enabled ? RGB(75,235,135) : C_PEWTER);
+        cv_text(x + 65, y + 5, &FONT_XS, !enabled ? "MUTED" : active ? "ACTIVE" : "STANDBY",
+                !enabled ? C_PEWTER : active ? RGB(75,235,135) : RGB(235,175,75));
         cv_text_fit(x+12,y+23,&FONT_B,patch_display_name(p),C_WHITE,96);
         if (p == FM1LAB_SLOT_FM6) {
             cv_text(x + 12, y + 49, &FONT_XS, "ALG", C_PEWTER);
