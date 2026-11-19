@@ -1999,6 +1999,13 @@ uint8_t fm6_patch_is_active(uint32_t patch)
 {
     return patch<PATCHES && (fm6_patch_active_mask()&(uint8_t)(1u<<patch))!=0u;
 }
+static void fm6_stop_inactive_patch_voices(void)
+{
+    uint8_t active=fm6_patch_active_mask();
+    for(uint32_t i=0u;i<VOICES;++i)
+        if(voices[i].used && !(active&(uint8_t)(1u<<voices[i].patch)))
+            voices[i].used=0u;
+}
 uint32_t fm6_patch_count(void) { return PATCHES; }
 const char *fm6_patch_name(uint32_t patch) { return patch < PATCHES ? (const char *)&instrument[patch].base[FP_NAME] : ""; }
 uint8_t fm6_patch_enabled(uint32_t patch) { return patch < PATCHES ? instrument[patch].enabled : 0; }
@@ -2008,6 +2015,7 @@ void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled)
     if (patch >= PATCHES)
         return;
     instrument[patch].enabled = enabled != 0;
+    fm6_stop_inactive_patch_voices();
     if (!enabled)
         for (i = 0; i < VOICES; i++)
             if (voices[i].used && voices[i].patch == patch)
@@ -2073,6 +2081,7 @@ void fm6_patch_set_level(uint32_t patch, uint8_t level)
     if (patch >= PATCHES) return;
     if (level > 127u) level = 127u;
     instrument[patch].level = level;
+    fm6_stop_inactive_patch_voices();
     if (!level)
         for (uint32_t i = 0; i < VOICES; ++i)
             if (voices[i].used && voices[i].patch == patch)

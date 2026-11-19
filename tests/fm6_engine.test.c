@@ -231,6 +231,7 @@ static uint64_t render_native_engine_patch(uint8_t slot,const fm1lab_synth_patch
 {
     uint64_t hash=1469598103934665603ULL;
     fm6_init();
+    for(uint8_t prior=0u;prior<slot;++prior)fm6_patch_set_level(prior,0u);
     assert(fm6_patch_set_synth_patch(slot,patch)==0);
     fm6_patch_set_level(slot,31u);
     fm6_note_on_mask(60u,110u,(uint8_t)(1u<<slot));
@@ -754,38 +755,37 @@ int main(void) {
     fm6_panic();
     assert(fm6_active_voices() == 0u);
 
-    /* Dual-Instrument stress: all eight independent patch pools reach their
-     * documented per-patch limit simultaneously (64 live FM voices). */
+    /* Two selected engines retain their eight-voice pools; standby slots
+     * cannot allocate or keep sounding voices. */
     fm6_init();
-    memcpy(voice, fm6_patch_data(0), 155u);
-    for (unsigned patch = 1; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
-        assert(fm6_patch_set_voice(patch, voice) == 0);
-        fm6_patch_set_level(patch, 127u);
-        fm6_patch_set_enabled(patch, 1u);
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;++patch) {
+        fm6_patch_set_level(patch,31u);
+        fm6_patch_set_enabled(patch,1u);
     }
-    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch) {
-        for (unsigned n = 0; n < FM1LAB_VOICE_LIMIT; ++n)
-            fm6_note_on_mask((uint8_t)(24u + patch * 10u + n), 100u,
-                             (uint8_t)(1u << patch));
-        if(fm6_active_voices_patch(patch)!=FM1LAB_VOICE_LIMIT)
-            fprintf(stderr,"FM6 pool diagnostic: patch=%u active=%u total=%u\n",
-                    patch,fm6_active_voices_patch(patch),fm6_active_voices());
-        assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
-    }
-    assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
-
-    /* Overfilling one layer may steal only inside that layer's own pool. */
-    fm6_note_on_mask(100u, 100u, 0x04u);
-    fm6_note_on_mask(101u, 100u, 0x04u);
-    assert(fm6_active_voices() == FM6_ENGINE_PATCH_COUNT * FM1LAB_VOICE_LIMIT);
-    for (unsigned patch = 0; patch < FM6_ENGINE_PATCH_COUNT; ++patch)
-        assert(fm6_active_voices_patch(patch) == FM1LAB_VOICE_LIMIT);
-
-    memset(output, 0, sizeof output);
-    fm6_render(output, TEST_FRAMES, 4096u);
-    assert(peak(output, TEST_WORDS) > 0);
+    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;++patch)
+        for(unsigned n=0u;n<FM1LAB_VOICE_LIMIT;++n)
+            fm6_note_on_mask((uint8_t)(24u+patch*10u+n),100u,(uint8_t)(1u<<patch));
+    assert(fm6_active_voices()==2u*FM1LAB_VOICE_LIMIT);
+    assert(fm6_active_voices_patch(0u)==FM1LAB_VOICE_LIMIT);
+    assert(fm6_active_voices_patch(1u)==FM1LAB_VOICE_LIMIT);
+    assert(fm6_active_voices_patch(2u)==0u && fm6_active_voices_patch(3u)==0u);
+    fm6_patch_set_level(0u,0u); /* promotes slots 3 and 4 into the active pair */
+    assert(fm6_active_voices_patch(0u)==0u);
+    assert(fm6_active_voices_patch(1u)==0u);
+    assert(fm6_patch_active_mask()==0x06u);
+    fm6_note_on_mask(100u,100u,0x0fu);
+    assert(fm6_active_voices()==1u);
+    assert(fm6_active_voices_patch(2u)==1u);
+    fm6_patch_set_level(1u,0u);
+    assert(fm6_patch_active_mask()==0x0cu);
+    fm6_note_on_mask(101u,100u,0x0fu);
+    assert(fm6_active_voices()==2u);
+    assert(fm6_active_voices_patch(2u)==1u && fm6_active_voices_patch(3u)==1u);
+    memset(output,0,sizeof output);
+    fm6_render(output,TEST_FRAMES,4096u);
+    assert(peak(output,TEST_WORDS)>0);
     fm6_panic();
-    assert(fm6_active_voices() == 0u);
+    assert(fm6_active_voices()==0u);
 
     /* Single-track sequencer drives the same FM6 note allocator. */
     fm6_init();
