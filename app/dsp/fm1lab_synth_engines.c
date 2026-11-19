@@ -65,10 +65,10 @@ static int32_t oscillator(uint32_t phase,uint8_t waveform,uint8_t duty)
 void fm1lab_synth_patch_default(fm1lab_synth_engine_t engine,fm1lab_synth_patch_t *p)
 {
     if(!p)return;
-    p->waveform=0u;p->secondary_waveform=2u;p->duty=50u;p->noise_mix=0u;
-    p->osc_mix=50u;p->detune=8u;p->cutoff=65u;p->attack=8u;p->sustain=75u;p->release=35u;
-    if(engine==FM1LAB_SYNTH_PSG){p->waveform=3u;p->duty=50u;p->noise_mix=8u;}
-    if(engine==FM1LAB_SYNTH_SUBTRACTIVE){p->waveform=2u;p->secondary_waveform=2u;p->osc_mix=35u;p->cutoff=55u;}
+    p->waveform=0u;p->secondary_waveform=1u;p->duty=50u;p->noise_mix=0u;
+    p->osc_mix=25u;p->detune=8u;p->cutoff=80u;p->attack=25u;p->sustain=80u;p->release=65u;
+    if(engine==FM1LAB_SYNTH_PSG){p->waveform=3u;p->secondary_waveform=3u;p->duty=50u;p->noise_mix=0u;p->osc_mix=10u;p->detune=0u;p->cutoff=90u;p->attack=1u;p->sustain=85u;p->release=8u;}
+    if(engine==FM1LAB_SYNTH_SUBTRACTIVE){p->waveform=2u;p->secondary_waveform=3u;p->osc_mix=30u;p->detune=12u;p->cutoff=42u;p->attack=2u;p->sustain=75u;p->release=18u;}
 }
 
 int fm1lab_synth_patch_valid(fm1lab_synth_engine_t engine,const fm1lab_synth_patch_t *p)
