@@ -1426,6 +1426,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
         /* Time the complete post-voice sample stage once per 32-frame quantum.
          * This includes transport/mix, FX, master inserts, compressor and limiter. */
         uint32_t postmix_t0=plat_ticks24();
+        uint32_t output_t0=0u;
         for (i = 0; i < count; i++) {
             int32_t delta=(int32_t)master_gain_q12-output_gain_q12;
             if(delta) output_gain_q12+=delta/64+(delta>0?1:-1);
@@ -1551,7 +1552,7 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
             /* The retained four-effect bus feeds the output stage directly. */
             fm6_chaos_process(&left,&right);
             fm6_cpu0_fx_ticks+=plat_ticks24()-fx_t0;
-            uint32_t output_t0=plat_ticks24();
+            output_t0=plat_ticks24();
             /* fm1-base passes APP_GAIN(master): Q12 amplitude, 0..4096.
              * The output stage adds the requested 6 dB; calibrated Instrument
              * levels preserve headroom, with the stereo-linked limiter as backup. */
