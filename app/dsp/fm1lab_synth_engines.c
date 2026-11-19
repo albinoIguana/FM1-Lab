@@ -101,7 +101,8 @@ void fm1lab_synth_init(fm1lab_synth_voice_t *v,fm1lab_synth_engine_t engine)
 int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *v,int16_t pitch256)
 {
     if(!v||v->engine>=FM1LAB_SYNTH_ENGINE_COUNT)return -1;
-    if(pitch256<0)pitch256=0;if(pitch256>127*256)pitch256=127*256;
+    if (pitch256 < 0) pitch256 = 0;
+    if (pitch256 > 127 * 256) pitch256 = 127 * 256;
     v->note=(uint8_t)((uint16_t)pitch256>>8);v->phase_inc=phase_for_pitch256(pitch256);
     uint32_t detune=(uint32_t)v->patch.detune;
     v->phase_inc_b=(uint32_t)(((uint64_t)v->phase_inc*(1000u+detune*2u))/1000u);
