@@ -32,7 +32,7 @@ expect patch 1
 spin PRESET 1
 wait 40
 expect instrument 0
-expect presetcursor 0
+expect presetcursor 1
 
 # HOME with no patch focus changes the single active Instrument.
 tap HOME
@@ -52,7 +52,7 @@ expect focus 1
 expect patch 2
 spin PRESET 1
 wait 40
-expect presetcursor 0
+expect presetcursor 1
 tap SEQ
 wait 40
 spin SELECT 1
