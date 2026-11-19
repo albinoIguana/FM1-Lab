@@ -1,0 +1,6 @@
+{
+  "engine": "wavetable",
+  "patches": [
+    {"patch_id":"WT-002","name":"SAW CLOUD","category":"leads","source":"FM1-Lab original","license":"GPL-3.0-only","parameters":{"waveform":2,"secondary_waveform":1,"duty":50,"noise_mix":0,"osc_mix":35,"detune":12,"cutoff":65,"attack":20,"sustain":72,"release":55}}
+  ]
+}
