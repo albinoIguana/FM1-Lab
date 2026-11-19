@@ -12,6 +12,21 @@ typedef enum {
     FM1LAB_SYNTH_ENGINE_COUNT = 3
 } fm1lab_synth_engine_t;
 
+/* Compact, engine-native patch payload. The physical Instrument slot supplies
+ * the engine type; these values are the actual sound recipe, not display data. */
+typedef struct {
+    uint8_t waveform;          /* 0 sine, 1 triangle, 2 saw, 3 pulse */
+    uint8_t secondary_waveform;/* subtractive oscillator B */
+    uint8_t duty;              /* pulse width, 5..95 */
+    uint8_t noise_mix;         /* PSG noise contribution, 0..100 */
+    uint8_t osc_mix;           /* subtractive oscillator B mix, 0..100 */
+    uint8_t detune;            /* subtractive oscillator B detune, 0..100 */
+    uint8_t cutoff;            /* subtractive low-pass cutoff, 0..100 */
+    uint8_t attack;            /* 0..100 */
+    uint8_t sustain;           /* 0..100 */
+    uint8_t release;           /* 0..100 */
+} fm1lab_synth_patch_t;
+
 typedef struct {
     uint32_t phase;
     uint32_t phase_b;
@@ -21,12 +36,18 @@ typedef struct {
     int32_t filter_state;
     uint16_t envelope_q15;
     uint16_t filter_alpha_q15;
+    fm1lab_synth_patch_t patch;
     uint8_t engine;
     uint8_t note;
     uint8_t velocity;
     uint8_t gate;
     uint8_t active;
 } fm1lab_synth_voice_t;
+
+/* Engine-native defaults, validation and patch application are allocation-free. */
+void fm1lab_synth_patch_default(fm1lab_synth_engine_t engine, fm1lab_synth_patch_t *patch);
+int fm1lab_synth_patch_valid(fm1lab_synth_engine_t engine, const fm1lab_synth_patch_t *patch);
+int fm1lab_synth_set_patch(fm1lab_synth_voice_t *voice, const fm1lab_synth_patch_t *patch);
 
 /* One static state object per voice. All render calls are allocation-free,
  * fixed-point, and deterministic at the 44.1 kHz device sample rate. */

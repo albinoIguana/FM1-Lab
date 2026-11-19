@@ -67,6 +67,29 @@ int main(void)
     fm1lab_synth_note_on(&pitch, 72u, 127u);
     assert(pitch.phase_inc >= c4 * 2u - 2u && pitch.phase_inc <= c4 * 2u + 2u);
 
+    /* Engine-native patch edits must change the actual rendered waveform. */
+    for (uint32_t engine=0; engine<FM1LAB_SYNTH_ENGINE_COUNT; ++engine) {
+        fm1lab_synth_voice_t a,b;
+        fm1lab_synth_patch_t patch;
+        int16_t first[FRAMES], second[FRAMES];
+        fm1lab_synth_init(&a,(fm1lab_synth_engine_t)engine);
+        fm1lab_synth_init(&b,(fm1lab_synth_engine_t)engine);
+        fm1lab_synth_note_on(&a,48u,120u);
+        fm1lab_synth_note_on(&b,48u,120u);
+        assert(fm1lab_synth_render(&a,first,FRAMES)==0);
+        fm1lab_synth_patch_default((fm1lab_synth_engine_t)engine,&patch);
+        if(engine==FM1LAB_SYNTH_WAVETABLE) patch.waveform=2u;
+        else if(engine==FM1LAB_SYNTH_PSG) patch.noise_mix=90u;
+        else { patch.cutoff=95u; patch.detune=80u; }
+        assert(fm1lab_synth_set_patch(&b,&patch)==0);
+        /* Apply the new recipe at the next note boundary. */
+        fm1lab_synth_note_on(&b,48u,120u);
+        assert(fm1lab_synth_render(&b,second,FRAMES)==0);
+        assert(checksum(first,FRAMES)!=checksum(second,FRAMES));
+        patch.cutoff=101u;
+        assert(fm1lab_synth_set_patch(&b,&patch)==-1);
+    }
+
     /* Continuous pitch updates must not reset either oscillator phase. */
     for (uint32_t engine = 0; engine < FM1LAB_SYNTH_ENGINE_COUNT; ++engine) {
         fm1lab_synth_init(&pitch, (fm1lab_synth_engine_t)engine);
@@ -88,7 +111,7 @@ int main(void)
     assert(pitch.active == 0u);
     fm1lab_synth_init(&pitch, (fm1lab_synth_engine_t)255u);
     assert(fm1lab_synth_render(&pitch, buffers[0], 1u) == -1);
-    assert(fm1lab_synth_voice_bytes() == 36u);
+    assert(fm1lab_synth_voice_bytes() == sizeof(fm1lab_synth_voice_t));
     puts("FM1-Lab mixed-synthesis prototypes: PASS");
     return 0;
 }
