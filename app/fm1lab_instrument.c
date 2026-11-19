@@ -1,7 +1,6 @@
 #include "fm1lab_instrument.h"
 
 #include <stddef.h>
-#include <string.h>
 
 enum {
     OPERATOR_COUNT = 6,
@@ -17,6 +16,13 @@ static void copy_bytes(void *destination, const void *source, unsigned count)
     uint8_t *d = (uint8_t *)destination;
     const uint8_t *s = (const uint8_t *)source;
     while (count--) *d++ = *s++;
+}
+
+static int bytes_equal(const void *left,const void *right,unsigned count)
+{
+    const uint8_t *a=(const uint8_t *)left,*b=(const uint8_t *)right;
+    while(count--) if(*a++!=*b++) return 0;
+    return 1;
 }
 
 static void zero_bytes(void *destination, unsigned count)
@@ -250,7 +256,7 @@ int fm1lab_instrument_is_blank_library_slot(const fm1lab_instrument_t *instrumen
             fm1lab_synth_patch_t defaults;
             fm1lab_synth_engine_t engine = synth_engine_for_slot(patch);
             fm1lab_synth_patch_default(engine, &defaults);
-            if (memcmp(&instrument->patches[patch].synth_patch, &defaults, sizeof defaults) != 0 ||
+            if (!bytes_equal(&instrument->patches[patch].synth_patch, &defaults, sizeof defaults) ||
                 instrument->patches[patch].preset_id != 0u) return 0;
             continue;
         }
