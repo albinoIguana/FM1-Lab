@@ -167,34 +167,6 @@ static uint64_t render_stack_patch_peak(uint8_t patch_mask, uint64_t *dry_peak)
  * four sources active; the final output must respond to every perturbation.
  * This catches a wet-return/master-chain interaction that isolated-engine
  * and FX-bus tests cannot see, without changing the FX source normalization. */
-static void render_four_engine_fx_case(uint8_t fx_mask, uint8_t shifted_patch,
-                                       int32_t *destination)
-{
-    static int32_t warmup[2048u * 2u];
-    fm6_init();
-    for (unsigned patch=0u; patch<FM1LAB_PATCH_COUNT; ++patch) {
-        fm6_patch_set_enabled(patch,1u);
-        fm6_patch_set_level(patch,31u);
-        for (unsigned fx=0u; fx<FM6_FX_COUNT; ++fx)
-            fm6_fx_set_send(patch,(uint8_t)fx,100u);
-    }
-    for (unsigned fx=0u; fx<FM6_FX_COUNT; ++fx) {
-        fm6_fx_set_enabled((uint8_t)fx,(uint8_t)((fx_mask&(1u<<fx))!=0u));
-        fm6_fx_set_mix((uint8_t)fx,100u);
-        fm6_fx_set_time((uint8_t)fx,100u);
-        fm6_fx_set_feedback((uint8_t)fx,(uint8_t)(fx==FM6_FX_CHORUS?70u:90u));
-        fm6_fx_set_depth((uint8_t)fx,100u);
-    }
-    for (unsigned patch=0u; patch<FM1LAB_PATCH_COUNT; ++patch) {
-        uint8_t note=(uint8_t)(60u+patch*7u);
-        if (patch==shifted_patch) ++note;
-        fm6_note_on_mask(note,110u,(uint8_t)(1u<<patch));
-    }
-    fm6_render(warmup,2048u,4096u);
-    memset(destination,0,TEST_WORDS*sizeof destination[0]);
-    fm6_render(destination,TEST_FRAMES,4096u);
-}
-
 static void test_two_engine_runtime_cap_across_fx_combinations(void)
 {
     for(uint8_t fx_mask=0u;fx_mask<(1u<<FM6_FX_COUNT);++fx_mask) {
