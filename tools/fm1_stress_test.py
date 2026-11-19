@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Run a repeatable four-slot FM1 mixed-engine MIDI stress test.
+"""Automated two-engine FM1 hardware stress test over USB-MIDI.
 
-Install: python -m pip install mido python-rtmidi
-Run:     python tools/fm1_stress_test.py --port FM1 --output fm1-stress.csv
-
-The test sends ordinary MIDI notes to the currently loaded Instrument. It does
-not edit or save presets. Each note is routed by firmware to all four physical
-patch slots (FM6, wavetable, PSG, subtractive); patch_enabled_mask must report
-all four enabled for the run to qualify as a four-engine test.
+The script does not alter presets or settings. It sends ordinary MIDI notes,
+requests APP_LOG telemetry, and writes every sample to CSV. Configure exactly
+two ACTIVE patch slots and bypass all FX on the FM1 before running.
 """
 import argparse
 import csv
 import datetime as dt
 import pathlib
+import statistics
 import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from fm1_diag import read_snapshot  # noqa: E402
+from fm1_diag import read_snapshot  # noqa: E402 (also adds base/tools)
 
 try:
     import mido
@@ -31,136 +28,233 @@ except ImportError as exc:
 
 CHANNEL = 0
 BASE_NOTE = 48
+COUNTERS = (
+    "deadline_misses", "xruns", "cpu2_fallbacks", "shed_total",
+    "cpu2_bad_jobs", "cpu2_gave_up",
+)
 
 
-def send_notes(out, count, velocity=100):
-    notes = list(range(BASE_NOTE, BASE_NOTE + count))
+def send_on(out, notes, velocity=100):
     for note in notes:
         out.send(mido.Message("note_on", channel=CHANNEL, note=note,
                               velocity=velocity))
-    return notes
 
 
-def release_notes(out, notes):
+def send_off(out, notes):
     for note in notes:
         out.send(mido.Message("note_off", channel=CHANNEL, note=note,
                               velocity=0))
+
+
+def all_off(out):
     out.send(mido.Message("control_change", channel=CHANNEL,
                           control=123, value=0))
 
 
+def stamp():
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="milliseconds")
+
+
+class Run:
+    def __init__(self, inp, out, port, output):
+        self.inp, self.out, self.port = inp, out, port
+        self.path = pathlib.Path(output)
+        self.rows = []
+        self.missing_snapshots = 0
+        self.voice_underfills = []
+
+    def sample(self, phase, requested, timeout=0.35):
+        snap = read_snapshot(self.inp, self.out, timeout=timeout)
+        if snap is None:
+            self.missing_snapshots += 1
+            print(f"{stamp()} {phase:14s} NO_DIAGNOSTIC_REPLY")
+            return None
+        row = {"host_time_utc": stamp(), "phase": phase,
+               "requested_notes": requested, "port": self.port, **snap}
+        self.rows.append(row)
+        render = snap.get("render_us", 0)
+        budget = snap.get("render_budget_us", 0)
+        load = 100.0 * render / budget if budget else 0.0
+        print(
+            f"{row['host_time_utc']} {phase:14s} "
+            f"render={render}/{budget}us ({load:.1f}%) "
+            f"voices={snap.get('voice_peak', 0)} "
+            f"late={snap.get('deadline_misses', 0)} "
+            f"xruns={snap.get('xruns', 0)} "
+            f"fallback={snap.get('cpu2_fallbacks', 0)} "
+            f"shed={snap.get('shed_total', 0)}"
+        )
+        return snap
+
+    def wait_and_sample(self, phase, requested, seconds, interval=0.5):
+        end = time.monotonic() + seconds
+        next_sample = time.monotonic()
+        while time.monotonic() < end:
+            now = time.monotonic()
+            if now >= next_sample:
+                snap = self.sample(phase, requested)
+                if snap and requested:
+                    expected = requested * 2
+                    observed = snap.get("voice_peak", 0)
+                    if observed < expected:
+                        self.voice_underfills.append(
+                            (phase, expected, observed, snap.get("device_ms", -1))
+                        )
+                next_sample += interval
+            else:
+                time.sleep(min(0.01, next_sample - now))
+
+    def held_phase(self, count, seconds):
+        phase = f"hold-{count}"
+        notes = list(range(BASE_NOTE, BASE_NOTE + count))
+        all_off(self.out)
+        send_on(self.out, notes)
+        print(f"\n[{phase}] {count} simultaneous notes for {seconds:.1f}s")
+        try:
+            self.wait_and_sample(phase, count, seconds)
+        finally:
+            send_off(self.out, notes)
+            all_off(self.out)
+            time.sleep(0.12)
+
+    def chord_churn(self, seconds):
+        phase = "chord-churn"
+        print(f"\n[{phase}] rotating four-note chords for {seconds:.1f}s")
+        active = []
+        end = time.monotonic() + seconds
+        next_chord = time.monotonic()
+        next_sample = next_chord
+        root = BASE_NOTE
+        while time.monotonic() < end:
+            now = time.monotonic()
+            if now >= next_chord:
+                send_off(self.out, active)
+                active = [root, root + 4, root + 7, root + 12]
+                send_on(self.out, active)
+                root = BASE_NOTE + ((root - BASE_NOTE + 1) % 24)
+                next_chord = now + 0.14
+            if now >= next_sample:
+                self.sample(phase, 4)
+                next_sample = now + 0.5
+            time.sleep(0.005)
+        send_off(self.out, active)
+        all_off(self.out)
+
+    def write_csv(self):
+        if not self.rows:
+            raise RuntimeError("No APP_LOG diagnostic snapshots received.")
+        fields = list(dict.fromkeys(k for row in self.rows for k in row))
+        with self.path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(self.rows)
+
+    def report(self):
+        first, last = self.rows[0], self.rows[-1]
+        deltas = {
+            key: (int(last.get(key, 0)) - int(first.get(key, 0))) & 0xffffffff
+            for key in COUNTERS
+        }
+        render_pct = [
+            100.0 * row.get("render_us", 0) / row.get("render_budget_us", 1)
+            for row in self.rows if row.get("render_budget_us", 0)
+        ]
+        max_voice = max((row.get("voice_peak", 0) for row in self.rows), default=0)
+        print("\n========== FM1 STRESS REPORT ==========")
+        print(f"CSV: {self.path.resolve()}")
+        print(f"Snapshots: {len(self.rows)} | missing replies: {self.missing_snapshots}")
+        print(f"Peak callback budget use: {max(render_pct, default=0):.1f}%")
+        if render_pct:
+            print(f"Median callback budget use: {statistics.median(render_pct):.1f}%")
+        print(f"Peak simultaneous voices reported: {max_voice}")
+        print("Counter deltas: " + ", ".join(f"{k}={v}" for k, v in deltas.items()))
+        if self.voice_underfills:
+            print(f"Voice underfill samples: {len(self.voice_underfills)}")
+            for phase, expected, observed, device_ms in self.voice_underfills[:8]:
+                print(f"  {phase}: expected >= {expected}, observed {observed}, device_ms={device_ms}")
+        failures = [f"{k} increased by {v}" for k, v in deltas.items() if v]
+        if self.missing_snapshots:
+            failures.append(f"{self.missing_snapshots} diagnostic snapshots missing")
+        if self.voice_underfills:
+            failures.append(f"{len(self.voice_underfills)} samples below expected two-engine voice count")
+        if failures:
+            print("RESULT: FAIL")
+            for failure in failures:
+                print(f"  - {failure}")
+        else:
+            print("RESULT: PASS — no scheduling counters or voice-underfill faults observed.")
+        print("NOTE: APP_LOG cannot detect every analog/sample-level click or clipping event.")
+        return 1 if failures else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", help="substring of the FM1 MIDI port name")
-    parser.add_argument("--output", default="fm1-stress.csv",
-                        help="CSV diagnostics output")
-    parser.add_argument("--voices", type=int, default=12,
-                        choices=(1, 4, 8, 12),
-                        help="highest simultaneous-note phase (default: 12)")
+    parser.add_argument("--port", help="substring of the FM1 USB-MIDI port name")
+    parser.add_argument("--output", default="fm1-two-engine-stress.csv")
     parser.add_argument("--phase-seconds", type=float, default=5.0,
-                        help="duration of each voiced phase (default: 5)")
+                        help="seconds per sustained-note phase (default: 5)")
+    parser.add_argument("--churn-seconds", type=float, default=10.0,
+                        help="seconds of rapid chord turnover (default: 10)")
     args = parser.parse_args()
-    if args.phase_seconds < 2.0:
-        parser.error("--phase-seconds must be at least 2 seconds")
+    if args.phase_seconds < 2 or args.churn_seconds < 2:
+        parser.error("phase durations must be at least 2 seconds")
 
-    phases = [("idle", 0, 3.0)] + [
-        (f"{n}-voice", n, args.phase_seconds)
-        for n in (1, 4, 8, 12) if n <= args.voices
-    ]
     try:
         inp, out, port_name = fm1ports.connect(
             args.port, names=("FM1-Lab",), mido=mido)
     except LookupError as exc:
         raise SystemExit(f"Could not connect to FM1 over USB-MIDI: {exc}") from exc
 
-    path = pathlib.Path(args.output)
-    rows, notes = [], []
-    print(f"Connected: {port_name}")
-    print("Running baseline, then 1/4/8/12-note mixed-engine phases.")
-    print("No preset writes. MIDI All Notes Off is sent on exit.")
+    run = Run(inp, out, port_name, args.output)
+    result = 1
     try:
-        for phase, count, seconds in phases:
-            release_notes(out, notes)
-            notes = send_notes(out, count) if count else []
-            print(f"\n[{phase}] {seconds:.1f}s")
-            deadline = time.monotonic() + seconds
-            next_sample = time.monotonic()
-            while time.monotonic() < deadline:
-                now = time.monotonic()
-                if now < next_sample:
-                    time.sleep(min(0.02, next_sample - now))
-                    continue
-                snapshot = read_snapshot(inp, out, timeout=0.35)
-                stamp = dt.datetime.now(dt.timezone.utc).isoformat(
-                    timespec="milliseconds")
-                if snapshot is None:
-                    print(f"{stamp}  no APP_LOG reply")
-                else:
-                    row = {"host_time_utc": stamp, "phase": phase,
-                           "requested_voices": count, "port": port_name,
-                           **snapshot}
-                    rows.append(row)
-                    enabled = snapshot.get("patch_enabled_mask", -1)
-                    render = snapshot.get("render_us", 0)
-                    budget = snapshot.get("render_budget_us", 0)
-                    pct = 100.0 * render / budget if budget else 0.0
-                    print(
-                        f"{stamp} {phase:8s} render={render}/{budget}us "
-                        f"({pct:.1f}%) voice_peak={snapshot.get('voice_peak', 0)} "
-                        f"enabled=0x{enabled:x} "
-                        f"late={snapshot.get('deadline_misses', 0)} "
-                        f"xruns={snapshot.get('xruns', 0)} "
-                        f"cpu2_fallbacks={snapshot.get('cpu2_fallbacks', 0)}"
-                    )
-                next_sample += 0.5
-                if next_sample < time.monotonic() - 0.5:
-                    next_sample = time.monotonic() + 0.5
-            release_notes(out, notes)
-            notes = []
-            time.sleep(0.15)
+        print(f"Connected: {port_name}")
+        baseline = run.sample("preflight", 0)
+        if baseline is None:
+            raise RuntimeError("No APP_LOG response. Use an APP_LOG-enabled firmware build.")
+        active = baseline.get("patch_active_mask")
+        fx = baseline.get("fx_enabled_mask")
+        if active is None or fx is None:
+            raise RuntimeError("Firmware lacks patch_active_mask/fx_enabled_mask telemetry. Flash the diagnostic build.")
+        if int(active).bit_count() != 2:
+            raise RuntimeError(
+                f"Preflight rejected: patch_active_mask=0x{int(active):x}; "
+                "exactly two patch slots must be ACTIVE."
+            )
+        if int(fx) != 0:
+            raise RuntimeError(
+                f"Preflight rejected: fx_enabled_mask=0x{int(fx):x}; "
+                "bypass every FX before this zero-FX test."
+            )
+        print(f"Preflight OK: active patch mask=0x{int(active):x}; FX mask=0x{int(fx):x}")
+        print("The test changes no presets or settings. Sending MIDI stress patterns; Ctrl-C is safe.")
+        run.wait_and_sample("idle-baseline", 0, 2.0)
+        for count in (1, 2, 4, 8, 12):
+            run.held_phase(count, args.phase_seconds)
+        run.chord_churn(args.churn_seconds)
+        all_off(out)
+        run.wait_and_sample("release-check", 0, 2.0)
+        run.write_csv()
+        result = run.report()
     except KeyboardInterrupt:
-        print("\nInterrupted; releasing notes.")
+        print("\nInterrupted; sending All Notes Off.")
+        all_off(out)
+        if run.rows:
+            run.write_csv()
+            result = run.report()
+    except Exception as exc:
+        all_off(out)
+        print(f"\nABORTED: {exc}", file=sys.stderr)
+        if run.rows:
+            run.write_csv()
+            run.report()
+        result = 2
     finally:
-        try:
-            release_notes(out, notes)
-        finally:
-            inp.close()
-            out.close()
-
-    if not rows:
-        raise SystemExit("FAIL: no diagnostic snapshots received; CSV not written")
-    fields = list(dict.fromkeys(k for row in rows for k in row))
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(rows)
-
-    enabled_masks = {r.get("patch_enabled_mask", -1) for r in rows}
-    max_voice = max(r.get("voice_peak", 0) for r in rows)
-    first, last = rows[0], rows[-1]
-    late_delta = (last.get("deadline_misses", 0) -
-                  first.get("deadline_misses", 0)) & 0xffffffff
-    xrun_delta = (last.get("xruns", 0) - first.get("xruns", 0)) & 0xffffffff
-    fallbacks = max(r.get("cpu2_fallbacks", 0) for r in rows)
-    max_load = max(
-        (100.0 * r.get("render_us", 0) / r.get("render_budget_us", 1))
-        for r in rows if r.get("render_budget_us", 0)
-    )
-    print(f"\nSaved {len(rows)} snapshots: {path.resolve()}")
-    print(f"Peak render/budget: {max_load:.1f}% | peak voices: {max_voice}")
-    print(f"New deadline misses: {late_delta} | new XRUNs: {xrun_delta} | "
-          f"peak CPU2 fallbacks/callback: {fallbacks}")
-    if enabled_masks != {15}:
-        print("INCONCLUSIVE: all four patch slots were not confirmed enabled "
-              f"(observed masks: {sorted(enabled_masks)}).")
-    elif late_delta or xrun_delta or fallbacks:
-        print("FAIL: audio scheduling/CPU2 fault counters increased during test.")
-    else:
-        print("PASS: all four slots enabled; no deadline misses, XRUNs, or "
-              "CPU2 fallbacks observed.")
-    print("Telemetry detects scheduling faults, not audible clipping directly; "
-          "audio capture is required to prove sample-level artifacts.")
+        all_off(out)
+        inp.close()
+        out.close()
+    return result
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

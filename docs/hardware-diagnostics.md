@@ -31,11 +31,12 @@ opens the FM1 as a disk, sends MIDI notes, or changes device state.
 ## Captured measurements
 
 The CSV includes callback render time and budget, render peaks and deadline
-misses, CPU0 busy/voice/postmix time, CPU2 job and wait time (sum and maximum),
-CPU2 backup cost, UI/MIDI/master-gain timing, active voice peak, render quanta,
-CPU2 dispatch/fallback counts, platform CPU load and clock, DMA xruns, overload
-voice shedding, pre-limiter peak, limiter gain reduction, and CPU2 health/stack
-status. Both host UTC time and the device's millisecond uptime are recorded.
+misses, CPU0 busy/voice/postmix/FX/output time, CPU2 job and wait time (sum and
+maximum), CPU2 backup cost, UI/MIDI/master-gain timing, active voice peak, render
+quanta, CPU2 dispatch/fallback counts, platform CPU load and clock, DMA xruns,
+overload voice shedding, pre-limiter peak, limiter gain reduction, CPU2
+health/stack status, the active patch-slot mask, and the enabled-FX mask. Both
+host UTC time and the device millisecond uptime are recorded.
 
 The per-callback values are the most recent completed audio callback at the
 instant the snapshot is requested. Cumulative counters such as xruns,
@@ -59,3 +60,24 @@ Keep the same Instrument and playing pattern for each stage. Record at least
 Save a separate CSV per stage if you want clean comparisons. Do not use the
 diagnostic logger as a substitute for listening for clicks, dropouts, stuck
 notes, or timing errors.
+
+
+## Automated two-engine stress test
+
+With exactly two HOME slots marked ACTIVE and all four FX bypassed, run:
+
+```sh
+python tools/fm1_stress_test.py --output fm1-two-engine-stress.csv
+```
+
+The script verifies the active-slot and FX masks before sending any notes. It
+then runs idle, 1/2/4/8/12-note sustained phases, rapid four-note chord turnover,
+and a release check. It sends All Notes Off on completion or interruption and
+does not edit presets/settings. The report fails on new deadline misses, DMA
+xruns, CPU2 fallback/bad-job/health faults, overload voice shedding, missing
+diagnostic replies, or observed voice counts below the two-engine expectation.
+
+This is a device-side scheduling and voice-path test. APP_LOG cannot detect every
+analog clipping event or sample-level discontinuity; if the counters pass while
+the output remains audibly broken, record the FM1 analog output through an audio
+interface for waveform-level analysis.
