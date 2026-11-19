@@ -704,6 +704,8 @@ static void instrument_apply_engine_bank(uint8_t lane,const fm1lab_instrument_t 
         uint32_t engine_patch=base+p;
         if (fm1lab_patch_engine_for_context((uint8_t)engine_patch) == FM1LAB_PATCH_ENGINE_FM6)
             (void)fm6_patch_set_voice(engine_patch,part->voice);
+        else
+            (void)fm6_patch_set_synth_patch(engine_patch,&part->synth_patch);
         fm6_patch_set_enabled(engine_patch,1u);
         fm6_patch_set_level(engine_patch,part->level);
         fm6_patch_set_pan(engine_patch,fm1lab_patch_pan(source,p));

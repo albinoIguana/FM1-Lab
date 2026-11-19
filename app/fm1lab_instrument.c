@@ -84,6 +84,9 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
         instrument->patches[p].enabled = 1;
         instrument->patches[p].level = 31; /* 24.4% safe new-Instrument default */
         instrument->patches[p].voice[155] = 64u; /* centered pan */
+        if (p == 1u) fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE, &instrument->patches[p].synth_patch);
+        else if (p == 2u) fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG, &instrument->patches[p].synth_patch);
+        else if (p == 3u) fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE, &instrument->patches[p].synth_patch);
     }
 }
 
@@ -105,6 +108,42 @@ int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
     instrument->patches[patch].level = 31; /* new voice starts at safe level */
     instrument->patches[patch].octave = 0;
     instrument->patches[patch].fine_cents = 0;
+    return 0;
+}
+
+
+static fm1lab_synth_engine_t synth_engine_for_slot(unsigned patch)
+{
+    return patch == 1u ? FM1LAB_SYNTH_WAVETABLE :
+           patch == 2u ? FM1LAB_SYNTH_PSG :
+           patch == 3u ? FM1LAB_SYNTH_SUBTRACTIVE : FM1LAB_SYNTH_ENGINE_COUNT;
+}
+
+int fm1lab_patch_set_synth(fm1lab_instrument_t *instrument, unsigned patch,
+                           const fm1lab_synth_patch_t *settings)
+{
+    fm1lab_synth_engine_t engine = synth_engine_for_slot(patch);
+    if (!instrument || instrument->magic != FM1LAB_INSTRUMENT_MAGIC ||
+        instrument->version != FM1LAB_INSTRUMENT_VERSION ||
+        !fm1lab_synth_patch_valid(engine, settings)) return -1;
+    instrument->patches[patch].synth_patch = *settings;
+    return 0;
+}
+
+int fm1lab_patch_replace_synth(fm1lab_instrument_t *instrument, unsigned patch,
+                               const fm1lab_synth_patch_t *settings)
+{
+    fm1lab_patch_t previous;
+    if (!fm1lab_instrument_valid(instrument) || patch == 0u || patch >= FM1LAB_PATCH_COUNT)
+        return -1;
+    previous = instrument->patches[patch];
+    if (fm1lab_patch_set_synth(instrument, patch, settings) != 0) return -1;
+    instrument->patches[patch].level = previous.level;
+    instrument->patches[patch].enabled = previous.enabled;
+    instrument->patches[patch].octave = previous.octave;
+    instrument->patches[patch].fine_cents = previous.fine_cents;
+    copy_bytes(instrument->patches[patch].macros, previous.macros, FM1LAB_MACRO_COUNT);
+    instrument->patches[patch].voice[155] = previous.voice[155];
     return 0;
 }
 
@@ -147,11 +186,14 @@ int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
         if (patch->enabled > 1 || patch->level > 127 ||
             patch->octave < -4 || patch->octave > 4 ||
             patch->fine_cents < -100 || patch->fine_cents > 100 ||
-            patch->voice[VOICE_ALGORITHM] > 31 ||
-            patch->voice[GLOBAL_FEEDBACK] > 7)
+            (p == 0u && (patch->voice[VOICE_ALGORITHM] > 31 ||
+            patch->voice[GLOBAL_FEEDBACK] > 7)) ||
+            (p > 0u && !fm1lab_synth_patch_valid(synth_engine_for_slot(p), &patch->synth_patch)))
             return 0;
-        for (unsigned i = 0; i < FM1LAB_PATCH_BYTES; ++i)
-            if (patch->voice[i] > 127) return 0;
+        if (p == 0u) {
+            for (unsigned i = 0; i < FM1LAB_PATCH_BYTES; ++i)
+                if (patch->voice[i] > 127) return 0;
+        } else if (patch->voice[155] > 127u) return 0;
         for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             if (patch->macros[m] > 100) return 0;
     }
@@ -176,6 +218,7 @@ int fm1lab_instrument_is_blank_library_slot(const fm1lab_instrument_t *instrumen
         if (instrument->name[n] && instrument->name[n] != ' ') return 0;
 
     for (unsigned patch = 0u; patch < FM1LAB_PATCH_COUNT; ++patch) {
+        if (patch != 0u) continue;
         const uint8_t *voice = instrument->patches[patch].voice;
         uint8_t carriers = fm1lab_carrier_mask(voice[VOICE_ALGORITHM]);
         for (unsigned n = 0u; n < FM1LAB_PATCH_NAME_BYTES; ++n)
@@ -236,7 +279,7 @@ int fm1lab_render_patch(const fm1lab_instrument_t *instrument, unsigned patch_in
                         uint8_t output[FM1LAB_PATCH_BYTES])
 {
     if (!fm1lab_instrument_valid(instrument) || !output ||
-        patch_index >= FM1LAB_PATCH_COUNT)
+        patch_index != 0u)
         return -1;
 
     const fm1lab_patch_t *patch = &instrument->patches[patch_index];
