@@ -1533,7 +1533,11 @@ static void app_diag_log_u32(void (*line)(const char *), const char *key, uint32
 void app_log(void (*line)(const char *t))
 {
     if(!line) return;
-    uint32_t patch_enabled_mask=0u;\n    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)\n        if(fm6_patch_enabled(patch)) patch_enabled_mask|=1u<<patch;\n    app_diag_log_u32(line,"patch_enabled_mask",patch_enabled_mask);\n    app_diag_log_u32(line,"device_ms",plat_ms());
+    uint32_t patch_enabled_mask=0u;
+    for(uint32_t patch=0u;patch<FM1LAB_PATCH_COUNT;patch++)
+        if(fm6_patch_enabled(patch)) patch_enabled_mask|=1u<<patch;
+    app_diag_log_u32(line,"patch_enabled_mask",patch_enabled_mask);
+    app_diag_log_u32(line,"device_ms",plat_ms());
     app_diag_log_u32(line,"render_us",render_last_us);
     app_diag_log_u32(line,"render_budget_us",render_budget_us);
     app_diag_log_u32(line,"render_peak_us",render_peak_window_us);
