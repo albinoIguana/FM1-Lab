@@ -122,7 +122,7 @@ static int fm1lab_seed_dx7_instrument(uint32_t index,fm1lab_instrument_t *out);
 
 #ifdef PLAT_HOST
 static uint8_t app_host_migration_probe, app_host_factory_slot0_loaded;
-static uint8_t app_host_legacy_factory_migration_pass;
+static uint8_t app_host_legacy_factory_migration_pass,app_host_legacy_factory_migration_stage;
 static uint8_t app_host_force_meta_lookup_failure, app_host_rom_fallback_pass;
 static uint8_t app_host_resync_pass;
 static uint8_t app_host_factory_name_changed, app_host_factory_save_ok;
@@ -4285,6 +4285,8 @@ int app_expect(const char *what, int *got)
         *got = app_host_rom_fallback_pass;
     else if (!fm1lab_strcmp(what, "legacy_factory_migration"))
         *got = app_host_legacy_factory_migration_pass;
+    else if (!fm1lab_strcmp(what, "legacy_migstage"))
+        *got = app_host_legacy_factory_migration_stage;
 #endif
     else if (!fm1lab_strcmp(what, "page"))
         *got = page;
@@ -4372,11 +4374,13 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
         fm1lab_instrument_t legacy,migrated,expected,edited;
         fm1lab_insert_state_t inserts;
         app_host_legacy_factory_migration_pass=0u;
+        app_host_legacy_factory_migration_stage=0u;
         fm1lab_insert_state_init(&inserts);
         fm1lab_instrument_init(&legacy,"FACTORY");
         if(fm1lab_patch_set_voice(&legacy,0u,fm1lab_legacy_factory_fixture[0])!=0) return 1;
         if(!fm1lab_is_previous_factory_instrument(0u,&legacy) ||
-           fm1lab_is_previous_factory_instrument(1u,&legacy)) return 1;
+           fm1lab_is_previous_factory_instrument(1u,&legacy)) { app_host_legacy_factory_migration_stage=1u; return 1; }
+        app_host_legacy_factory_migration_stage=2u;
 
         /* Reproduce every slot left by the old directory formatter: it used
          * INSTRUMENT nn / INSTR nn names while copying the same old four
@@ -4392,10 +4396,11 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             slot_name[FM1LAB_INSTRUMENT_NAME_BYTES]='\0';
             fm1lab_instrument_init(&legacy,slot_name);
             if(fm1lab_patch_set_voice(&legacy,0u,fm1lab_legacy_factory_fixture[0])!=0) return 1;
-            if(!fm1lab_is_previous_factory_instrument(index,&legacy)) return 1;
-            if(fm1lab_store_library_save_full(index,&legacy,&inserts)!=0) return 1;
+            if(!fm1lab_is_previous_factory_instrument(index,&legacy)) { app_host_legacy_factory_migration_stage=3u; return 1; }
+            if(fm1lab_store_library_save_full(index,&legacy,&inserts)!=0) { app_host_legacy_factory_migration_stage=4u; return 1; }
         }
         fm1lab_seed_factory_library();
+        app_host_legacy_factory_migration_stage=5u;
         for(uint32_t index=0u;index<FM1LAB_STORE_INSTRUMENT_COUNT;index++) {
             if(fm1lab_store_library_load_full(index,&migrated,&inserts)!=0 ||
                fm1lab_seed_dx7_instrument(index,&expected)!=0 ||
@@ -4406,12 +4411,13 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
 
         /* A one-byte user edit must make the legacy fingerprint fail closed. */
         fm1lab_instrument_init(&legacy,"INSTRUMENT 01");
-        if(fm1lab_patch_set_voice(&legacy,0u,fm1lab_legacy_factory_fixture[0])!=0) return 1;
+        if(fm1lab_patch_set_voice(&legacy,0u,fm1lab_legacy_factory_fixture[0])!=0) { app_host_legacy_factory_migration_stage=7u; return 1; }
         edited=legacy;
         edited.patches[0].voice[0]^=1u;
         if(fm1lab_is_previous_factory_instrument(0u,&edited) ||
-           fm1lab_store_library_save_full(0u,&edited,&inserts)!=0) return 1;
+           fm1lab_store_library_save_full(0u,&edited,&inserts)!=0) { app_host_legacy_factory_migration_stage=8u; return 1; }
         fm1lab_seed_factory_library();
+        app_host_legacy_factory_migration_stage=9u;
         if(fm1lab_store_library_load_full(0u,&migrated,&inserts)!=0 ||
            memcmp(migrated.name,edited.name,sizeof migrated.name)!=0 ||
            memcmp(migrated.patches,edited.patches,sizeof migrated.patches)!=0)
