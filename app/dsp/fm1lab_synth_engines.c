@@ -152,7 +152,7 @@ static int32_t envelope_next(fm1lab_synth_voice_t *v)
     }
     case ENV_STAGE_DECAY:
         if(v->envelope_q15<=sustain){v->envelope_q15=(uint16_t)sustain;v->envelope_stage=ENV_STAGE_SUSTAIN;}
-        else v->envelope_q15=(uint16_t)(v->envelope_q15-sustain>v->envelope_decay_step?v->envelope_q15-v->envelope_decay_step:sustain);
+        else { uint32_t remaining=(uint32_t)v->envelope_q15-sustain; v->envelope_q15=(uint16_t)(remaining>v->envelope_decay_step?(uint32_t)v->envelope_q15-v->envelope_decay_step:sustain); }
         break;
     case ENV_STAGE_SUSTAIN:v->envelope_q15=(uint16_t)sustain;break;
     case ENV_STAGE_RELEASE:
