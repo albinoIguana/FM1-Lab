@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "engine": "wavetable",
+  "category": "textures",
+  "patches": [
+    {
+      "patch_id": "WT-004",
+      "name": "DARK DRONE",
+      "category": "textures",
+      "source": "FM1-Lab original",
+      "license": "GPL-3.0-only",
+      "parameters": {
+        "waveform": 1,
+        "secondary_waveform": 0,
+        "duty": 50,
+        "noise_mix": 0,
+        "osc_mix": 60,
+        "detune": 18,
+        "cutoff": 38,
+        "attack": 70,
+        "sustain": 90,
+        "release": 80
+      }
+    }
+  ]
+}
