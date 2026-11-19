@@ -213,6 +213,40 @@ static void test_four_engine_audibility_across_fx_combinations(void)
     }
 }
 
+
+static uint64_t render_native_engine_patch(uint8_t slot,const fm1lab_synth_patch_t *patch)
+{
+    uint64_t hash=1469598103934665603ULL;
+    fm6_init();
+    assert(fm6_patch_set_synth_patch(slot,patch)==0);
+    fm6_patch_set_level(slot,31u);
+    fm6_note_on_mask(60u,110u,(uint8_t)(1u<<slot));
+    fm6_render(output,TEST_FRAMES,4096u);
+    for(unsigned i=0u;i<TEST_WORDS;i++){
+        hash^=(uint32_t)output[i];
+        hash*=1099511628211ULL;
+    }
+    assert(peak(output,TEST_WORDS)>0);
+    return hash;
+}
+
+static void test_engine_native_patch_changes_audio(void)
+{
+    for(uint8_t slot=1u;slot<FM1LAB_PATCH_COUNT;slot++){
+        fm1lab_synth_engine_t engine=slot==1u?FM1LAB_SYNTH_WAVETABLE:
+            slot==2u?FM1LAB_SYNTH_PSG:FM1LAB_SYNTH_SUBTRACTIVE;
+        fm1lab_synth_patch_t base,changed;
+        fm1lab_synth_patch_default(engine,&base);
+        changed=base;
+        if(slot==1u)changed.waveform=2u;
+        else if(slot==2u)changed.noise_mix=95u;
+        else {changed.cutoff=96u;changed.detune=88u;}
+        uint64_t dry=render_native_engine_patch(slot,&base);
+        uint64_t wet=render_native_engine_patch(slot,&changed);
+        assert(dry!=wet);
+    }
+}
+
 static void render_insert_variant(uint8_t amp, uint8_t eq, int32_t *destination)
 {
     fm6_init();
@@ -411,6 +445,8 @@ int main(void) {
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
     render_cpu2_mode(2u, 0x0fu, 32u, chunk_b);
     assert(memcmp(chunk_a, chunk_b, TEST_WORDS * sizeof(int32_t)) == 0);
+    test_engine_native_patch_changes_audio();
+
     /* Retired context masks cannot allocate voices beyond the one live bank. */
     fm6_init();
     fm6_note_on_mask(60u,100u,0xf0u);
