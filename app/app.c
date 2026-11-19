@@ -1517,6 +1517,33 @@ FM1LAB_WEB_EXPORT uint32_t app_audio_core2_pct(void)
 #endif
 }
 uint32_t app_audio_overload_shed_count(void) { return fm6_overload_shed_count(); }
+/* Runtime-only Maelstrom control for automated USB-MIDI stress A/B. Payload:
+ * 7D 'F' 'M' '1' 'T' command amount; 0=OFF, 1=ON, 2=restore.
+ * Never marks settings dirty or writes flash. Five-minute expiry is fail-safe. */
+static uint8_t app_diag_chaos_override, app_diag_chaos_saved_amount;
+static uint32_t app_diag_chaos_expires;
+static void app_diag_chaos_restore(void)
+{
+    if(!app_diag_chaos_override)return;
+    set.performance.chaos_amount=app_diag_chaos_saved_amount;
+    performance_publish();
+    app_diag_chaos_override=0u;
+    app_diag_chaos_expires=0u;
+}
+int app_sysex(const uint8_t *p,uint32_t n)
+{
+    if(!p || n!=7u || p[0]!=0x7du || p[1]!='F' || p[2]!='M' ||
+       p[3]!='1' || p[4]!='T' || p[6]>100u || p[5]>2u)return 0;
+    if(p[5]==2u) { app_diag_chaos_restore(); return 1; }
+    if(!app_diag_chaos_override) {
+        app_diag_chaos_saved_amount=set.performance.chaos_amount;
+        app_diag_chaos_override=1u;
+    }
+    set.performance.chaos_amount=p[5]==0u?0u:(p[6]?p[6]:60u);
+    app_diag_chaos_expires=plat_ms()+300000u;
+    performance_publish();
+    return 1;
+}
 /* APP_LOG is called from fm1-base's main loop after an LG SysEx request.
  * Each record is a short key=value line; never called from the audio ISR. */
 static void app_diag_log_u32(void (*line)(const char *), const char *key, uint32_t value)
@@ -1542,6 +1569,8 @@ void app_log(void (*line)(const char *t))
     for(uint32_t fx=0u;fx<FM6_FX_COUNT;fx++)
         if(fm6_fx_enabled(fx)) fx_enabled_mask|=1u<<fx;
     app_diag_log_u32(line,"fx_enabled_mask",fx_enabled_mask);
+    app_diag_log_u32(line,"chaos_amount",set.performance.chaos_amount);
+    app_diag_log_u32(line,"chaos_override",app_diag_chaos_override);
     app_diag_log_u32(line,"device_ms",plat_ms());
     app_diag_log_u32(line,"render_us",render_last_us);
     app_diag_log_u32(line,"render_budget_us",render_budget_us);
@@ -4193,6 +4222,8 @@ void app_frame(void)
         if (startup_active)
             return; /* keep the power-on ident clean; don't consume control input */
     }
+    if(app_diag_chaos_override && (int32_t)(now-app_diag_chaos_expires)>=0)
+        app_diag_chaos_restore();
     input();
     if(fm1lab_pending_watch_update(&pending_watch,instrument_apply_pending,now,render_heartbeat)) {
         app_say("AUDIO STALLED","LOAD HELD");
