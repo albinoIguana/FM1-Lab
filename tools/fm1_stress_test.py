@@ -183,6 +183,12 @@ class Run:
             100.0 * row.get("render_us", 0) / row.get("render_budget_us", 1)
             for row in self.rows if row.get("render_budget_us", 0)
         ]
+        mode_loads = {}
+        for mode in ("maelstrom-off/", "maelstrom-on/"):
+            values = [100.0 * row.get("render_us", 0) / row.get("render_budget_us", 1)
+                      for row in self.rows if str(row.get("phase", "")).startswith(mode)
+                      and row.get("render_budget_us", 0)]
+            mode_loads[mode] = values
         max_voice = max((row.get("voice_peak", 0) for row in self.rows), default=0)
         print("\n========== FM1 STRESS REPORT ==========")
         print(f"CSV: {self.path.resolve()}")
@@ -190,6 +196,13 @@ class Run:
         print(f"Peak callback budget use: {max(render_pct, default=0):.1f}%")
         if render_pct:
             print(f"Median callback budget use: {statistics.median(render_pct):.1f}%")
+        for mode, values in mode_loads.items():
+            if values:
+                print("{}: median={:.1f}% peak={:.1f}%".format(mode[:-1], statistics.median(values), max(values)))
+        off_values, on_values = mode_loads["maelstrom-off/"], mode_loads["maelstrom-on/"]
+        if off_values and on_values and statistics.median(off_values):
+            delta = 100.0 * (statistics.median(on_values) / statistics.median(off_values) - 1.0)
+            print("Maelstrom median render-load change: {:+.1f}% (ON vs OFF)".format(delta))
         print(f"Peak simultaneous voices reported: {max_voice}")
         print("Counter deltas: " + ", ".join(f"{k}={v}" for k, v in deltas.items()))
         if self.voice_underfills:
