@@ -129,10 +129,47 @@ static int32_t envelope_next(fm1lab_synth_voice_t *v)
     return v->envelope_q15;
 }
 
+/* The wavetable engine uses four 64-sample single-cycle tables. The
+ * second table and osc_mix form a continuous morph control; interpolation
+ * between adjacent samples keeps phase motion smooth at table boundaries. */
+static int32_t wavetable_point(uint32_t index, uint8_t waveform, uint8_t duty)
+{
+    index &= 63u;
+    switch (waveform & 3u) {
+    case 0:
+        return sine64[index];
+    case 1: {
+        /* Triangle table: four linear quarter-cycle segments. */
+        uint32_t q = index & 15u;
+        if (index < 16u) return -32768 + (int32_t)(q * 4096u);
+        if (index < 32u) return (int32_t)(q * 4096u);
+        if (index < 48u) return 32767 - (int32_t)(q * 4096u);
+        return -(int32_t)(q * 4096u);
+    }
+    case 2:
+        return (int32_t)(index * 1024u) - 32768;
+    default:
+        return index < ((uint32_t)duty * 64u / 100u) ? 24576 : -24576;
+    }
+}
+
+static int32_t wavetable_lookup(uint32_t phase, uint8_t waveform, uint8_t duty)
+{
+    uint32_t index = phase >> 26;
+    uint32_t fraction = (phase >> 10) & 0xffffu;
+    int32_t a = wavetable_point(index, waveform, duty);
+    int32_t b = wavetable_point(index + 1u, waveform, duty);
+    return a + (int32_t)(((int64_t)(b - a) * fraction) >> 16);
+}
+
 static int32_t render_wavetable(fm1lab_synth_voice_t *v)
 {
-    int32_t y=oscillator(v->phase,v->patch.waveform,v->patch.duty);
-    v->phase+=v->phase_inc;return y;
+    int32_t a = wavetable_lookup(v->phase, v->patch.waveform, v->patch.duty);
+    int32_t b = wavetable_lookup(v->phase, v->patch.secondary_waveform, v->patch.duty);
+    uint32_t morph = v->patch.osc_mix;
+    int32_t y = (int32_t)(((int64_t)a * (100u - morph) + (int64_t)b * morph) / 100);
+    v->phase += v->phase_inc;
+    return y;
 }
 static int32_t render_psg(fm1lab_synth_voice_t *v)
 {

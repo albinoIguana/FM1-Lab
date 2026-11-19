@@ -78,8 +78,11 @@ int main(void)
         fm1lab_synth_note_on(&b,48u,120u);
         assert(fm1lab_synth_render(&a,first,FRAMES)==0);
         fm1lab_synth_patch_default((fm1lab_synth_engine_t)engine,&patch);
-        if(engine==FM1LAB_SYNTH_WAVETABLE) patch.waveform=2u;
-        else if(engine==FM1LAB_SYNTH_PSG) patch.noise_mix=90u;
+        if(engine==FM1LAB_SYNTH_WAVETABLE) {
+            patch.waveform=2u;
+            patch.secondary_waveform=3u;
+            patch.osc_mix=75u;
+        } else if(engine==FM1LAB_SYNTH_PSG) patch.noise_mix=90u;
         else { patch.cutoff=95u; patch.detune=80u; }
         assert(fm1lab_synth_set_patch(&b,&patch)==0);
         /* Apply the new recipe at the next note boundary. */
@@ -89,6 +92,23 @@ int main(void)
         patch.cutoff=101u;
         assert(fm1lab_synth_set_patch(&b,&patch)==-1);
     }
+
+    /* Wavetable morph must use both selected tables and the morph amount. */
+    fm1lab_synth_voice_t morph_a, morph_b;
+    fm1lab_synth_patch_t morph_patch;
+    int16_t morph_first[FRAMES], morph_second[FRAMES];
+    fm1lab_synth_init(&morph_a, FM1LAB_SYNTH_WAVETABLE);
+    fm1lab_synth_init(&morph_b, FM1LAB_SYNTH_WAVETABLE);
+    fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE, &morph_patch);
+    morph_patch.waveform=0u; morph_patch.secondary_waveform=2u; morph_patch.osc_mix=0u;
+    assert(fm1lab_synth_set_patch(&morph_a,&morph_patch)==0);
+    morph_patch.osc_mix=100u;
+    assert(fm1lab_synth_set_patch(&morph_b,&morph_patch)==0);
+    fm1lab_synth_note_on(&morph_a,48u,120u);
+    fm1lab_synth_note_on(&morph_b,48u,120u);
+    assert(fm1lab_synth_render(&morph_a,morph_first,FRAMES)==0);
+    assert(fm1lab_synth_render(&morph_b,morph_second,FRAMES)==0);
+    assert(checksum(morph_first,FRAMES)!=checksum(morph_second,FRAMES));
 
     /* Continuous pitch updates must not reset either oscillator phase. */
     for (uint32_t engine = 0; engine < FM1LAB_SYNTH_ENGINE_COUNT; ++engine) {
