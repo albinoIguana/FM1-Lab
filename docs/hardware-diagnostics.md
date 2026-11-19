@@ -81,3 +81,10 @@ This is a device-side scheduling and voice-path test. APP_LOG cannot detect ever
 analog clipping event or sample-level discontinuity; if the counters pass while
 the output remains audibly broken, record the FM1 analog output through an audio
 interface for waveform-level analysis.
+
+
+### Automated Maelstrom A/B stress test
+
+The updated tools/fm1_stress_test.py automatically runs the two-engine polyphony and four-note chord-churn workload with Maelstrom OFF and ON. It uses a runtime-only APP_SYSEX test command to set chaos_amount, verifies the reported amount through APP_LOG before proceeding, captures the original value, and restores it after the test. The firmware also restores the captured value after five minutes if the host disconnects. This command does not set the settings dirty flag and does not write presets or flash.
+
+The test requires the matching firmware build with APP_SYSEX and chaos_amount telemetry. It still requires a physical FM1 for actual device timing/audio measurements; host tests cannot prove analog output quality.
