@@ -353,7 +353,7 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
     }
     fm1lab_instrument_init(out,instrument_name);
 
-    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
+    for(uint32_t patch=0;patch<1u;patch++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
         if(fm1lab_digitone_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
 
@@ -374,7 +374,7 @@ static int fm1lab_seed_digitone_instrument(uint32_t index,fm1lab_instrument_t *o
     return fm1lab_instrument_valid(out)?0:-1;
 }
 
-/* PRESETS in patch-focus mode replaces only the selected patch's DX7 voice.
+/* PRESETS in patch-focus mode replaces only the selected engine-native patch.
  * Mixer level, enable state, tuning, pan, and macros belong to the patch slot. */
 static const char *fm1lab_store_load_failure_label(void)
 {
@@ -452,7 +452,7 @@ static int fm1lab_seed_dx7_legacy_instrument(uint32_t index,fm1lab_instrument_t 
 {
     if(index>=FM1LAB_DX7_LEGACY_INSTRUMENT_COUNT || !out) return -1;
     fm1lab_instrument_init(out,fm1lab_dx7_legacy_instrument_names[index]);
-    for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
+    for(uint32_t patch=0;patch<1u;patch++) {
         uint8_t voice[FM1LAB_PATCH_BYTES];
         if(fm1lab_dx7_legacy_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
         if(fm1lab_patch_set_voice(out,patch,voice)) return -1;
@@ -479,12 +479,13 @@ static int fm1lab_seed_dx7_instrument_at_level(uint32_t index,fm1lab_instrument_
     instrument_name[name_len]='\0';
     fm1lab_instrument_init(out,instrument_name);
     for(uint32_t patch=0;patch<FM1LAB_PATCH_COUNT;patch++) {
-        uint8_t voice[FM1LAB_PATCH_BYTES];
-        if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT+patch,voice)) return -1;
-        /* The old v0.3 bank shipped SYN-LEAD10 with both algorithm-0 carriers
-         * muted. Recreate that exact old record only for legacy matching. */
-        if(mix_level==31u && index==20u && patch==1u) voice[79]=0u;
-        if(fm1lab_patch_set_voice(out,patch,voice)) return -1;
+        if(patch==0u) {
+            uint8_t voice[FM1LAB_PATCH_BYTES];
+            if(fm1lab_dx7_decode_voice(index*FM1LAB_PATCH_COUNT,voice)) return -1;
+            if(fm1lab_patch_set_voice(out,0u,voice)) return -1;
+        }
+        /* One Instrument now contains one DX7 voice plus the three native
+         * engine defaults. Preserve the curated mix level across all slots. */
         out->patches[patch].level=mix_level;
         out->patches[patch].enabled=1u;
         for(uint32_t macro=0;macro<FM1LAB_MACRO_COUNT;macro++)
@@ -567,8 +568,9 @@ static uint8_t fm1lab_restore_factory_instrument_name(
 static uint8_t fm1lab_seed_fresh_bank_mask;
 static void fm1lab_seed_factory_library(void)
 {
-    /* Curated CC0 six-operator DX7 library: 8 bass, 8 choir, one FM rhythm,
-     * one synth-percussion, plus analog-like, lead, pad and motion Instruments.
+    /* Curated CC0 six-operator DX7 voices seed slot 0; each Instrument's
+     * remaining slots start with native Wavetable, PSG and Subtractive patches.
+     * The source catalog still supplies the Instrument's FM6 voice/name.
      * Exact-match migration replaces untouched prior Digitone/DX7 slots;
      * renamed or edited user Instruments remain untouched. */
     for(uint32_t index=0;index<FM1LAB_DX7_INSTRUMENT_COUNT;index++) {
