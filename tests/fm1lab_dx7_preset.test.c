@@ -47,31 +47,31 @@ int main(void)
 
     fm1lab_instrument_t instrument;
     fm1lab_instrument_init(&instrument, "PRESET TEST");
-    fm1lab_patch_t before = instrument.patches[2];
+    fm1lab_patch_t before = instrument.patches[0];
     uint8_t next = 255u;
-    assert(fm1lab_dx7_patch_preset_step(&instrument, 2u, 255u, 1, &next)
+    assert(fm1lab_dx7_patch_preset_step(&instrument, 0u, 255u, 1, &next)
         == FM1LAB_DX7_PRESET_OK);
     assert(next == 0u);
-    assert(memcmp(instrument.patches[2].voice, expected, FM1LAB_PATCH_BYTES - 1u) == 0);
-    assert(instrument.patches[2].level == before.level);
-    assert(instrument.patches[2].enabled == before.enabled);
-    assert(instrument.patches[2].octave == before.octave);
-    assert(instrument.patches[2].fine_cents == before.fine_cents);
-    assert(instrument.patches[2].voice[155] == before.voice[155]);
-    assert(memcmp(instrument.patches[2].macros, before.macros, FM1LAB_MACRO_COUNT) == 0);
+    assert(memcmp(instrument.patches[0].voice, expected, FM1LAB_PATCH_BYTES - 1u) == 0);
+    assert(instrument.patches[0].level == before.level);
+    assert(instrument.patches[0].enabled == before.enabled);
+    assert(instrument.patches[0].octave == before.octave);
+    assert(instrument.patches[0].fine_cents == before.fine_cents);
+    assert(instrument.patches[0].voice[155] == before.voice[155]);
+    assert(memcmp(instrument.patches[0].macros, before.macros, FM1LAB_MACRO_COUNT) == 0);
     assert(fm1lab_instrument_valid(&instrument));
 
     /* Exercise the same physical PRESETS route and dispatcher as app.c,
      * ending in the production bundled-data decode + patch replacement. */
     fm1lab_input_state_t state = {0};
     fm1lab_input_ops_t ops = {0};
-    state.patch_focus = 1u;
-    state.patch = 1u;
+    state.patch_focus = 0u;
+    state.patch = 0u;
     ops.patch_preset_step = dispatch_patch_preset;
     enum fm1lab_input_action action = fm1lab_input_route(
         FM1LAB_INPUT_PAGE_HOME, FM1LAB_ENCODER_PRESETS, 1u);
     assert(action == FM1LAB_INPUT_PATCH_PRESET_STEP);
-    assert(fm1lab_input_apply(&state, action, 1, 32u,
+    assert(fm1lab_input_apply(&state, action, 0, 32u,
         FM1LAB_PATCH_COUNT, &ops, &instrument) == FM1LAB_INPUT_RESULT_APPLIED);
 
     uint8_t prior = next;

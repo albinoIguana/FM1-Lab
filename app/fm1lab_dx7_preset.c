@@ -58,7 +58,7 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_replace_voice(
     fm1lab_instrument_t *instrument, uint8_t patch,
     const uint8_t voice[FM1LAB_PATCH_BYTES])
 {
-    if (patch >= FM1LAB_PATCH_COUNT)
+    if (patch != 0u)
         return FM1LAB_DX7_PRESET_INDEX_INVALID;
     if (!fm1lab_dx7_voice_valid(voice))
         return FM1LAB_DX7_PRESET_VOICE_INVALID;

@@ -1,6 +1,7 @@
 #include "fm1lab_instrument.h"
 
 #include <stddef.h>
+#include <string.h>
 
 enum {
     OPERATOR_COUNT = 6,
@@ -93,7 +94,7 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
 int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
                            const uint8_t voice[FM1LAB_PATCH_BYTES])
 {
-    if (!instrument || !voice || patch >= FM1LAB_PATCH_COUNT ||
+    if (!instrument || !voice || patch != 0u ||
         instrument->magic != FM1LAB_INSTRUMENT_MAGIC ||
         instrument->version != FM1LAB_INSTRUMENT_VERSION)
         return -1;
@@ -153,7 +154,7 @@ int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
     fm1lab_patch_t previous;
     fm1lab_patch_t *replacement;
 
-    if (!fm1lab_instrument_valid(instrument) || !voice || patch >= FM1LAB_PATCH_COUNT)
+    if (!fm1lab_instrument_valid(instrument) || !voice || patch != 0u)
         return -1;
 
     previous = instrument->patches[patch];
@@ -218,7 +219,14 @@ int fm1lab_instrument_is_blank_library_slot(const fm1lab_instrument_t *instrumen
         if (instrument->name[n] && instrument->name[n] != ' ') return 0;
 
     for (unsigned patch = 0u; patch < FM1LAB_PATCH_COUNT; ++patch) {
-        if (patch != 0u) continue;
+        if (patch != 0u) {
+            fm1lab_synth_patch_t defaults;
+            fm1lab_synth_engine_t engine = synth_engine_for_slot(patch);
+            fm1lab_synth_patch_default(engine, &defaults);
+            if (memcmp(&instrument->patches[patch].synth_patch, &defaults, sizeof defaults) != 0)
+                return 0;
+            continue;
+        }
         const uint8_t *voice = instrument->patches[patch].voice;
         uint8_t carriers = fm1lab_carrier_mask(voice[VOICE_ALGORITHM]);
         for (unsigned n = 0u; n < FM1LAB_PATCH_NAME_BYTES; ++n)
