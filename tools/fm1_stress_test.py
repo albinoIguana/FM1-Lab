@@ -19,7 +19,7 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from fm1_diag import read_snapshot, LOG, END  # noqa: E402
+from fm1_diag import read_snapshot  # noqa: E402
 
 try:
     import mido
@@ -29,9 +29,6 @@ except ImportError as exc:
         "Missing MIDI dependencies. Run: python -m pip install mido python-rtmidi"
     ) from exc
 
-PHASES = (("idle", 0, 3.0), ("1-voice", 1, 5.0),
-          ("4-voice", 4, 5.0), ("8-voice", 8, 5.0),
-          ("12-voice", 12, 5.0))
 CHANNEL = 0
 BASE_NOTE = 48
 
@@ -77,7 +74,7 @@ def main():
         raise SystemExit(f"Could not connect to FM1 over USB-MIDI: {exc}") from exc
 
     path = pathlib.Path(args.output)
-    rows, samples, notes = [], 0, []
+    rows, notes = [], []
     print(f"Connected: {port_name}")
     print("Running baseline, then 1/4/8/12-note mixed-engine phases.")
     print("No preset writes. MIDI All Notes Off is sent on exit.")
@@ -103,7 +100,6 @@ def main():
                            "requested_voices": count, "port": port_name,
                            **snapshot}
                     rows.append(row)
-                    samples += 1
                     enabled = snapshot.get("patch_enabled_mask", -1)
                     render = snapshot.get("render_us", 0)
                     budget = snapshot.get("render_budget_us", 0)
@@ -141,27 +137,29 @@ def main():
 
     enabled_masks = {r.get("patch_enabled_mask", -1) for r in rows}
     max_voice = max(r.get("voice_peak", 0) for r in rows)
-    late = max(r.get("deadline_misses", 0) for r in rows)
-    xruns = max(r.get("xruns", 0) for r in rows)
+    first, last = rows[0], rows[-1]
+    late_delta = (last.get("deadline_misses", 0) -
+                  first.get("deadline_misses", 0)) & 0xffffffff
+    xrun_delta = (last.get("xruns", 0) - first.get("xruns", 0)) & 0xffffffff
     fallbacks = max(r.get("cpu2_fallbacks", 0) for r in rows)
     max_load = max(
         (100.0 * r.get("render_us", 0) / r.get("render_budget_us", 1))
         for r in rows if r.get("render_budget_us", 0)
     )
-    print(f"\nSaved {samples} snapshots: {path.resolve()}")
+    print(f"\nSaved {len(rows)} snapshots: {path.resolve()}")
     print(f"Peak render/budget: {max_load:.1f}% | peak voices: {max_voice}")
-    print(f"Deadline-miss counter: {late} | XRUN counter: {xruns} | "
-          f"CPU2 fallback counter: {fallbacks}")
+    print(f"New deadline misses: {late_delta} | new XRUNs: {xrun_delta} | "
+          f"peak CPU2 fallbacks/callback: {fallbacks}")
     if enabled_masks != {15}:
         print("INCONCLUSIVE: all four patch slots were not confirmed enabled "
               f"(observed masks: {sorted(enabled_masks)}).")
-    elif late or xruns or fallbacks:
+    elif late_delta or xrun_delta or fallbacks:
         print("FAIL: audio scheduling/CPU2 fault counters increased during test.")
     else:
         print("PASS: all four slots enabled; no deadline misses, XRUNs, or "
               "CPU2 fallbacks observed.")
-    print("Note: telemetry detects scheduling faults, not audible clipping "
-          "directly; audio capture is needed to prove sample-level artifacts.")
+    print("Telemetry detects scheduling faults, not audible clipping directly; "
+          "audio capture is required to prove sample-level artifacts.")
 
 
 if __name__ == "__main__":
