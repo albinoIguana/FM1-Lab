@@ -779,8 +779,8 @@ int main(void) {
     memset(output,0,sizeof output); fm6_render(output,1u,4096u);
     assert(fm6_sequencer_step()==1u); /* sample 5513: first tick */
     assert(fm6_sequencer_running()==1u);
-    for(unsigned patch=0u;patch<FM6_ENGINE_PATCH_COUNT;patch++)
-        assert(fm6_active_voices_patch(patch)>=1u); /* one Instrument fans out to all four engine patches */
+    assert(fm6_active_voices_patch(0u)>=1u && fm6_active_voices_patch(1u)>=1u);
+    assert(fm6_active_voices_patch(2u)==0u && fm6_active_voices_patch(3u)==0u); /* sequencer obeys the two-engine cap */
     memset(output,0,sizeof output); fm6_render(output,128u,4096u);
     seq_peak=peak(output,TEST_WORDS);
     assert(seq_peak>0);
