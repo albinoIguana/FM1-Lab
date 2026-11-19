@@ -14,49 +14,6 @@ _Static_assert(sizeof(settings_v8_t) == sizeof(settings_v9_t), "legacy v8 settin
 _Static_assert(sizeof(settings_v9_t) < sizeof(settings_v10_t), "V10 event record must extend V9");
 _Static_assert(sizeof(settings_v10_t) < sizeof(settings_t), "V11 MAELSTROM record must extend V10");
 
-/* The record codec delegates performance-state validation to FM6. Keep this
- * unit test focused on the settings envelope and migration boundary. */
-int fm6_compat_performance_state_valid(const fm6_performance_state_compat_t *s)
-{
-    if (!s || s->tempo_bpm < 30u || s->tempo_bpm > 300u ||
-        s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 4u ||
-        s->arp_division>5u || s->arp_gate<10u || s->arp_gate>100u ||
-        s->arp_octaves<1u || s->arp_octaves>4u ||
-        (s->arp_length!=8u&&s->arp_length!=16u) || s->arp_output>2u ||
-        s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
-        return 0;
-    for(unsigned step=0;step<16u;step++)
-        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_gate[step]>1u)return 0;
-    for (unsigned lane = 0; lane < 2u; ++lane) {
-        if (s->lane_instrument[lane] >= 32u) return 0;
-        for (unsigned step = 0; step < 64u; ++step)
-            if (s->seq_enabled[lane][step] > 1u || s->seq_velocity[lane][step] > 127u ||
-                (s->seq_gate[lane][step] & 0x7fu) > 100u || s->seq_note[lane][step] > 127u)
-                return 0;
-    }
-    for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
-        if (s->fx_enabled[fx] > 1u || s->fx_mix[fx] > 100u ||
-            s->fx_time[fx] > 100u || s->fx_feedback[fx] > 100u || s->fx_depth[fx] > 100u)
-            return 0;
-    for(unsigned lane=0;lane<2u;lane++) {
-        if(s->seq_event_count[lane]>128u)return 0;
-        for(unsigned i=0;i<s->seq_event_count[lane];i++) {
-            const fm6_seq_event_t *event=&s->seq_events[lane][i];
-            if(event->start>=(unsigned)s->seq_length*2u||!event->duration||
-               event->duration>(unsigned)s->seq_length*2u-event->start||
-               event->pitch>127u||!event->velocity||event->velocity>127u||event->accent>100u)return 0;
-        }
-    }
-    for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p)
-        for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
-            if (s->fx_send[p][fx] > 100u) return 0;
-    if(s->chaos_amount>100u||s->chaos_rate>100u||s->chaos_tone>100u||s->chaos_shape>5u)return 0;
-    if (s->compressor_enabled > 1u ||
-        s->compressor_ratio > 100u || s->compressor_attack > 100u ||
-        s->compressor_release > 100u || s->compressor_makeup > 100u) return 0;
-    return 1;
-}
-
 static void make_valid(settings_t *s)
 {
     memset(s, 0, sizeof *s);

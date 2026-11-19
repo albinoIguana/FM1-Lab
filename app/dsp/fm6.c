@@ -1862,17 +1862,8 @@ int fm6_live_performance_state_update(const fm1lab_live_performance_state_t *s)
             a->velocity!=b->velocity || a->accent!=b->accent) { changed=1u; break; }
     }
     if (s->seq_event_count) {
-        if (changed) {
-            fm6_seq_event_t converted[FM6_SEQ_EVENTS_PER_LANE];
-            for (uint32_t i=0u; i<s->seq_event_count; ++i) {
-                converted[i].start=s->seq_events[i].start;
-                converted[i].duration=s->seq_events[i].duration;
-                converted[i].pitch=s->seq_events[i].pitch;
-                converted[i].velocity=s->seq_events[i].velocity;
-                converted[i].accent=s->seq_events[i].accent;
-            }
-            if (fm6_sequencer_set_events(0u,converted,s->seq_event_count)!=0) return -1;
-        }
+        if (changed && fm6_sequencer_set_events(0u,s->seq_events,s->seq_event_count)!=0)
+            return -1;
     } else if (seq_event_mode) {
         fm6_seq_event_release_lane(0u);
         seq_event_count[0]=0u;

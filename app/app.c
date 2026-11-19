@@ -679,9 +679,7 @@ static void performance_publish(void)
         }
     }
     if(fm1lab_live_performance_from_compat(&performance_update_snapshot,
-                                           &set.performance)!=0 ||
-       fm1lab_live_performance_to_compat(&performance_update_compat_snapshot,
-                                         &performance_update_snapshot)!=0)
+                                           &set.performance)!=0)
         return;
     performance_update_dirty=0u;
     performance_update_pending=1u;
