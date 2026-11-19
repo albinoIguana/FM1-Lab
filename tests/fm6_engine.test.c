@@ -751,8 +751,8 @@ int main(void) {
     fm6_patch_set_level(1u,0u);
     assert(fm6_patch_active_mask()==0x0cu);
     fm6_note_on_mask(101u,100u,0x0fu);
-    assert(fm6_active_voices()==2u);
-    assert(fm6_active_voices_patch(2u)==1u && fm6_active_voices_patch(3u)==1u);
+    assert(fm6_active_voices()==3u);
+    assert(fm6_active_voices_patch(2u)==2u && fm6_active_voices_patch(3u)==1u);
     memset(output,0,sizeof output);
     fm6_render(output,TEST_FRAMES,4096u);
     assert(peak(output,TEST_WORDS)>0);
