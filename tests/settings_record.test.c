@@ -354,8 +354,28 @@ int main(void)
     memcpy(v11.macros,good.macros,sizeof v11.macros);
     memcpy(v11.levels,good.levels,sizeof v11.levels);
     memcpy(&v11.performance,&good.performance,sizeof v11.performance);
+    v11.performance.lane_instrument[0]=7u;
+    v11.performance.lane_instrument[1]=19u;
     v11.performance.seq_event_count[0]=1u;
     v11.performance.seq_events[0][0]=(fm6_seq_event_t){3u,2u,61u,99u,0u};
+    v11.performance.seq_event_count[1]=1u;
+    v11.performance.seq_events[1][0]=(fm6_seq_event_t){5u,4u,22u,80u,10u};
+    v11.performance.arp_mode=3u;
+    v11.performance.arp_division=4u;
+    v11.performance.arp_gate=63u;
+    v11.performance.arp_octaves=2u;
+    v11.performance.arp_length=16u;
+    v11.performance.arp_step_gain[5]=91u;
+    v11.performance.fx_enabled[FM6_FX_CHORUS]=1u;
+    v11.performance.fx_enabled[FM6_FX_DELAY]=1u;
+    v11.performance.fx_enabled[FM6_FX_REVERB]=1u;
+    v11.performance.fx_enabled[FM6_FX_PHASER]=1u;
+    v11.performance.fx_mix[FM6_FX_PHASER]=47u;
+    v11.performance.fx_send[3][FM6_FX_PHASER]=72u;
+    v11.performance.chaos_amount=83u;
+    v11.performance.chaos_rate=37u;
+    v11.performance.chaos_tone=61u;
+    v11.performance.chaos_shape=4u;
     v11.reserved=good.reserved;v11.padding=0u;
     v11.crc=settings_crc16(&v11,offsetof(settings_v11_t,crc));
     assert(settings_v11_valid(&v11));
@@ -364,6 +384,26 @@ int main(void)
     assert(imported.swing==50u);
     assert(imported.performance.seq_events[0][0].start==6u);
     assert(imported.performance.seq_events[0][0].duration==4u);
+    assert(imported.performance.seq_event_count[1]==1u);
+    assert(imported.performance.seq_events[1][0].start==10u);
+    /* Historical records retain both lanes for byte-compatible decoding;
+     * only lane 0 is allowed through the live-state adapter. */
+    {
+        fm1lab_live_performance_state_t migrated_live;
+        assert(fm1lab_live_performance_from_compat(&migrated_live,&imported.performance)==0);
+        assert(migrated_live.instrument==7u);
+        assert(migrated_live.seq_event_count==1u);
+        assert(migrated_live.seq_events[0].start==6u);
+        assert(migrated_live.seq_events[0].pitch==61u);
+        assert(migrated_live.arp_mode==3u&&migrated_live.arp_division==4u);
+        assert(migrated_live.arp_gate==63u&&migrated_live.arp_octaves==2u);
+        assert(migrated_live.arp_step_gain[5]==91u);
+        for(unsigned fx=0u;fx<4u;fx++)assert(migrated_live.fx_enabled[fx]==1u);
+        assert(migrated_live.fx_mix[FM6_FX_PHASER]==47u);
+        assert(migrated_live.fx_send[3][FM6_FX_PHASER]==72u);
+        assert(migrated_live.chaos_amount==83u&&migrated_live.chaos_rate==37u);
+        assert(migrated_live.chaos_tone==61u&&migrated_live.chaos_shape==4u);
+    }
     settings_seal(&imported);assert(settings_valid(&imported));
 
     /* The live state is a distinct one-lane type. Compatibility decode
