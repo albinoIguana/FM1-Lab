@@ -3,6 +3,7 @@
 #pragma once
 #include <stdint.h>
 #include "fm1lab_dsp_config.h"
+#include "fm1lab_live_performance_types.h"
 #include "fm1lab_insert_state.h"
 
 #define FM6_SAMPLE_RATE_HZ 44100u /* fm1-base device/main_fm1.c: FS */
@@ -10,14 +11,6 @@ enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUN
 
 /* Event positions and durations are measured in 32nd-note ticks:
  * two ticks per displayed sixteenth step, up to 128 ticks per 64-step loop. */
-typedef struct {
-    uint8_t start;
-    uint8_t duration;
-    uint8_t pitch;
-    uint8_t velocity;
-    uint8_t accent;
-} fm6_seq_event_t;
-
 typedef struct {
     uint32_t tick;
     uint8_t lane, note, velocity, on;
