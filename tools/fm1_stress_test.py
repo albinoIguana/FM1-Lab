@@ -210,6 +210,8 @@ class Run:
             for phase, expected, observed, device_ms in self.voice_underfills[:8]:
                 print(f"  {phase}: expected >= {expected}, observed {observed}, device_ms={device_ms}")
         failures = [f"{k} increased by {v}" for k, v in deltas.items() if v]
+        if render_pct and max(render_pct) > 85.0:
+            failures.append("render callback exceeded 85% of its audio deadline budget")
         if self.missing_snapshots:
             failures.append(f"{self.missing_snapshots} diagnostic snapshots missing")
         if self.voice_underfills:
