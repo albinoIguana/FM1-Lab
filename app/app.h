@@ -47,6 +47,7 @@ uint32_t app_audio_cpu_pct(void);       /* measured, smoothed device render load
 uint32_t app_audio_xruns(void);          /* audio DMA deadline misses since boot */
 uint32_t app_audio_overload_shed_count(void); /* FM6 voices faded after overload callbacks */
 void app_log(void (*line)(const char *t)); /* development telemetry snapshot, main loop only */
+int app_sysex(const uint8_t *p, uint32_t n); /* bounded runtime-only stress-test control */
 void app_panic(void);                    /* silence now (before an update rewrites the flash) */
 void app_splash(void);                  /* suppress the generic platform splash */
 void app_ui_init(void);                  /* the first screen, after the splash */
