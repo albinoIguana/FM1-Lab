@@ -131,8 +131,10 @@ int main(void)
     objects[0][6]=(uint8_t)legacy_crc; objects[0][7]=(uint8_t)(legacy_crc>>8);
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(loaded.patches[0].voice[145u]=='A');
-    assert(loaded.patches[1].preset_id==255u);
+    assert(loaded.patches[1].preset_id==0u && loaded.patches[2].preset_id==0u && loaded.patches[3].preset_id==0u);
     assert(memcmp(loaded.patches[1].name,"WT INIT",7u)==0);
+    assert(memcmp(loaded.patches[2].name,"PSG INIT",8u)==0);
+    assert(memcmp(loaded.patches[3].name,"SUB INIT",8u)==0);
     assert(fm1lab_store_library_save_full(0u,&loaded,&restored)==0);
     assert(objects[0][0]==0x46u && objects[0][1]==0x4Cu &&
            objects[0][2]==0x50u && objects[0][3]==0x34u && objects[0][4]==4u);
