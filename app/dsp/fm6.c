@@ -104,6 +104,7 @@ typedef struct {
     uint8_t feedback;
     int8_t octave;
     int8_t fine_cents;
+    fm1lab_synth_patch_t synth_patch;
     uint8_t ready;
 } fm1lab_patch_t;
 
@@ -883,6 +884,13 @@ void fm6_init(void)
     fx_delay_pos=fx_chorus_pos=fx_comb_pos_a=fx_comb_pos_b=fx_comb_pos_c=0u; fx_lfo_phase=fx_phaser_phase=0u;
     for (i = 0; i < PATCHES; i++) {
         fm6_unpack(FM6_FACTORY[i % FM1LAB_PATCH_COUNT], instrument[i].base);
+        fm1lab_patch_engine_t engine = fm1lab_patch_engine_for_context((uint8_t)i);
+        if (engine == FM1LAB_PATCH_ENGINE_WAVETABLE)
+            fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE, &instrument[i].synth_patch);
+        else if (engine == FM1LAB_PATCH_ENGINE_PSG)
+            fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG, &instrument[i].synth_patch);
+        else if (engine == FM1LAB_PATCH_ENGINE_SUBTRACTIVE)
+            fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE, &instrument[i].synth_patch);
         instrument[i].macro[0] = 50;
         instrument[i].macro[1] = 50;
         instrument[i].macro[2] = 50;
@@ -969,6 +977,7 @@ static void fm6_note_start_tuned_mask(uint8_t note,uint8_t velocity,uint8_t patc
                     engine == FM1LAB_PATCH_ENGINE_PSG ? FM1LAB_SYNTH_PSG :
                     FM1LAB_SYNTH_SUBTRACTIVE;
                 fm1lab_synth_init(&v->state.synth, synth_engine);
+                (void)fm1lab_synth_set_patch(&v->state.synth, &p->synth_patch);
                 fm1lab_synth_note_on(&v->state.synth, note, velocity);
                 (void)fm1lab_synth_set_pitch(&v->state.synth,
                     (int16_t)(pitch256 < 0 ? 0 : pitch256 > 127 * 256 ? 127 * 256 : pitch256));
@@ -2001,6 +2010,36 @@ int fm6_patch_set_voice(uint32_t patch, const uint8_t *voice)
         if (voices[i].used && voices[i].patch == patch)
             voices[i].used = 0;
     fm6_rebuild_patch(patch);
+    return 0;
+}
+
+int fm6_patch_set_synth_patch(uint32_t patch, const fm1lab_synth_patch_t *settings)
+{
+    if (patch >= PATCHES) return -1;
+    fm1lab_patch_engine_t engine = fm1lab_patch_engine_for_context((uint8_t)patch);
+    fm1lab_synth_engine_t synth_engine =
+        engine == FM1LAB_PATCH_ENGINE_WAVETABLE ? FM1LAB_SYNTH_WAVETABLE :
+        engine == FM1LAB_PATCH_ENGINE_PSG ? FM1LAB_SYNTH_PSG :
+        engine == FM1LAB_PATCH_ENGINE_SUBTRACTIVE ? FM1LAB_SYNTH_SUBTRACTIVE :
+        FM1LAB_SYNTH_ENGINE_COUNT;
+    if (!fm1lab_synth_patch_valid(synth_engine, settings)) return -1;
+    instrument[patch].synth_patch = *settings;
+    for (uint32_t i = 0; i < VOICES; ++i) {
+        if (voices[i].used && voices[i].patch == patch &&
+            engine != FM1LAB_PATCH_ENGINE_FM6) {
+            if (fm1lab_synth_set_patch(&voices[i].state.synth, settings) != 0)
+                voices[i].used = 0u;
+        }
+    }
+    return 0;
+}
+
+int fm6_patch_get_synth_patch(uint32_t patch, fm1lab_synth_patch_t *settings)
+{
+    if (patch >= PATCHES || !settings ||
+        fm1lab_patch_engine_for_context((uint8_t)patch) == FM1LAB_PATCH_ENGINE_FM6)
+        return -1;
+    *settings = instrument[patch].synth_patch;
     return 0;
 }
 

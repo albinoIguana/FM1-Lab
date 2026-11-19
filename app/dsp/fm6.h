@@ -5,6 +5,7 @@
 #include "fm1lab_dsp_config.h"
 #include "fm1lab_live_performance_types.h"
 #include "fm1lab_insert_state.h"
+#include "fm1lab_synth_engines.h"
 
 #define FM6_SAMPLE_RATE_HZ 44100u /* fm1-base device/main_fm1.c: FS */
 enum { FM6_FX_CHORUS=0u, FM6_FX_DELAY, FM6_FX_REVERB, FM6_FX_PHASER, FM6_FX_COUNT };
@@ -127,6 +128,9 @@ const char *fm6_patch_name(uint32_t patch);
 uint8_t fm6_patch_enabled(uint32_t patch);
 void fm6_patch_set_enabled(uint32_t patch, uint8_t enabled);
 int fm6_patch_set_voice(uint32_t patch, const uint8_t *voice);
+/* Engine-native patch payloads are valid only for slots 2-4. */
+int fm6_patch_set_synth_patch(uint32_t patch, const fm1lab_synth_patch_t *settings);
+int fm6_patch_get_synth_patch(uint32_t patch, fm1lab_synth_patch_t *settings);
 void fm6_patch_set_level(uint32_t patch, uint8_t level);
 uint8_t fm6_patch_level(uint32_t patch);
 void fm6_patch_set_pan(uint32_t patch, uint8_t pan);
