@@ -117,9 +117,9 @@ int main(void)
     assert(loaded.patches[1].synth_patch.waveform==factory.patches[1].synth_patch.waveform);
     assert(loaded.patches[2].synth_patch.noise_mix==factory.patches[2].synth_patch.noise_mix);
     assert(loaded.patches[3].synth_patch.cutoff==factory.patches[3].synth_patch.cutoff);
-    assert(strcmp(loaded.patches[1].name,"SAW CLOUD")==0 && loaded.patches[1].preset_id==1u);
-    assert(strcmp(loaded.patches[2].name,"ARCADE LEA")==0 && loaded.patches[2].preset_id==2u);
-    assert(strcmp(loaded.patches[3].name,"WARM PAD")==0 && loaded.patches[3].preset_id==2u);
+    assert(memcmp(loaded.patches[1].name,"SAW CLOUD",9u)==0 && loaded.patches[1].preset_id==1u);
+    assert(memcmp(loaded.patches[2].name,"ARCADE LEA",10u)==0 && loaded.patches[2].preset_id==2u);
+    assert(memcmp(loaded.patches[3].name,"WARM PAD",8u)==0 && loaded.patches[3].preset_id==2u);
 
     /* Legacy FLP3 records are decoded without treating the retired
      * non-FM DX7 payloads as engine patches. A later save upgrades to FLP4. */
@@ -132,7 +132,7 @@ int main(void)
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
     assert(loaded.patches[0].voice[145u]=='A');
     assert(loaded.patches[1].preset_id==255u);
-    assert(strcmp(loaded.patches[1].name,"WT INIT")==0);
+    assert(memcmp(loaded.patches[1].name,"WT INIT",7u)==0);
     assert(fm1lab_store_library_save_full(0u,&loaded,&restored)==0);
     assert(objects[0][0]==0x46u && objects[0][1]==0x4Cu &&
            objects[0][2]==0x50u && objects[0][3]==0x34u && objects[0][4]==4u);
