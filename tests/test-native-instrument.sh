@@ -22,7 +22,7 @@ AUDIO_PEAK_BIN="$(mktemp)"
 CPU2_STARTUP_BIN="$(mktemp)"
 trap 'rm -f "$INSTRUMENT_BIN" "$METADATA_BIN" "$CONTROLS_BIN" "$LIBRARY_BIN" "$RUNTIME_BIN" "$SEQUENCER_BIN" "$SETTINGS_BIN" "$PRESET_BIN" "$APP_INSTRUMENT_BIN" "$EVENT_ORDER_BIN" "$PENDING_WATCH_BIN" "$AUDIO_PEAK_BIN" "$CPU2_STARTUP_BIN"' EXIT
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
-  "$ROOT/firmware/fm1lab_instrument.c" \
+  "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" \
   "$ROOT/tests/fm1lab_instrument.test.c" -o "$INSTRUMENT_BIN"
 "$INSTRUMENT_BIN"
 cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
@@ -47,7 +47,7 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" \
 echo "FM1-Lab Instrument/patch preset focus tests passed."
 
 cc -std=c11 -Wall -Wextra -Werror \
-  "$ROOT/app/fm1lab_instrument.c" "$ROOT/tests/app_fm1lab_instrument.test.c" \
+  "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/tests/app_fm1lab_instrument.test.c" \
   -o "$APP_INSTRUMENT_BIN"
 "$APP_INSTRUMENT_BIN"
 echo "FM1-Lab app-side patch replacement isolation tests passed."
@@ -101,8 +101,8 @@ cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/firmware" \
 echo "FM1-Lab native voice editor tests passed."
 
 # Exercise the exact bundled DX7 decoder and patch replacement used by app.c.
-cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" \
-  "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/fm1lab_dx7_preset.c" \
+cc -std=c11 -Wall -Wextra -Werror -I"$ROOT/app" -I"$ROOT/app/dsp" \
+  "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/app/fm1lab_dx7_preset.c" \
   "$ROOT/tests/fm1lab_dx7_preset.test.c" -o "$PRESET_BIN"
 "$PRESET_BIN"
 echo "FM1-Lab bundled DX7 preset decode/replacement tests passed."
@@ -121,6 +121,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function "$ROOT/base/tests/storage
 # Exercise the pinned storage.c pool with FM1-Lab's exact object IDs and 12-sector layout.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-function -DFM1_HOST_TEST \
   -I"$ROOT/app" -I"$ROOT/app/dsp" -I"$ROOT/base/include" \
-  "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/fm1lab_store_library.c" \
+  "$ROOT/app/fm1lab_instrument.c" "$ROOT/app/dsp/fm1lab_synth_engines.c" "$ROOT/app/fm1lab_store_library.c" \
   "$ROOT/tests/fm1lab_flash_pool.test.c" -o "$CONTROLS_BIN"
 "$CONTROLS_BIN"

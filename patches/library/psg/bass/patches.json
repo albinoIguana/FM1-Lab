@@ -1,0 +1,6 @@
+{
+  "engine": "psg",
+  "patches": [
+    {"patch_id":"PSG-001","name":"CHIP BASS","category":"bass","source":"FM1-Lab original","license":"GPL-3.0-only","parameters":{"waveform":3,"secondary_waveform":3,"duty":50,"noise_mix":0,"osc_mix":10,"detune":0,"cutoff":90,"attack":1,"sustain":85,"release":8}}
+  ]
+}

@@ -2,6 +2,7 @@
 #define FM1LAB_INSTRUMENT_H
 
 #include <stdint.h>
+#include "dsp/fm1lab_synth_engines.h"
 
 #define FM1LAB_INSTRUMENT_MAGIC 0x31494c46u
 #define FM1LAB_INSTRUMENT_VERSION 1u
@@ -12,6 +13,11 @@
 #define FM1LAB_INSTRUMENT_NAME_BYTES 24u
 #define FM1LAB_MACRO_COUNT 4u
 
+/* An Instrument remains four independent typed patch records. Engine identity
+ * is fixed by slot (FM6 / Wavetable / PSG / Subtractive). Patch-bank v4 stores
+ * native engine payloads for slots 1-3; v3 DX7-only banks migrate those slots
+ * to explicit engine defaults while preserving the FM6 voice in slot 0. */
+
 enum fm1lab_macro {
     FM1LAB_BRIGHTNESS,
     FM1LAB_BODY,
@@ -21,7 +27,10 @@ enum fm1lab_macro {
 };
 
 typedef struct {
-    uint8_t voice[FM1LAB_PATCH_BYTES];
+    uint8_t voice[FM1LAB_PATCH_BYTES]; /* FM payload in slot 0; pan sentinel retained in every slot */
+    fm1lab_synth_patch_t synth_patch;  /* engine-native payload for slots 1-3 */
+    char name[FM1LAB_PATCH_NAME_BYTES + 1u];
+    uint8_t preset_id;
     uint8_t macros[FM1LAB_MACRO_COUNT]; /* 0..100; 50 is neutral */
     uint8_t enabled;                    /* 0 = muted, 1 = active */
     uint8_t level;                      /* 0..127; mixer gain, not DX7 voice data */
@@ -56,9 +65,16 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name);
 int fm1lab_patch_set_voice(fm1lab_instrument_t *instrument, unsigned patch,
                            const uint8_t voice[FM1LAB_PATCH_BYTES]);
 
-/* Replace a patch's voice while preserving slot-owned mix, tuning, pan and macros. */
+/* Replace an FM6 voice while preserving slot-owned mix, tuning, pan and macros. */
 int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
                                const uint8_t voice[FM1LAB_PATCH_BYTES]);
+/* Engine-native patch payloads for Wavetable, PSG and Subtractive slots. */
+int fm1lab_patch_set_synth(fm1lab_instrument_t *instrument, unsigned patch,
+                           const fm1lab_synth_patch_t *settings);
+int fm1lab_patch_replace_synth(fm1lab_instrument_t *instrument, unsigned patch,
+                               const fm1lab_synth_patch_t *settings);
+int fm1lab_patch_replace_engine_preset(fm1lab_instrument_t *instrument, unsigned patch,
+    const fm1lab_synth_patch_t *settings, const char *name, uint8_t preset_id);
 
 /* Validate the complete serialized value before loading or saving it. */
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument);

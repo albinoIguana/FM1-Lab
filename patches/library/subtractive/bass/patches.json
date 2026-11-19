@@ -1,0 +1,24 @@
+{
+  "engine": "subtractive",
+  "patches": [
+    {
+      "patch_id": "SUB-001",
+      "name": "ANALOG BS",
+      "category": "bass",
+      "source": "FM1-Lab original",
+      "license": "GPL-3.0-only",
+      "parameters": {
+        "waveform": 2,
+        "secondary_waveform": 3,
+        "duty": 50,
+        "noise_mix": 60,
+        "osc_mix": 30,
+        "detune": 12,
+        "cutoff": 42,
+        "attack": 2,
+        "sustain": 75,
+        "release": 18
+      }
+    }
+  ]
+}

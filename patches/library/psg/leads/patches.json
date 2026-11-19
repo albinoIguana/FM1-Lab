@@ -1,0 +1,6 @@
+{
+  "engine": "psg",
+  "patches": [
+    {"patch_id":"PSG-003","name":"ARCADE LEAD","category":"leads","source":"FM1-Lab original","license":"GPL-3.0-only","parameters":{"waveform":3,"secondary_waveform":0,"duty":35,"noise_mix":3,"osc_mix":10,"detune":5,"cutoff":85,"attack":1,"sustain":75,"release":15}}
+  ]
+}

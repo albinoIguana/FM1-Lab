@@ -1,0 +1,6 @@
+{
+  "engine": "wavetable",
+  "patches": [
+    {"patch_id":"WT-003","name":"PULSE PLUK","category":"plucks","source":"FM1-Lab original","license":"GPL-3.0-only","parameters":{"waveform":3,"secondary_waveform":2,"duty":42,"noise_mix":0,"osc_mix":15,"detune":4,"cutoff":75,"attack":2,"sustain":45,"release":20}}
+  ]
+}

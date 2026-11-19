@@ -5,7 +5,8 @@ This directory is the **source of truth for patch assets and curation metadata**
 ## Organization
 
 - `catalog/` — machine-readable patch inventory, source registry and taxonomy.
-- `library/` — patch assets organized by audible sound family, not by author or download source.
+- `library/dx7/` — DX7 voice assets organized by audible sound family.
+- `library/wavetable/`, `library/psg/`, `library/subtractive/` — engine-native patch catalogs, each organized by audible sound family.
 - `sources/` — provenance, source-bank notes, license terms and original bank references.
 - `curated/` — approved four-patch FM1 instrument sets, assembled from the library.
 

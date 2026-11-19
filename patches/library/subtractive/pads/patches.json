@@ -1,0 +1,24 @@
+{
+  "engine": "subtractive",
+  "patches": [
+    {
+      "patch_id": "SUB-003",
+      "name": "WARM PAD",
+      "category": "pads",
+      "source": "FM1-Lab original",
+      "license": "GPL-3.0-only",
+      "parameters": {
+        "waveform": 1,
+        "secondary_waveform": 0,
+        "duty": 50,
+        "noise_mix": 75,
+        "osc_mix": 25,
+        "detune": 7,
+        "cutoff": 38,
+        "attack": 55,
+        "sustain": 85,
+        "release": 75
+      }
+    }
+  ]
+}

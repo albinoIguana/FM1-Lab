@@ -32,5 +32,8 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_replace_voice(
 enum fm1lab_dx7_preset_result fm1lab_dx7_patch_preset_step(
     fm1lab_instrument_t *instrument, uint8_t patch, uint8_t cursor, int delta,
     uint8_t *next_cursor);
+enum fm1lab_dx7_preset_result fm1lab_engine_patch_preset_step(
+    fm1lab_instrument_t *instrument, uint8_t patch, uint8_t cursor, int delta,
+    uint8_t *next_cursor);
 
 #endif

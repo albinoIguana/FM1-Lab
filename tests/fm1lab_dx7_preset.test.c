@@ -1,6 +1,7 @@
 #include "fm1lab_dx7_preset.h"
 #include "fm1lab_dx7_data.h"
 #include "fm1lab_input_dispatch.h"
+#include "fm1lab_synth_engines.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -9,8 +10,9 @@ static int dispatch_patch_preset(void *context, uint8_t patch, int delta)
 {
     static uint8_t cursor[FM1LAB_PATCH_COUNT] = {255u,255u,255u,255u};
     uint8_t next;
-    enum fm1lab_dx7_preset_result r = fm1lab_dx7_patch_preset_step(
-        (fm1lab_instrument_t *)context, patch, cursor[patch], delta, &next);
+    enum fm1lab_dx7_preset_result r = patch==0u
+        ? fm1lab_dx7_patch_preset_step((fm1lab_instrument_t *)context, patch, cursor[patch], delta, &next)
+        : fm1lab_engine_patch_preset_step((fm1lab_instrument_t *)context, patch, cursor[patch], delta, &next);
     if (r != FM1LAB_DX7_PRESET_OK) return -1;
     cursor[patch] = next;
     return 0;
@@ -47,18 +49,18 @@ int main(void)
 
     fm1lab_instrument_t instrument;
     fm1lab_instrument_init(&instrument, "PRESET TEST");
-    fm1lab_patch_t before = instrument.patches[2];
+    fm1lab_patch_t before = instrument.patches[0];
     uint8_t next = 255u;
-    assert(fm1lab_dx7_patch_preset_step(&instrument, 2u, 255u, 1, &next)
+    assert(fm1lab_dx7_patch_preset_step(&instrument, 0u, 255u, 1, &next)
         == FM1LAB_DX7_PRESET_OK);
     assert(next == 0u);
-    assert(memcmp(instrument.patches[2].voice, expected, FM1LAB_PATCH_BYTES - 1u) == 0);
-    assert(instrument.patches[2].level == before.level);
-    assert(instrument.patches[2].enabled == before.enabled);
-    assert(instrument.patches[2].octave == before.octave);
-    assert(instrument.patches[2].fine_cents == before.fine_cents);
-    assert(instrument.patches[2].voice[155] == before.voice[155]);
-    assert(memcmp(instrument.patches[2].macros, before.macros, FM1LAB_MACRO_COUNT) == 0);
+    assert(memcmp(instrument.patches[0].voice, expected, FM1LAB_PATCH_BYTES - 1u) == 0);
+    assert(instrument.patches[0].level == before.level);
+    assert(instrument.patches[0].enabled == before.enabled);
+    assert(instrument.patches[0].octave == before.octave);
+    assert(instrument.patches[0].fine_cents == before.fine_cents);
+    assert(instrument.patches[0].voice[155] == before.voice[155]);
+    assert(memcmp(instrument.patches[0].macros, before.macros, FM1LAB_MACRO_COUNT) == 0);
     assert(fm1lab_instrument_valid(&instrument));
 
     /* Exercise the same physical PRESETS route and dispatcher as app.c,
@@ -66,13 +68,54 @@ int main(void)
     fm1lab_input_state_t state = {0};
     fm1lab_input_ops_t ops = {0};
     state.patch_focus = 1u;
-    state.patch = 1u;
+    state.patch = 0u;
     ops.patch_preset_step = dispatch_patch_preset;
     enum fm1lab_input_action action = fm1lab_input_route(
         FM1LAB_INPUT_PAGE_HOME, FM1LAB_ENCODER_PRESETS, 1u);
     assert(action == FM1LAB_INPUT_PATCH_PRESET_STEP);
     assert(fm1lab_input_apply(&state, action, 1, 32u,
         FM1LAB_PATCH_COUNT, &ops, &instrument) == FM1LAB_INPUT_RESULT_APPLIED);
+
+
+
+    /* Each fixed engine slot browses a distinct native catalog. A detent
+     * changes synthesis parameters and name, while preserving slot mix. */
+    for (uint8_t patch=1u; patch<FM1LAB_PATCH_COUNT; ++patch) {
+        uint8_t engine_cursor=255u;
+        instrument.patches[patch].level=(uint8_t)(70u+patch);
+        instrument.patches[patch].enabled=1u;
+        instrument.patches[patch].voice[155]=(uint8_t)(80u+patch);
+        instrument.patches[patch].macros[0]=23u;
+        assert(fm1lab_engine_patch_preset_step(&instrument,patch,engine_cursor,1,&next)
+            ==FM1LAB_DX7_PRESET_OK);
+        assert(next==0u);
+        assert(instrument.patches[patch].preset_id==0u);
+        assert(instrument.patches[patch].name[0]!='\0');
+        assert(instrument.patches[patch].level==(uint8_t)(70u+patch));
+        assert(instrument.patches[patch].enabled==1u);
+        assert(instrument.patches[patch].voice[155]==(uint8_t)(80u+patch));
+        assert(instrument.patches[patch].macros[0]==23u);
+        fm1lab_synth_patch_t first=instrument.patches[patch].synth_patch;
+        fm1lab_synth_engine_t engine=patch==1u?FM1LAB_SYNTH_WAVETABLE:
+            patch==2u?FM1LAB_SYNTH_PSG:FM1LAB_SYNTH_SUBTRACTIVE;
+        fm1lab_synth_voice_t dsp; int16_t dsp_audio[256];
+        fm1lab_synth_init(&dsp,engine);
+        assert(fm1lab_synth_set_patch(&dsp,&first)==0);
+        fm1lab_synth_note_on(&dsp,60u,127u);
+        assert(fm1lab_synth_render(&dsp,dsp_audio,256u)==0);
+        uint32_t dsp_hash=0u;for(unsigned n=0;n<256u;n++)dsp_hash=(dsp_hash^(uint16_t)dsp_audio[n])*16777619u;
+        assert(dsp_hash!=0u);
+        assert(fm1lab_engine_patch_preset_step(&instrument,patch,next,1,&next)
+            ==FM1LAB_DX7_PRESET_OK);
+        assert(next==1u);
+        assert(instrument.patches[patch].preset_id==1u);
+        assert(memcmp(&first,&instrument.patches[patch].synth_patch,sizeof first)!=0);
+        assert(fm1lab_instrument_valid(&instrument));
+    }
+    assert(fm1lab_engine_patch_preset_step(&instrument,0u,255u,1,&next)
+        ==FM1LAB_DX7_PRESET_INDEX_INVALID);
+    assert(fm1lab_engine_patch_preset_step(&instrument,3u,255u,0,&next)
+        ==FM1LAB_DX7_PRESET_BAD_ARGUMENT);
 
     uint8_t prior = next;
     assert(fm1lab_dx7_patch_preset_step(&instrument, FM1LAB_PATCH_COUNT,

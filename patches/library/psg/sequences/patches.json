@@ -1,0 +1,6 @@
+{
+  "engine": "psg",
+  "patches": [
+    {"patch_id":"PSG-004","name":"8BIT ARP","category":"sequences","source":"FM1-Lab original","license":"GPL-3.0-only","parameters":{"waveform":2,"secondary_waveform":3,"duty":50,"noise_mix":5,"osc_mix":20,"detune":2,"cutoff":95,"attack":0,"sustain":55,"release":10}}
+  ]
+}

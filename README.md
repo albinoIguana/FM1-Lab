@@ -1,48 +1,44 @@
 # FM1-Lab
 
-**FM1-Lab is an independent four-patch Instrument design environment for the M-VAVE FM1.** The firmware foundation is M-VAVE's own open FM1 source and SDK. The Instrument model, macro system, editor and workflow are our own.
+**FM1-Lab is an independent mixed-synthesis Instrument for the M-VAVE FM1.** The firmware foundation is the open M-VAVE FM1 source/SDK and the pinned Felucca FM6 implementation. The Instrument model, engine-native patch data, editor and workflow are FM1-Lab work.
 
-## Product model
+## Instrument model
 
-- One **Instrument** contains exactly four independent six-operator FM patches.
-- Each patch uses M-VAVE's expanded 156-byte DX7 voice format.
-- PRESET selects among 32 Instrument slots; SELECT chooses one of four voices inside the active Instrument.
-- Four performance macros are implemented as non-destructive transformations of the saved patch: **Brightness**, **Body**, **Motion** and **Edge**.
-- Brightness and Body act on carrier operators; Edge acts on modulators and algorithm feedback. Carrier roles come from M-VAVE's actual DX7 algorithm routing table.
-- Operator editing changes the underlying patch; macro positions are applied as a separate live layer.
+One Instrument contains exactly four fixed-role patch slots:
 
-## Official firmware foundation
+1. **FM6** — six-operator FM voice, using the expanded M-VAVE/DX7-compatible voice format.
+2. **Wavetable** — native wavetable-engine patch.
+3. **PSG** — native programmable-sound-generator patch.
+4. **Subtractive** — native subtractive-synth patch.
 
-The pinned submodule vendor/m-vave-fm1 points to [M-VAVE's official FM1 open-source repository](https://github.com/m-vave/fm1_open). It contains the device application, board interfaces, FM1 SDK, official synthesis code, and browser simulator. The simulator is used as the sound engine for the browser workshop and for rapid verification of patch behavior.
+The four slots are simultaneous layers of one Instrument, not four interchangeable DX7 voices. The library contains 4 banks × 8 Instruments (32 Instruments). Each slot retains its own patch name/identity, enable state, level, pan, tuning and macros. The current native Wavetable, PSG and Subtractive factory catalogs each contain four starter patches; their source records live under `patches/library/<engine>/`. DX7 archive material is kept separately under `patches/library/dx7/`.
 
-## Current implementation
+The FM6 slot uses the curated 128-voice DX7-compatible library. The other three slots store and apply engine-native parameter records; legacy DX7-only Instrument records migrate by retaining the old FM voice in slot 1 and assigning valid defaults to the three newly typed slots. Old DX7 bytes are never reinterpreted as Wavetable, PSG or Subtractive parameters.
 
-- Four-patch Instrument data model with import/export.
-- A curated 128-voice, six-operator DX7 library from a CC0-1.0 archive: dedicated sub/bass, choral layers, FM rhythm and synth percussion.
-- Native 156-byte voice editing: algorithm, feedback, operator mode/coarse/fine, output, and four-stage envelopes.
-- Algorithm-aware macro transforms.
-- Browser audio powered by the official M-VAVE simulator and its own WASM audio worklet.
+## Performance and audio
 
-The browser workshop is a development and audition surface. The active native fm1-base app is a separate Felucca FM6 implementation; native device builds are checked in CI, but physical FM1 playback and performance validation remain outstanding.
+- One live sequencer track. Older two-lane save records are decoded at the persistence boundary: lane 0 is retained and lane 1 is intentionally retired.
+- Arpeggiator and Maelstrom/Chaos remain active features.
+- Four retained stereo effects: Chorus, Delay, Reverb and Phaser.
+- The previously explored second sequencer lane, Amp/Drive, parametric EQ and master compressor are retired from the active product scope.
+- The DSP uses fixed-size voice/state storage and allocation-free fixed-point synthesis on the device audio path.
 
-## Native firmware core
+## Editing and persistence
 
-The active `app/app.c` build connects the four-patch Instrument model to the Felucca FM6 voice engine. ALGO edits the selected patch's actual six-operator FM algorithm on the Home and Operator Map pages; PRESET always browses all 32 four-patch Instruments, including while a patch is focused; SELECT chooses one of the four patches inside the active Instrument. The factory library is seeded with 128 named DX7-compatible voices, with short role descriptions on the Home cards. Each Instrument stores four packed DX7 voices plus per-patch macro, enable and level state. The four bank records use the platform's existing pooled, CRC-protected A/B object store (four 3,840-byte objects in the 12-sector pool), not the upstream FM1 synth engine or reserved factory/system sectors. The bank payload has its own version and CRC16. The on-device label shows the current bank and Instrument index.
+The physical patch slots have fixed engine identities. Selecting a preset in a slot replaces that slot's sound recipe while preserving its mixer/performance state. Instrument and performance data use versioned, CRC-protected persistence records. Compatibility structures for older two-lane settings remain persistence-only and are converted into the one-track live state before reaching runtime code.
 
-The bank format uses 11-character persisted Instrument names to fit all 32 voices and their per-patch state inside the platform's 3,840-byte object limit. Existing three-slot Instrument objects are migrated into the first three Instrument positions when the bank format is initialized. Instrument loading is handed to the audio task through the app event queue so the UI thread does not write live FM voice state.
+The browser workshop and native device application are separate surfaces. The active native firmware is built against the pinned fm1-base/Felucca target; the browser simulator is useful for development but is not proof of device audio behavior.
 
-On Home, SELECT or K1–K4 focuses one of the four patch cards. PRESETS then browses the curated individual-voice bank and replaces only that focused patch; with no patch focused, PRESETS browses the complete four-patch Instrument bank. In the main Sequencer, SELECT toggles between Track 1 and Track 2 in either rotation direction, while PRESETS changes the complete Instrument assigned to the highlighted track.
+## Validation status
 
-The active app also has dedicated operator-envelope and two-page LFO editors. The envelope page edits each DX7 operator's four rates and four levels; the LFO pages follow the official FM1 voice map for waveform, speed, pitch/amp depth, delay, pitch sensitivity, LFO key sync, and oscillator sync. These edits are queued to the audio task as voice snapshots rather than writing DSP state from the UI thread.
+GitHub Actions runs the firmware-specific host regression suite, app-input route tests, mixed-engine audio tests, retained-FX combination tests, ARP/Maelstrom checks, persistence/migration tests and the native FM1 firmware build. A successful CI build proves compilation and host-side regression coverage; it does **not** prove physical FM1 playback, hardware timing, flash migration/recovery or real-time CPU/xrun behavior.
 
-The active FM6 audio path includes a sample-clocked two-lane sequencer, held-note arpeggiator (UP / DOWN / UP-DOWN), four stereo FX buses (CHORUS / PHASER / DELAY / REVERB), per-patch send levels, Instrument-wide Amp/Drive and parametric EQ, a stereo-linked master compressor, and a final peak limiter. These are implemented in `app/dsp/fm6.c`, not the older SDK adapter. Sequencer patterns, tempo, lane assignments, arp mode, FX parameters/sends, and compressor settings are captured in the CRC-protected performance settings record and restored at boot. Instrument voices and master insert state are saved together in the versioned Instrument library. Native host regression tests cover the two sequencer lanes, generated arp output, stereo FX, per-patch send isolation, master inserts, linked compression, output bounds, and render chunk determinism. The device build and browser emulator build pass in CI; physical FM1 playback, flash migration/recovery, and real-time CPU/xrun validation remain outstanding.
+Before installing any firmware, make a complete 1 MiB flash backup using the documented recovery procedure. The web installer itself does not create that backup. Physical-device audition and performance validation remain outstanding.
 
-## Build and validation
+## Build
 
-GitHub Actions checks the Instrument and macro models, applies the M-VAVE integration patch to the pinned source, builds the official browser simulator with WASI SDK 27, and verifies the FM1-Lab API exports.
-
-A device firmware build requires the matching JieLi Windows toolchain 2.5.3. The official source kit requires the exact 2.5.3 toolchain and validates its binaries against the SDK manifest. See the official M-VAVE README for installation and packaging requirements.
+The native firmware build uses the pinned M-VAVE/Felucca sources and matching JieLi toolchain. GitHub Actions publishes a `packages` artifact containing the firmware package, installer and build diagnostics. Verify the build identity and package checksum before use.
 
 ## Licensing
 
-The M-VAVE application is GPLv3 with its FM1 SDK linking exception. The proprietary engine is supplied as a binary SDK with an explicit FM1-only linking and redistribution grant. Preserve M-VAVE's license, third-party notices and SDK terms when distributing any build. See the license and third-party notices in vendor/m-vave-fm1.
+Preserve the upstream M-VAVE, fm1-base and Felucca licenses, third-party notices and SDK redistribution terms when building or distributing firmware. See the source and license notices in the pinned dependencies.

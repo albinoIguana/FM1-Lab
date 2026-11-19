@@ -29,8 +29,12 @@ static void test_four_patch_contract(void)
     assert(fm1lab_patch_set_voice(&instrument, 0, voice) == 0);
     assert(instrument.patches[0].level == 31u);
     assert(fm1lab_patch_pan(&instrument, 0u) == 64u);
-    assert(fm1lab_patch_set_voice(&instrument, 3, voice) == 0);
-    assert(instrument.patches[3].level == 31u);
+    assert(fm1lab_patch_set_voice(&instrument, 3, voice) == -1);
+    fm1lab_synth_patch_t psg;
+    fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG, &psg);
+    psg.noise_mix = 90u;
+    assert(fm1lab_patch_set_synth(&instrument, 2u, &psg) == 0);
+    assert(instrument.patches[2].synth_patch.noise_mix == 90u);
     assert(fm1lab_instrument_valid(&instrument));
     assert(fm1lab_patch_set_voice(&instrument, 4, voice) == -1);
     voice[134] = 32;

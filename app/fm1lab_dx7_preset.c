@@ -58,12 +58,37 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_replace_voice(
     fm1lab_instrument_t *instrument, uint8_t patch,
     const uint8_t voice[FM1LAB_PATCH_BYTES])
 {
-    if (patch >= FM1LAB_PATCH_COUNT)
+    if (patch != 0u)
         return FM1LAB_DX7_PRESET_INDEX_INVALID;
     if (!fm1lab_dx7_voice_valid(voice))
         return FM1LAB_DX7_PRESET_VOICE_INVALID;
     if (fm1lab_patch_replace_voice(instrument, patch, voice) != 0)
         return FM1LAB_DX7_PRESET_PATCH_REPLACE_FAILED;
+    return FM1LAB_DX7_PRESET_OK;
+}
+
+
+typedef struct { fm1lab_synth_patch_t settings; const char *name; const char *patch_id; } engine_preset_t;
+#include "fm1lab_engine_presets.generated.h"
+
+enum fm1lab_dx7_preset_result fm1lab_engine_patch_preset_step(
+    fm1lab_instrument_t *instrument, uint8_t patch, uint8_t cursor, int delta,
+    uint8_t *next_cursor)
+{
+    const engine_preset_t *catalog=0;
+    uint8_t catalog_count=0u;
+    fm1lab_synth_engine_t engine;
+    if(!instrument || !next_cursor || !delta) return FM1LAB_DX7_PRESET_BAD_ARGUMENT;
+    if(patch==1u){engine=FM1LAB_SYNTH_WAVETABLE;catalog=wavetable_presets;catalog_count=FM1LAB_WAVETABLE_PRESET_COUNT;}
+    else if(patch==2u){engine=FM1LAB_SYNTH_PSG;catalog=psg_presets;catalog_count=FM1LAB_PSG_PRESET_COUNT;}
+    else if(patch==3u){engine=FM1LAB_SYNTH_SUBTRACTIVE;catalog=subtractive_presets;catalog_count=FM1LAB_SUBTRACTIVE_PRESET_COUNT;}
+    else return FM1LAB_DX7_PRESET_INDEX_INVALID;
+    uint8_t next=fm1lab_preset_cursor_step(cursor,delta,catalog_count);
+    const engine_preset_t *preset=&catalog[next];
+    if(!fm1lab_synth_patch_valid(engine,&preset->settings) ||
+       fm1lab_patch_replace_engine_preset(instrument,patch,&preset->settings,preset->name,next)!=0)
+        return FM1LAB_DX7_PRESET_PATCH_REPLACE_FAILED;
+    *next_cursor=next;
     return FM1LAB_DX7_PRESET_OK;
 }
 
@@ -77,7 +102,7 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_patch_preset_step(
 
     if (!instrument || !next_cursor || !delta)
         return FM1LAB_DX7_PRESET_BAD_ARGUMENT;
-    if (patch >= FM1LAB_PATCH_COUNT)
+    if (patch != 0u)
         return FM1LAB_DX7_PRESET_INDEX_INVALID;
 
     next = fm1lab_preset_cursor_step(cursor, delta, FM1LAB_DX7_VOICE_COUNT);

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "fm1lab_settings_record.h"
+#include "fm1lab_live_performance_state.h"
 
 _Static_assert(offsetof(settings_v3_t, performance) == 28u, "legacy v3 settings prefix changed");
 _Static_assert(sizeof(fm6_performance_state_v3_t) == 542u, "legacy v3 performance layout changed");
@@ -12,49 +13,6 @@ _Static_assert(sizeof(settings_v7_t) == sizeof(settings_v9_t), "legacy v7 settin
 _Static_assert(sizeof(settings_v8_t) == sizeof(settings_v9_t), "legacy v8 settings layout changed");
 _Static_assert(sizeof(settings_v9_t) < sizeof(settings_v10_t), "V10 event record must extend V9");
 _Static_assert(sizeof(settings_v10_t) < sizeof(settings_t), "V11 MAELSTROM record must extend V10");
-
-/* The record codec delegates performance-state validation to FM6. Keep this
- * unit test focused on the settings envelope and migration boundary. */
-int fm6_performance_state_valid(const fm6_performance_state_t *s)
-{
-    if (!s || s->tempo_bpm < 30u || s->tempo_bpm > 300u ||
-        s->seq_length < 1u || s->seq_length > 64u || s->arp_mode > 4u ||
-        s->arp_division>5u || s->arp_gate<10u || s->arp_gate>100u ||
-        s->arp_octaves<1u || s->arp_octaves>4u ||
-        (s->arp_length!=8u&&s->arp_length!=16u) || s->arp_output>2u ||
-        s->arp_random>100u || s->arp_macro_dest>3u || s->arp_depth>100u)
-        return 0;
-    for(unsigned step=0;step<16u;step++)
-        if(s->arp_step_gain[step]>127u||s->arp_step_accent[step]>100u||s->arp_step_gate[step]>1u)return 0;
-    for (unsigned lane = 0; lane < 2u; ++lane) {
-        if (s->lane_instrument[lane] >= 32u) return 0;
-        for (unsigned step = 0; step < 64u; ++step)
-            if (s->seq_enabled[lane][step] > 1u || s->seq_velocity[lane][step] > 127u ||
-                (s->seq_gate[lane][step] & 0x7fu) > 100u || s->seq_note[lane][step] > 127u)
-                return 0;
-    }
-    for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
-        if (s->fx_enabled[fx] > 1u || s->fx_mix[fx] > 100u ||
-            s->fx_time[fx] > 100u || s->fx_feedback[fx] > 100u || s->fx_depth[fx] > 100u)
-            return 0;
-    for(unsigned lane=0;lane<2u;lane++) {
-        if(s->seq_event_count[lane]>128u)return 0;
-        for(unsigned i=0;i<s->seq_event_count[lane];i++) {
-            const fm6_seq_event_t *event=&s->seq_events[lane][i];
-            if(event->start>=(unsigned)s->seq_length*2u||!event->duration||
-               event->duration>(unsigned)s->seq_length*2u-event->start||
-               event->pitch>127u||!event->velocity||event->velocity>127u||event->accent>100u)return 0;
-        }
-    }
-    for (unsigned p = 0; p < FM1LAB_PATCH_COUNT; ++p)
-        for (unsigned fx = 0; fx < FM6_FX_COUNT; ++fx)
-            if (s->fx_send[p][fx] > 100u) return 0;
-    if(s->chaos_amount>100u||s->chaos_rate>100u||s->chaos_tone>100u||s->chaos_shape>5u)return 0;
-    if (s->compressor_enabled > 1u ||
-        s->compressor_ratio > 100u || s->compressor_attack > 100u ||
-        s->compressor_release > 100u || s->compressor_makeup > 100u) return 0;
-    return 1;
-}
 
 static void make_valid(settings_t *s)
 {
@@ -396,8 +354,28 @@ int main(void)
     memcpy(v11.macros,good.macros,sizeof v11.macros);
     memcpy(v11.levels,good.levels,sizeof v11.levels);
     memcpy(&v11.performance,&good.performance,sizeof v11.performance);
+    v11.performance.lane_instrument[0]=7u;
+    v11.performance.lane_instrument[1]=19u;
     v11.performance.seq_event_count[0]=1u;
     v11.performance.seq_events[0][0]=(fm6_seq_event_t){3u,2u,61u,99u,0u};
+    v11.performance.seq_event_count[1]=1u;
+    v11.performance.seq_events[1][0]=(fm6_seq_event_t){5u,4u,22u,80u,10u};
+    v11.performance.arp_mode=3u;
+    v11.performance.arp_division=4u;
+    v11.performance.arp_gate=63u;
+    v11.performance.arp_octaves=2u;
+    v11.performance.arp_length=16u;
+    v11.performance.arp_step_gain[5]=91u;
+    v11.performance.fx_enabled[FM6_FX_CHORUS]=1u;
+    v11.performance.fx_enabled[FM6_FX_DELAY]=1u;
+    v11.performance.fx_enabled[FM6_FX_REVERB]=1u;
+    v11.performance.fx_enabled[FM6_FX_PHASER]=1u;
+    v11.performance.fx_mix[FM6_FX_PHASER]=47u;
+    v11.performance.fx_send[3][FM6_FX_PHASER]=72u;
+    v11.performance.chaos_amount=83u;
+    v11.performance.chaos_rate=37u;
+    v11.performance.chaos_tone=61u;
+    v11.performance.chaos_shape=4u;
     v11.reserved=good.reserved;v11.padding=0u;
     v11.crc=settings_crc16(&v11,offsetof(settings_v11_t,crc));
     assert(settings_v11_valid(&v11));
@@ -406,8 +384,110 @@ int main(void)
     assert(imported.swing==50u);
     assert(imported.performance.seq_events[0][0].start==6u);
     assert(imported.performance.seq_events[0][0].duration==4u);
+    assert(imported.performance.seq_event_count[1]==1u);
+    assert(imported.performance.seq_events[1][0].start==10u);
+    /* Historical records retain both lanes for byte-compatible decoding;
+     * only lane 0 is allowed through the live-state adapter. */
+    {
+        fm1lab_live_performance_state_t migrated_live;
+        assert(fm1lab_live_performance_from_compat(&migrated_live,&imported.performance)==0);
+        assert(migrated_live.instrument==7u);
+        assert(migrated_live.seq_event_count==1u);
+        assert(migrated_live.seq_events[0].start==6u);
+        assert(migrated_live.seq_events[0].pitch==61u);
+        assert(migrated_live.arp_mode==3u&&migrated_live.arp_division==4u);
+        assert(migrated_live.arp_gate==63u&&migrated_live.arp_octaves==2u);
+        assert(migrated_live.arp_step_gain[5]==91u);
+        for(unsigned fx=0u;fx<4u;fx++)assert(migrated_live.fx_enabled[fx]==1u);
+        assert(migrated_live.fx_mix[FM6_FX_PHASER]==47u);
+        assert(migrated_live.fx_send[3][FM6_FX_PHASER]==72u);
+        assert(migrated_live.chaos_amount==83u&&migrated_live.chaos_rate==37u);
+        assert(migrated_live.chaos_tone==61u&&migrated_live.chaos_shape==4u);
+    }
     settings_seal(&imported);assert(settings_valid(&imported));
 
-    puts("FM1-Lab settings record CRC, validation and V1/V2/V3/V4/V5/V6/V7/V8/V9/V10/V11 -> V12 migration tests passed");
+    /* The live state is a distinct one-lane type. Compatibility decode
+     * retains lane 0, discards lane 1, and keeps ARP, Maelstrom and all FX. */
+    {
+        fm1lab_live_performance_state_t live;
+        memset(&live, 0xA5, sizeof live);
+        fm6_performance_state_compat_t compatibility = good.performance;
+        compatibility.lane_instrument[0] = 7u;
+        compatibility.lane_instrument[1] = 19u;
+        compatibility.seq_enabled[0][3] = 1u;
+        compatibility.seq_enabled[1][3] = 0u;
+        compatibility.seq_note[0][3] = 67u;
+        compatibility.seq_note[1][3] = 22u;
+        compatibility.seq_event_count[0] = 1u;
+        compatibility.seq_events[0][0] = (fm6_seq_event_t){6u, 8u, 67u, 111u, 40u};
+        compatibility.seq_event_count[1] = 1u;
+        compatibility.seq_events[1][0] = (fm6_seq_event_t){2u, 4u, 22u, 50u, 0u};
+        compatibility.chaos_amount = 83u;
+        compatibility.chaos_rate = 37u;
+        compatibility.chaos_tone = 61u;
+        compatibility.chaos_shape = 4u;
+        compatibility.fx_enabled[FM6_FX_PHASER] = 1u;
+        compatibility.fx_mix[FM6_FX_PHASER] = 47u;
+        compatibility.fx_send[3][FM6_FX_PHASER] = 72u;
+        assert(fm1lab_live_performance_from_compat(&live, &compatibility) == 0);
+        assert(live.instrument == 7u);
+        assert(live.seq_enabled[3] == 1u && live.seq_note[3] == 67u);
+        assert(live.seq_event_count == 1u);
+        assert(live.seq_events[0].start == 6u && live.seq_events[0].pitch == 67u);
+        assert(live.arp_mode == compatibility.arp_mode);
+        assert(live.arp_step_gain[5] == compatibility.arp_step_gain[5]);
+        assert(live.fx_enabled[FM6_FX_PHASER] == 1u);
+        assert(live.fx_mix[FM6_FX_PHASER] == 47u);
+        assert(live.fx_send[3][FM6_FX_PHASER] == 72u);
+        assert(live.chaos_amount == 83u && live.chaos_rate == 37u);
+        assert(live.chaos_tone == 61u && live.chaos_shape == 4u);
+        assert(fm1lab_live_performance_from_compat(NULL, &compatibility) == -1);
+
+        {
+            fm6_performance_state_compat_t roundtrip;
+            assert(fm1lab_live_performance_to_compat(&roundtrip, &live) == 0);
+            assert(roundtrip.lane_instrument[0] == 7u);
+            assert(roundtrip.lane_instrument[1] == 0u);
+            assert(roundtrip.seq_enabled[0][3] == 1u);
+            assert(roundtrip.seq_enabled[1][3] == 0u);
+            assert(roundtrip.seq_event_count[0] == 1u);
+            assert(roundtrip.seq_event_count[1] == 0u);
+            assert(roundtrip.seq_events[0][0].pitch == 67u);
+            assert(roundtrip.arp_mode == live.arp_mode);
+            assert(roundtrip.fx_enabled[FM6_FX_PHASER] == 1u);
+            assert(roundtrip.fx_send[3][FM6_FX_PHASER] == 72u);
+            assert(roundtrip.chaos_amount == 83u && roundtrip.chaos_rate == 37u);
+            assert(roundtrip.compressor_enabled == 0u);
+            assert(fm6_compat_performance_state_valid(&roundtrip));
+            assert(fm1lab_live_performance_to_compat(&roundtrip, NULL) == -1);
+        }
+        {
+            fm1lab_live_performance_state_t invalid = live;
+            fm6_performance_state_compat_t rejected;
+            invalid.instrument = 32u;
+            assert(fm1lab_live_performance_to_compat(&rejected, &invalid) == -1);
+        }
+    }
+
+
+    /* Direct persistence-to-runtime migration: old two-lane saves become a
+     * one-lane state. V9 event reconstruction and V10 tick conversion happen
+     * before lane 1 is discarded. */
+    {
+        fm1lab_live_performance_state_t live;
+        assert(settings_import_live_v9(&live, &v9) == 0);
+        assert(live.instrument == v9.performance.lane_instrument[0]);
+        assert(live.seq_event_count == 2u);
+        assert(live.seq_events[0].pitch == 60u && live.seq_events[1].pitch == 64u);
+        assert(settings_import_live_v10(&live, &v10) == 0);
+        assert(live.instrument == v10.performance.lane_instrument[0]);
+        assert(live.seq_event_count == v10.performance.seq_event_count[0]);
+        assert(live.chaos_amount == 0u && live.chaos_rate == 42u);
+        assert(settings_import_live_v12(&live, &good) == 0);
+        assert(live.instrument == good.performance.lane_instrument[0]);
+        assert(settings_import_live_v12(&live, NULL) == -1);
+    }
+
+    puts("FM1-Lab settings record and single-track live-state migration tests passed");
     return 0;
 }

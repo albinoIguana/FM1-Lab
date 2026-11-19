@@ -48,7 +48,7 @@ def main() -> None:
 
     manifest = json.loads((root / args.manifest).read_text(encoding="utf-8"))
     library = {}
-    for path in (root / "patches/library").rglob("*.json"):
+    for path in (root / "patches/library/dx7").rglob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
         for patch in payload.get("patches", []):
             patch_id = patch["id"]
@@ -108,8 +108,8 @@ def main() -> None:
         "#define FM1LAB_DX7_Z85_BYTES 195u",
         "",
         "/* Generated from patches/curated/instrument-bank-v0.3.json.",
-        " * Patch source of truth: patches/library/ by audible sound family.",
-        " * 128 voices / 32 four-patch instruments. Draft selections require listening.",
+        " * Patch source of truth: patches/library/dx7/ by audible sound family.",
+        " * 128 DX7 presets / 32 factory FM6 seeds; other slots use native engines.",
         " */",
         "static const char fm1lab_dx7_voice_z85[] =",
     ]

@@ -1,0 +1,6 @@
+{
+  "engine": "psg",
+  "patches": [
+    {"patch_id":"PSG-002","name":"NOISE SNAR","category":"percussion","source":"FM1-Lab original","license":"GPL-3.0-only","parameters":{"waveform":3,"secondary_waveform":3,"duty":50,"noise_mix":35,"osc_mix":0,"detune":0,"cutoff":100,"attack":0,"sustain":15,"release":12}}
+  ]
+}

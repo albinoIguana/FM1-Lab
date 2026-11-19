@@ -1,0 +1,24 @@
+{
+  "engine": "subtractive",
+  "patches": [
+    {
+      "patch_id": "SUB-002",
+      "name": "SAW LEAD",
+      "category": "leads",
+      "source": "FM1-Lab original",
+      "license": "GPL-3.0-only",
+      "parameters": {
+        "waveform": 2,
+        "secondary_waveform": 1,
+        "duty": 50,
+        "noise_mix": 55,
+        "osc_mix": 40,
+        "detune": 18,
+        "cutoff": 65,
+        "attack": 4,
+        "sustain": 68,
+        "release": 22
+      }
+    }
+  ]
+}

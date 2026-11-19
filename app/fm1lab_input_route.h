@@ -9,16 +9,14 @@ enum {
     FM1LAB_INPUT_PAGE_HOME = 0u,
     FM1LAB_INPUT_PAGE_SEQ = 7u,
     FM1LAB_INPUT_PAGE_SEQ_OPTIONS = 8u,
-    FM1LAB_INPUT_PAGE_COUNT = 23u
+    FM1LAB_INPUT_PAGE_COUNT = 20u
 };
 
 enum fm1lab_input_action {
     FM1LAB_INPUT_NONE = 0u,
     FM1LAB_INPUT_PATCH_FOCUS_STEP,
     FM1LAB_INPUT_PATCH_PRESET_STEP,
-    FM1LAB_INPUT_INSTRUMENT_STEP,
-    FM1LAB_INPUT_TRACK_TOGGLE,
-    FM1LAB_INPUT_TRACK_INSTRUMENT_STEP
+    FM1LAB_INPUT_INSTRUMENT_STEP
 };
 
 /* Return all matching claims so tests can detect overlapping routing rules.
@@ -34,11 +32,6 @@ static inline uint32_t fm1lab_input_route_claims(uint8_t page,
             claims |= (uint32_t)1u << (patch_focus
                 ? FM1LAB_INPUT_PATCH_PRESET_STEP
                 : FM1LAB_INPUT_INSTRUMENT_STEP);
-    } else if (page == FM1LAB_INPUT_PAGE_SEQ) {
-        if (encoder == 0u)
-            claims |= (uint32_t)1u << FM1LAB_INPUT_TRACK_TOGGLE;
-        if (encoder == 2u)
-            claims |= (uint32_t)1u << FM1LAB_INPUT_TRACK_INSTRUMENT_STEP;
     }
     return claims;
 }
@@ -50,15 +43,10 @@ static inline enum fm1lab_input_action fm1lab_input_route(
     if (!claims || (claims & (claims - 1u)))
         return FM1LAB_INPUT_NONE;
     for (uint32_t action = FM1LAB_INPUT_PATCH_FOCUS_STEP;
-         action <= FM1LAB_INPUT_TRACK_INSTRUMENT_STEP; ++action)
+         action <= FM1LAB_INPUT_INSTRUMENT_STEP; ++action)
         if (claims == ((uint32_t)1u << action))
             return (enum fm1lab_input_action)action;
     return FM1LAB_INPUT_NONE;
-}
-
-static inline uint8_t fm1lab_input_track_next(uint8_t lane, int delta)
-{
-    return delta ? (uint8_t)((lane ^ 1u) & 1u) : (uint8_t)(lane & 1u);
 }
 
 static inline uint8_t fm1lab_input_focus_after_page_change(
