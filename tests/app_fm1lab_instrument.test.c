@@ -69,7 +69,6 @@ int main(void)
     test_blank_library_slot_detection();
     fm1lab_instrument_t instrument;
     uint8_t voice[FM1LAB_PATCH_BYTES];
-    uint8_t expected[FM1LAB_PATCH_BYTES];
     fm1lab_patch_t before[FM1LAB_PATCH_COUNT];
 
     fm1lab_instrument_init(&instrument, "REPLACE TEST");
