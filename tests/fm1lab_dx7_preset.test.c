@@ -65,11 +65,11 @@ int main(void)
      * ending in the production bundled-data decode + patch replacement. */
     fm1lab_input_state_t state = {0};
     fm1lab_input_ops_t ops = {0};
-    state.patch_focus = 0u;
+    state.patch_focus = 1u;
     state.patch = 0u;
     ops.patch_preset_step = dispatch_patch_preset;
     enum fm1lab_input_action action = fm1lab_input_route(
-        FM1LAB_INPUT_PAGE_HOME, FM1LAB_ENCODER_PRESETS, 0u);
+        FM1LAB_INPUT_PAGE_HOME, FM1LAB_ENCODER_PRESETS, 1u);
     assert(action == FM1LAB_INPUT_PATCH_PRESET_STEP);
     assert(fm1lab_input_apply(&state, action, 0, 32u,
         FM1LAB_PATCH_COUNT, &ops, &instrument) == FM1LAB_INPUT_RESULT_APPLIED);
