@@ -4418,13 +4418,18 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
            fm1lab_store_library_save_full(0u,&edited,&inserts)!=0) { app_host_legacy_factory_migration_stage=8u; return 1; }
         fm1lab_seed_factory_library();
         app_host_legacy_factory_migration_stage=9u;
-        if(fm1lab_store_library_load_full(0u,&migrated,&inserts)!=0 ||
-           memcmp(migrated.name,edited.name,sizeof migrated.name)!=0 ||
-           memcmp(migrated.patches,edited.patches,sizeof migrated.patches)!=0)
-            return 1;
+        if(fm1lab_store_library_load_full(0u,&migrated,&inserts)!=0) {
+            app_host_legacy_factory_migration_stage=91u; return 1;
+        }
+        if(memcmp(migrated.name,edited.name,sizeof migrated.name)!=0) {
+            app_host_legacy_factory_migration_stage=92u; return 1;
+        }
+        if(memcmp(migrated.patches,edited.patches,sizeof migrated.patches)!=0) {
+            app_host_legacy_factory_migration_stage=93u; return 1;
+        }
         if(fm1lab_seed_dx7_instrument(0u,&expected)!=0 ||
            fm1lab_store_library_save_full(0u,&expected,&inserts)!=0) return 1;
-        app_host_legacy_factory_migration_stage=12u;
+        app_host_legacy_factory_migration_stage=14u;
         app_host_legacy_factory_migration_pass=1u;
         return 1;
     }
