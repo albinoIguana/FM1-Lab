@@ -415,8 +415,11 @@ static int fm1lab_patch_preset_step(int delta)
     enum fm1lab_dx7_preset_result result;
     if (!delta) { patch_preset_last_result=FM1LAB_DX7_PRESET_BAD_ARGUMENT; return -1; }
     if (set.patch >= FM1LAB_PATCH_COUNT) { patch_preset_last_result=FM1LAB_DX7_PRESET_INDEX_INVALID; return -1; }
-    result=fm1lab_dx7_patch_preset_step(&current_instrument,set.patch,
-        patch_preset_cursor[lane][set.patch],delta,&next);
+    result=set.patch==0u
+        ? fm1lab_dx7_patch_preset_step(&current_instrument,set.patch,
+            patch_preset_cursor[lane][set.patch],delta,&next)
+        : fm1lab_engine_patch_preset_step(&current_instrument,set.patch,
+            patch_preset_cursor[lane][set.patch],delta,&next);
     patch_preset_last_result=result;
     if(result!=FM1LAB_DX7_PRESET_OK) return -1;
     patch_preset_cursor[lane][set.patch]=next;
@@ -3051,8 +3054,13 @@ static const char *patch_display_name(uint32_t patch)
     static char display[FM1LAB_PATCH_COUNT][FM1LAB_PATCH_NAME_BYTES + 1u];
     static char fallback[FM1LAB_PATCH_COUNT][12];
     if (patch >= FM1LAB_PATCH_COUNT) patch = 0u;
-    /* Use the DX voice-name accessor, never the containing Instrument name. */
-    if (fm1lab_voice_name_get(current_instrument.patches[patch].voice,
+    /* Each non-FM engine owns its own short catalog name. */
+    if (patch != 0u) {
+        for(uint32_t n=0u;n<FM1LAB_PATCH_NAME_BYTES;n++) display[patch][n]=current_instrument.patches[patch].name[n];
+        display[patch][FM1LAB_PATCH_NAME_BYTES]='\\0';
+        if(display[patch][0]) return display[patch];
+    }
+    if (patch == 0u && fm1lab_voice_name_get(current_instrument.patches[patch].voice,
                               display[patch]) == 0) {
         uint32_t n = fm1lab_strlen(display[patch]);
         int placeholder = fm1lab_strcmp(display[patch], "INSTRUMENT") == 0 ||
