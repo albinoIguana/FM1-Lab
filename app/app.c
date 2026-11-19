@@ -3057,7 +3057,7 @@ static const char *patch_display_name(uint32_t patch)
     /* Each non-FM engine owns its own short catalog name. */
     if (patch != 0u) {
         for(uint32_t n=0u;n<FM1LAB_PATCH_NAME_BYTES;n++) display[patch][n]=current_instrument.patches[patch].name[n];
-        display[patch][FM1LAB_PATCH_NAME_BYTES]='\\0';
+        display[patch][FM1LAB_PATCH_NAME_BYTES]='\0';
         if(display[patch][0]) return display[patch];
     }
     if (patch == 0u && fm1lab_voice_name_get(current_instrument.patches[patch].voice,
