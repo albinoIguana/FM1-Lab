@@ -67,18 +67,27 @@ static void make_instrument(fm1lab_instrument_t *in,const char *name,unsigned se
 {
     fm1lab_instrument_init(in,name);
     for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++){
-        uint8_t *v=in->patches[p].voice;
-        for(unsigned op=0;op<6;op++){
-            uint8_t *q=v+op*21u;
-            for(unsigned i=0;i<11;i++)q[i]=(uint8_t)((i*3u+p*7u+seed)%100u);
-            q[11]=1;q[12]=2;q[13]=3;q[14]=1;q[15]=3;
-            q[16]=(uint8_t)(70u+seed);q[17]=1;q[18]=14;q[19]=77;q[20]=4;
+        if(p==0u) {
+            uint8_t *v=in->patches[p].voice;
+            for(unsigned op=0;op<6;op++){
+                uint8_t *q=v+op*21u;
+                for(unsigned i=0;i<11;i++)q[i]=(uint8_t)((i*3u+p*7u+seed)%100u);
+                q[11]=1;q[12]=2;q[13]=3;q[14]=1;q[15]=3;
+                q[16]=(uint8_t)(70u+seed);q[17]=1;q[18]=14;q[19]=77;q[20]=4;
+            }
+            for(unsigned i=126;i<156;i++)v[i]=(uint8_t)(i%90u);
+            v[145]='A';for(unsigned n=1u;n<FM1LAB_PATCH_NAME_BYTES;n++)v[145u+n]=' ';
+            v[134]=2u;v[135]=1u;v[136]=1u;v[141]=1u;v[142]=4u;v[143]=6u;
+        } else if(p==1u) {
+            in->patches[p].synth_patch.waveform=(uint8_t)((seed+1u)%4u);
+            in->patches[p].synth_patch.attack=(uint8_t)(10u+seed);
+        } else if(p==2u) {
+            in->patches[p].synth_patch.noise_mix=(uint8_t)(20u+seed);
+            in->patches[p].synth_patch.duty=(uint8_t)(40u+seed);
+        } else {
+            in->patches[p].synth_patch.cutoff=(uint8_t)(50u+seed);
+            in->patches[p].synth_patch.detune=(uint8_t)(15u+seed);
         }
-        for(unsigned i=126;i<156;i++)v[i]=(uint8_t)(i%90u);
-        v[145]=(uint8_t)('A'+p);
-        for(unsigned n=1u;n<FM1LAB_PATCH_NAME_BYTES;n++)v[145u+n]=' ';
-        v[134]=(uint8_t)(p+2u);v[135]=(uint8_t)(p+1u);
-        v[136]=1;v[141]=1;v[142]=4;v[143]=6;v[155]=(uint8_t)(20u+p*30u);
         in->patches[p].voice[155]=(uint8_t)(20u+p*30u);
         in->patches[p].enabled=(uint8_t)(p&1u);
         in->patches[p].level=(uint8_t)(80u+p);
@@ -101,8 +110,10 @@ int main(void)
             assert(loaded.patch_ids[p]==(uint8_t)(i*4u+p));
     }
     assert(fm1lab_store_library_load_full(0u,&loaded,&restored)==0);
-    for(unsigned p=0;p<FM1LAB_PATCH_COUNT;p++)
-        assert(loaded.patches[p].voice[145u]==(uint8_t)('A'+p));
+    assert(loaded.patches[0].voice[145u]=='A');
+    assert(loaded.patches[1].synth_patch.waveform==factory.patches[1].synth_patch.waveform);
+    assert(loaded.patches[2].synth_patch.noise_mix==factory.patches[2].synth_patch.noise_mix);
+    assert(loaded.patches[3].synth_patch.cutoff==factory.patches[3].synth_patch.cutoff);
 
     /* Exercise the same route + dispatcher used by app.c, ending in the
      * production store loader rather than a mocked successful callback. */
@@ -155,12 +166,12 @@ int main(void)
     assert(restored.drive==73u && restored.eq[1].gain==19u);
 
     /* A failed patch-bank commit leaves the previous saved patch intact. */
-    uint8_t saved=loaded.patches[1].voice[0];
-    loaded.patches[1].voice[0]=(uint8_t)((saved+1u)%100u);
+    uint8_t saved=loaded.patches[1].synth_patch.waveform;
+    loaded.patches[1].synth_patch.waveform=(uint8_t)((saved+1u)%4u);
     fail_obj=OBJ_INSTRUMENTS0;
     assert(fm1lab_store_library_save_full(0u,&loaded,&restored)<0);
     assert(fm1lab_store_library_load_full(0u,&one,&inserts)==0);
-    assert(one.patches[1].voice[0]==saved);
+    assert(one.patches[1].synth_patch.waveform==saved);
 
     /* Fault injection identifies lookup/read/validation failures precisely. */
     fail_size_obj=OBJ_INSERTS;

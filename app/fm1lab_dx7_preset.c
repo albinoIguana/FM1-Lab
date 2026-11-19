@@ -77,7 +77,7 @@ enum fm1lab_dx7_preset_result fm1lab_dx7_patch_preset_step(
 
     if (!instrument || !next_cursor || !delta)
         return FM1LAB_DX7_PRESET_BAD_ARGUMENT;
-    if (patch >= FM1LAB_PATCH_COUNT)
+    if (patch != 0u)
         return FM1LAB_DX7_PRESET_INDEX_INVALID;
 
     next = fm1lab_preset_cursor_step(cursor, delta, FM1LAB_DX7_VOICE_COUNT);
