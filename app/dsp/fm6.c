@@ -1603,8 +1603,8 @@ void fm6_render(int32_t *stereo, uint32_t frames, uint32_t master_gain_q12)
 #endif
             stereo[(base+i)*2u] = (int32_t)out_l;
             stereo[(base+i)*2u+1u] = (int32_t)out_r;
+            fm6_cpu0_output_ticks+=plat_ticks24()-output_t0;
         }
-        fm6_cpu0_output_ticks+=plat_ticks24()-output_t0;
         fm6_cpu0_postmix_ticks += plat_ticks24()-postmix_t0;
     }
 
