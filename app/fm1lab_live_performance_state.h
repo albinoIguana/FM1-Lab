@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include "dsp/fm6.h"
 #include "dsp/fm1lab_live_performance_types.h"
+#include "fm1lab_settings_legacy_types.h"
 
 /* Decode the current two-lane-shaped compatibility state into the single
  * live lane. Lane 1 is intentionally not copied. Retired compressor fields
