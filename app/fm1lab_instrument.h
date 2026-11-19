@@ -28,6 +28,8 @@ enum fm1lab_macro {
 typedef struct {
     uint8_t voice[FM1LAB_PATCH_BYTES]; /* FM payload in slot 0; pan sentinel retained in every slot */
     fm1lab_synth_patch_t synth_patch;  /* engine-native payload for slots 1-3 */
+    char name[FM1LAB_PATCH_NAME_BYTES + 1u];
+    uint8_t preset_id;
     uint8_t macros[FM1LAB_MACRO_COUNT]; /* 0..100; 50 is neutral */
     uint8_t enabled;                    /* 0 = muted, 1 = active */
     uint8_t level;                      /* 0..127; mixer gain, not DX7 voice data */
@@ -70,6 +72,8 @@ int fm1lab_patch_set_synth(fm1lab_instrument_t *instrument, unsigned patch,
                            const fm1lab_synth_patch_t *settings);
 int fm1lab_patch_replace_synth(fm1lab_instrument_t *instrument, unsigned patch,
                                const fm1lab_synth_patch_t *settings);
+int fm1lab_patch_replace_engine_preset(fm1lab_instrument_t *instrument, unsigned patch,
+    const fm1lab_synth_patch_t *settings, const char *name, uint8_t preset_id);
 
 /* Validate the complete serialized value before loading or saving it. */
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument);

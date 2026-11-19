@@ -85,9 +85,9 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
         instrument->patches[p].enabled = 1;
         instrument->patches[p].level = 31; /* 24.4% safe new-Instrument default */
         instrument->patches[p].voice[155] = 64u; /* centered pan */
-        if (p == 1u) fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE, &instrument->patches[p].synth_patch);
-        else if (p == 2u) fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG, &instrument->patches[p].synth_patch);
-        else if (p == 3u) fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE, &instrument->patches[p].synth_patch);
+        if (p == 1u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE, &instrument->patches[p].synth_patch); copy_name(instrument->patches[p].name, sizeof instrument->patches[p].name, "WT INIT"); }
+        else if (p == 2u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG, &instrument->patches[p].synth_patch); copy_name(instrument->patches[p].name, sizeof instrument->patches[p].name, "PSG INIT"); }
+        else if (p == 3u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE, &instrument->patches[p].synth_patch); copy_name(instrument->patches[p].name, sizeof instrument->patches[p].name, "SUB INIT"); }
     }
 }
 
@@ -172,6 +172,25 @@ int fm1lab_patch_replace_voice(fm1lab_instrument_t *instrument, unsigned patch,
     return 0;
 }
 
+
+int fm1lab_patch_replace_engine_preset(fm1lab_instrument_t *instrument, unsigned patch,
+    const fm1lab_synth_patch_t *settings, const char *name, uint8_t preset_id)
+{
+    if (!name || patch == 0u || patch >= FM1LAB_PATCH_COUNT || preset_id >= 4u)
+        return -1;
+    if (fm1lab_patch_replace_synth(instrument, patch, settings) != 0) return -1;
+    unsigned i=0u;
+    while(i<FM1LAB_PATCH_NAME_BYTES && name[i]) {
+        unsigned char ch=(unsigned char)name[i];
+        instrument->patches[patch].name[i]=(char)(ch>=32u&&ch<=126u?ch:' ');
+        ++i;
+    }
+    while(i<FM1LAB_PATCH_NAME_BYTES)instrument->patches[patch].name[i++]=' ';
+    instrument->patches[patch].name[FM1LAB_PATCH_NAME_BYTES]='\0';
+    instrument->patches[patch].preset_id=preset_id;
+    return 0;
+}
+
 int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
 {
     if (!instrument || instrument->magic != FM1LAB_INSTRUMENT_MAGIC ||
@@ -194,7 +213,14 @@ int fm1lab_instrument_valid(const fm1lab_instrument_t *instrument)
         if (p == 0u) {
             for (unsigned i = 0; i < FM1LAB_PATCH_BYTES; ++i)
                 if (patch->voice[i] > 127) return 0;
-        } else if (patch->voice[155] > 127u) return 0;
+        } else {
+            if (patch->voice[155] > 127u || patch->preset_id >= 4u ||
+                patch->name[FM1LAB_PATCH_NAME_BYTES] != '\0') return 0;
+            for (unsigned n=0u;n<FM1LAB_PATCH_NAME_BYTES;n++) {
+                unsigned char ch=(unsigned char)patch->name[n];
+                if (ch && (ch<32u || ch>126u)) return 0;
+            }
+        }
         for (unsigned m = 0; m < FM1LAB_MACRO_COUNT; ++m)
             if (patch->macros[m] > 100) return 0;
     }
@@ -223,8 +249,8 @@ int fm1lab_instrument_is_blank_library_slot(const fm1lab_instrument_t *instrumen
             fm1lab_synth_patch_t defaults;
             fm1lab_synth_engine_t engine = synth_engine_for_slot(patch);
             fm1lab_synth_patch_default(engine, &defaults);
-            if (memcmp(&instrument->patches[patch].synth_patch, &defaults, sizeof defaults) != 0)
-                return 0;
+            if (memcmp(&instrument->patches[patch].synth_patch, &defaults, sizeof defaults) != 0 ||
+                instrument->patches[patch].preset_id != 0u) return 0;
             continue;
         }
         const uint8_t *voice = instrument->patches[patch].voice;

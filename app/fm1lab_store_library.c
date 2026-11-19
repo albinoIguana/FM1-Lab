@@ -156,12 +156,11 @@ static void patch_decode_v3(const uint8_t *record,fm1lab_patch_t *patch,unsigned
     }
     patch->voice[155]=pan;
     patch->enabled=(uint8_t)(m[4]>>7);patch->level=(uint8_t)(m[4]&127u);
-    if(slot%FM1LAB_PATCH_COUNT==1u)
-        fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE,&patch->synth_patch);
-    else if(slot%FM1LAB_PATCH_COUNT==2u)
-        fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG,&patch->synth_patch);
-    else if(slot%FM1LAB_PATCH_COUNT==3u)
-        fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE,&patch->synth_patch);
+    if(slot%FM1LAB_PATCH_COUNT==1u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE,&patch->synth_patch); bytes_copy(patch->name,"WT INIT   ",10u); }
+    else if(slot%FM1LAB_PATCH_COUNT==2u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG,&patch->synth_patch); bytes_copy(patch->name,"PSG INIT  ",10u); }
+    else if(slot%FM1LAB_PATCH_COUNT==3u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE,&patch->synth_patch); bytes_copy(patch->name,"SUB INIT  ",10u); }
+    patch->name[FM1LAB_PATCH_NAME_BYTES]='\0';
+    patch->preset_id=0u;
 }
 
 static void patch_decode(const uint8_t *record,fm1lab_patch_t *patch,unsigned slot)
@@ -180,6 +179,10 @@ static void patch_decode(const uint8_t *record,fm1lab_patch_t *patch,unsigned sl
     if(slot%FM1LAB_PATCH_COUNT==3u && !fm1lab_synth_patch_valid(FM1LAB_SYNTH_SUBTRACTIVE,&patch->synth_patch))
         fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE,&patch->synth_patch);
     patch->voice[155]=record[10];
+    bytes_copy(patch->name,record+11u,FM1LAB_PATCH_NAME_BYTES);
+    patch->name[FM1LAB_PATCH_NAME_BYTES]='\0';
+    patch->preset_id=record[21u];
+    if(patch->preset_id>=4u)patch->preset_id=0u;
     for(unsigned k=0;k<FM1LAB_MACRO_COUNT;k++)patch->macros[k]=(uint8_t)(m[k]&127u);
     patch->enabled=(uint8_t)(m[4]>>7);patch->level=(uint8_t)(m[4]&127u);
     patch->octave=0;patch->fine_cents=0;
@@ -202,6 +205,8 @@ static void patch_encode(uint8_t *record,const fm1lab_patch_t *patch,unsigned sl
     }
     bytes_copy(record,&patch->synth_patch,sizeof patch->synth_patch);
     record[10]=patch->voice[155];
+    bytes_copy(record+11u,patch->name,FM1LAB_PATCH_NAME_BYTES);
+    record[21u]=patch->preset_id;
     uint8_t *m=record+VOICE_BYTES;
     for(unsigned k=0;k<FM1LAB_MACRO_COUNT;k++)m[k]=patch->macros[k];
     m[4]=(uint8_t)(patch->level|(patch->enabled?128u:0u));
