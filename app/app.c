@@ -839,7 +839,6 @@ static int instrument_load(uint32_t index, int from_audio)
     if (index >= USER_INSTRUMENT_COUNT) return FM1LAB_LOAD_INVALID;
     fm1lab_instrument_t candidate;
     fm1lab_insert_state_t candidate_inserts;
-    uint8_t previous_instrument=seq_ui_instrument[FM1LAB_LIVE_LANE&1u];
     uint8_t rom_fallback=0u;
 #ifdef PLAT_HOST
     ++app_host_store_load_calls;
@@ -853,9 +852,8 @@ static int instrument_load(uint32_t index, int from_audio)
      * It must not mark a loaded Instrument dirty or silently rewrite storage. */
     (void)instrument_repair_missing_voices(&current_instrument);
     instrument_index = (uint8_t)index;
-    if(previous_instrument!=instrument_index)
-        for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++)
-            patch_preset_cursor[FM1LAB_LIVE_LANE&1u][p]=p==0u?255u:current_instrument.patches[p].preset_id;
+    for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++)
+        patch_preset_cursor[FM1LAB_LIVE_LANE&1u][p]=p==0u?255u:current_instrument.patches[p].preset_id;
     seq_ui_instrument[FM1LAB_LIVE_LANE]=instrument_index;
     fm6_sequencer_set_lane(FM1LAB_LIVE_LANE,(uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(FM1LAB_LIVE_LANE,current_instrument.name);
