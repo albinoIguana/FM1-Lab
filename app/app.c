@@ -844,7 +844,7 @@ static int instrument_load(uint32_t index, int from_audio)
     instrument_index = (uint8_t)index;
     if(previous_instrument!=instrument_index)
         for(uint32_t p=0u;p<FM1LAB_PATCH_COUNT;p++)
-            patch_preset_cursor[FM1LAB_LIVE_LANE&1u][p]=255u;
+            patch_preset_cursor[FM1LAB_LIVE_LANE&1u][p]=p==0u?255u:current_instrument.patches[p].preset_id;
     seq_ui_instrument[FM1LAB_LIVE_LANE]=instrument_index;
     fm6_sequencer_set_lane(FM1LAB_LIVE_LANE,(uint8_t)(FM1LAB_LIVE_LANE*FM1LAB_PATCH_COUNT));
     sequencer_cache_instrument_name(FM1LAB_LIVE_LANE,current_instrument.name);
@@ -974,7 +974,8 @@ static void save_name_step(int delta)
     char *name;
     uint32_t length;
     if(save_name_target) {
-        name=(char *)current_instrument.patches[save_patch].voice+145u;
+        name=save_patch==0u ? (char *)current_instrument.patches[save_patch].voice+145u
+                            : current_instrument.patches[save_patch].name;
         length=FM1LAB_PATCH_NAME_BYTES;
     } else {
         name=current_instrument.name;
