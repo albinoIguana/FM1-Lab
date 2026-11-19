@@ -13,7 +13,8 @@
 #define APP_OVERLOAD                    /* shed a voice gracefully when the measured render exceeds 90% */
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_BTDEV                        /* Bluetooth MIDI devices (lib/btdev.h) */
-#define APP_LOG                         /* read-only diagnostics over USB-MIDI SysEx */
+#define APP_LOG                         /* development diagnostics over USB-MIDI SysEx */
+#define APP_SYSEX                       /* bounded runtime-only stress-test control SysEx */
 #define APP_CPU_KHZ                     /* expose the measured system clock */
 
 #define APP_BLE_AT_BOOT (!fm1lab_ble_off())   /* Bluetooth at power-on: as the player left it (REC held) */
