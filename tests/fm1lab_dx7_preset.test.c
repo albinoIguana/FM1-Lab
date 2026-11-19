@@ -89,7 +89,7 @@ int main(void)
             ==FM1LAB_DX7_PRESET_OK);
         assert(next==0u);
         assert(instrument.patches[patch].preset_id==0u);
-        assert(instrument.patches[patch].name[0]!='\\0');
+        assert(instrument.patches[patch].name[0]!='\0');
         assert(instrument.patches[patch].level==(uint8_t)(70u+patch));
         assert(instrument.patches[patch].enabled==1u);
         assert(instrument.patches[patch].voice[155]==(uint8_t)(80u+patch));
