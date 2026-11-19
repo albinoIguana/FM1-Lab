@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Automated two-engine FM1 hardware stress test over USB-MIDI.
 
-The script does not alter presets or settings. It sends ordinary MIDI notes,
-requests APP_LOG telemetry, and writes every sample to CSV. Configure exactly
-two ACTIVE patch slots and bypass all FX on the FM1 before running.
+Temporarily overrides Maelstrom amount in RAM for OFF/ON A/B testing, then
+restores the saved amount. No preset or flash writes. Configure exactly two
+ACTIVE patch slots and bypass the other FX before running.
 """
 import argparse
 import csv
