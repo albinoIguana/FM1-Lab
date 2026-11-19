@@ -4424,6 +4424,7 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
             return 1;
         if(fm1lab_seed_dx7_instrument(0u,&expected)!=0 ||
            fm1lab_store_library_save_full(0u,&expected,&inserts)!=0) return 1;
+        app_host_legacy_factory_migration_stage=12u;
         app_host_legacy_factory_migration_pass=1u;
         return 1;
     }
