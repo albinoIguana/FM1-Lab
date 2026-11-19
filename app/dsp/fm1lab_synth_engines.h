@@ -16,11 +16,11 @@ typedef enum {
  * the engine type; these values are the actual sound recipe, not display data. */
 typedef struct {
     uint8_t waveform;          /* 0 sine, 1 triangle, 2 saw, 3 pulse */
-    uint8_t secondary_waveform;/* subtractive oscillator B */
+    uint8_t secondary_waveform;/* wavetable morph target / secondary tone */
     uint8_t duty;              /* pulse width, 5..95 */
-    uint8_t noise_mix;         /* PSG noise contribution, 0..100 */
+    uint8_t noise_mix;         /* PSG noise mix / subtractive filter-envelope depth */
     uint8_t osc_mix;           /* subtractive oscillator B mix, 0..100 */
-    uint8_t detune;            /* subtractive oscillator B detune, 0..100 */
+    uint8_t detune;            /* subtractive oscillator detune / PSG noise clock rate, 0..100 */
     uint8_t cutoff;            /* subtractive low-pass cutoff, 0..100 */
     uint8_t attack;            /* 0..100 */
     uint8_t sustain;           /* 0..100 */

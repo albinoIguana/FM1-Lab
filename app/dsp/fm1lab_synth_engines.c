@@ -116,8 +116,10 @@ int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *v,int16_t pitch256)
     if (pitch256 > 127 * 256) pitch256 = 127 * 256;
     v->note=(uint8_t)((uint16_t)pitch256>>8);v->phase_inc=phase_for_pitch256(pitch256);
     uint32_t detune=(uint32_t)v->patch.detune;
-    if(v->engine==FM1LAB_SYNTH_PSG)
-        v->phase_inc_b=(uint32_t)(((uint64_t)v->phase_inc*(8u+detune*56u))/256u);
+    if(v->engine==FM1LAB_SYNTH_PSG) {
+        uint64_t noise_inc=((uint64_t)v->phase_inc*(128u+detune*896u/100u))/256u;
+        v->phase_inc_b=noise_inc>UINT32_MAX?UINT32_MAX:(uint32_t)noise_inc;
+    }
     else
         v->phase_inc_b=(uint32_t)(((uint64_t)v->phase_inc*(1000u+detune*2u))/1000u);
     return 0;
