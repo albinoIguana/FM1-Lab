@@ -13,9 +13,10 @@
 #define FM1LAB_INSTRUMENT_NAME_BYTES 24u
 #define FM1LAB_MACRO_COUNT 4u
 
-/* The known-good Instrument remains four independent patch records. Engine
- * identity is fixed by slot (FM6 / wavetable / PSG / subtractive), not stored
- * per preset, so the v1 flash and save formats remain compatible. */
+/* An Instrument remains four independent typed patch records. Engine identity
+ * is fixed by slot (FM6 / Wavetable / PSG / Subtractive). Patch-bank v4 stores
+ * native engine payloads for slots 1-3; v3 DX7-only banks migrate those slots
+ * to explicit engine defaults while preserving the FM6 voice in slot 0. */
 
 enum fm1lab_macro {
     FM1LAB_BRIGHTNESS,

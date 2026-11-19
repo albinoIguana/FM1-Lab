@@ -248,8 +248,11 @@ static int patch_bank_save(unsigned bank)
     return plat_store_save(OBJ_INSTRUMENTS0+bank,bank_work,PATCH_BANK_BYTES);
 }
 
-/* A patch record is 112 packed DX7 VMEM bytes plus four macro bytes and
- * one level/on byte. Pan occupies reserved bits in the packed voice/macros. */
+/* Patch-bank v4 keeps the 117-byte physical record size. Slot 0 stores the
+ * legacy packed DX7 voice + macro/mix fields; slots 1-3 store ten native
+ * engine parameters, pan, a ten-byte name, preset identity, macros and mix.
+ * v3 banks are decoded as DX7 records before non-FM slots are reset to engine
+ * defaults. */
 
 static void meta_snapshot_seal(uint8_t *snapshot)
 { write16(snapshot+META_SNAPSHOT_DATA_BYTES,crc16(snapshot,META_SNAPSHOT_DATA_BYTES)); }
