@@ -1569,7 +1569,9 @@ void app_log(void (*line)(const char *t))
     for(uint32_t fx=0u;fx<FM6_FX_COUNT;fx++)
         if(fm6_fx_enabled(fx)) fx_enabled_mask|=1u<<fx;
     app_diag_log_u32(line,"fx_enabled_mask",fx_enabled_mask);
-    app_diag_log_u32(line,"chaos_amount",set.performance.chaos_amount);
+    uint8_t chaos_amount=0u;
+    fm6_chaos_get(&chaos_amount,0,0,0);
+    app_diag_log_u32(line,"chaos_amount",chaos_amount);
     app_diag_log_u32(line,"chaos_override",app_diag_chaos_override);
     app_diag_log_u32(line,"device_ms",plat_ms());
     app_diag_log_u32(line,"render_us",render_last_us);
