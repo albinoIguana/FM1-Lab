@@ -48,7 +48,6 @@ static void test_pending_watch_requires_stalled_audio_heartbeat(void)
 static void test_blank_library_slot_detection(void)
 {
     fm1lab_instrument_t blank;
-    uint8_t voice[FM1LAB_PATCH_BYTES] = {0};
     fm1lab_instrument_init(&blank, "INSTR 01");
     assert(fm1lab_instrument_is_blank_library_slot(&blank));
 
