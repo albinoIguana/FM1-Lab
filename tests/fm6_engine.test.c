@@ -741,12 +741,12 @@ int main(void) {
     assert(fm6_active_voices_patch(0u)==FM1LAB_VOICE_LIMIT);
     assert(fm6_active_voices_patch(1u)==FM1LAB_VOICE_LIMIT);
     assert(fm6_active_voices_patch(2u)==0u && fm6_active_voices_patch(3u)==0u);
-    fm6_patch_set_level(0u,0u); /* promotes slots 3 and 4 into the active pair */
+    fm6_patch_set_level(0u,0u); /* active pair becomes slots 2 and 3 */
     assert(fm6_active_voices_patch(0u)==0u);
-    assert(fm6_active_voices_patch(1u)==0u);
+    assert(fm6_active_voices_patch(1u)==FM1LAB_VOICE_LIMIT);
     assert(fm6_patch_active_mask()==0x06u);
     fm6_note_on_mask(100u,100u,0x0fu);
-    assert(fm6_active_voices()==1u);
+    assert(fm6_active_voices()==FM1LAB_VOICE_LIMIT+1u);
     assert(fm6_active_voices_patch(2u)==1u);
     fm6_patch_set_level(1u,0u);
     assert(fm6_patch_active_mask()==0x0cu);
