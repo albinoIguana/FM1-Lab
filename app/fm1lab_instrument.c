@@ -88,6 +88,7 @@ void fm1lab_instrument_init(fm1lab_instrument_t *instrument, const char *name)
         if (p == 1u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_WAVETABLE, &instrument->patches[p].synth_patch); copy_name(instrument->patches[p].name, sizeof instrument->patches[p].name, "WT INIT"); }
         else if (p == 2u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG, &instrument->patches[p].synth_patch); copy_name(instrument->patches[p].name, sizeof instrument->patches[p].name, "PSG INIT"); }
         else if (p == 3u) { fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE, &instrument->patches[p].synth_patch); copy_name(instrument->patches[p].name, sizeof instrument->patches[p].name, "SUB INIT"); }
+        if (p > 0u) instrument->patches[p].name[FM1LAB_PATCH_NAME_BYTES] = 0;
     }
 }
 
