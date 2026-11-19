@@ -51,8 +51,8 @@ int main(void)
         assert(memcmp(buffers[engine], twin_buffer, sizeof twin_buffer) == 0);
 
         fm1lab_synth_note_off(&voice);
-        assert(fm1lab_synth_render(&voice, buffers[engine], 256u) == 0);
-        assert(voice.active == 0u);
+        while(voice.active) assert(fm1lab_synth_render(&voice,buffers[engine],FRAMES)==0);
+        assert(voice.envelope_q15==0u);
         assert(fm1lab_synth_render(&voice, buffers[engine], 64u) == 0);
         for (uint32_t i = 0; i < 64u; ++i) assert(buffers[engine][i] == 0);
     }
@@ -82,8 +82,8 @@ int main(void)
             patch.waveform=2u;
             patch.secondary_waveform=3u;
             patch.osc_mix=75u;
-        } else if(engine==FM1LAB_SYNTH_PSG) patch.noise_mix=90u;
-        else { patch.cutoff=95u; patch.detune=80u; }
+        } else if(engine==FM1LAB_SYNTH_PSG) { patch.noise_mix=90u; patch.osc_mix=65u; patch.detune=90u; }
+        else { patch.cutoff=95u; patch.detune=80u; patch.noise_mix=85u; }
         assert(fm1lab_synth_set_patch(&b,&patch)==0);
         /* Apply the new recipe at the next note boundary. */
         fm1lab_synth_note_on(&b,48u,120u);
@@ -92,6 +92,42 @@ int main(void)
         patch.cutoff=101u;
         assert(fm1lab_synth_set_patch(&b,&patch)==-1);
     }
+
+    fm1lab_synth_voice_t psg_a,psg_b; fm1lab_synth_patch_t psg_patch;
+    int16_t psg_first[FRAMES],psg_second[FRAMES];
+    fm1lab_synth_init(&psg_a,FM1LAB_SYNTH_PSG);fm1lab_synth_init(&psg_b,FM1LAB_SYNTH_PSG);
+    fm1lab_synth_patch_default(FM1LAB_SYNTH_PSG,&psg_patch);
+    psg_patch.noise_mix=70u;psg_patch.detune=0u;
+    assert(fm1lab_synth_set_patch(&psg_a,&psg_patch)==0);
+    psg_patch.detune=100u;assert(fm1lab_synth_set_patch(&psg_b,&psg_patch)==0);
+    fm1lab_synth_note_on(&psg_a,48u,127u);fm1lab_synth_note_on(&psg_b,48u,127u);
+    assert(fm1lab_synth_render(&psg_a,psg_first,FRAMES)==0);
+    assert(fm1lab_synth_render(&psg_b,psg_second,FRAMES)==0);
+    assert(checksum(psg_first,FRAMES)!=checksum(psg_second,FRAMES));
+
+    fm1lab_synth_voice_t sub_a,sub_b; fm1lab_synth_patch_t sub_patch;
+    int16_t sub_first[FRAMES],sub_second[FRAMES];
+    fm1lab_synth_init(&sub_a,FM1LAB_SYNTH_SUBTRACTIVE);fm1lab_synth_init(&sub_b,FM1LAB_SYNTH_SUBTRACTIVE);
+    fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE,&sub_patch);
+    sub_patch.waveform=2u;sub_patch.secondary_waveform=3u;sub_patch.cutoff=15u;sub_patch.noise_mix=0u;
+    assert(fm1lab_synth_set_patch(&sub_a,&sub_patch)==0);
+    sub_patch.noise_mix=100u;assert(fm1lab_synth_set_patch(&sub_b,&sub_patch)==0);
+    fm1lab_synth_note_on(&sub_a,48u,127u);fm1lab_synth_note_on(&sub_b,48u,127u);
+    assert(fm1lab_synth_render(&sub_a,sub_first,FRAMES)==0);
+    assert(fm1lab_synth_render(&sub_b,sub_second,FRAMES)==0);
+    assert(checksum(sub_first,FRAMES)!=checksum(sub_second,FRAMES));
+
+    fm1lab_synth_voice_t adsr; fm1lab_synth_patch_t adsr_patch; int16_t adsr_buf[FRAMES];
+    fm1lab_synth_init(&adsr,FM1LAB_SYNTH_SUBTRACTIVE);
+    fm1lab_synth_patch_default(FM1LAB_SYNTH_SUBTRACTIVE,&adsr_patch);
+    adsr_patch.attack=0u;adsr_patch.sustain=40u;adsr_patch.release=0u;
+    assert(fm1lab_synth_set_patch(&adsr,&adsr_patch)==0);
+    fm1lab_synth_note_on(&adsr,60u,127u);
+    for(uint32_t i=0;i<10u;i++)assert(fm1lab_synth_render(&adsr,adsr_buf,FRAMES)==0);
+    assert(adsr.envelope_stage==2u && adsr.envelope_q15>=13000u && adsr.envelope_q15<=13200u);
+    fm1lab_synth_note_off(&adsr);
+    while(adsr.active)assert(fm1lab_synth_render(&adsr,adsr_buf,FRAMES)==0);
+    assert(adsr.envelope_q15==0u);
 
     /* Wavetable morph must use both selected tables and the morph amount. */
     fm1lab_synth_voice_t morph_a, morph_b;

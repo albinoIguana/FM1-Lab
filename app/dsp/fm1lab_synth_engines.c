@@ -21,6 +21,17 @@ static const int16_t sine64[64] = {
     -32767,-32609,-32137,-31356,-30273,-28898,-27245,-25329,-23170,-20787,-18204,-15446,-12539,-9512,-6393,-3212
 };
 
+enum { ENV_STAGE_ATTACK=0u, ENV_STAGE_DECAY=1u, ENV_STAGE_SUSTAIN=2u, ENV_STAGE_RELEASE=3u };
+static uint16_t envelope_step_for_frames(uint32_t frames)
+{
+    uint32_t step=(32767u+frames-1u)/frames;
+    return (uint16_t)(step?step:1u);
+}
+static uint16_t filter_alpha_for_cutoff(uint32_t cutoff)
+{
+    if(cutoff>100u)cutoff=100u;
+    return (uint16_t)(512u+(cutoff*cutoff*320u)/100u);
+}
 static int32_t clamp_q15(int64_t x)
 {
     if (x > OUT_LIMIT) return OUT_LIMIT;
@@ -84,7 +95,7 @@ int fm1lab_synth_set_patch(fm1lab_synth_voice_t *v,const fm1lab_synth_patch_t *p
     if(!v||!fm1lab_synth_patch_valid((fm1lab_synth_engine_t)v->engine,p))return -1;
     v->patch=*p;
     /* Exponential-ish one-pole cutoff curve; no floating point in the renderer. */
-    v->filter_alpha_q15=(uint16_t)(512u+((uint32_t)p->cutoff*p->cutoff*320u)/100u);
+    v->filter_alpha_q15=filter_alpha_for_cutoff(p->cutoff);
     return 0;
 }
 
@@ -95,7 +106,7 @@ void fm1lab_synth_init(fm1lab_synth_voice_t *v,fm1lab_synth_engine_t engine)
     for(uint32_t i=0;i<sizeof(*v);++i)bytes[i]=0u;
     v->engine=(uint8_t)engine;v->noise=0x2ce1u;
     fm1lab_synth_patch_default(engine,&v->patch);
-    v->filter_alpha_q15=(uint16_t)(512u+((uint32_t)v->patch.cutoff*v->patch.cutoff*320u)/100u);
+    v->filter_alpha_q15=filter_alpha_for_cutoff(v->patch.cutoff);
 }
 
 int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *v,int16_t pitch256)
@@ -105,7 +116,10 @@ int fm1lab_synth_set_pitch(fm1lab_synth_voice_t *v,int16_t pitch256)
     if (pitch256 > 127 * 256) pitch256 = 127 * 256;
     v->note=(uint8_t)((uint16_t)pitch256>>8);v->phase_inc=phase_for_pitch256(pitch256);
     uint32_t detune=(uint32_t)v->patch.detune;
-    v->phase_inc_b=(uint32_t)(((uint64_t)v->phase_inc*(1000u+detune*2u))/1000u);
+    if(v->engine==FM1LAB_SYNTH_PSG)
+        v->phase_inc_b=(uint32_t)(((uint64_t)v->phase_inc*(8u+detune*56u))/256u);
+    else
+        v->phase_inc_b=(uint32_t)(((uint64_t)v->phase_inc*(1000u+detune*2u))/1000u);
     return 0;
 }
 
@@ -113,19 +127,38 @@ void fm1lab_synth_note_on(fm1lab_synth_voice_t *v,uint8_t note,uint8_t velocity)
 {
     if(!v||v->engine>=FM1LAB_SYNTH_ENGINE_COUNT||!velocity)return;
     v->velocity=velocity;(void)fm1lab_synth_set_pitch(v,(int16_t)((note>127u?127u:note)*256u));
-    v->phase=0u;v->phase_b=0u;v->envelope_q15=0u;v->gate=1u;v->active=1u;v->filter_state=0;
+    v->phase=0u;v->phase_b=0u;v->noise_phase=0u;
+    v->envelope_q15=0u;v->gate=1u;v->active=1u;v->filter_state=0;v->filter_state2=0;
+    v->envelope_stage=ENV_STAGE_ATTACK;
+    v->envelope_attack_step=envelope_step_for_frames(44u+(uint32_t)v->patch.attack*440u);
+    v->envelope_decay_step=envelope_step_for_frames(4410u);
+    v->envelope_release_step=envelope_step_for_frames(220u+(uint32_t)v->patch.release*440u);
     if(!v->noise)v->noise=0x2ce1u;
 }
-void fm1lab_synth_note_off(fm1lab_synth_voice_t *v){if(v)v->gate=0u;}
+void fm1lab_synth_note_off(fm1lab_synth_voice_t *v){if(v){v->gate=0u;if(v->active)v->envelope_stage=ENV_STAGE_RELEASE;}}
 
 static int32_t envelope_next(fm1lab_synth_voice_t *v)
 {
-    uint32_t attack=64u+(uint32_t)v->patch.attack*1984u/100u;
     uint32_t sustain=(uint32_t)v->patch.sustain*ENV_MAX_Q15/100u;
-    uint32_t release=32u+(uint32_t)v->patch.release*992u/100u;
-    if(v->gate){uint32_t next=(uint32_t)v->envelope_q15+attack;v->envelope_q15=(uint16_t)(next>sustain?sustain:next);}
-    else if(v->envelope_q15)v->envelope_q15=(uint16_t)(v->envelope_q15>release?v->envelope_q15-release:0u);
-    else v->active=0u;
+    if(!v->gate && v->envelope_stage!=ENV_STAGE_RELEASE)v->envelope_stage=ENV_STAGE_RELEASE;
+    switch(v->envelope_stage) {
+    case ENV_STAGE_ATTACK: {
+        uint32_t next=(uint32_t)v->envelope_q15+v->envelope_attack_step;
+        if(next>=ENV_MAX_Q15){v->envelope_q15=ENV_MAX_Q15;v->envelope_stage=ENV_STAGE_DECAY;}
+        else v->envelope_q15=(uint16_t)next;
+        break;
+    }
+    case ENV_STAGE_DECAY:
+        if(v->envelope_q15<=sustain){v->envelope_q15=(uint16_t)sustain;v->envelope_stage=ENV_STAGE_SUSTAIN;}
+        else v->envelope_q15=(uint16_t)(v->envelope_q15-sustain>v->envelope_decay_step?v->envelope_q15-v->envelope_decay_step:sustain);
+        break;
+    case ENV_STAGE_SUSTAIN:v->envelope_q15=(uint16_t)sustain;break;
+    case ENV_STAGE_RELEASE:
+        if(v->envelope_q15<=v->envelope_release_step){v->envelope_q15=0u;v->active=0u;}
+        else v->envelope_q15=(uint16_t)(v->envelope_q15-v->envelope_release_step);
+        break;
+    default:v->envelope_q15=0u;v->active=0u;break;
+    }
     return v->envelope_q15;
 }
 
@@ -171,22 +204,40 @@ static int32_t render_wavetable(fm1lab_synth_voice_t *v)
     v->phase += v->phase_inc;
     return y;
 }
+static void psg_noise_clock(fm1lab_synth_voice_t *v)
+{
+    uint32_t bit=((v->noise>>0)^(v->noise>>1))&1u;
+    v->noise=(v->noise>>1)|(bit<<14);
+    if(!v->noise)v->noise=0x2ce1u;
+}
 static int32_t render_psg(fm1lab_synth_voice_t *v)
 {
-    int32_t pulse=oscillator(v->phase,3u,v->patch.duty);
-    uint32_t bit=((v->noise>>0)^(v->noise>>1))&1u;
-    v->noise=(v->noise>>1)|(bit<<14);v->phase+=v->phase_inc;
+    int32_t tone_a=oscillator(v->phase,3u,v->patch.duty);
+    int32_t tone_b=oscillator(v->phase_b,v->patch.secondary_waveform,v->patch.duty);
+    uint32_t mix=v->patch.osc_mix;
+    int32_t tone=(tone_a*(100-(int32_t)mix)+tone_b*(int32_t)mix)/100;
+    uint32_t old_noise_phase=v->noise_phase;
+    v->noise_phase+=v->phase_inc_b;
+    if(v->noise_phase<old_noise_phase)psg_noise_clock(v);
     int32_t noise=(v->noise&1u)?24576:-24576;
-    return (pulse*(100-v->patch.noise_mix)+noise*v->patch.noise_mix)/100;
+    v->phase+=v->phase_inc;v->phase_b+=v->phase_inc>>1;
+    return (tone*(100-(int32_t)v->patch.noise_mix)+noise*(int32_t)v->patch.noise_mix)/100;
 }
 static int32_t render_subtractive(fm1lab_synth_voice_t *v)
 {
     int32_t a=oscillator(v->phase,v->patch.waveform,v->patch.duty);
     int32_t b=oscillator(v->phase_b,v->patch.secondary_waveform,v->patch.duty);
     int32_t x=(a*(100-v->patch.osc_mix)+b*v->patch.osc_mix)/100;
+    v->phase+=v->phase_inc;v->phase_b+=v->phase_inc_b;
+    /* For subtractive patches noise_mix is the filter-envelope amount. */
+    uint32_t cutoff=(uint32_t)v->patch.cutoff+
+        ((v->envelope_q15*(uint32_t)v->patch.noise_mix)/32767u);
+    v->filter_alpha_q15=filter_alpha_for_cutoff(cutoff);
     int32_t delta=x-v->filter_state;
     v->filter_state+=(int32_t)(((int64_t)delta*v->filter_alpha_q15)>>15);
-    v->phase+=v->phase_inc;v->phase_b+=v->phase_inc_b;return v->filter_state;
+    delta=v->filter_state-v->filter_state2;
+    v->filter_state2+=(int32_t)(((int64_t)delta*v->filter_alpha_q15)>>15);
+    return v->filter_state2;
 }
 
 int fm1lab_synth_render(fm1lab_synth_voice_t *v,int16_t *out,uint32_t frames)

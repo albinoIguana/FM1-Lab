@@ -1,6 +1,7 @@
 #include "fm1lab_dx7_preset.h"
 #include "fm1lab_dx7_data.h"
 #include "fm1lab_input_dispatch.h"
+#include "fm1lab_synth_engines.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -95,6 +96,15 @@ int main(void)
         assert(instrument.patches[patch].voice[155]==(uint8_t)(80u+patch));
         assert(instrument.patches[patch].macros[0]==23u);
         fm1lab_synth_patch_t first=instrument.patches[patch].synth_patch;
+        fm1lab_synth_engine_t engine=patch==1u?FM1LAB_SYNTH_WAVETABLE:
+            patch==2u?FM1LAB_SYNTH_PSG:FM1LAB_SYNTH_SUBTRACTIVE;
+        fm1lab_synth_voice_t dsp; int16_t dsp_audio[256];
+        fm1lab_synth_init(&dsp,engine);
+        assert(fm1lab_synth_set_patch(&dsp,&first)==0);
+        fm1lab_synth_note_on(&dsp,60u,127u);
+        assert(fm1lab_synth_render(&dsp,dsp_audio,256u)==0);
+        uint32_t dsp_hash=0u;for(unsigned n=0;n<256u;n++)dsp_hash=(dsp_hash^(uint16_t)dsp_audio[n])*16777619u;
+        assert(dsp_hash!=0u);
         assert(fm1lab_engine_patch_preset_step(&instrument,patch,next,1,&next)
             ==FM1LAB_DX7_PRESET_OK);
         assert(next==1u);

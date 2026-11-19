@@ -33,9 +33,15 @@ typedef struct {
     uint32_t phase_inc;
     uint32_t phase_inc_b;
     uint32_t noise;
+    uint32_t noise_phase;
     int32_t filter_state;
+    int32_t filter_state2;
     uint16_t envelope_q15;
+    uint16_t envelope_attack_step;
+    uint16_t envelope_decay_step;
+    uint16_t envelope_release_step;
     uint16_t filter_alpha_q15;
+    uint8_t envelope_stage;
     fm1lab_synth_patch_t patch;
     uint8_t engine;
     uint8_t note;

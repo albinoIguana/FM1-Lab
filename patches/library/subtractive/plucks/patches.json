@@ -1,6 +1,24 @@
 {
   "engine": "subtractive",
   "patches": [
-    {"patch_id":"SUB-004","name":"SYNC PLUK","category":"plucks","source":"FM1-Lab original","license":"GPL-3.0-only","parameters":{"waveform":3,"secondary_waveform":2,"duty":40,"noise_mix":0,"osc_mix":55,"detune":22,"cutoff":70,"attack":0,"sustain":35,"release":28}}
+    {
+      "patch_id": "SUB-004",
+      "name": "SYNC PLUK",
+      "category": "plucks",
+      "source": "FM1-Lab original",
+      "license": "GPL-3.0-only",
+      "parameters": {
+        "waveform": 3,
+        "secondary_waveform": 2,
+        "duty": 40,
+        "noise_mix": 80,
+        "osc_mix": 55,
+        "detune": 22,
+        "cutoff": 70,
+        "attack": 0,
+        "sustain": 35,
+        "release": 28
+      }
+    }
   ]
 }
